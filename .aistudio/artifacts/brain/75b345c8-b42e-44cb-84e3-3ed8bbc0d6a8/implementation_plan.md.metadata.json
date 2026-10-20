@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan de implementación para el nuevo sistema de bloqueo y autenticación Zero-Trust para el dashboard de recursos. Sustituye el sistema anterior por un esquema criptográfico HMAC-SHA256 con cookies seguras HttpOnly, emparejamiento automático en red local (LAN), persistencia para acceso posterior desde datos móviles (WAN), escudo contra fuerza bruta con retardo exponencial y panel de gestión/revocación de dispositivos en la interfaz web.",
+  "updatedAt":  "2026-10-20T21:03:22.576016946Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
