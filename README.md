@@ -87,16 +87,27 @@ Desde la vista **`/version`** o mediante el botón de actualización en la cabec
 
 ---
 
+### 6. 🏷️ Control de Versión Unificado y Archivo Canónico (`VERSION`)
+El proyecto sigue una estricta política de versionado unificado que elimina por completo los números de versión duplicados o hardcodeados en el código:
+- **Punto Único de Verdad**: La versión activa reside exclusivamente en el archivo de texto plano [`VERSION`](file:///home/servidor/servicios/dashboard/VERSION) en la raíz del proyecto.
+- **Distribución Dinámica**: `server.py` lee este archivo en tiempo real mediante `get_app_version()` y lo propaga a través de `/api/metrics` y `/api/version`.
+- **Propagación en el Frontend**: La interfaz actualiza de inmediato todos los elementos visibles (badge del sidebar, botón de cabecera, tarjeta Bento en Vista General y la pantalla `/version`) con el valor de la API, previniendo incoherencias entre la interfaz y el servidor.
+- **Sincronización con `package.json`**: Se mantiene idéntico valor en `package.json` para coherencia del ecosistema de dependencias.
+
+---
+
 ## 🛠️ Estructura del Proyecto
 
 ```text
 /home/servidor/servicios/dashboard/
+├── VERSION                    # Punto único de verdad de la versión semántica activa
 ├── server.py                  # Servidor HTTP/API Python 3 (Zero-Trust Dual-Token, Telemetría, OTA)
 ├── static/
 │   ├── index.html             # Interfaz Web Multi-Página (Diseño Nativo Nextcloud Hub 9/10)
 │   └── visipics_externo.rdp   # Plantilla RDP externa (inyectada al vuelo con dominio dinámico)
 ├── index.html                 # Espejo sincronizado para previsualización en Google AI Studio
 ├── update.sh                  # Script CLI de sincronización rápida con GitHub y reinicio systemd
+├── package.json               # Metadatos del proyecto sincronizados con VERSION
 ├── planes/                    # Historial, Planes de Implementación y Walkthroughs
 │   ├── README.md              # Documentación y directrices de la carpeta planes
 │   ├── implementation_plan.md # Plan de implementación activo o más reciente
@@ -110,12 +121,13 @@ Desde la vista **`/version`** o mediante el botón de actualización en la cabec
 
 ## 📋 Reglas Operativas de Sincronización y Desarrollo
 
-Para garantizar la coherencia absoluta entre el servidor local, el repositorio de GitHub y el entorno móvil de Google AI Studio, el proyecto sigue cuatro reglas obligatorias estipuladas en `GEMINI.md`:
+Para garantizar la coherencia absoluta entre el servidor local, el repositorio de GitHub y el entorno móvil de Google AI Studio, el proyecto sigue cinco reglas obligatorias estipuladas en `GEMINI.md`:
 
 1. **Sincronización Previa (`git pull`)**: Siempre se ejecuta `git pull origin main` antes de realizar cualquier cambio en el código o responder solicitudes de edición.
 2. **Publicación Automática (`git push`)**: Cualquier cambio en el backend, la web o los archivos de configuración se confirma con un commit descriptivo y se envía de inmediato a `origin main`.
 3. **Almacenamiento de Planes y Walkthroughs (`planes/`)**: Todos los planes de implementación (`implementation_plan.md`), archivos de recorrido/resumen (`walkthrough.md`), bitácoras y registros de pruebas se almacenan obligatoriamente en la carpeta `planes/`.
 4. **Mantenimiento Continuo del README (`README.md`)**: El archivo `README.md` se actualiza obligatoriamente en cada intervención para reflejar con exactitud las características y cambios implementados.
+5. **Control de Versión Unificado (`VERSION`)**: Se identifica la versión al inicio de cualquier tarea y se incrementa en `VERSION` (y `package.json`) al concluir antes de hacer el commit y push.
 
 ---
 

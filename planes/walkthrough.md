@@ -46,20 +46,27 @@ Se ha diagnosticado y resuelto el fallo que impedía que el dashboard cargara co
   - Integración de iframe (`.in-nextcloud`): Altura ajustada a `100%` para eliminar barras de desplazamiento duplicadas y márgenes dobles.
   - Soporte de navegación por hash (`#security`, `#overview`) para sincronizar con los enlaces externos de Nextcloud.
 
-### 3. Documentación y Reglas Operativas
+### 3. Sistema de Versionado Centralizado (`VERSION`) y Regla 5
+- **Archivo Canónico [`VERSION`](file:///home/servidor/servicios/dashboard/VERSION)**: Creado en la raíz del proyecto para definir de forma única la versión semántica de la aplicación (`2.2.0`).
+- **Backend dinámico**: `server.py` lee `VERSION` mediante `get_app_version()` y lo propaga a través de `/api/version` y `/api/metrics`.
+- **Frontend unificado**: `static/index.html` e `index.html` vinculan reactivamente todos los badges y tarjetas (sidebar, cabecera, vista general y `/version`) al valor provisto por la API, erradicando cadenas hardcodeadas.
+- **Regla 5 en [`GEMINI.md`](file:///home/servidor/servicios/dashboard/GEMINI.md)**: Establecida la obligación de identificar la versión al iniciar una tarea e incrementarla al finalizar antes de confirmar el commit.
+
+### 4. Documentación y Reglas Operativas
 - **Regla 4 en [GEMINI.md](file:///home/servidor/servicios/dashboard/GEMINI.md)**: Registrada la obligatoriedad de mantener actualizado `README.md` en cada modificación técnica o de diseño.
-- **[README.md](file:///home/servidor/servicios/dashboard/README.md)**: Actualizado por completo con la documentación de diseño Nextcloud Hub 9/10, arquitectura Dual-Token Zero-Trust (`X-Device-Token` + Partitioned Cookie), matriz de 12 rutas web y árbol de directorios con `planes/`.
+- **[README.md](file:///home/servidor/servicios/dashboard/README.md)**: Actualizado por completo con la documentación de diseño Nextcloud Hub 9/10, arquitectura Dual-Token Zero-Trust (`X-Device-Token` + Partitioned Cookie), matriz de 12 rutas web y árbol de directorios con `planes/` y `VERSION`.
 
 ---
 
 ## Verificación Realizada
 
-1. **Prueba de cabeceras CSP vía HTTPS (Caddy)**:
+1. **Prueba de versión unificada vía API**:
+   - `curl -s http://127.0.0.1:8085/api/version` devolvió `{"version": "2.2.0", ...}` leyendo directamente de `VERSION`.
+   - Consulta de `/api/metrics` confirmó que `version_info.version` es `2.2.0`.
+2. **Prueba de cabeceras CSP vía HTTPS (Caddy)**:
    - `curl -s -k -I https://recursos.cminewar.duckdns.org/` confirmó que `frame-ancestors` incluye `https://cminewar.duckdns.org` y subdominios.
-2. **Prueba de rutas**:
+3. **Prueba de rutas**:
    - `/descargas`, `/version` y `/seguridad` devuelven `HTTP/2 200 OK`.
-3. **Prueba de autenticación**:
-   - `/api/metrics` genera y valida tokens vía `X-Device-Token` y Cookie HttpOnly.
 4. **Servicio y Git**:
    - `system-dashboard.service` reiniciado y en ejecución activa.
    - Sincronización continua de código y documentación en GitHub (`cminewarIA/recursos-ui`, rama `main`).

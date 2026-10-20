@@ -311,6 +311,32 @@ def resolve_request_domain(handler=None):
                 return host_clean
     return sys_dom
 
+def get_app_version():
+    """
+    Lee la versión oficial canónica desde el archivo centralizado VERSION en la raíz del proyecto.
+    Si no existe o falla la lectura, recurre a package.json o al valor base.
+    """
+    v_file = os.path.join(BASE_DIR, "VERSION")
+    if os.path.isfile(v_file):
+        try:
+            with open(v_file, "r", encoding="utf-8") as vf:
+                v = vf.read().strip()
+                if v:
+                    return v
+        except Exception:
+            pass
+
+    pkg_path = os.path.join(BASE_DIR, "package.json")
+    if os.path.isfile(pkg_path):
+        try:
+            with open(pkg_path, "r", encoding="utf-8") as pf:
+                pkg_json = json.load(pf)
+                return pkg_json.get("version", "2.1.0")
+        except Exception:
+            pass
+
+    return "2.1.0"
+
 def get_version_info(force_refresh=False):
     """
     Obtiene la versión actual instalada localmente (Git commit, fecha, versión semántica)
@@ -321,15 +347,8 @@ def get_version_info(force_refresh=False):
         if not force_refresh and VERSION_CACHE["data"] and (now - VERSION_CACHE["timestamp"] < 90):
             return dict(VERSION_CACHE["data"])
 
-    pkg_version = "2.0.0"
-    pkg_path = os.path.join(BASE_DIR, "package.json")
-    if os.path.isfile(pkg_path):
-        try:
-            with open(pkg_path, "r", encoding="utf-8") as pf:
-                pkg_json = json.load(pf)
-                pkg_version = pkg_json.get("version", "2.0.0")
-        except Exception:
-            pass
+    pkg_version = get_app_version()
+
 
     local_sha = "desconocido"
     local_full_sha = ""
@@ -2822,8 +2841,12 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
 
             index_path = os.path.join(STATIC_DIR, "index.html")
             try:
-                with open(index_path, 'rb') as f:
-                    content = f.read()
+                with open(index_path, 'r', encoding='utf-8') as f:
+                    content_str = f.read()
+                current_ver = get_app_version()
+                # Reemplazo de marcadores de versión para carga instantánea coherente
+                content_str = content_str.replace('id="sidebarVersionTag">v2.0<', f'id="sidebarVersionTag">v{current_ver}<')
+                content = content_str.encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
                 self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')

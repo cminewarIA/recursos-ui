@@ -2390,6 +2390,7 @@
                 <div>
                   <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     <h2 style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em; color: #F8FAFC;">Gestor de Versiones & Actualización GitHub</h2>
+                    <span class="adw-badge badge-blue" id="verHeaderVersionBadge" style="font-family: var(--font-mono); font-weight: 700;">v2.1.0</span>
                     <span class="adw-badge badge-green" id="verStatusBadge">Comprobando...</span>
                   </div>
                   <p style="font-size: 12.5px; color: var(--adw-text-secondary); margin-top: 4px;">
@@ -2417,7 +2418,10 @@
               <div class="adw-card" style="padding: 18px 20px; background: rgba(11, 15, 23, 0.55); border: 1px solid rgba(148, 163, 184, 0.14);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                   <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--adw-text-dim);">Versión Local Instalada</span>
-                  <span class="adw-badge badge-blue" id="verLocalBranch">main</span>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <span class="adw-badge badge-blue" id="verAppSemanticVersion" style="font-weight: 700; font-family: var(--font-mono);">v2.1.0</span>
+                    <span class="adw-badge" id="verLocalBranch" style="background: rgba(255,255,255,0.06); color: var(--adw-text-secondary);">main</span>
+                  </div>
                 </div>
                 <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px;">
                   <code style="font-size: 22px; font-weight: 700; font-family: var(--font-mono); color: #F8FAFC; letter-spacing: -0.02em;" id="verLocalHash">-------</code>
@@ -3237,31 +3241,49 @@
 
     function renderVersionInfo(info) {
       if (!info) return;
+      const rawVer = info.version || '2.1.0';
+      const semVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
       const localHash = info.local_hash || '-------';
       const remoteHash = info.remote_hash || localHash;
       const hasUpdate = Boolean(info.update_available);
       const behindCount = info.behind_count || 0;
 
-      // Sidebar & Header Badges
+      // 1. Sidebar Top Logo Version Tag
+      const sideVerTag = document.getElementById('sidebarVersionTag');
+      if (sideVerTag) sideVerTag.innerText = semVer;
+
+      // 2. Sidebar Navigation Badge
       const badgeNavVer = document.getElementById('badgeNavVersion');
       if (badgeNavVer) {
-        badgeNavVer.innerText = hasUpdate ? `↑ ${remoteHash}` : `v•${localHash}`;
+        badgeNavVer.innerText = hasUpdate ? `↑ ${remoteHash}` : `${semVer} • ${localHash}`;
         badgeNavVer.className = 'nav-badge ' + (hasUpdate ? 'badge-amber' : 'badge-green');
       }
 
+      // 3. Header Action Button
       const dotVerHeader = document.getElementById('dotVersionHeader');
       const lblVerHeader = document.getElementById('lblVersionHeader');
       if (dotVerHeader && lblVerHeader) {
         dotVerHeader.style.background = hasUpdate ? 'var(--adw-amber)' : 'var(--adw-green)';
         dotVerHeader.style.boxShadow = hasUpdate ? '0 0 8px var(--adw-amber)' : '0 0 6px var(--adw-green)';
-        lblVerHeader.innerText = hasUpdate ? `Actualizar (${remoteHash})` : `v•${localHash}`;
+        lblVerHeader.innerText = hasUpdate ? `Actualizar (${remoteHash})` : `${semVer} • ${localHash}`;
       }
 
+      // 4. Overview Bento Card
+      const ovVersionCommit = document.getElementById('ovVersionCommit');
+      if (ovVersionCommit) {
+        ovVersionCommit.innerText = `${semVer} • ${localHash}`;
+      }
       const ovBadgeGitVersion = document.getElementById('ovBadgeGitVersion');
       if (ovBadgeGitVersion) {
         ovBadgeGitVersion.className = 'adw-badge ' + (hasUpdate ? 'badge-amber' : 'badge-purple');
-        ovBadgeGitVersion.innerText = hasUpdate ? `⚡ Nueva versión: ${remoteHash}` : `Git: ${localHash} (Al día)`;
+        ovBadgeGitVersion.innerText = hasUpdate ? `⚡ Nueva versión: ${remoteHash}` : `Git: ${localHash} (${semVer})`;
       }
+
+      // 5. Version View Semantic Badges
+      const verAppSemanticVersion = document.getElementById('verAppSemanticVersion');
+      if (verAppSemanticVersion) verAppSemanticVersion.innerText = semVer;
+      const verHeaderVersionBadge = document.getElementById('verHeaderVersionBadge');
+      if (verHeaderVersionBadge) verHeaderVersionBadge.innerText = semVer;
 
       // Main Version Page Elements
       const verStatusBadge = document.getElementById('verStatusBadge');
@@ -4733,6 +4755,12 @@
             const badgeNavSec = document.getElementById('badgeNavSec');
             if (badgeNavSec) {
               badgeNavSec.innerText = `${f2b.currently_banned || 0} bans`;
+            }
+
+            // Sincronización continua de Versión Canónica del Sistema
+            if (data.version_info) {
+              latestVersionInfo = data.version_info;
+              renderVersionInfo(data.version_info);
             }
 
             // Descargas & Videoteca Overview Card
