@@ -2624,8 +2624,8 @@
               <!-- Card 2: Credencial y Script -->
               <div class="adw-card" style="padding: 18px 20px; background: rgba(11, 15, 23, 0.55); border: 1px solid rgba(14, 165, 233, 0.22);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--adw-blue);">Token & Configuración</span>
-                  <button class="btn-header" style="height: 22px; padding: 0 8px; font-size: 10.5px;" onclick="openDuckConfigModal()">Editar ✏️</button>
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--adw-blue);">Token & Script</span>
+                  <span class="adw-badge badge-blue" style="font-size: 10px;">Solo Lectura</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <code style="font-size: 13px; font-family: var(--font-mono); color: #E2E8F0; background: rgba(255,255,255,0.06); padding: 4px 8px; border-radius: 6px;" id="dnsCardToken">••••••••••••••••</code>
@@ -2725,15 +2725,14 @@
             </div>
           </div>
 
-          <!-- Guía para Añadir Otras DNS / Dominios Dinámicos -->
+          <!-- Guía DuckDNS y Panel Oficial -->
           <div class="adw-group">
-            <div class="adw-group-title">Añadir Subdominios o Proveedores DNS Adicionales</div>
+            <div class="adw-group-title">Gestión de Dominios DuckDNS</div>
             <div class="adw-card" style="padding: 18px 20px;">
               <p style="font-size: 13px; color: var(--adw-text-secondary); line-height: 1.5; margin-bottom: 12px;">
-                DuckDNS permite vincular <strong>múltiples subdominios</strong> a la misma IP pública bajo una misma cuenta. Para añadir dominios adicionales, edita la configuración y escribe los nombres separados por comas (por ejemplo: <code style="font-family: var(--font-mono); color: var(--adw-blue);">cminewar,subdominio2,backup</code>).
+                Por motivos de seguridad y estabilidad del sistema, la configuración del dominio y token está fijada en el script local (<code style="font-family: var(--font-mono); color: var(--adw-blue);">/home/servidor/servicios/duckdns/duck.sh</code>). Para dar de alta subdominios adicionales o gestionar tu cuenta, puedes acceder al panel oficial de DuckDNS.
               </p>
               <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button class="btn-header" onclick="openDuckConfigModal()">⚙️ Editar Dominios en DuckDNS</button>
                 <a href="https://www.duckdns.org" target="_blank" rel="noopener" class="btn-header" style="text-decoration: none;">
                   Panel Oficial DuckDNS.org ↗
                 </a>
@@ -2832,41 +2831,6 @@
     </div>
   </div>
 
-  <!-- Modal Configuración DuckDNS -->
-  <div class="modal-overlay" id="duckConfigModal" onclick="if(event.target===this) closeDuckConfigModal()">
-    <div class="adw-dialog" style="max-width: 480px;">
-      <div class="adw-dialog-header">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div class="app-icon-squircle" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(14, 165, 233, 0.14); color: var(--adw-blue);">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
-          </div>
-          <div>
-            <h3 style="font-size: 15px; font-weight: 700; color: var(--color-main-text); letter-spacing: -0.01em;">Configuración de DuckDNS</h3>
-            <div style="font-size: 11px; color: var(--adw-text-dim);">Actualización directa en duck.sh</div>
-          </div>
-        </div>
-        <button class="adw-dialog-close" onclick="closeDuckConfigModal()">✕</button>
-      </div>
-      <div class="adw-dialog-body" style="padding: 18px 20px;">
-        <div style="margin-bottom: 14px;">
-          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--color-text-dim); margin-bottom: 6px;">
-            Subdominio(s) DuckDNS (ej: cminewar o cminewar,sub2):
-          </label>
-          <input type="text" id="inputDuckDomain" class="adw-input" style="width: 100%; box-sizing: border-box;" placeholder="cminewar">
-        </div>
-        <div style="margin-bottom: 18px;">
-          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--color-text-dim); margin-bottom: 6px;">
-            Token Secreto DuckDNS (UUID):
-          </label>
-          <input type="text" id="inputDuckToken" class="adw-input" style="width: 100%; box-sizing: border-box; font-family: var(--font-mono);" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
-        </div>
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button class="btn-header" onclick="closeDuckConfigModal()">Cancelar</button>
-          <button class="btn-header primary-cta" id="btnSaveDuckConfig" onclick="saveDuckDnsConfigFromModal()">Guardar en duck.sh</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <div id="appToast" style="position: fixed; bottom: 20px; right: 20px; z-index: 2500; padding: 12px 16px; border-radius: 10px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(14, 165, 233, 0.35); color: #F8FAFC; font-size: 12.5px; font-weight: 600; box-shadow: 0 16px 40px rgba(0,0,0,0.6); backdrop-filter: blur(12px); display: none; align-items: center; gap: 10px; max-width: 380px;">
     <span id="appToastIcon">✔</span>
@@ -2967,6 +2931,17 @@
       dns: 'DNS, DuckDNS & Tráfico por IP',
       version: 'Versión & Actualización GitHub'
     };
+
+    // Helper para escapar cadenas de texto en HTML de forma segura contra XSS y ReferenceErrors
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
     // Toast Notification & Modal Confirm Helpers (Sin alert/confirm bloqueantes)
     let toastTimeout = null;
@@ -3790,57 +3765,6 @@
       } finally {
         if (btn) btn.disabled = false;
         if (lbl) lbl.innerText = '⚡ Forzar Actualización DuckDNS';
-      }
-    }
-
-    function openDuckConfigModal() {
-      const modal = document.getElementById('duckConfigModal');
-      const inDom = document.getElementById('inputDuckDomain');
-      const inTok = document.getElementById('inputDuckToken');
-      if (currentDuckData) {
-        if (inDom) inDom.value = currentDuckData.domain || 'cminewar';
-        if (inTok) inTok.value = currentDuckData.token || '';
-      }
-      if (modal) modal.classList.add('open');
-    }
-
-    function closeDuckConfigModal() {
-      const modal = document.getElementById('duckConfigModal');
-      if (modal) modal.classList.remove('open');
-    }
-
-    async function saveDuckDnsConfigFromModal() {
-      const inDom = document.getElementById('inputDuckDomain');
-      const inTok = document.getElementById('inputDuckToken');
-      const domainVal = inDom ? inDom.value.trim() : '';
-      const tokenVal = inTok ? inTok.value.trim() : '';
-
-      if (!domainVal || !tokenVal) {
-        showToast('Por favor completa el subdominio y el token', 'error');
-        return;
-      }
-
-      const btn = document.getElementById('btnSaveDuckConfig');
-      if (btn) btn.disabled = true;
-
-      try {
-        const res = await fetch('/api/dns/duckdns/config', {
-          method: 'POST',
-          headers: authHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ domain: domainVal, token: tokenVal })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          showToast('Configuración guardada en duck.sh', 'success');
-          closeDuckConfigModal();
-          loadDuckDnsStatus(true);
-        } else {
-          showToast(data.message || 'Error guardando configuración', 'error');
-        }
-      } catch (e) {
-        showToast('Fallo al conectar con el servidor', 'error');
-      } finally {
-        if (btn) btn.disabled = false;
       }
     }
 

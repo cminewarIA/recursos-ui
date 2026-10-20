@@ -99,11 +99,11 @@ El proyecto sigue una estricta política de versionado unificado que elimina por
 
 ### 7. 🌐 Gestor DNS, DuckDNS en Vivo & Telemetría de Tráfico por IP
 En la vista **`/dns`** se integran las herramientas de dominio dinámico y monitorización de red:
-- **Control Directo de DuckDNS**:
-  - Lectura en vivo del script `/home/servidor/servicios/duckdns/duck.sh`.
+- **Control y Telemetría de DuckDNS**:
+  - Lectura en vivo del script `/home/servidor/servicios/duckdns/duck.sh` (modo protegido de solo lectura).
   - Comparativa en tiempo real entre la IP pública activa y la IP registrada en DuckDNS (`last_ip.txt`).
   - Botón **"⚡ Forzar Actualización DuckDNS"** (`POST /api/dns/duckdns/update`) para sincronizar de inmediato la IP pública sin esperar al cron de 5 minutos.
-  - Editor modal de subdominios y token (`POST /api/dns/duckdns/config`) con soporte para múltiples dominios separados por comas.
+  - Credenciales protegidas con visualización de token enmascarado y sanitización HTML segura contra XSS (`escapeHtml`).
 - **Consola de Logs en Pantalla (`duck.log`)**:
   - Visor interactivo de terminal (`GET /api/dns/logs`) con recarga automática cada 10 segundos y resaltado sintáctico de cambios de IP, heartbeats y errores.
 - **Monitor de Tráfico DNS & Servicios por Dispositivo (Pi-hole FTL)**:

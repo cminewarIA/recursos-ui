@@ -1823,33 +1823,6 @@ def update_duckdns_now():
     except Exception as e:
         return {"success": False, "message": str(e)}
 
-def save_duckdns_config(new_domain, new_token):
-    if not new_domain or not new_token:
-        return {"success": False, "message": "Dominio y Token requeridos"}
-    clean_domain = re.sub(r'[^a-zA-Z0-9_-]', '', new_domain.strip())
-    clean_token = re.sub(r'[^a-zA-Z0-9_-]', '', new_token.strip())
-    if not clean_domain or not clean_token:
-        return {"success": False, "message": "Dominio o Token inválido"}
-
-    if not os.path.isfile(DUCKDNS_SCRIPT):
-        return {"success": False, "message": "Script duck.sh no encontrado"}
-
-    try:
-        with open(DUCKDNS_SCRIPT, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        with open(DUCKDNS_SCRIPT + ".bak", "w", encoding="utf-8") as bf:
-            bf.write(content)
-
-        new_content = re.sub(r'DOMAIN=["\']?.*?["\']?', f'DOMAIN="{clean_domain}"', content, count=1)
-        new_content = re.sub(r'TOKEN=["\']?.*?["\']?', f'TOKEN="{clean_token}"', new_content, count=1)
-
-        with open(DUCKDNS_SCRIPT, "w", encoding="utf-8") as f:
-            f.write(new_content)
-
-        return {"success": True, "message": "Configuración guardada correctamente en duck.sh"}
-    except Exception as e:
-        return {"success": False, "message": f"Error al guardar configuración: {e}"}
 
 def get_dns_traffic_stats(client_filter=None, limit=50):
     db_path = "/etc/pihole/pihole-FTL.db"
@@ -3766,30 +3739,6 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             res = update_duckdns_now()
-            resp = json.dumps(res).encode('utf-8')
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_security_headers()
-            self.send_header('Content-Length', str(len(resp)))
-            self.end_headers()
-            self.wfile.write(resp)
-            return
-
-        # 8. Guardar configuración de DuckDNS (dominio / token)
-        elif self.path in ("/api/dns/duckdns/config", "/api/duckdns/config"):
-            auth = check_trust_status(self)
-            if not auth["is_trusted"]:
-                self.send_response(403)
-                self.send_security_headers()
-                self.end_headers()
-                return
-            try:
-                content_length = int(self.headers.get('Content-Length', 0))
-                body = self.rfile.read(content_length).decode('utf-8')
-                data = json.loads(body)
-                res = save_duckdns_config(data.get("domain"), data.get("token"))
-            except Exception as e:
-                res = {"success": False, "message": f"Error procesando solicitud: {e}"}
             resp = json.dumps(res).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
