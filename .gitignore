@@ -17,6 +17,8 @@ venv/
 
 # Datos y sesiones locales sensibles
 trusted_devices.json
+.auth_secret
+.aistudio/
 .env*
 !.env.example
 

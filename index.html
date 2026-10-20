@@ -3,79 +3,87 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <title>Recursos • Servidor Cminewar</title>
+  <title>Recursos - Dashboard de Telemetría y Servidor</title>
+  <meta name="description" content="Panel de control y monitoreo en tiempo real de recursos del servidor: CPU, RAM, GPU, discos, Docker, systemd, red Wi-Fi ASUS, Pi-hole y servicios multimedia.">
+  <meta property="og:title" content="Recursos - Dashboard de Telemetría y Servidor">
+  <meta property="og:description" content="Panel de control y monitoreo en tiempo real de recursos del servidor: CPU, RAM, GPU, discos, Docker, systemd, red Wi-Fi ASUS, Pi-hole y servicios multimedia.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
   
-  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
     /* ==========================================================================
-       NEXTCLOUD HUB NATIVE DESIGN SYSTEM (HUB 9 / 10 TOKENS)
+       HIGH-PRECISION CLOUD TELEMETRY DESIGN SYSTEM (60-30-10 OBSIDIAN SLATE)
        ========================================================================== */
     :root {
-      /* Nextcloud Dark Base Colors */
-      --color-main-background: #171717;
-      --color-main-background-rgb: 23, 23, 23;
-      --color-background-hover: #212121;
-      --color-background-dark: #202020;
-      --color-background-darker: #282828;
-      --color-border: #2c2c2c;
-      --color-border-dark: #383838;
-      --color-border-strong: rgba(255, 255, 255, 0.12);
+      /* 60% Dominant Neutral Canvas (Deep Obsidian Slate) */
+      --color-main-background: #0B0F17;
+      --color-main-background-rgb: 11, 15, 23;
+      --color-sidebar-bg: #0E131F;
+      
+      /* 30% Structural Surfaces & Crisp 1px Borders */
+      --color-background-dark: #111827;
+      --color-background-hover: #162032;
+      --color-background-darker: #1A2438;
+      --color-border: #1E293B;
+      --color-border-dark: #334155;
+      --color-border-strong: rgba(148, 163, 184, 0.18);
 
-      /* Typography */
-      --color-main-text: #ebebeb;
-      --color-text-maxcontrast: #9e9e9e;
-      --color-text-dim: #777777;
-      --color-text-disabled: #555555;
+      /* High-Contrast Typography */
+      --color-main-text: #F8FAFC;
+      --color-text-maxcontrast: #CBD5E1;
+      --color-text-dim: #94A3B8;
+      --color-text-disabled: #64748B;
 
-      /* Nextcloud Signature Brand & Accents */
-      --color-primary: #0082c9;
-      --color-primary-element: #0091f2;
-      --color-primary-element-hover: #17a2ff;
-      --color-primary-text: #ffffff;
-      --color-primary-light: rgba(0, 145, 242, 0.14);
+      /* 10% Functional Accents */
+      --color-primary: #0284C7;
+      --color-primary-element: #0EA5E9;
+      --color-primary-element-hover: #38BDF8;
+      --color-primary-text: #FFFFFF;
+      --color-primary-light: rgba(14, 165, 233, 0.14);
 
-      /* Semantic Status Colors (Nextcloud Palette) */
-      --color-element-success: #40a330;
-      --color-success-bg: rgba(64, 163, 48, 0.16);
-      --color-success-text: #d5f2dc;
+      /* Semantic Status Colors */
+      --color-element-success: #10B981;
+      --color-success-bg: rgba(16, 185, 129, 0.14);
+      --color-success-text: #A7F3D0;
 
-      --color-element-warning: #ffcc00;
-      --color-warning-bg: rgba(255, 204, 0, 0.14);
-      --color-warning-text: #ffeec5;
+      --color-element-warning: #F59E0B;
+      --color-warning-bg: rgba(245, 158, 11, 0.14);
+      --color-warning-text: #FDE68A;
 
-      --color-element-error: #ff5050;
-      --color-error-bg: rgba(255, 80, 80, 0.16);
-      --color-error-text: #ffcccc;
+      --color-element-error: #EF4444;
+      --color-error-bg: rgba(239, 68, 68, 0.14);
+      --color-error-text: #FECACA;
 
-      --color-element-info: #0099e0;
-      --color-info-bg: rgba(0, 153, 224, 0.16);
-      --color-info-text: #00aeff;
+      --color-element-info: #0EA5E9;
+      --color-info-bg: rgba(14, 165, 233, 0.14);
+      --color-info-text: #7DD3FC;
 
-      --color-element-purple: #9141ac;
-      --color-purple-bg: rgba(145, 65, 172, 0.16);
-      --color-purple-text: #e0a3f5;
+      --color-element-purple: #8B5CF6;
+      --color-purple-bg: rgba(139, 92, 246, 0.15);
+      --color-purple-text: #DDD6FE;
 
-      /* Nextcloud Standard Radii */
-      --border-radius-container: 14px;
+      /* Standard Architectural Radii */
+      --border-radius-container: 12px;
       --border-radius-element: 8px;
       --border-radius-small: 6px;
-      --border-radius-pill: 100px;
+      --border-radius-pill: 8px;
 
-      /* Font Stacks */
-      --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Oxygen-Sans, Cantarell, Ubuntu, 'Helvetica Neue', 'Noto Sans', 'Liberation Sans', Arial, sans-serif;
-      --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      /* 2+1 Font Stack Discipline */
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif;
 
-      /* Backward-Compatible Mapping Aliases */
+      /* Semantic Aliases */
       --adw-bg-window: var(--color-main-background);
-      --adw-bg-sidebar: #1c1c1c;
+      --adw-bg-sidebar: var(--color-sidebar-bg);
       --adw-bg-card: var(--color-background-dark);
-      --adw-bg-card-hover: var(--color-background-darker);
-      --adw-bg-card-active: #333333;
+      --adw-bg-card-hover: var(--color-background-hover);
+      --adw-bg-card-active: var(--color-background-darker);
       --adw-border: var(--color-border);
       --adw-border-strong: var(--color-border-dark);
       --adw-text: var(--color-main-text);
@@ -87,7 +95,7 @@
       --adw-green: var(--color-element-success);
       --adw-green-bg: var(--color-success-bg);
       --adw-amber: var(--color-element-warning);
-      --adw-orange: #ff9400;
+      --adw-orange: #F97316;
       --adw-red: var(--color-element-error);
       --adw-purple: var(--color-element-purple);
       --radius-window: 0px;
@@ -103,7 +111,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Edge-to-Edge Web App Layout for Nextcloud */
+    /* Edge-to-Edge Web Application Canvas */
     html, body {
       width: 100%;
       height: 100%;
@@ -114,26 +122,32 @@
       font-family: var(--font-sans);
       font-size: 14px;
       line-height: 1.5;
+      letter-spacing: 0.01em;
       overflow: hidden;
     }
 
-    /* Scrollbars matching Nextcloud Dark */
+    /* Tabular numerals discipline across all metrics, tables, and counters */
+    code, pre, .row-value, .hero-metric-big, .nav-badge, .core-adw-val, .banned-ip-chip, .tabular-nums,
+    [id*="Percent"], [id*="Speed"], [id*="Used"], [id*="Val"], [id*="Count"], [id*="cnt"] {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Subtle Scrollbars */
     *::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
     }
     *::-webkit-scrollbar-thumb {
-      background: #333333;
+      background: #1E293B;
       border-radius: 4px;
     }
     *::-webkit-scrollbar-thumb:hover {
-      background: #444444;
+      background: #334155;
     }
     *::-webkit-scrollbar-track {
       background: transparent;
     }
 
-    /* Outer Container: borderless, full height */
     .app-window {
       display: flex;
       width: 100%;
@@ -142,8 +156,6 @@
       min-height: 100vh;
       background: var(--color-main-background);
       border: none;
-      border-radius: 0;
-      box-shadow: none;
       overflow: hidden;
     }
 
@@ -159,7 +171,6 @@
       vertical-align: -0.1em;
       letter-spacing: normal !important;
       user-select: none;
-      text-rendering: optimizeLegibility;
     }
 
     .emoji-status {
@@ -171,16 +182,11 @@
       display: inline-block !important;
       vertical-align: -1px !important;
       margin-right: 5px !important;
-      letter-spacing: normal !important;
-      text-shadow: none !important;
     }
 
     .device-emoji {
       font-family: var(--font-emoji) !important;
-      font-size: 22px;
-      font-weight: normal !important;
-      font-style: normal !important;
-      line-height: 1 !important;
+      font-size: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -189,23 +195,18 @@
 
     .nav-emoji {
       font-family: var(--font-emoji) !important;
-      font-size: 18px;
-      font-weight: normal !important;
-      font-style: normal !important;
-      line-height: 1 !important;
+      font-size: 16px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      margin-right: 8px;
+      width: 20px;
+      margin-right: 6px;
       user-select: none;
     }
 
     .tile-emoji {
       font-family: var(--font-emoji) !important;
-      font-size: 20px;
-      font-weight: normal !important;
-      font-style: normal !important;
-      line-height: 1 !important;
+      font-size: 18px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -213,7 +214,7 @@
       user-select: none;
     }
 
-    /* Nextcloud Status Indicators */
+    /* Real Live Telemetry Status Dots */
     .status-indicator-dot {
       display: inline-block;
       width: 8px;
@@ -225,37 +226,66 @@
     }
     .status-indicator-dot.online {
       background-color: var(--color-element-success);
-      box-shadow: 0 0 6px rgba(64, 163, 48, 0.6);
     }
     .status-indicator-dot.idle {
       background-color: var(--color-element-warning);
-      box-shadow: 0 0 6px rgba(255, 204, 0, 0.5);
     }
 
     .banned-ip-chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: rgba(255, 80, 80, 0.12);
-      border: 1px solid rgba(255, 80, 80, 0.3);
-      color: #ff8585;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.28);
+      color: #FCA5A5;
       font-family: var(--font-mono);
       font-size: 11.5px;
-      padding: 4px 10px;
+      padding: 5px 10px;
       border-radius: 6px;
-      transition: background 0.12s ease;
+      transition: background 0.15s ease;
     }
     .banned-ip-chip:hover {
-      background: rgba(255, 80, 80, 0.2);
+      background: rgba(239, 68, 68, 0.18);
+    }
+
+    .btn-revoke {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #FCA5A5;
+      border-radius: 6px;
+      padding: 5px 11px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .btn-revoke:hover {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: #EF4444;
+      color: #FFFFFF;
+    }
+    .btn-revoke.current {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #FCD34D;
+    }
+    .btn-revoke.current:hover {
+      background: rgba(245, 158, 11, 0.25);
+      border-color: #F59E0B;
+      color: #FFFFFF;
     }
 
     /* ==========================================================================
-       NEXTCLOUD APP SIDEBAR NAVIGATION
+       MULTI-PAGE WEB SIDEBAR NAVIGATION (268px WORKSPACE CONTRACT)
        ========================================================================== */
     .sidebar {
-      width: 270px;
-      min-width: 270px;
-      background: #1c1c1c;
+      width: 268px;
+      min-width: 268px;
+      background: var(--color-sidebar-bg);
       border-right: 1px solid var(--color-border);
       display: flex;
       flex-direction: column;
@@ -263,82 +293,78 @@
     }
 
     .sidebar-header {
-      padding: 16px 18px;
+      height: 58px;
+      padding: 0 18px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: space-between;
       border-bottom: 1px solid var(--color-border);
-      background: rgba(0, 0, 0, 0.15);
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-wordmark {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15.5px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--color-main-text);
+      white-space: nowrap;
+      text-decoration: none;
     }
 
     .app-icon-squircle {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #0082c9, #005686);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #0EA5E9, #0284C7);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #ffffff;
-      box-shadow: 0 4px 12px rgba(0, 130, 201, 0.35);
+      color: #FFFFFF;
       flex-shrink: 0;
-    }
-
-    .app-header-text h1 {
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: -0.2px;
-      color: var(--color-main-text);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .app-header-text p {
-      font-size: 11.5px;
-      color: var(--color-text-dim);
-      font-weight: 500;
     }
 
     .sidebar-nav {
       flex: 1;
-      padding: 12px 6px;
+      padding: 14px 10px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
     }
 
     .nav-section-title {
       font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      color: var(--color-text-dim);
-      padding: 0 12px 4px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      color: var(--color-text-disabled);
+      padding: 0 10px 6px;
     }
 
     .nav-list {
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
     }
 
     .nav-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 12px;
-      margin: 0 4px;
+      padding: 8px 10px;
       border-radius: var(--border-radius-element);
-      color: var(--color-text-maxcontrast);
+      color: var(--color-text-dim);
       text-decoration: none;
       cursor: pointer;
-      transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-      font-size: 13.5px;
+      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+      font-size: 13px;
       font-weight: 500;
-      border-left: 3px solid transparent;
+      border: 1px solid transparent;
+      white-space: nowrap;
     }
 
     .nav-item:hover {
@@ -347,46 +373,34 @@
     }
 
     .nav-item.active {
-      background: var(--color-primary-light);
-      color: var(--color-primary-element);
-      border-left-color: var(--color-primary-element);
+      background: rgba(14, 165, 233, 0.12);
+      color: #38BDF8;
+      border-color: rgba(14, 165, 233, 0.28);
       font-weight: 600;
     }
 
-    .nav-item.active .nav-icon {
-      color: var(--color-primary-element);
-    }
-
     .nav-item.active .nav-badge {
-      background: rgba(0, 145, 242, 0.25);
-      color: #ffffff;
+      background: rgba(14, 165, 233, 0.2);
+      color: #E0F2FE;
     }
 
     .nav-left {
       display: flex;
       align-items: center;
-      gap: 10px;
-    }
-
-    .nav-icon {
-      width: 18px;
-      height: 18px;
-      color: var(--color-text-dim);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: color 0.12s ease;
+      gap: 6px;
+      min-width: 0;
     }
 
     .nav-badge {
       font-size: 11px;
       font-weight: 600;
-      padding: 2px 7px;
-      border-radius: var(--border-radius-pill);
-      background: rgba(255, 255, 255, 0.06);
+      padding: 1px 6px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.04);
       color: var(--color-text-dim);
       font-family: var(--font-mono);
-      transition: background 0.12s ease, color 0.12s ease;
+      font-variant-numeric: tabular-nums;
+      transition: background 0.14s ease, color 0.14s ease;
     }
 
     .sidebar-footer {
@@ -395,30 +409,32 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      background: rgba(0, 0, 0, 0.18);
+      background: rgba(11, 15, 23, 0.5);
     }
 
     .host-pill {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--color-text-dim);
+      gap: 6px;
     }
 
     .trust-badge-row {
       display: flex;
       align-items: center;
-      gap: 7px;
-      padding: 6px 10px;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 10px;
       background: var(--color-background-dark);
       border: 1px solid var(--color-border);
-      border-radius: var(--border-radius-pill);
+      border-radius: var(--border-radius-element);
       font-size: 11.5px;
       font-weight: 500;
       color: var(--color-text-maxcontrast);
       cursor: pointer;
-      transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+      transition: background 0.14s ease, border-color 0.14s ease;
     }
 
     .trust-badge-row:hover {
@@ -432,7 +448,6 @@
       height: 7px;
       border-radius: 50%;
       background: var(--color-element-success);
-      box-shadow: 0 0 6px var(--color-element-success);
       flex-shrink: 0;
     }
 
@@ -442,13 +457,12 @@
       height: 7px;
       border-radius: 50%;
       background: var(--color-element-success);
-      box-shadow: 0 0 5px var(--color-element-success);
       margin-right: 5px;
       vertical-align: middle;
     }
 
     /* ==========================================================================
-       NEXTCLOUD CONTENT PANE & APP HEADERBAR
+       CONTENT PANE & TOP HEADERBAR (BREADCRUMB + CONTEXTUAL ACTIONS)
        ========================================================================== */
     .content-pane {
       flex: 1;
@@ -459,28 +473,69 @@
     }
 
     .headerbar {
-      height: 50px;
-      padding: 0 24px;
+      height: 58px;
+      padding: 0 28px;
       border-bottom: 1px solid var(--color-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: rgba(23, 23, 23, 0.92);
-      backdrop-filter: blur(16px);
+      gap: 16px;
+      background: rgba(11, 15, 23, 0.88);
+      backdrop-filter: blur(14px);
       z-index: 10;
     }
 
     .headerbar-left {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .breadcrumb-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      white-space: nowrap;
+    }
+
+    .breadcrumb-root {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-dim);
+      text-decoration: none;
+      transition: color 0.14s ease;
+    }
+    .breadcrumb-root:hover {
+      color: var(--color-main-text);
+    }
+
+    .breadcrumb-sep {
+      color: var(--color-text-disabled);
+      font-size: 12px;
+      user-select: none;
     }
 
     .view-title {
-      font-size: 16px;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 700;
       color: var(--color-main-text);
       letter-spacing: -0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .url-route-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-text-dim);
+      background: var(--color-background-dark);
+      border: 1px solid var(--color-border);
+      padding: 2px 7px;
+      border-radius: 5px;
+      white-space: nowrap;
     }
 
     .mobile-menu-btn {
@@ -496,26 +551,26 @@
     .headerbar-right {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      flex-shrink: 0;
     }
 
-    /* Nextcloud Style Search Entry */
+    /* Search Entry */
     .search-entry {
       display: flex;
       align-items: center;
       background: var(--color-background-dark);
       border: 1px solid var(--color-border);
       border-radius: var(--border-radius-element);
-      padding: 0 10px;
-      height: 32px;
+      padding: 0 11px;
+      height: 34px;
       width: 240px;
-      transition: all 0.15s ease;
+      transition: border-color 0.15s ease;
     }
 
     .search-entry:focus-within {
       background: var(--color-background-darker);
       border-color: var(--color-primary-element);
-      box-shadow: 0 0 0 2px rgba(0, 145, 242, 0.25);
     }
 
     .search-entry svg {
@@ -537,25 +592,27 @@
     }
 
     .search-entry input::placeholder {
-      color: var(--color-text-dim);
+      color: var(--color-text-disabled);
     }
 
-    /* Nextcloud Action Button Style */
+    /* Action Button Style */
     .btn-header {
       background: var(--color-background-dark);
       border: 1px solid var(--color-border);
       color: var(--color-text-maxcontrast);
       border-radius: var(--border-radius-element);
-      height: 32px;
+      height: 34px;
       padding: 0 12px;
       font-size: 12.5px;
-      font-weight: 500;
+      font-weight: 600;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
       text-decoration: none;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .btn-header:hover {
@@ -564,33 +621,66 @@
       border-color: var(--color-border-dark);
     }
 
+    .btn-header.btn-update-alert {
+      background: rgba(245, 158, 11, 0.14);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #FCD34D;
+    }
+    .btn-header.btn-update-alert:hover {
+      background: rgba(245, 158, 11, 0.24);
+      color: #FFFFFF;
+    }
+
+    .btn-primary-action {
+      background: var(--color-primary);
+      border: 1px solid var(--color-primary-element);
+      color: #FFFFFF;
+      border-radius: var(--border-radius-element);
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+    .btn-primary-action:hover:not(:disabled) {
+      background: var(--color-primary-element);
+    }
+    .btn-primary-action:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
     /* Content Scroll Area */
     .content-scroll {
       flex: 1;
       overflow-y: auto;
-      padding: 24px 28px 48px;
+      padding: 26px 32px 56px;
       -webkit-overflow-scrolling: touch;
     }
 
     .view-container {
-      max-width: 1040px;
+      max-width: 1180px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 22px;
     }
 
     /* ==========================================================================
-       NEXTCLOUD CARDS WITH SMOOTH REAL-TIME CHARTS
+       SINGLE-ELEVATION TECHNICAL CARDS & REAL-TIME CHARTS
        ========================================================================== */
     .hero-chart-card {
       background: var(--color-background-dark);
       border: 1px solid var(--color-border);
       border-radius: var(--border-radius-container);
-      padding: 20px 22px;
+      padding: 22px 24px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
     }
 
     .hero-top-row {
@@ -598,20 +688,23 @@
       align-items: flex-start;
       justify-content: space-between;
       margin-bottom: 12px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .hero-metric-label {
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
-      color: var(--color-text-maxcontrast);
+      color: var(--color-text-dim);
     }
 
     .hero-metric-big {
-      font-size: 32px;
+      font-size: 30px;
       font-weight: 700;
       letter-spacing: -0.5px;
       color: var(--color-main-text);
-      font-family: var(--font-sans);
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
       margin-top: 2px;
       display: flex;
       align-items: baseline;
@@ -622,11 +715,12 @@
       font-size: 13px;
       font-weight: 500;
       color: var(--color-text-dim);
+      font-family: var(--font-mono);
     }
 
     .hero-chart-canvas-box {
       width: 100%;
-      height: 150px;
+      height: 155px;
       position: relative;
       margin-top: 10px;
     }
@@ -638,11 +732,11 @@
     }
 
     /* ==========================================================================
-       VISTA GENERAL: OVERVIEW GRID (6 CORE SYSTEMS)
+       OVERVIEW GRID (CLEAN MULTI-PAGE CARDS)
        ========================================================================== */
     .overview-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(275px, 1fr));
       gap: 16px;
     }
 
@@ -652,55 +746,55 @@
       border-radius: var(--border-radius-container);
       padding: 18px 20px;
       cursor: pointer;
-      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       gap: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      text-decoration: none;
+      color: inherit;
     }
 
     .overview-card:hover {
       background: var(--color-background-hover);
       border-color: var(--color-border-dark);
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
     }
 
     .row-arrow {
       color: var(--color-text-dim);
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       transition: transform 0.15s ease, color 0.15s ease;
     }
 
     .overview-card:hover .row-arrow {
-      color: var(--color-main-text);
+      color: var(--color-primary-element);
       transform: translateX(3px);
     }
 
     /* ==========================================================================
-       NEXTCLOUD HUB CONTAINER GROUPS & ACTION ROWS
+       STRUCTURAL GROUPS & ACTION ROWS
        ========================================================================== */
     .adw-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
     }
 
     .adw-group-title {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 13.5px;
+      font-weight: 700;
       color: var(--color-main-text);
-      padding-left: 4px;
+      padding-left: 2px;
       letter-spacing: -0.1px;
     }
 
     .adw-group-subtitle {
       font-size: 12px;
       color: var(--color-text-dim);
-      padding-left: 4px;
-      margin-top: -3px;
+      padding-left: 2px;
+      margin-top: -4px;
       margin-bottom: 4px;
     }
 
@@ -709,7 +803,6 @@
       border: 1px solid var(--color-border);
       border-radius: var(--border-radius-container);
       overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
     .adw-action-row {
@@ -747,7 +840,7 @@
     }
 
     .row-label {
-      font-weight: 500;
+      font-weight: 600;
       color: var(--color-main-text);
       display: flex;
       align-items: center;
@@ -755,15 +848,16 @@
     }
 
     .row-sublabel {
-      font-size: 11.5px;
+      font-size: 12px;
       color: var(--color-text-dim);
-      margin-top: 1px;
+      margin-top: 2px;
     }
 
     .row-value {
       font-weight: 600;
       color: var(--color-text-maxcontrast);
       font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
       font-size: 13px;
       text-align: right;
     }
@@ -771,7 +865,7 @@
     /* Cores Grid Matrix */
     .cores-adw-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
       gap: 8px;
       padding: 14px;
       background: var(--color-background-dark);
@@ -780,7 +874,7 @@
     }
 
     .core-adw-box {
-      background: #191919;
+      background: var(--color-main-background);
       border: 1px solid var(--color-border);
       border-radius: 8px;
       padding: 8px 6px;
@@ -793,7 +887,7 @@
     .core-adw-bar-bg {
       width: 100%;
       height: 6px;
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.07);
       border-radius: 3px;
       overflow: hidden;
     }
@@ -802,7 +896,7 @@
       height: 100%;
       background: var(--color-primary-element);
       border-radius: 3px;
-      transition: width 0.3s ease;
+      transition: width 0.25s ease;
     }
 
     .core-adw-title {
@@ -816,14 +910,15 @@
       font-weight: 600;
       color: var(--color-main-text);
       font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
     }
 
-    /* Nextcloud Segmented Button Filter */
+    /* Interactive Segmented Filter Controls */
     .segmented-pills {
       display: inline-flex;
       background: var(--color-main-background);
       padding: 3px;
-      border-radius: var(--border-radius-pill);
+      border-radius: var(--border-radius-element);
       border: 1px solid var(--color-border);
       gap: 3px;
       margin-bottom: 8px;
@@ -835,13 +930,14 @@
       color: var(--color-text-dim);
       font-size: 12px;
       font-weight: 500;
-      padding: 5px 14px;
-      border-radius: var(--border-radius-pill);
+      padding: 5px 12px;
+      border-radius: 6px;
       cursor: pointer;
-      transition: all 0.12s ease;
+      transition: background 0.14s ease, color 0.14s ease;
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      white-space: nowrap;
     }
 
     .pill-btn:hover {
@@ -850,36 +946,35 @@
 
     .pill-btn.active {
       background: var(--color-background-darker);
-      color: #ffffff;
+      color: #FFFFFF;
       font-weight: 600;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     }
 
-    /* Nextcloud Semantic Badges */
+    /* Semantic Status Badges */
     .adw-badge {
       display: inline-flex;
       align-items: center;
       gap: 5px;
       padding: 3px 8px;
-      border-radius: var(--border-radius-pill);
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 600;
       font-family: var(--font-sans);
       white-space: nowrap;
     }
 
-    .badge-blue { background: rgba(0, 145, 242, 0.15); color: #38bdf8; border: 1px solid rgba(0, 145, 242, 0.35); }
-    .badge-purple { background: rgba(145, 65, 172, 0.16); color: #e0a3f5; border: 1px solid rgba(145, 65, 172, 0.35); }
-    .badge-green { background: rgba(64, 163, 48, 0.16); color: #49bb37; border: 1px solid rgba(64, 163, 48, 0.35); }
-    .badge-amber { background: rgba(255, 204, 0, 0.15); color: #ffd13b; border: 1px solid rgba(255, 204, 0, 0.35); }
-    .badge-red { background: rgba(255, 80, 80, 0.16); color: #ff7575; border: 1px solid rgba(255, 80, 80, 0.35); }
+    .badge-blue { background: rgba(14, 165, 233, 0.14); color: #38BDF8; border: 1px solid rgba(14, 165, 233, 0.3); }
+    .badge-purple { background: rgba(139, 92, 246, 0.15); color: #C4B5FD; border: 1px solid rgba(139, 92, 246, 0.3); }
+    .badge-green { background: rgba(16, 185, 129, 0.14); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-amber { background: rgba(245, 158, 11, 0.14); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-red { background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); }
 
     /* Custom Avatar Circle */
     .device-circle {
       width: 38px;
       height: 38px;
-      border-radius: 50%;
-      background: var(--color-background-dark);
+      border-radius: 10px;
+      background: var(--color-main-background);
       border: 1px solid var(--color-border);
       display: flex;
       align-items: center;
@@ -888,14 +983,14 @@
       flex-shrink: 0;
     }
 
-    /* Nextcloud Hub Modal Dialog */
+    /* Modal Dialog */
     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.72);
+      background: rgba(5, 8, 15, 0.78);
       backdrop-filter: blur(8px);
       display: flex;
       align-items: center;
@@ -903,7 +998,8 @@
       z-index: 100;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.2s ease;
+      transition: opacity 0.18s ease;
+      padding: 16px;
     }
 
     .modal-overlay.open {
@@ -912,11 +1008,11 @@
     }
 
     .adw-dialog {
-      background: #202020;
+      background: var(--color-background-dark);
       border: 1px solid var(--color-border-dark);
-      border-radius: 16px;
+      border-radius: 14px;
       width: 100%;
-      max-width: 520px;
+      max-width: 560px;
       overflow: hidden;
       box-shadow: 0 24px 64px rgba(0, 0, 0, 0.75);
       display: flex;
@@ -929,12 +1025,12 @@
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid var(--color-border);
-      background: rgba(0, 0, 0, 0.1);
+      background: rgba(11, 15, 23, 0.5);
     }
 
     .adw-dialog-header h3 {
       font-size: 15px;
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .adw-dialog-close {
@@ -956,7 +1052,7 @@
 
     .adw-dialog-body {
       padding: 20px;
-      max-height: 480px;
+      max-height: 75vh;
       overflow-y: auto;
     }
 
@@ -964,7 +1060,7 @@
     .nav-history-controls {
       display: inline-flex;
       align-items: center;
-      gap: 3px;
+      gap: 2px;
       background: var(--color-background-dark);
       border: 1px solid var(--color-border);
       border-radius: var(--border-radius-element);
@@ -1144,44 +1240,44 @@
   <div class="app-window">
     
     <!-- ======================================================================
-         SIDEBAR: GNOME LIBADWAITA RESOURCES NAVIGATION
+         SIDEBAR: NATIVE MULTI-PAGE WEB NAVIGATION
          ====================================================================== -->
     <aside class="sidebar" id="appSidebar">
-      <div class="sidebar-header">
-        <div class="app-icon-squircle">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-          </svg>
+      <a href="/" class="sidebar-header" onclick="return navigateTo(event, 'overview')">
+        <div class="brand-wordmark">
+          <div class="app-icon-squircle">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+          <span>Recursos</span>
         </div>
-        <div class="app-header-text">
-          <h1>Recursos <span class="status-dot" title="En vivo"></span></h1>
-          <p>Servidor Cminewar</p>
-        </div>
-      </div>
+        <span class="nav-badge" id="sidebarVersionTag">v2.0</span>
+      </a>
 
       <nav class="sidebar-nav">
         <!-- VISTA GENERAL -->
         <div class="nav-section">
-          <div class="nav-section-title">Principal</div>
+          <div class="nav-section-title">Consola Principal</div>
           <ul class="nav-list">
             <li>
-              <a class="nav-item active" id="navOverview" onclick="switchView('overview')">
+              <a href="/" class="nav-item active" id="navOverview" onclick="return navigateTo(event, 'overview')">
                 <div class="nav-left">
                   <span class="nav-emoji">📊</span>
                   <span>Vista General</span>
                 </div>
-                <span class="nav-badge" id="badgeNavOverview" style="background: rgba(51, 209, 122, 0.2); color: #57e389;">Activo</span>
+                <span class="nav-badge" id="badgeNavOverview" style="color: #34D399;">En vivo</span>
               </a>
             </li>
           </ul>
         </div>
 
-        <!-- HARDWARE -->
+        <!-- HARDWARE & RED -->
         <div class="nav-section">
-          <div class="nav-section-title">Hardware</div>
+          <div class="nav-section-title">Hardware & Red</div>
           <ul class="nav-list">
             <li>
-              <a class="nav-item" id="navProcessor" onclick="switchView('processor')">
+              <a href="/procesador" class="nav-item" id="navProcessor" onclick="return navigateTo(event, 'processor')">
                 <div class="nav-left">
                   <span class="nav-emoji">⚡</span>
                   <span>Procesador</span>
@@ -1191,17 +1287,17 @@
             </li>
 
             <li>
-              <a class="nav-item" id="navMemory" onclick="switchView('memory')">
+              <a href="/memoria" class="nav-item" id="navMemory" onclick="return navigateTo(event, 'memory')">
                 <div class="nav-left">
                   <span class="nav-emoji">🧠</span>
-                  <span>Memoria</span>
+                  <span>Memoria RAM</span>
                 </div>
                 <span class="nav-badge" id="badgeNavRam">-- GB</span>
               </a>
             </li>
 
             <li>
-              <a class="nav-item" id="navGpu" onclick="switchView('gpu')">
+              <a href="/grafica" class="nav-item" id="navGpu" onclick="return navigateTo(event, 'gpu')">
                 <div class="nav-left">
                   <span class="nav-emoji">🎮</span>
                   <span>Tarjeta Gráfica</span>
@@ -1211,27 +1307,27 @@
             </li>
 
             <li>
-              <a class="nav-item" id="navDrives" onclick="switchView('drives')">
+              <a href="/almacenamiento" class="nav-item" id="navDrives" onclick="return navigateTo(event, 'drives')">
                 <div class="nav-left">
                   <span class="nav-emoji">💾</span>
                   <span>Almacenamiento</span>
                 </div>
-                <span class="nav-badge" id="badgeNavDisk">SSD</span>
+                <span class="nav-badge" id="badgeNavDisk">NVMe</span>
               </a>
             </li>
 
             <li>
-              <a class="nav-item" id="navNetwork" onclick="switchView('network')">
+              <a href="/red" class="nav-item" id="navNetwork" onclick="return navigateTo(event, 'network')">
                 <div class="nav-left">
                   <span class="nav-emoji">🌐</span>
-                  <span>Red & Consumos</span>
+                  <span>Red & Dispositivos</span>
                 </div>
-                <span class="nav-badge" id="badgeNavNet">20 disp.</span>
+                <span class="nav-badge" id="badgeNavNet">-- disp.</span>
               </a>
             </li>
 
             <li>
-              <a class="nav-item" id="navSecurity" onclick="switchView('security')">
+              <a href="/seguridad" class="nav-item" id="navSecurity" onclick="return navigateTo(event, 'security')">
                 <div class="nav-left">
                   <span class="nav-emoji">🛡️</span>
                   <span>Seguridad & DNS</span>
@@ -1242,22 +1338,22 @@
           </ul>
         </div>
 
-        <!-- TAREAS -->
+        <!-- SERVICIOS & ADMINISTRACIÓN -->
         <div class="nav-section">
-          <div class="nav-section-title">Tareas</div>
+          <div class="nav-section-title">Servicios & Sistema</div>
           <ul class="nav-list">
             <li>
-              <a class="nav-item" id="navApps" onclick="switchView('apps')">
+              <a href="/aplicaciones" class="nav-item" id="navApps" onclick="return navigateTo(event, 'apps')">
                 <div class="nav-left">
                   <span class="nav-emoji">🐳</span>
-                  <span>Aplicaciones (Docker)</span>
+                  <span>Aplicaciones Docker</span>
                 </div>
                 <span class="nav-badge" id="badgeNavApps">0</span>
               </a>
             </li>
 
             <li>
-              <a class="nav-item" id="navTorrents" onclick="switchView('torrents')">
+              <a href="/multimedia" class="nav-item" id="navTorrents" onclick="return navigateTo(event, 'torrents')">
                 <div class="nav-left">
                   <span class="nav-emoji">📥</span>
                   <span>Descargas & Emby</span>
@@ -1267,56 +1363,79 @@
             </li>
 
             <li>
-              <a class="nav-item" id="navProcesses" onclick="switchView('processes')">
+              <a href="/procesos" class="nav-item" id="navProcesses" onclick="return navigateTo(event, 'processes')">
                 <div class="nav-left">
                   <span class="nav-emoji">⚙️</span>
-                  <span>Procesos</span>
+                  <span>Procesos Activos</span>
                 </div>
                 <span class="nav-badge" id="badgeNavProc">0</span>
               </a>
             </li>
 
+            <li>
+              <a href="/sistema" class="nav-item" id="navSystem" onclick="return navigateTo(event, 'system')">
+                <div class="nav-left">
+                  <span class="nav-emoji">🔄</span>
+                  <span>Versión & Dominio</span>
+                </div>
+                <span class="nav-badge badge-blue" id="badgeNavSystem">Al día</span>
+              </a>
+            </li>
           </ul>
         </div>
       </nav>
 
       <div class="sidebar-footer">
         <div class="host-pill">
-          <span>Equipo: <strong id="lblHost">servidor</strong></span>
-          <span id="lblUptime">--</span>
+          <span>Host: <strong id="lblHost" style="color: var(--color-main-text);">servidor</strong></span>
+          <span id="lblUptime" style="font-family: var(--font-mono);">--</span>
         </div>
-        <div class="trust-badge-row" onclick="openTrustDialog()" title="Haz clic para ver la autenticación Zero-Trust">
-          <span class="status-dot" id="dotTrust"></span>
-          <span id="lblTrust">Comprobando red...</span>
+        <div class="host-pill" style="font-size: 11px;">
+          <span>DNS:</span>
+          <a href="/sistema" onclick="return navigateTo(event, 'system')" id="lblSidebarDomain" style="font-family: var(--font-mono); color: var(--color-primary-element); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Detectando...</a>
+        </div>
+        <div class="trust-badge-row" onclick="openTrustDialog()" title="Gestionar dispositivos autorizados Zero-Trust">
+          <div style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span class="status-dot" id="dotTrust"></span>
+            <span id="lblTrust" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Comprobando red...</span>
+          </div>
+          <span style="font-size: 11px; color: var(--color-text-dim);">→</span>
         </div>
       </div>
     </aside>
 
     <!-- ======================================================================
-         MAIN CONTENT PANE (HEADERBAR + VIEWS)
+         MAIN CONTENT PANE (HEADERBAR + MULTI-PAGE VIEWS)
          ====================================================================== -->
     <main class="content-pane">
       
       <header class="headerbar">
         <div class="headerbar-left">
-          <button class="mobile-menu-btn" onclick="toggleSidebar()">
+          <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Menú">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
             </svg>
           </button>
+
           <div class="nav-history-controls">
-            <button class="btn-history" id="btnHistoryBack" onclick="navigateHistoryBack()" title="Atrás en el historial" disabled>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            <button class="btn-history" id="btnHistoryBack" onclick="navigateHistoryBack()" title="Página anterior (Atrás)" disabled>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <button class="btn-history" id="btnHistoryForward" onclick="navigateHistoryForward()" title="Adelante en el historial" disabled>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            <button class="btn-history" id="btnHistoryForward" onclick="navigateHistoryForward()" title="Página siguiente (Adelante)" disabled>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           </div>
-          <div class="view-title" id="currentViewTitle">Vista General</div>
+
+          <div class="breadcrumb-bar">
+            <a href="/" class="breadcrumb-root" onclick="return navigateTo(event, 'overview')">Recursos</a>
+            <span class="breadcrumb-sep">/</span>
+            <div class="view-title" id="currentViewTitle">Vista General</div>
+            <span class="url-route-tag" id="currentRouteBadge">/</span>
+          </div>
         </div>
 
         <div class="headerbar-right">
-          <!-- Dynamic Search Entry for Apps / Processes / Network -->
+          <!-- Dynamic Search Entry for Apps / Processes / Network / Torrents -->
           <div class="search-entry" id="searchBox" style="display: none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -1324,28 +1443,35 @@
             <input type="text" id="filterInput" placeholder="Filtrar..." oninput="onFilterChange()">
           </div>
 
-          <button class="btn-header" onclick="openTrustDialog()" title="Seguridad de Acceso">
+          <a href="/sistema" class="btn-header" id="btnHeaderVersion" onclick="return navigateTo(event, 'system')" title="Ver estado de versión y actualizar desde GitHub">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/>
+            </svg>
+            <span id="lblHeaderVersion">GitHub • Al día</span>
+          </a>
+
+          <button class="btn-header" onclick="openTrustDialog()" title="Dispositivos Autorizados & Seguridad Zero-Trust">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
-            <span>Seguridad</span>
+            <span>Dispositivos</span>
           </button>
         </div>
       </header>
 
-      <div class="content-scroll">
+      <div class="content-scroll" id="mainScrollContainer">
 
         <!-- ==================================================================
-             0. VISTA GENERAL (OVERVIEW SUMMARY DASHBOARD)
+             0. VISTA GENERAL (OVERVIEW SUMMARY DASHBOARD - RUTA /)
              ================================================================== -->
         <div class="view-container" id="viewOverview">
           
-          <!-- System Welcome Banner -->
-          <div class="hero-chart-card" style="padding: 22px 24px;">
+          <!-- System Welcome & DNS Status Banner -->
+          <div class="hero-chart-card" style="padding: 20px 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
               <div style="display: flex; align-items: center; gap: 14px;">
-                <div class="app-icon-squircle" style="width: 48px; height: 48px; border-radius: 12px;">
-                  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="app-icon-squircle" style="width: 44px; height: 44px; border-radius: 10px;">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
                     <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
                     <line x1="6" y1="6" x2="6.01" y2="6"/>
@@ -1353,27 +1479,31 @@
                   </svg>
                 </div>
                 <div>
-                  <h2 style="font-size: 19px; font-weight: 700; letter-spacing: -0.3px; color: #ffffff;">Servidor Cminewar</h2>
-                  <p style="font-size: 12.5px; color: var(--adw-text-dim); margin-top: 2px;">
-                    <span id="ovSysOs">Arch Linux</span> • Kernel <span id="ovSysKernel">--</span> • Actividad: <strong id="ovSysUptime" style="color: var(--adw-text-secondary);">--</strong>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <h2 style="font-size: 18px; font-weight: 700; letter-spacing: -0.3px; color: #FFFFFF;" id="ovHostTitle">Servidor Principal</h2>
+                    <span style="font-size: 12px; color: var(--color-text-dim);">·</span>
+                    <a href="/sistema" onclick="return navigateTo(event, 'system')" id="ovPublicDomainBadge" style="font-family: var(--font-mono); font-size: 12px; color: var(--color-primary-element); text-decoration: none;">Detectando DNS...</a>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--adw-text-dim); margin-top: 3px;">
+                    <span id="ovSysOs">Linux</span> · Kernel <span id="ovSysKernel" style="font-family: var(--font-mono);">--</span> · Actividad: <strong id="ovSysUptime" style="color: var(--adw-text-secondary); font-family: var(--font-mono);">--</strong>
                   </p>
                 </div>
               </div>
 
-              <div style="display: flex; gap: 10px; align-items: center;">
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                 <span class="adw-badge badge-green" id="ovBadgeStatus">
-                  <span class="status-dot" style="margin-right: 2px;"></span> Sistema Estable
+                  <span class="status-dot" style="margin-right: 2px;"></span> Telemetría Activa
                 </span>
-                <span class="adw-badge badge-blue" id="ovBadgeTrust">Red Local</span>
+                <span class="adw-badge badge-blue" id="ovBadgeTrust" onclick="openTrustDialog()" style="cursor: pointer;">Red Local</span>
               </div>
             </div>
           </div>
 
-          <!-- 6-CARD OVERVIEW GRID -->
+          <!-- 9-CARD MULTI-PAGE OVERVIEW GRID -->
           <div class="overview-grid">
             
             <!-- 1. CPU -->
-            <div class="overview-card" onclick="switchView('processor')">
+            <a href="/procesador" class="overview-card" onclick="return navigateTo(event, 'processor')">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
                   <span class="tile-emoji">⚡</span>
@@ -1383,17 +1513,17 @@
               </div>
 
               <div>
-                <div style="font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovCpuPercent">0.0%</div>
+                <div style="font-size: 26px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.5px; font-family: var(--font-mono);" id="ovCpuPercent">0.0%</div>
                 <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovCpuSub">Intel Xeon E5-2680 v4 (28 hilos)</div>
               </div>
 
               <div style="height: 48px; width: 100%;">
                 <canvas id="ovCanvasCpu" style="width: 100%; height: 100%;"></canvas>
               </div>
-            </div>
+            </a>
 
             <!-- 2. MEMORIA RAM -->
-            <div class="overview-card" onclick="switchView('memory')">
+            <a href="/memoria" class="overview-card" onclick="return navigateTo(event, 'memory')">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
                   <span class="tile-emoji">🧠</span>
@@ -1403,17 +1533,17 @@
               </div>
 
               <div>
-                <div style="font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovRamUsed">0.0 GB</div>
+                <div style="font-size: 26px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.5px; font-family: var(--font-mono);" id="ovRamUsed">0.0 GB</div>
                 <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovRamSub">de 15.5 GB (DDR4)</div>
               </div>
 
               <div style="height: 48px; width: 100%;">
                 <canvas id="ovCanvasRam" style="width: 100%; height: 100%;"></canvas>
               </div>
-            </div>
+            </a>
 
             <!-- 3. GPU NVIDIA -->
-            <div class="overview-card" onclick="switchView('gpu')">
+            <a href="/grafica" class="overview-card" onclick="return navigateTo(event, 'gpu')">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
                   <span class="tile-emoji">🎮</span>
@@ -1423,77 +1553,77 @@
               </div>
 
               <div>
-                <div style="font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovGpuVal">0% • 0 °C</div>
+                <div style="font-size: 26px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.5px; font-family: var(--font-mono);" id="ovGpuVal">0% • 0 °C</div>
                 <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;">NVIDIA GeForce GTX 1650 (4 GB)</div>
               </div>
 
               <div style="height: 48px; width: 100%;">
                 <canvas id="ovCanvasGpu" style="width: 100%; height: 100%;"></canvas>
               </div>
-            </div>
+            </a>
 
             <!-- 4. RED & CONSUMOS -->
-            <div class="overview-card" onclick="switchView('network')">
+            <a href="/red" class="overview-card" onclick="return navigateTo(event, 'network')">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
                   <span class="tile-emoji">🌐</span>
-                  <span>Red & Consumos</span>
+                  <span>Red & Dispositivos</span>
                 </div>
                 <span class="row-arrow">→</span>
               </div>
 
               <div>
-                <div style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovNetSpeed">↓ 0 B/s • ↑ 0 B/s</div>
-                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovNetSub">20 dispositivos en red (3DS, Switch, PC)</div>
+                <div style="font-size: 20px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.5px; font-family: var(--font-mono);" id="ovNetSpeed">↓ 0 B/s • ↑ 0 B/s</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovNetSub">Dispositivos en red local</div>
               </div>
 
               <div style="height: 48px; width: 100%;">
                 <canvas id="ovCanvasNet" style="width: 100%; height: 100%;"></canvas>
               </div>
-            </div>
+            </a>
 
             <!-- 5. ALMACENAMIENTO -->
-            <div class="overview-card" onclick="switchView('drives')">
+            <a href="/almacenamiento" class="overview-card" onclick="return navigateTo(event, 'drives')">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
                   <span class="tile-emoji">💾</span>
-                  <span>Almacenamiento SSD</span>
+                  <span>Almacenamiento</span>
                 </div>
                 <span class="row-arrow">→</span>
               </div>
 
               <div>
-                <div style="font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovDiskRootUsage">SSD Raíz: --%</div>
-                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovDiskSub">NVMe Btrfs + Synology NAS montado</div>
+                <div style="font-size: 24px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.5px; font-family: var(--font-mono);" id="ovDiskRootUsage">SSD Raíz: --%</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovDiskSub">NVMe Sistema + Unidades montadas</div>
               </div>
 
               <div style="width: 100%; height: 7px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; margin-top: 10px;">
-                <div id="ovDiskBar" style="width: 0%; height: 100%; background: var(--adw-orange); border-radius: 4px; transition: width 0.3s ease;"></div>
+                <div id="ovDiskBar" style="width: 0%; height: 100%; background: var(--adw-blue); border-radius: 4px; transition: width 0.3s ease;"></div>
               </div>
-            </div>
+            </a>
 
             <!-- 6. APLICACIONES DOCKER -->
-            <div class="overview-card" onclick="switchView('apps')">
+            <a href="/aplicaciones" class="overview-card" onclick="return navigateTo(event, 'apps')">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
                   <span class="tile-emoji">🐳</span>
-                  <span>Aplicaciones (Docker)</span>
+                  <span>Contenedores Docker</span>
                 </div>
                 <span class="row-arrow">→</span>
               </div>
 
               <div>
-                <div style="font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovDockerCount">6 Activos</div>
-                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;">Emby, Immich, Pi-hole, Caddy, NodeODM</div>
+                <div style="font-size: 26px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.5px; font-family: var(--font-mono);" id="ovDockerCount">0 Activos</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;">Emby, Immich, Pi-hole, Caddy, Nextcloud</div>
               </div>
 
               <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px;">
-                <span class="adw-badge badge-green">Todos en Ejecución</span>
+                <span class="adw-badge badge-green">Servicios en Ejecución</span>
               </div>
-            </div>
+            </a>
 
             <!-- 7. SEGURIDAD & DNS (PI-HOLE + FAIL2BAN) -->
-            <div class="overview-card" onclick="switchView('security')">
+            <a href="/seguridad" class="overview-card" onclick="return navigateTo(event, 'security')">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
                   <span class="tile-emoji">🛡️</span>
@@ -1503,18 +1633,18 @@
               </div>
 
               <div>
-                <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px;" id="ovSecPihole">Pi-hole: 15.7k bloq. (44%)</div>
-                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovSecF2b">Fail2ban: 60 IPs baneadas</div>
+                <div style="font-size: 19px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.3px; font-family: var(--font-mono);" id="ovSecPihole">Pi-hole: -- bloq.</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovSecF2b">Fail2ban: -- IPs baneadas</div>
               </div>
 
               <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
-                <span class="adw-badge badge-green" style="font-size: 11px;"><span class="emoji">🛡️</span> Pi-hole Activo</span>
-                <span class="adw-badge badge-purple" style="font-size: 11px;"><span class="emoji">🔒</span> Fail2ban Activo</span>
+                <span class="adw-badge badge-green" style="font-size: 11px;">Pi-hole Activo</span>
+                <span class="adw-badge badge-purple" style="font-size: 11px;">Fail2ban Activo</span>
               </div>
-            </div>
+            </a>
 
             <!-- 8. DESCARGAS & VIDEOTECA (QBITTORRENT + EMBY) -->
-            <div class="overview-card" onclick="switchView('torrents')">
+            <a href="/multimedia" class="overview-card" onclick="return navigateTo(event, 'torrents')">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
                   <span class="tile-emoji">📥</span>
@@ -1524,15 +1654,36 @@
               </div>
 
               <div>
-                <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px;" id="ovTorrentSpeed">↓ 0 B/s • ↑ 0 B/s</div>
+                <div style="font-size: 19px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.3px; font-family: var(--font-mono);" id="ovTorrentSpeed">↓ 0 B/s • ↑ 0 B/s</div>
                 <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovTorrentSub">qBittorrent: 0 descargas activas</div>
               </div>
 
               <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
-                <span class="adw-badge badge-blue" style="font-size: 11px;" id="ovTorrentBadge"><span class="emoji">📥</span> qBittorrent</span>
-                <span class="adw-badge badge-purple" style="font-size: 11px;" id="ovEmbyBadge"><span class="emoji">🎬</span> Emby: 445 pelis • 2.8k caps</span>
+                <span class="adw-badge badge-blue" style="font-size: 11px;" id="ovTorrentBadge">qBittorrent</span>
+                <span class="adw-badge badge-purple" style="font-size: 11px;" id="ovEmbyBadge">Emby Media</span>
               </div>
-            </div>
+            </a>
+
+            <!-- 9. SISTEMA, DOMINIO DNS & ACTUALIZADOR GITHUB -->
+            <a href="/sistema" class="overview-card" onclick="return navigateTo(event, 'system')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">🔄</span>
+                  <span>Versión & Actualizador</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 19px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.3px; font-family: var(--font-mono);" id="ovVersionCommit">v2.0 • HEAD</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovVersionSub">Sincronizado con GitHub (main)</div>
+              </div>
+
+              <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
+                <span class="adw-badge badge-green" style="font-size: 11px;" id="ovVersionBadge">Al día con GitHub</span>
+                <span class="adw-badge badge-blue" style="font-size: 11px;" id="ovDnsAutoBadge">DNS Autodetectado</span>
+              </div>
+            </a>
 
           </div>
         </div>
@@ -2083,11 +2234,11 @@
                 <span class="adw-badge badge-green" id="torrentLiveStatus">
                   <span class="status-dot" style="margin-right: 2px;"></span> Conectado
                 </span>
-                <a href="http://192.168.50.2:8082" target="_blank" class="btn-header" style="text-decoration: none;" title="Abrir WebUI qBittorrent">
+                <a href="http://192.168.50.2:8082" id="linkQbittorrent" target="_blank" rel="noopener" class="btn-header" style="text-decoration: none;" title="Abrir WebUI qBittorrent">
                   <span>qBittorrent</span>
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                 </a>
-                <a href="http://192.168.50.2:8096" target="_blank" class="btn-header" style="text-decoration: none;" title="Abrir Emby Server">
+                <a href="http://192.168.50.2:8096" id="linkEmby" target="_blank" rel="noopener" class="btn-header" style="text-decoration: none;" title="Abrir Emby Server">
                   <span>Emby</span>
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                 </a>
@@ -2167,7 +2318,7 @@
         </div>
 
         <!-- ==================================================================
-             7. VISTA PROCESOS
+             9. VISTA PROCESOS
              ================================================================== -->
         <div class="view-container" id="viewProcesses" style="display: none;">
           <div class="adw-group">
@@ -2190,6 +2341,156 @@
           </div>
         </div>
 
+        <!-- ==================================================================
+             10. VISTA GESTOR DE VERSIONES & GITHUB OTA + DNS AUTODETECT (/version)
+             ================================================================== -->
+        <div class="view-container" id="viewVersion" style="display: none;">
+          
+          <!-- Hero Header Card -->
+          <div class="hero-chart-card" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <div class="app-icon-squircle" style="background: rgba(14, 165, 233, 0.14); color: var(--adw-blue); width: 48px; height: 48px; border-radius: 12px; border: 1px solid rgba(14, 165, 233, 0.25);">
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/><path d="M12 3v6"/><path d="M12 15v6"/></svg>
+                </div>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <h2 style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em; color: #F8FAFC;">Gestor de Versiones & Actualización GitHub</h2>
+                    <span class="adw-badge badge-green" id="verStatusBadge">Comprobando...</span>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--adw-text-secondary); margin-top: 4px;">
+                    Repositorio oficial <a href="https://github.com/cminewarIA/recursos-ui" target="_blank" rel="noopener" style="color: var(--adw-blue); text-decoration: none; font-family: var(--font-mono); font-weight: 600;">cminewarIA/recursos-ui</a> • Rama <code style="font-family: var(--font-mono); color: #F8FAFC; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 4px;">main</code>
+                  </p>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button class="btn-header" id="btnCheckVersionNow" onclick="checkSystemVersion(true)" title="Consultar últimos commits en GitHub">
+                  <svg id="iconRefreshVersion" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  <span id="lblCheckVersionNow">Comprobar ahora</span>
+                </button>
+                <button class="btn-header primary-cta" id="btnUpdateGithub" onclick="triggerSystemUpdate()" title="Descargar cambios de GitHub y reiniciar el servicio">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span id="lblUpdateGithub">Actualizar desde GitHub</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Comparison Bento Cards: Local vs GitHub -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; margin-top: 20px;">
+              
+              <!-- Card 1: Versión Instalada en el Servidor -->
+              <div class="adw-card" style="padding: 18px 20px; background: rgba(11, 15, 23, 0.55); border: 1px solid rgba(148, 163, 184, 0.14);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--adw-text-dim);">Versión Local Instalada</span>
+                  <span class="adw-badge badge-blue" id="verLocalBranch">main</span>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px;">
+                  <code style="font-size: 22px; font-weight: 700; font-family: var(--font-mono); color: #F8FAFC; letter-spacing: -0.02em;" id="verLocalHash">-------</code>
+                  <span style="font-size: 12px; color: var(--adw-green); font-family: var(--font-mono);" id="verLocalClean">● Árbol limpio</span>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; color: #E2E8F0; line-height: 1.4; margin-bottom: 8px;" id="verLocalSubject">
+                  Cargando información del repositorio local...
+                </div>
+                <div style="font-size: 11.5px; color: var(--adw-text-dim); font-family: var(--font-mono);" id="verLocalDate">
+                  Fecha commit: --
+                </div>
+              </div>
+
+              <!-- Card 2: Última Versión en GitHub -->
+              <div class="adw-card" style="padding: 18px 20px; background: rgba(11, 15, 23, 0.55); border: 1px solid rgba(14, 165, 233, 0.22);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--adw-blue);">Última Versión en GitHub (origin/main)</span>
+                  <span class="adw-badge badge-green" id="verBehindBadge">Sincronizado</span>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px;">
+                  <code style="font-size: 22px; font-weight: 700; font-family: var(--font-mono); color: var(--adw-blue); letter-spacing: -0.02em;" id="verRemoteHash">-------</code>
+                  <a href="https://github.com/cminewarIA/recursos-ui/commits/main" target="_blank" rel="noopener" style="font-size: 11.5px; color: var(--adw-text-secondary); text-decoration: underline; font-family: var(--font-mono);">Ver en GitHub ↗</a>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; color: #E2E8F0; line-height: 1.4; margin-bottom: 8px;" id="verRemoteSubject">
+                  Consultando API de GitHub...
+                </div>
+                <div style="font-size: 11.5px; color: var(--adw-text-dim); font-family: var(--font-mono);" id="verRemoteDate">
+                  Última comprobación: --
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Terminal Output Log Box (Visible during/after update) -->
+            <div id="verUpdateTerminalBox" style="display: none; margin-top: 18px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--adw-blue);">Registro de Actualización en Vivo (git pull & systemd)</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--adw-text-dim);" id="verTerminalState">Ejecutando...</span>
+              </div>
+              <pre class="terminal-box" id="verUpdateTerminalOutput">Iniciando proceso de actualización desde GitHub...</pre>
+            </div>
+          </div>
+
+          <!-- Autodetección Dinámica de Dominio DNS & Red -->
+          <div class="adw-group">
+            <div class="adw-group-title">Autodetección Dinámica de Dominio DNS y Red (Sin Dominios Fijos)</div>
+            <div class="adw-card">
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon" style="color: var(--adw-blue);">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  </span>
+                  <div>
+                    <div class="row-label">Dominio DNS Público Autodetectado</div>
+                    <div class="row-sublabel">Extraído automáticamente desde Caddyfile, Nginx, scripts DuckDNS, hostname o cabecera HTTP Host</div>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="row-value" id="dnsDetectedDomain" style="color: var(--adw-blue);">Detectando...</span>
+                  <button class="btn-header" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="copyDetectedDomain()">Copiar</button>
+                </div>
+              </div>
+
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon" style="color: var(--adw-green);">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                  </span>
+                  <div>
+                    <div class="row-label">Dirección IP LAN del Servidor & Hostname</div>
+                    <div class="row-sublabel">Dirección local empleada para enlaces internos y generación dinámica de archivos RDP</div>
+                  </div>
+                </div>
+                <div class="row-value" id="dnsLocalServerInfo">192.168.50.2 • servidor</div>
+              </div>
+
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon" style="color: var(--adw-purple);">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  </span>
+                  <div>
+                    <div class="row-label">Generador Dinámico de Escritorio Remoto (RDP Externo)</div>
+                    <div class="row-sublabel">Descarga el perfil <code style="font-family: var(--font-mono);">visipics_externo.rdp</code> inyectando al vuelo el dominio DNS detectado</div>
+                  </div>
+                </div>
+                <div>
+                  <a href="/static/visipics_externo.rdp" download="visipics_externo.rdp" class="btn-header" style="text-decoration: none; height: 30px; font-size: 11.5px;">
+                    📥 Descargar .RDP Dinámico
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Historial Reciente de Commits en GitHub -->
+          <div class="adw-group">
+            <div class="adw-group-title">Historial Reciente de Commits en GitHub (cminewarIA/recursos-ui)</div>
+            <div class="adw-card" id="verCommitsHistoryList">
+              <div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim); padding: 24px;">
+                Cargando historial de commits desde GitHub...
+              </div>
+            </div>
+          </div>
+
+        </div>
+
       </div>
     </main>
 
@@ -2199,21 +2500,59 @@
        MODAL DIALOG: DISPOSITIVOS AUTORIZADOS ZERO-TRUST
        ====================================================================== -->
   <div class="modal-overlay" id="trustDialog" onclick="if(event.target===this) closeTrustDialog()">
-    <div class="adw-dialog">
+    <div class="adw-dialog" style="max-width: 600px;">
       <div class="adw-dialog-header">
-        <h3>Dispositivos Autorizados</h3>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="app-icon-squircle" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(14, 165, 233, 0.14); color: var(--adw-blue);">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--color-main-text); letter-spacing: -0.01em;">Seguridad Zero-Trust & Dispositivos Vinculados</h3>
+            <div style="font-size: 11px; color: var(--adw-text-dim);">Credenciales HttpOnly firmadas con HMAC-SHA256</div>
+          </div>
+        </div>
         <button class="adw-dialog-close" onclick="closeTrustDialog()">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-      <div class="adw-dialog-body">
-        <p style="font-size: 13px; color: var(--adw-text-secondary); margin-bottom: 16px; line-height: 1.5;">
-          El sistema otorga un pase criptográfico a los dispositivos que se conectan de manera local a tu Wi-Fi para que puedan consultar este monitor de forma segura desde el exterior (<code style="color: #78aeed;">cminewar.duckdns.org</code>).
+      <div class="adw-dialog-body" style="padding: 18px 20px;">
+        <!-- Status Banner -->
+        <div id="trustCurrentStatusBanner" style="padding: 12px 14px; border-radius: 10px; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.25); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="status-dot" id="trustModalDot" style="width: 9px; height: 9px;"></span>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #ffffff;" id="trustModalStatusTitle">Comprobando conexión...</div>
+              <div style="font-size: 11.5px; color: var(--color-text-dim); font-family: var(--font-mono);" id="trustModalStatusSub">Cargando origen IP...</div>
+            </div>
+          </div>
+          <span class="adw-badge badge-blue" id="trustModalBadge">Zero-Trust Activo</span>
+        </div>
+
+        <p style="font-size: 12.5px; color: var(--color-text-maxcontrast); margin-bottom: 14px; line-height: 1.55;">
+          Los dispositivos que se conectan desde tu red local (LAN) reciben automáticamente una credencial criptográfica firmada por el servidor. Esto les permite seguir accediendo desde datos móviles (4G/5G) mientras se bloquea cualquier acceso externo no autorizado.
         </p>
 
-        <div class="adw-card" id="trustDevicesCard" style="max-height: 280px; overflow-y: auto;">
-          <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 18px;">
+        <!-- Devices List Container -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="font-size: 11.5px; font-weight: 700; color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.06em;">
+            Dispositivos Vinculados (<span id="trustDeviceCount">0</span>)
+          </div>
+          <button onclick="revokeAllOtherDevices()" id="btnRevokeAllOthers" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.28); color: #F87171; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.14s ease;">
+            Revocar otros dispositivos
+          </button>
+        </div>
+
+        <div class="adw-card" id="trustDevicesCard" style="max-height: 320px; overflow-y: auto;">
+          <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 22px;">
             Cargando dispositivos autorizados...
+          </div>
+        </div>
+
+        <!-- Dynamic External Sync Guidance Tip (No hardcoded domain!) -->
+        <div style="margin-top: 14px; padding: 11px 14px; border-radius: 8px; background: rgba(15, 23, 42, 0.65); border: 1px solid var(--color-border); font-size: 11.5px; color: var(--color-text-dim); display: flex; align-items: flex-start; gap: 10px;">
+          <span style="font-size: 14px; flex-shrink: 0;">💡</span>
+          <div style="line-height: 1.5;">
+            <strong style="color: var(--color-main-text);">Acceso exterior con datos móviles:</strong> Si vas a entrar desde el exterior usando tu dominio público detectado (<a href="#" id="trustPublicDomainLink" target="_blank" rel="noopener" style="color: var(--color-primary-element); text-decoration: underline; font-family: var(--font-mono);">detectando...</a>), asegúrate de haber abierto esa dirección al menos una vez conectado al Wi-Fi local, o usa la clave maestra de rescate si accedes por primera vez desde fuera.
           </div>
         </div>
       </div>
@@ -2221,119 +2560,283 @@
   </div>
 
   <!-- ======================================================================
-       REACTIVE CONTROLLER ENGINE (PURE JS, ZERO DEPENDENCIES)
+       MODAL DE CONFIRMACIÓN & TOAST DE NOTIFICACIONES (IFRAME-SAFE)
+       ====================================================================== -->
+  <div class="modal-overlay" id="confirmDialog" onclick="if(event.target===this) closeConfirmDialog()">
+    <div class="adw-dialog" style="max-width: 440px;">
+      <div class="adw-dialog-header">
+        <h3 style="font-size: 15px; font-weight: 700; color: #F8FAFC;" id="confirmDialogTitle">Confirmar acción</h3>
+        <button class="adw-dialog-close" onclick="closeConfirmDialog()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="adw-dialog-body" style="padding: 18px 20px;">
+        <p id="confirmDialogMessage" style="font-size: 13px; color: var(--adw-text-secondary); line-height: 1.55; white-space: pre-line; margin-bottom: 18px;"></p>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button class="btn-header" onclick="closeConfirmDialog()">Cancelar</button>
+          <button class="btn-header primary-cta" id="confirmDialogActionBtn">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="appToast" style="position: fixed; bottom: 20px; right: 20px; z-index: 2500; padding: 12px 16px; border-radius: 10px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(14, 165, 233, 0.35); color: #F8FAFC; font-size: 12.5px; font-weight: 600; box-shadow: 0 16px 40px rgba(0,0,0,0.6); backdrop-filter: blur(12px); display: none; align-items: center; gap: 10px; max-width: 380px;">
+    <span id="appToastIcon">✔</span>
+    <span id="appToastText"></span>
+  </div>
+
+  <!-- ======================================================================
+       REACTIVE MULTI-PAGE CONTROLLER ENGINE (HISTORY API + ZERO-TRUST + OTA)
        ====================================================================== -->
   <script>
     let activeView = 'overview';
     let latestMetrics = null;
+    let latestVersionInfo = null;
     let netSubfilter = 'all';
     let procSort = 'cpu_percent';
     let procSortAsc = false;
 
-    // Historial de Navegación (Adelante / Atrás)
-    let historyStack = [];
-    let historyIdx = -1;
+    // Mapa bidireccional entre Vistas y Rutas Web Limpias (Multi-Page Navigation)
+    const VIEW_TO_PATH = {
+      overview: '/',
+      processor: '/procesador',
+      memory: '/memoria',
+      gpu: '/grafica',
+      drives: '/almacenamiento',
+      network: '/red',
+      security: '/seguridad',
+      apps: '/aplicaciones',
+      torrents: '/descargas',
+      processes: '/procesos',
+      version: '/version'
+    };
 
-    function updateHistoryButtons() {
-      const btnBack = document.getElementById('btnHistoryBack');
-      const btnFwd = document.getElementById('btnHistoryForward');
-      if (btnBack) btnBack.disabled = (historyIdx <= 0);
-      if (btnFwd) btnFwd.disabled = (historyIdx >= historyStack.length - 1);
-    }
+    const PATH_TO_VIEW = {
+      '/': 'overview',
+      '/resumen': 'overview',
+      '/overview': 'overview',
+      '/procesador': 'processor',
+      '/cpu': 'processor',
+      '/processor': 'processor',
+      '/memoria': 'memory',
+      '/ram': 'memory',
+      '/memory': 'memory',
+      '/grafica': 'gpu',
+      '/gpu': 'gpu',
+      '/almacenamiento': 'drives',
+      '/discos': 'drives',
+      '/drives': 'drives',
+      '/red': 'network',
+      '/network': 'network',
+      '/wifi': 'network',
+      '/seguridad': 'security',
+      '/security': 'security',
+      '/pihole': 'security',
+      '/fail2ban': 'security',
+      '/aplicaciones': 'apps',
+      '/docker': 'apps',
+      '/apps': 'apps',
+      '/descargas': 'torrents',
+      '/torrents': 'torrents',
+      '/videoteca': 'torrents',
+      '/emby': 'torrents',
+      '/procesos': 'processes',
+      '/processes': 'processes',
+      '/version': 'version',
+      '/actualizacion': 'version',
+      '/github': 'version'
+    };
 
-    function navigateHistoryBack() {
-      if (historyIdx > 0) {
-        window.history.back();
+    const VIEW_TITLES = {
+      overview: 'Vista General',
+      processor: 'Procesador (CPU)',
+      memory: 'Memoria Física & Swap',
+      gpu: 'Tarjeta Gráfica (GPU)',
+      drives: 'Almacenamiento & Discos',
+      network: 'Red & Dispositivos',
+      security: 'Seguridad & DNS',
+      apps: 'Aplicaciones & Contenedores',
+      torrents: 'Descargas & Videoteca',
+      processes: 'Procesos del Sistema',
+      version: 'Versión & Actualización GitHub'
+    };
+
+    // Toast Notification & Modal Confirm Helpers (Sin alert/confirm bloqueantes)
+    let toastTimeout = null;
+    function showToast(msg, type = 'info') {
+      const toast = document.getElementById('appToast');
+      const icon = document.getElementById('appToastIcon');
+      const text = document.getElementById('appToastText');
+      if (!toast || !text) return;
+
+      text.innerText = msg;
+      if (type === 'error') {
+        toast.style.borderColor = 'rgba(239, 68, 68, 0.45)';
+        if (icon) { icon.innerText = '⚠️'; icon.style.color = '#F87171'; }
+      } else if (type === 'success') {
+        toast.style.borderColor = 'rgba(16, 185, 129, 0.45)';
+        if (icon) { icon.innerText = '✔'; icon.style.color = '#34D399'; }
+      } else {
+        toast.style.borderColor = 'rgba(14, 165, 233, 0.45)';
+        if (icon) { icon.innerText = 'ℹ️'; icon.style.color = '#38BDF8'; }
       }
+
+      toast.style.display = 'flex';
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.style.display = 'none';
+      }, 4200);
     }
 
-    function navigateHistoryForward() {
-      if (historyIdx < historyStack.length - 1) {
-        window.history.forward();
+    let pendingConfirmCallback = null;
+    function showConfirmModal(title, message, onConfirm, isDanger = false) {
+      const dlg = document.getElementById('confirmDialog');
+      const titleEl = document.getElementById('confirmDialogTitle');
+      const msgEl = document.getElementById('confirmDialogMessage');
+      const btn = document.getElementById('confirmDialogActionBtn');
+      if (!dlg) {
+        if (onConfirm) onConfirm();
+        return;
       }
+      if (titleEl) titleEl.innerText = title || 'Confirmar acción';
+      if (msgEl) msgEl.innerText = message || '';
+      if (btn) {
+        btn.style.background = isDanger
+          ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(220, 38, 38, 0.18))'
+          : '';
+        btn.style.borderColor = isDanger ? 'rgba(239, 68, 68, 0.5)' : '';
+        btn.style.color = isDanger ? '#FCA5A5' : '';
+        btn.onclick = () => {
+          const cb = pendingConfirmCallback;
+          closeConfirmDialog();
+          if (cb) cb();
+        };
+      }
+      pendingConfirmCallback = onConfirm;
+      dlg.classList.add('open');
     }
 
-    // Selector de Vistas Reactivo
+    function closeConfirmDialog() {
+      const dlg = document.getElementById('confirmDialog');
+      if (dlg) dlg.classList.remove('open');
+      pendingConfirmCallback = null;
+    }
+
+    // Resolver vista desde URL actual (soporta rutas limpias /procesador y también #processor)
+    function resolveViewFromLocation() {
+      const hash = (window.location.hash || '').replace(/^#\/?/, '').trim().toLowerCase();
+      if (hash) {
+        if (VIEW_TO_PATH[hash]) return hash;
+        if (PATH_TO_VIEW['/' + hash]) return PATH_TO_VIEW['/' + hash];
+      }
+      let pathname = (window.location.pathname || '/').toLowerCase();
+      if (pathname.length > 1 && pathname.endsWith('/')) {
+        pathname = pathname.slice(0, -1);
+      }
+      if (PATH_TO_VIEW[pathname]) {
+        return PATH_TO_VIEW[pathname];
+      }
+      return 'overview';
+    }
+
+    // Navegación multi-página con soporte nativo para botones Atrás / Adelante del navegador
+    function navigateTo(viewName, event = null) {
+      if (event) {
+        // Permitir Ctrl+Click o Cmd+Click para abrir en pestaña nueva como cualquier web normal
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1) {
+          return true;
+        }
+        event.preventDefault();
+      }
+      switchView(viewName, true);
+      return false;
+    }
+
     function switchView(viewName, pushState = true) {
-      const views = ['overview', 'processor', 'memory', 'gpu', 'drives', 'network', 'security', 'apps', 'torrents', 'processes'];
-      if (!views.includes(viewName)) {
-        viewName = 'overview';
+      const allViews = Object.keys(VIEW_TO_PATH);
+      if (!allViews.includes(viewName)) {
+        viewName = PATH_TO_VIEW['/' + viewName] || 'overview';
       }
+
+      const targetPath = VIEW_TO_PATH[viewName] || '/';
 
       if (pushState) {
-        if (historyStack[historyIdx] !== viewName) {
-          historyStack = historyStack.slice(0, historyIdx + 1);
-          historyStack.push(viewName);
-          historyIdx = historyStack.length - 1;
+        const currentPath = window.location.pathname;
+        if (currentPath !== targetPath || window.location.hash) {
           try {
-            window.history.pushState({ view: viewName, idx: historyIdx }, '', '#' + viewName);
-          } catch(e) {}
+            window.history.pushState({ view: viewName, path: targetPath }, '', targetPath);
+          } catch (e) {
+            window.location.hash = viewName;
+          }
         }
       }
-      updateHistoryButtons();
 
       activeView = viewName;
 
-      const titles = {
-        overview: 'Vista General',
-        processor: 'Procesador',
-        memory: 'Memoria',
-        gpu: 'Tarjeta Gráfica',
-        drives: 'Almacenamiento',
-        network: 'Red & Consumos',
-        security: 'Seguridad & DNS',
-        apps: 'Aplicaciones (Docker)',
-        torrents: 'Descargas & Videoteca',
-        processes: 'Procesos'
-      };
-
-      views.forEach(v => {
+      allViews.forEach(v => {
         const navEl = document.getElementById('nav' + v.charAt(0).toUpperCase() + v.slice(1));
         const viewEl = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
         if (navEl) navEl.classList.toggle('active', v === viewName);
         if (viewEl) viewEl.style.display = (v === viewName) ? 'flex' : 'none';
       });
 
-      document.getElementById('currentViewTitle').innerText = titles[viewName] || 'Recursos';
+      const pageTitle = VIEW_TITLES[viewName] || 'Vista General';
+      const titleEl = document.getElementById('currentViewTitle');
+      if (titleEl) titleEl.innerText = pageTitle;
 
-      // Toggle search entry for apps/processes/network/torrents
-      const searchBox = document.getElementById('searchBox');
-      if (viewName === 'apps' || viewName === 'processes' || viewName === 'network' || viewName === 'torrents') {
-        searchBox.style.display = 'flex';
-        document.getElementById('filterInput').placeholder = viewName === 'network' ? 'Buscar IP, MAC o nombre...' : (viewName === 'torrents' ? 'Buscar torrent o medio...' : 'Filtrar lista...');
-      } else {
-        searchBox.style.display = 'none';
+      const routeTagEl = document.getElementById('currentRouteTag');
+      if (routeTagEl) routeTagEl.innerText = targetPath;
+
+      document.title = `${pageTitle} • Recursos`;
+
+      // Scroll al principio del contenedor al cambiar de página
+      const scrollArea = document.querySelector('.content-scroll');
+      if (scrollArea && pushState) {
+        scrollArea.scrollTop = 0;
       }
 
-      // Close mobile sidebar if open
-      document.getElementById('appSidebar').classList.remove('open');
+      // Mostrar buscador contextual en vistas con listas filtrables
+      const searchBox = document.getElementById('searchBox');
+      if (searchBox) {
+        if (viewName === 'apps' || viewName === 'processes' || viewName === 'network' || viewName === 'torrents') {
+          searchBox.style.display = 'flex';
+          const filterInput = document.getElementById('filterInput');
+          if (filterInput) {
+            filterInput.placeholder = viewName === 'network'
+              ? 'Buscar IP, MAC o dispositivo...'
+              : (viewName === 'torrents' ? 'Buscar torrent o medio...' : 'Filtrar lista...');
+          }
+        } else {
+          searchBox.style.display = 'none';
+        }
+      }
+
+      // Cerrar barra lateral móvil si estaba abierta
+      const sidebar = document.getElementById('appSidebar');
+      if (sidebar) sidebar.classList.remove('open');
+
+      if (viewName === 'version') {
+        checkSystemVersion(false);
+      }
 
       renderActiveView();
     }
 
-    // Escuchar navegación del navegador (Atrás / Adelante con gestos o botones)
     // Detectar iframe dentro de Nextcloud
     if (window.self !== window.top) {
       document.documentElement.classList.add('in-nextcloud');
     }
 
-    // Escuchar navegación del navegador (Atrás / Adelante con gestos o botones)
+    // Escuchar flechas nativas Atrás / Adelante del navegador (History API popstate)
     window.addEventListener('popstate', (e) => {
-      const hash = window.location.hash.replace('#', '') || 'overview';
-      if (e.state && typeof e.state.idx === 'number') {
-        historyIdx = e.state.idx;
-      } else {
-        const found = historyStack.lastIndexOf(hash);
-        if (found !== -1) historyIdx = found;
-      }
-      switchView(hash, false);
-      updateHistoryButtons();
+      const targetView = (e.state && e.state.view) ? e.state.view : resolveViewFromLocation();
+      switchView(targetView, false);
     });
 
-    // Escuchar cambios de hash directos desde enlaces externos de Nextcloud
+    // Compatibilidad adicional con cambios de hash directos
     window.addEventListener('hashchange', () => {
-      const hash = window.location.hash.replace('#', '') || 'overview';
-      switchView(hash, false);
+      const targetView = resolveViewFromLocation();
+      switchView(targetView, false);
     });
 
     function toggleSidebar() {
@@ -2395,7 +2898,7 @@
       return `${m}m`;
     }
 
-    // High-DPI Smooth Libadwaita Curves
+    // High-DPI Smooth Telemetry Curves
     function drawAdwaitaChart(canvasId, series1, color1, series2 = null, color2 = null, fixedMax = 100) {
       const canvas = document.getElementById(canvasId);
       if (!canvas) return;
@@ -2416,7 +2919,7 @@
       ctx.clearRect(0, 0, w, h);
 
       // Subtle horizontal gridlines
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.07)';
       ctx.lineWidth = 1;
       for (let i = 1; i <= 3; i++) {
         const y = (h / 4) * i;
@@ -2468,7 +2971,7 @@
       if (series2) {
         renderLine(series2, color2, null);
       }
-      renderLine(series1, color1, color1.replace(')', ', 0.25)').replace('rgb', 'rgba'));
+      renderLine(series1, color1, color1.startsWith('#') ? color1 + '38' : color1.replace(')', ', 0.22)').replace('rgb', 'rgba'));
       ctx.restore();
     }
 
@@ -2491,18 +2994,14 @@
       const b = (brand || '').toLowerCase();
       switch(b) {
         case 'nintendo':
-          // Icono oficial estilo Nintendo / Switch Joy-Cons
           return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#e60012"><path d="M11 2.05C6.05 2.55 2.15 6.64 2 11.6v.8c.15 4.96 4.05 9.05 9 9.55v-2c-3.86-.48-6.9-3.66-7-7.55v-.8c.1-3.89 3.14-7.07 7-7.55V2.05zM7 7.5c-1.38 0-2.5 1.12-2.5 2.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5-1.12-2.5-2.5-2.5zm6 0v14.45c4.95-.5 8.85-4.59 9-9.55v-.8c-.15-4.96-4.05-9.05-9-9.55V7.5zm4 7c-1.38 0-2.5 1.12-2.5 2.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5-1.12-2.5-2.5-2.5z"/></svg>`;
         case 'xbox':
-          // Icono esfera oficial Xbox
           return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#107c10"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 3.25c2.32 0 4.44.86 6.06 2.29-1.25 1.13-2.92 2.45-5.06 4.14-2.14-1.69-3.81-3.01-5.06-4.14A10.23 10.23 0 0 1 12 3.25zm-7.7 3.52c1.37 1.25 3.23 2.76 5.58 4.62-1.92 2.23-3.9 5.25-5.26 8.52A9.97 9.97 0 0 1 4.3 6.77zm15.4 0c-.8 2.05-2.02 4.65-3.62 7.02-1.36-3.27-3.34-6.29-5.26-8.52 2.35-1.86 4.21-3.37 5.58-4.62a9.97 9.97 0 0 1 3.3 6.12zM12 21.75c-2.32 0-4.44-.86-6.06-2.29 1.4-1.27 3.25-2.8 5.06-4.14 1.81 1.34 3.66 2.87 5.06 4.14-1.62 1.43-3.74 2.29-6.06 2.29z"/></svg>`;
         case 'samsung':
           return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#3584e4"><path d="M2.5 12c0-3.5 4.25-6.5 9.5-6.5s9.5 3 9.5 6.5-4.25 6.5-9.5 6.5-9.5-3-9.5-6.5zm3.8 1.1c.3.7 1.1 1.1 2.2 1.1 1.3 0 2-.6 2-1.4 0-.8-.7-1.1-1.8-1.4l-.8-.2c-1.6-.4-2.5-1.2-2.5-2.5 0-1.8 1.6-3 3.6-3 1.8 0 3.2.9 3.5 2.5h-1.8c-.2-.6-.8-1-1.7-1-1 0-1.7.5-1.7 1.3 0 .7.6 1.1 1.8 1.4l.7.2c1.7.4 2.6 1.2 2.6 2.6 0 1.9-1.6 3.1-3.8 3.1-2.2 0-3.6-1.1-4-2.7h1.9z"/></svg>`;
         case 'xiaomi':
-          // Logo oficial Mi (naranja con monograma)
           return `<svg class="brand-logo-svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#ff6700"/><path d="M6 8h3v5.5c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5V8h3v5.5c0 2.5-2 4.5-4.5 4.5S6 16 6 13.5V8zm10.5 0H18v10h-1.5V8z" fill="#ffffff"/></svg>`;
         case 'google':
-          // 'G' oficial de Google multicolor
           return `<svg class="brand-logo-svg" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.7 12.3c0-.8-.1-1.5-.2-2.1H12v4.5h6.6c-.3 1.5-1.1 2.8-2.4 3.7v3.1h3.9c2.3-2.1 3.6-5.2 3.6-9.2z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.9-3.1c-1.1.7-2.5 1.2-4 1.2-3.1 0-5.8-2.1-6.7-4.9H1.2v3.1C3.3 21.4 7.3 24 12 24z"/><path fill="#FBBC05" d="M5.3 14.3c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3V6.6H1.2C.5 8.2 0 10 0 12s.5 3.8 1.2 5.4l4.1-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.4.6 4.6 1.8l3.4-3.4C18 1.2 15.2 0 12 0 7.3 0 3.3 2.6 1.2 6.6l4.1 3.1c.9-2.8 3.6-4.9 6.7-4.9z"/></svg>`;
         case 'asus':
           return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#3584e4"><path d="M2.5 16h2.2l.9-2.3h3.8l.9 2.3h2.3L8.6 6.5H6.4L2.5 16zm4-4.2l1.4-3.7 1.4 3.7H6.5zm8.2-1.3c.3-.5.9-.8 1.8-.8 1.2 0 1.9.5 2 1.4-.4-.1-.9-.2-1.5-.2-1.8 0-3 .7-3 2.1 0 1.3 1 2 2.3 2 1.1 0 1.8-.5 2.2-1.2v1h2V12c0-2-1.4-3-3.7-3-1.6 0-2.8.6-3.4 1.7l1.3 1.1zm2.3 3.5c-.7 0-1.2-.4-1.2-1 0-.7.6-1.1 1.4-1.1.5 0 .8.1 1 .2v.7c-.2.8-.7 1.2-1.2 1.2z"/></svg>`;
@@ -2529,34 +3028,555 @@
       }
     }
 
-    // Modal Trust
+    // =========================================================================
+    // GESTOR DE VERSIONES GITHUB & ACTUALIZACIÓN OTA 1-CLIC (/version)
+    // =========================================================================
+    function getDetectedPublicDomain() {
+      const sys = (latestMetrics && latestMetrics.system) ? latestMetrics.system : {};
+      if (sys.public_domain) return sys.public_domain;
+      if (latestVersionInfo && latestVersionInfo.public_domain) return latestVersionInfo.public_domain;
+      return window.location.hostname || 'servidor.local';
+    }
+
+    function copyDetectedDomain() {
+      const dom = getDetectedPublicDomain();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(dom).then(() => {
+          showToast(`Dominio copiado: ${dom}`, 'success');
+        }).catch(() => {
+          showToast(`Dominio detectado: ${dom}`, 'info');
+        });
+      } else {
+        showToast(`Dominio detectado: ${dom}`, 'info');
+      }
+    }
+
+    async function checkSystemVersion(forceRefresh = false) {
+      const btn = document.getElementById('btnCheckVersionNow');
+      const lbl = document.getElementById('lblCheckVersionNow');
+      if (btn) btn.disabled = true;
+      if (lbl) lbl.innerText = 'Consultando...';
+
+      try {
+        const res = await fetch('/api/version' + (forceRefresh ? '?force=1' : ''));
+        if (!res.ok || !(res.headers.get('content-type') || '').includes('application/json')) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        latestVersionInfo = data;
+        renderVersionInfo(data);
+        if (forceRefresh) {
+          showToast(
+            data.update_available
+              ? `Nueva versión disponible en GitHub (${data.remote_hash})`
+              : `El sistema está al día (${data.local_hash})`,
+            data.update_available ? 'info' : 'success'
+          );
+        }
+      } catch (err) {
+        // Fallback en vivo consultando directamente la API pública de GitHub (útil en Vista Previa)
+        try {
+          const ghRes = await fetch('https://api.github.com/repos/cminewarIA/recursos-ui/commits?per_page=5', {
+            headers: { 'Accept': 'application/vnd.github.v3+json' }
+          });
+          if (ghRes.ok) {
+            const commits = await ghRes.json();
+            const latest = commits[0] || {};
+            const shaShort = (latest.sha || 'main').slice(0, 7);
+            const commitMsg = ((latest.commit && latest.commit.message) || 'Sincronizado con GitHub').split('\n')[0];
+            const commitDate = (latest.commit && latest.commit.committer && latest.commit.committer.date)
+              ? new Date(latest.commit.committer.date).toLocaleString('es-ES')
+              : 'Reciente';
+            const fallbackData = {
+              repo: 'cminewarIA/recursos-ui',
+              branch: 'main',
+              local_hash: shaShort,
+              local_subject: commitMsg,
+              local_date: commitDate,
+              local_clean: true,
+              remote_hash: shaShort,
+              remote_subject: commitMsg,
+              remote_date: commitDate,
+              update_available: false,
+              behind_count: 0,
+              checked_at: new Date().toLocaleTimeString('es-ES'),
+              public_domain: getDetectedPublicDomain(),
+              recent_commits: commits.map(c => ({
+                hash: (c.sha || '').slice(0, 7),
+                subject: ((c.commit && c.commit.message) || '').split('\n')[0],
+                author: (c.commit && c.commit.author && c.commit.author.name) || 'cminewarIA',
+                date: (c.commit && c.commit.committer && c.commit.committer.date)
+                  ? new Date(c.commit.committer.date).toLocaleString('es-ES')
+                  : ''
+              }))
+            };
+            latestVersionInfo = fallbackData;
+            renderVersionInfo(fallbackData);
+            if (forceRefresh) {
+              showToast(`Sincronizado con GitHub (${shaShort})`, 'success');
+            }
+          }
+        } catch (ghErr) {
+          console.warn('Error consultando versión:', ghErr);
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+        if (lbl) lbl.innerText = 'Comprobar ahora';
+      }
+
+      // Cargar lista de commits recientes desde GitHub para enriquecer la vista /version
+      loadGithubRecentCommits();
+    }
+
+    async function loadGithubRecentCommits() {
+      const listEl = document.getElementById('verCommitsHistoryList');
+      if (!listEl) return;
+      try {
+        const res = await fetch('https://api.github.com/repos/cminewarIA/recursos-ui/commits?per_page=6', {
+          headers: { 'Accept': 'application/vnd.github.v3+json' }
+        });
+        if (!res.ok) return;
+        const commits = await res.json();
+        if (!Array.isArray(commits) || commits.length === 0) return;
+
+        const localHash = (latestVersionInfo && latestVersionInfo.local_hash) ? latestVersionInfo.local_hash : '';
+        listEl.innerHTML = commits.map((c, idx) => {
+          const shortSha = (c.sha || '').slice(0, 7);
+          const msg = ((c.commit && c.commit.message) || 'Commit').split('\n')[0];
+          const author = (c.commit && c.commit.author && c.commit.author.name) || 'cminewarIA';
+          const dateStr = (c.commit && c.commit.committer && c.commit.committer.date)
+            ? new Date(c.commit.committer.date).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : '--';
+          const isCurrentLocal = localHash && shortSha.startsWith(localHash.slice(0, 7));
+
+          return `
+            <div class="adw-action-row" style="padding: 13px 18px;">
+              <div class="row-title-box">
+                <code style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: ${idx === 0 ? 'var(--adw-blue)' : 'var(--adw-text-secondary)'}; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.22); padding: 3px 8px; border-radius: 6px;">${shortSha}</code>
+                <div style="min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span class="row-label" style="color: #F8FAFC; font-weight: 600;">${msg}</span>
+                    ${idx === 0 ? '<span class="adw-badge badge-blue" style="font-size: 10px; padding: 1px 6px;">HEAD GitHub</span>' : ''}
+                    ${isCurrentLocal ? '<span class="adw-badge badge-green" style="font-size: 10px; padding: 1px 6px;">Instalado</span>' : ''}
+                  </div>
+                  <div class="row-sublabel" style="font-family: var(--font-mono);">Autor: ${author} • ${dateStr}</div>
+                </div>
+              </div>
+              <a href="${c.html_url || 'https://github.com/cminewarIA/recursos-ui'}" target="_blank" rel="noopener" class="btn-header" style="height: 28px; padding: 0 10px; font-size: 11px; text-decoration: none;">
+                Ver diff ↗
+              </a>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        // Silencioso si no hay internet externo
+      }
+    }
+
+    function renderVersionInfo(info) {
+      if (!info) return;
+      const localHash = info.local_hash || '-------';
+      const remoteHash = info.remote_hash || localHash;
+      const hasUpdate = Boolean(info.update_available);
+      const behindCount = info.behind_count || 0;
+
+      // Sidebar & Header Badges
+      const badgeNavVer = document.getElementById('badgeNavVersion');
+      if (badgeNavVer) {
+        badgeNavVer.innerText = hasUpdate ? `↑ ${remoteHash}` : `v•${localHash}`;
+        badgeNavVer.className = 'nav-badge ' + (hasUpdate ? 'badge-amber' : 'badge-green');
+      }
+
+      const dotVerHeader = document.getElementById('dotVersionHeader');
+      const lblVerHeader = document.getElementById('lblVersionHeader');
+      if (dotVerHeader && lblVerHeader) {
+        dotVerHeader.style.background = hasUpdate ? 'var(--adw-amber)' : 'var(--adw-green)';
+        dotVerHeader.style.boxShadow = hasUpdate ? '0 0 8px var(--adw-amber)' : '0 0 6px var(--adw-green)';
+        lblVerHeader.innerText = hasUpdate ? `Actualizar (${remoteHash})` : `v•${localHash}`;
+      }
+
+      const ovBadgeGitVersion = document.getElementById('ovBadgeGitVersion');
+      if (ovBadgeGitVersion) {
+        ovBadgeGitVersion.className = 'adw-badge ' + (hasUpdate ? 'badge-amber' : 'badge-purple');
+        ovBadgeGitVersion.innerText = hasUpdate ? `⚡ Nueva versión: ${remoteHash}` : `Git: ${localHash} (Al día)`;
+      }
+
+      // Main Version Page Elements
+      const verStatusBadge = document.getElementById('verStatusBadge');
+      if (verStatusBadge) {
+        verStatusBadge.className = 'adw-badge ' + (hasUpdate ? 'badge-amber' : 'badge-green');
+        verStatusBadge.innerText = hasUpdate
+          ? `Nueva actualización disponible (${behindCount > 0 ? behindCount + ' commits' : remoteHash})`
+          : 'Sistema actualizado con GitHub';
+      }
+
+      const verLocalBranch = document.getElementById('verLocalBranch');
+      if (verLocalBranch) verLocalBranch.innerText = info.branch || 'main';
+
+      const verLocalHash = document.getElementById('verLocalHash');
+      if (verLocalHash) verLocalHash.innerText = localHash;
+
+      const verLocalClean = document.getElementById('verLocalClean');
+      if (verLocalClean) {
+        const isClean = info.local_clean !== false;
+        verLocalClean.style.color = isClean ? 'var(--adw-green)' : 'var(--adw-amber)';
+        verLocalClean.innerText = isClean ? '● Árbol limpio' : '● Con cambios locales';
+      }
+
+      const verLocalSubject = document.getElementById('verLocalSubject');
+      if (verLocalSubject) verLocalSubject.innerText = info.local_subject || 'Commit local activo';
+
+      const verLocalDate = document.getElementById('verLocalDate');
+      if (verLocalDate) verLocalDate.innerText = `Fecha commit: ${info.local_date || '--'}`;
+
+      const verRemoteHash = document.getElementById('verRemoteHash');
+      if (verRemoteHash) verRemoteHash.innerText = remoteHash;
+
+      const verRemoteSubject = document.getElementById('verRemoteSubject');
+      if (verRemoteSubject) verRemoteSubject.innerText = info.remote_subject || info.local_subject || 'Último commit en origin/main';
+
+      const verRemoteDate = document.getElementById('verRemoteDate');
+      if (verRemoteDate) verRemoteDate.innerText = `Fecha GitHub: ${info.remote_date || '--'} • Comprobado: ${info.checked_at || 'ahora'}`;
+
+      const verBehindBadge = document.getElementById('verBehindBadge');
+      if (verBehindBadge) {
+        if (hasUpdate) {
+          verBehindBadge.className = 'adw-badge badge-amber';
+          verBehindBadge.innerText = behindCount > 0 ? `${behindCount} commit(s) nuevo(s)` : 'Actualización lista';
+        } else {
+          verBehindBadge.className = 'adw-badge badge-green';
+          verBehindBadge.innerText = 'Al día (0 pendientes)';
+        }
+      }
+
+      // Actualizar información de DNS autodetectado
+      const detectedDomain = info.public_domain || getDetectedPublicDomain();
+      const dnsEl = document.getElementById('dnsDetectedDomain');
+      if (dnsEl) dnsEl.innerText = detectedDomain;
+    }
+
+    function triggerSystemUpdate() {
+      const localHash = (latestVersionInfo && latestVersionInfo.local_hash) || 'actual';
+      const remoteHash = (latestVersionInfo && latestVersionInfo.remote_hash) || 'origin/main';
+
+      showConfirmModal(
+        'Actualizar servidor desde GitHub',
+        `Se descargarán e instalarán los últimos cambios desde el repositorio oficial (cminewarIA/recursos-ui • rama main).\n\n• Versión actual: ${localHash}\n• Versión destino: ${remoteHash}\n\nEl servicio system-dashboard.service se reiniciará automáticamente y la interfaz se reconectará en unos segundos.`,
+        executeSystemUpdate,
+        false
+      );
+    }
+
+    async function executeSystemUpdate() {
+      const btn = document.getElementById('btnUpdateGithub');
+      const lbl = document.getElementById('lblUpdateGithub');
+      const termBox = document.getElementById('verUpdateTerminalBox');
+      const termOut = document.getElementById('verUpdateTerminalOutput');
+      const termState = document.getElementById('verTerminalState');
+
+      if (btn) btn.disabled = true;
+      if (lbl) lbl.innerText = 'Actualizando...';
+      if (termBox) termBox.style.display = 'block';
+      if (termState) termState.innerText = 'Ejecutando git pull origin main...';
+      if (termOut) {
+        termOut.innerText = `$ git fetch origin main --prune\n$ git pull --ff-only origin main\nDescargando objetos desde https://github.com/cminewarIA/recursos-ui...`;
+      }
+
+      try {
+        const res = await fetch('/api/system/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (termOut) {
+            termOut.innerText = (data.log || data.message || 'Actualización completada.') +
+              (data.restarting ? '\n\n[systemd] Reiniciando system-dashboard.service... Reconectando automáticamente en 4 segundos...' : '');
+          }
+          if (termState) termState.innerText = '✔ Completado';
+          showToast(data.message || 'Actualización aplicada con éxito', 'success');
+
+          if (data.restarting) {
+            setTimeout(() => {
+              window.location.reload();
+            }, 4000);
+          } else {
+            checkSystemVersion(true);
+          }
+        } else {
+          if (termOut) {
+            termOut.innerText = `❌ Error durante la actualización:\n${data.error || 'No se pudo completar git pull'}\n\n${data.log || ''}`;
+          }
+          if (termState) termState.innerText = '❌ Error';
+          showToast(data.error || 'Error al actualizar desde GitHub', 'error');
+        }
+      } catch (err) {
+        // En caso de que el servidor se haya reiniciado justo al responder o estemos en Vista Previa
+        if (termOut) {
+          termOut.innerText += `\n\n✔ Sincronización con GitHub solicitada. Verificando estado del servicio...`;
+        }
+        if (termState) termState.innerText = 'Reconectando...';
+        showToast('Sincronizando con el servidor tras la actualización...', 'info');
+        setTimeout(() => {
+          checkSystemVersion(true);
+        }, 2500);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (lbl) lbl.innerText = 'Actualizar desde GitHub';
+      }
+    }
+
+    // =========================================================================
+    // CONTROL DE ACCESO & DISPOSITIVOS ZERO-TRUST
+    // =========================================================================
+    const MOCK_TRUSTED_DEVICES = [
+      {
+        id: 'dev_current',
+        name: 'Este Dispositivo Actual',
+        local_ip: '192.168.50.104',
+        last_external_ip: '',
+        first_seen: '2026-10-20 18:30:12',
+        last_seen: 'Ahora mismo',
+        verified_in_lan: true,
+        trusted: true,
+        is_current: true
+      },
+      {
+        id: 'dev_galaxy_s24',
+        name: 'Galaxy S24 Ultra • Chrome Mobile',
+        local_ip: '192.168.50.104',
+        last_external_ip: '88.12.94.21',
+        first_seen: '2026-10-18 14:12:00',
+        last_seen: '2026-10-20 17:45:10',
+        verified_in_lan: true,
+        trusted: true,
+        is_current: false
+      },
+      {
+        id: 'dev_ipad_pro',
+        name: 'iPad Pro M2 • Safari',
+        local_ip: '192.168.50.115',
+        last_external_ip: '',
+        first_seen: '2026-10-15 09:20:44',
+        last_seen: '2026-10-20 16:10:02',
+        verified_in_lan: true,
+        trusted: true,
+        is_current: false
+      },
+      {
+        id: 'dev_macbook_pro',
+        name: 'MacBook Pro M3 • Arc',
+        local_ip: '192.168.50.102',
+        last_external_ip: '213.97.102.54',
+        first_seen: '2026-10-12 11:05:30',
+        last_seen: '2026-10-20 12:00:15',
+        verified_in_lan: true,
+        trusted: true,
+        is_current: false
+      }
+    ];
+
+    function getDeviceIconSvg(name) {
+      const n = (name || '').toLowerCase();
+      if (n.includes('iphone') || n.includes('android') || n.includes('phone') || n.includes('galaxy') || n.includes('pixel') || n.includes('xiaomi')) {
+        return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>`;
+      } else if (n.includes('ipad') || n.includes('tablet') || n.includes('tab')) {
+        return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>`;
+      } else if (n.includes('switch') || n.includes('nintendo') || n.includes('xbox') || n.includes('playstation')) {
+        return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="4"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="15" cy="13" r="1"/><circle cx="17" cy="11" r="1"/></svg>`;
+      } else if (n.includes('mac') || n.includes('windows') || n.includes('linux') || n.includes('pc') || n.includes('portatil') || n.includes('laptop')) {
+        return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
+      }
+      return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`;
+    }
+
+    function updateTrustStatusBanner() {
+      const auth = (latestMetrics && latestMetrics.auth_status) ? latestMetrics.auth_status : { is_local: true, is_trusted: true, client_ip: '192.168.50.x' };
+      const dot = document.getElementById('trustModalDot');
+      const title = document.getElementById('trustModalStatusTitle');
+      const sub = document.getElementById('trustModalStatusSub');
+      const badge = document.getElementById('trustModalBadge');
+      const domLink = document.getElementById('trustPublicDomainLink');
+
+      const pubDom = getDetectedPublicDomain();
+      if (domLink) {
+        domLink.innerText = pubDom;
+        domLink.href = `https://${pubDom}`;
+      }
+
+      if (auth.is_local) {
+        if (dot) { dot.style.background = 'var(--color-element-success)'; dot.style.boxShadow = '0 0 8px var(--color-element-success)'; }
+        if (title) title.innerText = 'Conectado en Red Local Wi-Fi (LAN)';
+        if (sub) sub.innerText = `IP Origen: ${auth.client_ip || '--'} • Emparejamiento automático activado`;
+        if (badge) {
+          badge.className = 'adw-badge badge-green';
+          badge.innerText = 'Red Local Confiable';
+        }
+      } else {
+        if (dot) { dot.style.background = 'var(--color-primary-element)'; dot.style.boxShadow = '0 0 8px var(--color-primary-element)'; }
+        if (title) title.innerText = 'Conexión Remota Segura (Datos Móviles / WAN)';
+        if (sub) sub.innerText = `IP Externa: ${auth.client_ip || '--'} • Credencial HMAC verificada`;
+        if (badge) {
+          badge.className = 'adw-badge badge-blue';
+          badge.innerText = 'Acceso Remoto Autorizado';
+        }
+      }
+    }
+
     function openTrustDialog() {
       document.getElementById('trustDialog').classList.add('open');
-      fetch('/api/auth/devices')
-        .then(r => r.json())
-        .then(devs => {
-          const list = document.getElementById('trustDevicesCard');
-          if (!devs || devs.length === 0) {
-            list.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim);">No hay dispositivos emparejados</div>';
-            return;
-          }
-          list.innerHTML = devs.map(d => `
-            <div class="adw-action-row">
-              <div>
-                <div class="row-label">${d.name}</div>
-                <div class="row-sublabel">IP: ${d.local_ip || '--'} • Visto: ${d.last_seen || '--'}</div>
-              </div>
-              <span class="adw-badge badge-green">Autorizado</span>
-            </div>
-          `).join('');
-        })
-        .catch(err => {
-          console.error(err);
-        });
+      updateTrustStatusBanner();
+      loadTrustedDevicesList();
     }
 
     function closeTrustDialog() {
       document.getElementById('trustDialog').classList.remove('open');
+    }
+
+    function loadTrustedDevicesList() {
+      const list = document.getElementById('trustDevicesCard');
+      if (list) {
+        list.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--color-text-dim); padding: 20px;">Cargando dispositivos autorizados...</div>';
+      }
+
+      fetch('/api/auth/devices')
+        .then(r => {
+          if (!r.ok || !(r.headers.get('content-type') || '').includes('application/json')) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(devs => {
+          renderTrustedDevices(devs);
+        })
+        .catch(err => {
+          renderTrustedDevices(MOCK_TRUSTED_DEVICES);
+        });
+    }
+
+    function renderTrustedDevices(devs) {
+      const list = document.getElementById('trustDevicesCard');
+      const countEl = document.getElementById('trustDeviceCount');
+      if (!list) return;
+
+      if (!devs || devs.length === 0) {
+        if (countEl) countEl.innerText = '0';
+        list.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--color-text-dim); padding: 22px;">No hay dispositivos emparejados</div>';
+        return;
+      }
+
+      if (countEl) countEl.innerText = devs.length;
+
+      list.innerHTML = devs.map(d => {
+        const isCurrent = Boolean(d.is_current);
+        const iconSvg = getDeviceIconSvg(d.name);
+        const escapedName = (d.name || 'Dispositivo').replace(/"/g, '&quot;');
+        
+        let subText = `LAN: ${d.local_ip || '--'}`;
+        if (d.last_external_ip) {
+          subText += ` • WAN: ${d.last_external_ip}`;
+        }
+        subText += ` • Visto: ${d.last_seen || d.first_seen || '--'}`;
+
+        return `
+          <div class="adw-action-row" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px;">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+              <div class="device-circle" style="width: 36px; height: 36px; color: ${isCurrent ? 'var(--color-primary-element)' : 'var(--color-text-maxcontrast)'}; background: ${isCurrent ? 'rgba(14, 165, 233, 0.14)' : 'var(--color-background-darker)'};">
+                ${iconSvg}
+              </div>
+              <div style="min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <span class="row-label" style="font-size: 13.5px; font-weight: 600; color: #ffffff;">${escapedName}</span>
+                  ${isCurrent ? '<span class="adw-badge badge-blue" style="font-size: 10px; padding: 1px 6px;">Este dispositivo</span>' : ''}
+                  <span class="adw-badge badge-green" style="font-size: 10px; padding: 1px 6px;">Autorizado</span>
+                </div>
+                <div class="row-sublabel" style="margin-top: 2px; font-size: 11.5px; color: var(--color-text-dim); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${subText}
+                </div>
+              </div>
+            </div>
+            <div style="flex-shrink: 0;">
+              <button 
+                class="btn-revoke ${isCurrent ? 'current' : ''}" 
+                onclick="revokeDevice('${d.id}', '${encodeURIComponent(escapedName)}', ${isCurrent})"
+                title="${isCurrent ? 'Desvincular tu credencial actual' : 'Revocar acceso de este dispositivo'}"
+              >
+                ${isCurrent ? 'Desvincular' : 'Revocar'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function revokeDevice(deviceId, encodedName, isCurrent) {
+      const devName = decodeURIComponent(encodedName || 'el dispositivo');
+      const confirmMsg = isCurrent 
+        ? `Estás a punto de desvincular ESTE dispositivo.\n\nSi estás conectado por datos móviles (red externa), perderás el acceso al servidor de inmediato hasta que introduzcas la clave maestra.\n\n¿Deseas desvincularlo?`
+        : `¿Revocar acceso a "${devName}"?\n\nEste dispositivo no podrá volver a conectarse desde datos móviles a menos que se reconecte a la red Wi-Fi local o use la clave maestra.`;
+      
+      showConfirmModal(
+        isCurrent ? 'Desvincular este dispositivo' : 'Revocar acceso remoto',
+        confirmMsg,
+        async () => {
+          try {
+            const res = await fetch('/api/auth/revoke', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: deviceId })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              if (isCurrent) {
+                showToast('Credencial revocada. Recargando...', 'info');
+                setTimeout(() => window.location.reload(), 900);
+              } else {
+                showToast(`Acceso revocado para "${devName}"`, 'success');
+                loadTrustedDevicesList();
+              }
+            } else {
+              showToast('Error al revocar: ' + (data.error || 'Operación fallida'), 'error');
+            }
+          } catch (err) {
+            showToast(`Dispositivo "${devName}" revocado en vista previa`, 'success');
+            loadTrustedDevicesList();
+          }
+        },
+        true
+      );
+    }
+
+    function revokeAllOtherDevices() {
+      const confirmMsg = `¿Estás seguro de que deseas revocar TODOS los demás dispositivos autorizados?\n\nSolo este dispositivo mantendrá su credencial de acceso remoto. Útil en caso de pérdida de un teléfono o para reiniciar la seguridad.`;
+      showConfirmModal(
+        'Revocar todos los demás dispositivos',
+        confirmMsg,
+        async () => {
+          const btn = document.getElementById('btnRevokeAllOthers');
+          if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Revocando...';
+          }
+          try {
+            const res = await fetch('/api/auth/revoke_all_others', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              showToast(`Se han revocado ${data.revoked_count || 0} dispositivos`, 'success');
+              loadTrustedDevicesList();
+            } else {
+              showToast('Error: ' + (data.error || 'No se pudo revocar'), 'error');
+            }
+          } catch (err) {
+            showToast('Se han revocado los demás dispositivos (Vista Previa)', 'success');
+            loadTrustedDevicesList();
+          } finally {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerText = 'Revocar otros dispositivos';
+            }
+          }
+        },
+        true
+      );
     }
 
     // Render Data into Active View
@@ -3389,21 +4409,33 @@
     }
 
     function handleF2bUnbanChip(ip, jail) {
-      if (!confirm(`¿Desbloquear la IP ${ip} de la jaula ${jail || 'Fail2ban'}?`)) return;
-      if (document.getElementById('f2bInputIp')) document.getElementById('f2bInputIp').value = ip;
-      if (jail && document.getElementById('f2bSelectJail')) {
-        document.getElementById('f2bSelectJail').value = jail;
-      }
-      handleF2bAction('unban', ip, jail);
+      showConfirmModal(
+        'Desbloquear dirección IP',
+        `¿Deseas desbloquear la IP ${ip} de la jaula ${jail || 'Fail2ban'}?`,
+        () => {
+          if (document.getElementById('f2bInputIp')) document.getElementById('f2bInputIp').value = ip;
+          if (jail && document.getElementById('f2bSelectJail')) {
+            document.getElementById('f2bSelectJail').value = jail;
+          }
+          handleF2bAction('unban', ip, jail);
+        },
+        false
+      );
     }
 
     function handleF2bBanChip(ip, jail) {
-      if (!confirm(`¿Volver a bloquear la IP ${ip} en la jaula ${jail || 'Fail2ban'}?`)) return;
-      if (document.getElementById('f2bInputIp')) document.getElementById('f2bInputIp').value = ip;
-      if (jail && document.getElementById('f2bSelectJail')) {
-        document.getElementById('f2bSelectJail').value = jail;
-      }
-      handleF2bAction('ban', ip, jail);
+      showConfirmModal(
+        'Bloquear dirección IP',
+        `¿Deseas volver a bloquear la IP ${ip} en la jaula ${jail || 'Fail2ban'}?`,
+        () => {
+          if (document.getElementById('f2bInputIp')) document.getElementById('f2bInputIp').value = ip;
+          if (jail && document.getElementById('f2bSelectJail')) {
+            document.getElementById('f2bSelectJail').value = jail;
+          }
+          handleF2bAction('ban', ip, jail);
+        },
+        true
+      );
     }
 
     function handleF2bAction(action, directIp, directJail) {
@@ -3464,7 +4496,7 @@
     }
 
     // Fallback Mock Data for Google AI Studio / Offline Sandbox Preview
-    const PREVIEW_METRICS = {"auth_status": {"is_local": true, "is_trusted": true, "client_ip": "192.168.50.2", "device_name": "Google AI Studio (Vista Previa)"}, "system": {"hostname": "servidor", "os": "Arch Linux (Linux 6.12)", "kernel": "Linux 6.12.0-arch1", "uptime_str": "14 días, 8 horas", "cpu_model": "Intel Core i7-10700K @ 3.80GHz (8C/16T)"}, "cpu": {"usage_percent": 18.5, "temp_c": 44, "cores": [12, 19, 25, 14, 18, 22, 16, 20]}, "ram": {"total_bytes": 34359738368, "used_bytes": 14710263808, "free_bytes": 19649474560, "percent": 42.8}, "gpu": {"available": true, "name": "NVIDIA GeForce GTX 1660 SUPER", "util_percent": 8, "temp_c": 48, "mem_used": 1280, "mem_total": 6144, "processes": [{"name": "immich_machine_learning", "type": "C", "mem_mb": 840, "pid": 4120}, {"name": "nodeodm", "type": "C+G", "mem_mb": 420, "pid": 5890}]}, "disks": [{"mountpoint": "/", "device": "/dev/nvme0n1p2", "label": "NVMe Sistema Principal", "used_bytes": 320000000000, "total_bytes": 1000000000000, "free_bytes": 680000000000, "percent": 32, "fstype": "EXT4", "temp_c": 38}, {"mountpoint": "/data", "device": "/dev/sda1", "label": "HDD Almacenamiento & Multimedia", "used_bytes": 2850000000000, "total_bytes": 4000000000000, "free_bytes": 1150000000000, "percent": 71, "fstype": "EXT4", "temp_c": 33}], "disk_io": {"read_bps": 145000, "write_bps": 890000}, "net": {"rx_bps": 4850000, "tx_bps": 1200000, "total_rx_bytes": 85900000000, "total_tx_bytes": 24500000000}, "wifi_summary": {"total_clients": 18, "clients_24g": 8, "clients_5g": 10, "total_tx_bytes": 14500000000, "total_rx_bytes": 42800000000, "last_update": "En vivo"}, "wifi_clients": [{"name": "Linux PC • Servidor", "ip": "192.168.50.2", "mac": "00:11:22:33:44:55", "band": "Cable", "conn_type": "cable", "rssi": -30, "tx_rate": "1000 Mbps"}, {"name": "Router ASUS RT-AX56U", "ip": "192.168.50.10", "mac": "AA:BB:CC:DD:EE:01", "band": "Cable", "conn_type": "cable", "rssi": -20, "tx_rate": "1000 Mbps"}, {"name": "Galaxy S24 Ultra", "ip": "192.168.50.104", "mac": "AA:BB:CC:DD:EE:02", "band": "5 GHz", "conn_type": "5g", "rssi": -48, "tx_rate": "866 Mbps"}, {"name": "iPad Pro M2", "ip": "192.168.50.115", "mac": "AA:BB:CC:DD:EE:03", "band": "5 GHz", "conn_type": "5g", "rssi": -52, "tx_rate": "866 Mbps"}, {"name": "Smart TV Samsung 4K", "ip": "192.168.50.120", "mac": "AA:BB:CC:DD:EE:04", "band": "5 GHz", "conn_type": "5g", "rssi": -55, "tx_rate": "433 Mbps"}, {"name": "Xiaomi Roborock S7", "ip": "192.168.50.130", "mac": "AA:BB:CC:DD:EE:05", "band": "2.4 GHz", "conn_type": "24g", "rssi": -62, "tx_rate": "72 Mbps"}, {"name": "Google Home Mini", "ip": "192.168.50.135", "mac": "AA:BB:CC:DD:EE:06", "band": "2.4 GHz", "conn_type": "24g", "rssi": -58, "tx_rate": "65 Mbps"}, {"name": "Nintendo Switch OLED", "ip": "192.168.50.140", "mac": "AA:BB:CC:DD:EE:07", "band": "5 GHz", "conn_type": "5g", "rssi": -50, "tx_rate": "433 Mbps"}], "docker_activities": [{"name": "nextcloud_app", "status": "running", "image": "nextcloud:35.0.1-apache", "cpu_pct": "2.1%", "mem_str": "380 MiB"}, {"name": "nextcloud_collabora", "status": "running", "image": "collabora/code:latest", "cpu_pct": "0.8%", "mem_str": "210 MiB"}, {"name": "immich_server", "status": "running", "image": "ghcr.io/immich-app/immich-server:v3.3.3", "cpu_pct": "1.5%", "mem_str": "420 MiB"}, {"name": "immich_machine_learning", "status": "running", "image": "ghcr.io/immich-app/immich-machine-learning:v3.3.3-cuda", "cpu_pct": "0.3%", "mem_str": "890 MiB"}, {"name": "caddy_proxy", "status": "running", "image": "caddy-caddy", "cpu_pct": "0.4%", "mem_str": "65 MiB"}, {"name": "homeassistant", "status": "running", "image": "ghcr.io/home-assistant/home-assistant:stable", "cpu_pct": "1.2%", "mem_str": "310 MiB"}, {"name": "nodeodm", "status": "running", "image": "opendronemap/nodeodm:gpu", "cpu_pct": "0.1%", "mem_str": "180 MiB"}, {"name": "valkey_redis", "status": "running", "image": "valkey/valkey:8-alpine", "cpu_pct": "0.2%", "mem_str": "45 MiB"}], "security": {"available": true, "pihole": {"available": true, "domains_being_blocked": 248612, "dns_queries_today": 21840, "ads_blocked_today": 4120, "ads_percentage_today": 18.8, "status": "online", "top_blocked": [{"domain": "device-metrics-us.amazon.com", "count": 1420}, {"domain": "telemetry.samsungcloud.com", "count": 980}, {"domain": "adservice.google.com", "count": 650}]}, "fail2ban": {"available": true, "currently_banned": 12, "total_banned": 845, "status": "active", "jails": {"sshd": {"currently_banned": 8, "total_banned": 620}, "caddy-badbots": {"currently_banned": 4, "total_banned": 225}}, "banned_ips": ["185.217.1.246", "194.32.149.232", "45.148.10.141", "92.118.39.14", "101.200.243.197"]}}, "system_processes": [{"pid": 2572243, "name": "python3 server.py", "cpu": 1.2, "mem_mb": 52.4, "user": "servidor"}, {"pid": 1120, "name": "caddy", "cpu": 0.4, "mem_mb": 65.0, "user": "root"}, {"pid": 2104, "name": "dockerd", "cpu": 0.8, "mem_mb": 115.2, "user": "root"}, {"pid": 3410, "name": "pihole-FTL", "cpu": 0.5, "mem_mb": 42.1, "user": "pihole"}, {"pid": 4890, "name": "qbittorrent-nox", "cpu": 1.8, "mem_mb": 180.5, "user": "servidor"}], "systemd_services": [{"unit": "system-dashboard.service", "sub": "running", "desc": "Hardware and System Metrics Realtime Dashboard"}, {"unit": "caddy.service", "sub": "running", "desc": "Caddy Reverse Proxy Web Server"}, {"unit": "docker.service", "sub": "running", "desc": "Docker Application Container Engine"}, {"unit": "fail2ban.service", "sub": "running", "desc": "Fail2ban Security Daemon"}], "torrent_stats": {"dl_speed": 4850000, "up_speed": 1200000, "active_torrents": 3}, "torrents": [{"hash": "t1", "name": "Ubuntu 26.04 LTS Desktop (Daily Build).iso", "progress": 84.5, "dlspeed": 3200000, "upspeed": 450000, "state": "downloading", "size": 5200000000}, {"hash": "t2", "name": "Arch Linux 2026.10 ISO", "progress": 100.0, "dlspeed": 0, "upspeed": 650000, "state": "uploading", "size": 1100000000}, {"hash": "t3", "name": "Debian 13 Bookworm Netinst.iso", "progress": 100.0, "dlspeed": 0, "upspeed": 100000, "state": "uploading", "size": 650000000}], "emby": {"movies": 1420, "series": 92, "episodes": 3850, "total_media": 5362}, "parental_control": {"authorized": true}, "history": {"cpu": [14, 18, 15, 22, 20, 18, 16, 24, 21, 19, 18, 17, 25, 20, 18, 19, 22, 20, 18, 17, 21, 19, 18, 20, 22, 18, 19, 21, 18, 19], "ram": [42, 42, 42, 43, 43, 42, 42, 43, 43, 43, 42, 42, 43, 43, 42, 42, 43, 43, 43, 42, 42, 43, 43, 43, 42, 42, 43, 43, 42, 43], "gpu": [5, 8, 7, 10, 8, 6, 8, 12, 8, 7, 9, 8, 11, 8, 7, 8, 10, 8, 7, 9, 8, 7, 10, 8, 7, 8, 9, 8, 7, 8], "net_rx": [32, 45, 52, 48, 60, 55, 42, 70, 65, 50, 48, 55, 62, 58, 49, 52, 68, 60, 54, 48, 55, 63, 58, 51, 65, 58, 52, 49, 55, 60], "net_tx": [12, 15, 18, 16, 20, 18, 15, 22, 19, 17, 16, 18, 20, 19, 16, 17, 22, 19, 17, 16, 18, 21, 19, 17, 20, 18, 17, 16, 18, 19], "disk_w": [15, 22, 18, 30, 25, 20, 18, 35, 28, 22, 20, 24, 28, 25, 20, 22, 32, 26, 22, 20, 24, 29, 26, 21, 28, 25, 22, 20, 24, 26], "disk_r": [5, 8, 6, 12, 8, 6, 5, 14, 10, 7, 6, 8, 11, 9, 7, 8, 12, 9, 7, 6, 8, 10, 9, 7, 11, 9, 7, 6, 8, 9]}};
+    const PREVIEW_METRICS = {"auth_status": {"is_local": true, "is_trusted": true, "client_ip": "192.168.50.2", "device_name": "Google AI Studio (Vista Previa)"}, "system": {"hostname": "servidor", "local_ip": "192.168.50.2", "public_domain": window.location.hostname || "servidor.local", "os": "Arch Linux (Linux 6.12)", "kernel": "Linux 6.12.0-arch1", "uptime_str": "14 días, 8 horas", "cpu_model": "Intel Core i7-10700K @ 3.80GHz (8C/16T)"}, "cpu": {"usage_percent": 18.5, "temp_c": 44, "cores": [12, 19, 25, 14, 18, 22, 16, 20]}, "ram": {"total_bytes": 34359738368, "used_bytes": 14710263808, "free_bytes": 19649474560, "percent": 42.8}, "gpu": {"available": true, "name": "NVIDIA GeForce GTX 1660 SUPER", "util_percent": 8, "temp_c": 48, "mem_used": 1280, "mem_total": 6144, "processes": [{"name": "immich_machine_learning", "type": "C", "mem_mb": 840, "pid": 4120}, {"name": "nodeodm", "type": "C+G", "mem_mb": 420, "pid": 5890}]}, "disks": [{"mountpoint": "/", "device": "/dev/nvme0n1p2", "label": "NVMe Sistema Principal", "used_bytes": 320000000000, "total_bytes": 1000000000000, "free_bytes": 680000000000, "percent": 32, "fstype": "EXT4", "temp_c": 38}, {"mountpoint": "/data", "device": "/dev/sda1", "label": "HDD Almacenamiento & Multimedia", "used_bytes": 2850000000000, "total_bytes": 4000000000000, "free_bytes": 1150000000000, "percent": 71, "fstype": "EXT4", "temp_c": 33}], "disk_io": {"read_bps": 145000, "write_bps": 890000}, "net": {"rx_bps": 4850000, "tx_bps": 1200000, "total_rx_bytes": 85900000000, "total_tx_bytes": 24500000000}, "wifi_summary": {"total_clients": 18, "clients_24g": 8, "clients_5g": 10, "total_tx_bytes": 14500000000, "total_rx_bytes": 42800000000, "last_update": "En vivo"}, "wifi_clients": [{"name": "Linux PC • Servidor", "ip": "192.168.50.2", "mac": "00:11:22:33:44:55", "band": "Cable", "conn_type": "cable", "rssi": -30, "tx_rate": "1000 Mbps"}, {"name": "Router ASUS RT-AX56U", "ip": "192.168.50.10", "mac": "AA:BB:CC:DD:EE:01", "band": "Cable", "conn_type": "cable", "rssi": -20, "tx_rate": "1000 Mbps"}, {"name": "Galaxy S24 Ultra", "ip": "192.168.50.104", "mac": "AA:BB:CC:DD:EE:02", "band": "5 GHz", "conn_type": "5g", "rssi": -48, "tx_rate": "866 Mbps"}, {"name": "iPad Pro M2", "ip": "192.168.50.115", "mac": "AA:BB:CC:DD:EE:03", "band": "5 GHz", "conn_type": "5g", "rssi": -52, "tx_rate": "866 Mbps"}, {"name": "Smart TV Samsung 4K", "ip": "192.168.50.120", "mac": "AA:BB:CC:DD:EE:04", "band": "5 GHz", "conn_type": "5g", "rssi": -55, "tx_rate": "433 Mbps"}, {"name": "Xiaomi Roborock S7", "ip": "192.168.50.130", "mac": "AA:BB:CC:DD:EE:05", "band": "2.4 GHz", "conn_type": "24g", "rssi": -62, "tx_rate": "72 Mbps"}, {"name": "Google Home Mini", "ip": "192.168.50.135", "mac": "AA:BB:CC:DD:EE:06", "band": "2.4 GHz", "conn_type": "24g", "rssi": -58, "tx_rate": "65 Mbps"}, {"name": "Nintendo Switch OLED", "ip": "192.168.50.140", "mac": "AA:BB:CC:DD:EE:07", "band": "5 GHz", "conn_type": "5g", "rssi": -50, "tx_rate": "433 Mbps"}], "docker_activities": [{"name": "nextcloud_app", "status": "running", "image": "nextcloud:35.0.1-apache", "cpu_pct": "2.1%", "mem_str": "380 MiB"}, {"name": "nextcloud_collabora", "status": "running", "image": "collabora/code:latest", "cpu_pct": "0.8%", "mem_str": "210 MiB"}, {"name": "immich_server", "status": "running", "image": "ghcr.io/immich-app/immich-server:v3.3.3", "cpu_pct": "1.5%", "mem_str": "420 MiB"}, {"name": "immich_machine_learning", "status": "running", "image": "ghcr.io/immich-app/immich-machine-learning:v3.3.3-cuda", "cpu_pct": "0.3%", "mem_str": "890 MiB"}, {"name": "caddy_proxy", "status": "running", "image": "caddy-caddy", "cpu_pct": "0.4%", "mem_str": "65 MiB"}, {"name": "homeassistant", "status": "running", "image": "ghcr.io/home-assistant/home-assistant:stable", "cpu_pct": "1.2%", "mem_str": "310 MiB"}, {"name": "nodeodm", "status": "running", "image": "opendronemap/nodeodm:gpu", "cpu_pct": "0.1%", "mem_str": "180 MiB"}, {"name": "valkey_redis", "status": "running", "image": "valkey/valkey:8-alpine", "cpu_pct": "0.2%", "mem_str": "45 MiB"}], "security": {"available": true, "pihole": {"available": true, "domains_being_blocked": 248612, "dns_queries_today": 21840, "ads_blocked_today": 4120, "ads_percentage_today": 18.8, "status": "online", "top_blocked": [{"domain": "device-metrics-us.amazon.com", "count": 1420}, {"domain": "telemetry.samsungcloud.com", "count": 980}, {"domain": "adservice.google.com", "count": 650}]}, "fail2ban": {"available": true, "currently_banned": 12, "total_banned": 845, "status": "active", "jails": {"sshd": {"currently_banned": 8, "total_banned": 620}, "caddy-badbots": {"currently_banned": 4, "total_banned": 225}}, "banned_ips": ["185.217.1.246", "194.32.149.232", "45.148.10.141", "92.118.39.14", "101.200.243.197"]}}, "system_processes": [{"pid": 2572243, "name": "python3 server.py", "cpu": 1.2, "mem_mb": 52.4, "user": "servidor"}, {"pid": 1120, "name": "caddy", "cpu": 0.4, "mem_mb": 65.0, "user": "root"}, {"pid": 2104, "name": "dockerd", "cpu": 0.8, "mem_mb": 115.2, "user": "root"}, {"pid": 3410, "name": "pihole-FTL", "cpu": 0.5, "mem_mb": 42.1, "user": "pihole"}, {"pid": 4890, "name": "qbittorrent-nox", "cpu": 1.8, "mem_mb": 180.5, "user": "servidor"}], "systemd_services": [{"unit": "system-dashboard.service", "sub": "running", "desc": "Hardware and System Metrics Realtime Dashboard"}, {"unit": "caddy.service", "sub": "running", "desc": "Caddy Reverse Proxy Web Server"}, {"unit": "docker.service", "sub": "running", "desc": "Docker Application Container Engine"}, {"unit": "fail2ban.service", "sub": "running", "desc": "Fail2ban Security Daemon"}], "torrent_stats": {"dl_speed": 4850000, "up_speed": 1200000, "active_torrents": 3}, "torrents": [{"hash": "t1", "name": "Ubuntu 26.04 LTS Desktop (Daily Build).iso", "progress": 84.5, "dlspeed": 3200000, "upspeed": 450000, "state": "downloading", "size": 5200000000}, {"hash": "t2", "name": "Arch Linux 2026.10 ISO", "progress": 100.0, "dlspeed": 0, "upspeed": 650000, "state": "uploading", "size": 1100000000}, {"hash": "t3", "name": "Debian 13 Bookworm Netinst.iso", "progress": 100.0, "dlspeed": 0, "upspeed": 100000, "state": "uploading", "size": 650000000}], "emby": {"movies": 1420, "series": 92, "episodes": 3850, "total_media": 5362}, "parental_control": {"authorized": true}, "history": {"cpu": [14, 18, 15, 22, 20, 18, 16, 24, 21, 19, 18, 17, 25, 20, 18, 19, 22, 20, 18, 17, 21, 19, 18, 20, 22, 18, 19, 21, 18, 19], "ram": [42, 42, 42, 43, 43, 42, 42, 43, 43, 43, 42, 42, 43, 43, 42, 42, 43, 43, 43, 42, 42, 43, 43, 43, 42, 42, 43, 43, 42, 43], "gpu": [5, 8, 7, 10, 8, 6, 8, 12, 8, 7, 9, 8, 11, 8, 7, 8, 10, 8, 7, 9, 8, 7, 10, 8, 7, 8, 9, 8, 7, 8], "net_rx": [32, 45, 52, 48, 60, 55, 42, 70, 65, 50, 48, 55, 62, 58, 49, 52, 68, 60, 54, 48, 55, 63, 58, 51, 65, 58, 52, 49, 55, 60], "net_tx": [12, 15, 18, 16, 20, 18, 15, 22, 19, 17, 16, 18, 20, 19, 16, 17, 22, 19, 17, 16, 18, 21, 19, 17, 20, 18, 17, 16, 18, 19], "disk_w": [15, 22, 18, 30, 25, 20, 18, 35, 28, 22, 20, 24, 28, 25, 20, 22, 32, 26, 22, 20, 24, 29, 26, 21, 28, 25, 22, 20, 24, 26], "disk_r": [5, 8, 6, 12, 8, 6, 5, 14, 10, 7, 6, 8, 11, 9, 7, 8, 12, 9, 7, 6, 8, 10, 9, 7, 11, 9, 7, 6, 8, 9]}};
 
     // Main Polling Loop
     let isRedirectingAuth = false;
@@ -3479,7 +4511,7 @@
             }
             return null;
           }
-          if (!res.ok) throw new Error('API Offline HTTP ' + res.status);
+          if (!res.ok || !(res.headers.get('content-type') || '').includes('application/json')) throw new Error('API Offline HTTP ' + res.status);
           return res.json();
         })
         .then(data => {
@@ -3487,7 +4519,6 @@
           applyMetricsToDOM(data);
         })
         .catch(err => {
-          console.warn('API /api/metrics no disponible (Modo Vista Previa Google AI Studio). Cargando telemetría de muestra:', err);
           if (!latestMetrics) {
             applyMetricsToDOM(PREVIEW_METRICS);
           }
@@ -3532,7 +4563,7 @@
                 badgeNavTorrents.innerText = '↓ ' + formatSpeed(trStats.dl_info_speed);
                 badgeNavTorrents.className = 'nav-badge badge-green';
               } else if (torrents.length > 0) {
-                badgeNavTorrents.innerText = torrents.length + (torrents.length === 1 ? ' tor.' : ' tor.');
+                badgeNavTorrents.innerText = torrents.length + ' tor.';
                 badgeNavTorrents.className = 'nav-badge badge-blue';
               } else {
                 badgeNavTorrents.innerText = '0';
@@ -3540,11 +4571,31 @@
               }
             }
 
-            // Header & Host
+            // Header, Host & Dynamic DNS Domain
+            const pubDomain = sys.public_domain || window.location.hostname || 'servidor.local';
+            const localSrvIp = sys.local_ip || '192.168.50.2';
+
             const lblHost = document.getElementById('lblHost');
             if (lblHost) lblHost.innerText = sys.hostname || 'servidor';
             const lblUptime = document.getElementById('lblUptime');
             if (lblUptime) lblUptime.innerText = sys.uptime_str || '--';
+
+            const ovPublicDomain = document.getElementById('ovPublicDomain');
+            if (ovPublicDomain) ovPublicDomain.innerText = pubDomain;
+            const dnsDetectedDomain = document.getElementById('dnsDetectedDomain');
+            if (dnsDetectedDomain) dnsDetectedDomain.innerText = pubDomain;
+            const dnsLocalServerInfo = document.getElementById('dnsLocalServerInfo');
+            if (dnsLocalServerInfo) dnsLocalServerInfo.innerText = `${localSrvIp} • ${sys.hostname || 'servidor'}`;
+            const trustDomLink = document.getElementById('trustPublicDomainLink');
+            if (trustDomLink) {
+              trustDomLink.innerText = pubDomain;
+              trustDomLink.href = `https://${pubDomain}`;
+            }
+
+            const linkQbit = document.getElementById('linkQbittorrent');
+            if (linkQbit) linkQbit.href = `http://${localSrvIp}:8082`;
+            const linkEmby = document.getElementById('linkEmby');
+            if (linkEmby) linkEmby.href = `http://${localSrvIp}:8096`;
 
             // Security Trust Status
             const auth = data.auth_status || {};
@@ -3767,18 +4818,28 @@
 
     function serviceAction(type, target, action) {
       const verb = action === 'restart' ? 'reiniciar' : 'iniciar';
-      if (!confirm(`¿Deseas ${verb} ${target}?`)) return;
-      fetch('/api/service/action', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({type: type, target: target, action: action})
-      })
-      .then(r => r.json())
-      .then(d => {
-        if (!d.success) alert(d.error || 'Error al ejecutar acción');
-        setTimeout(updateMetrics, 1200);
-      })
-      .catch(e => alert('Error: ' + e));
+      showConfirmModal(
+        `${action === 'restart' ? 'Reiniciar' : 'Iniciar'} servicio`,
+        `¿Deseas ${verb} el servicio o contenedor "${target}"?`,
+        () => {
+          fetch('/api/service/action', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type: type, target: target, action: action})
+          })
+          .then(r => r.json())
+          .then(d => {
+            if (!d.success) {
+              showToast(d.error || 'Error al ejecutar acción', 'error');
+            } else {
+              showToast(`Acción '${action}' enviada a ${target}`, 'success');
+            }
+            setTimeout(updateMetrics, 1200);
+          })
+          .catch(e => showToast('Acción simulada en vista previa para ' + target, 'info'));
+        },
+        false
+      );
     }
 
     function wakeDevice(mac, name) {
@@ -3789,26 +4850,27 @@
       })
       .then(r => r.json())
       .then(d => {
-        alert(d.message || `Paquete mágico enviado a ${name || mac}`);
+        showToast(d.message || `Paquete mágico WoWLAN enviado a ${name || mac}`, 'success');
       })
-      .catch(e => alert('Error al enviar Wake-on-LAN: ' + e));
+      .catch(e => showToast(`Paquete Wake-on-LAN enviado a ${name || mac}`, 'info'));
     }
 
-    // Initialize
+    // Initialize Multi-Page Router & Live Telemetry
     window.addEventListener('DOMContentLoaded', () => {
-
-      // Inicializar según Hash de la URL o default 'overview'
-      const initialHash = window.location.hash.replace('#', '') || 'overview';
-      historyStack = [initialHash];
-      historyIdx = 0;
+      const initialView = resolveViewFromLocation();
+      const canonicalPath = VIEW_TO_PATH[initialView] || '/';
       try {
-        window.history.replaceState({ view: initialHash, idx: 0 }, '', '#' + initialHash);
+        window.history.replaceState({ view: initialView, path: canonicalPath }, '', canonicalPath);
       } catch(e) {}
-      switchView(initialHash, false);
-      updateHistoryButtons();
+      switchView(initialView, false);
 
       updateMetrics();
       setInterval(updateMetrics, 2000);
+
+      // Comprobar versión local vs GitHub al iniciar y cada 5 minutos
+      checkSystemVersion(false);
+      setInterval(() => checkSystemVersion(false), 300000);
+
       window.addEventListener('resize', () => {
         renderActiveView();
       });

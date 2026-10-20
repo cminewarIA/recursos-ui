@@ -82,7 +82,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TRUSTED_FILE = os.path.join(BASE_DIR, "trusted_devices.json")
 TRUST_LOCK = threading.Lock()
-ADMIN_MASTER_KEY = "Cminewar2026!"  # Clave maestra de desbloqueo remoto de emergencia
+ADMIN_MASTER_KEY = os.environ.get("ADMIN_MASTER_KEY", "Cminewar2026!")  # Clave maestra de rescate / desbloqueo remoto
 
 # ==============================================================================
 # Rate Limiting & Anti-Brute-Force Shield for Master Key
@@ -157,37 +157,408 @@ HOSTNAME = os.uname().nodename
 KERNEL = os.uname().release
 BOOT_TIME = psutil.boot_time()
 
+# ==============================================================================
+# Dynamic DNS / Domain Auto-Detection & GitHub Version Manager
+# ==============================================================================
+GITHUB_REPO = "cminewarIA/recursos-ui"
+GITHUB_BRANCH = "main"
+VERSION_CACHE = {"data": None, "timestamp": 0}
+VERSION_LOCK = threading.Lock()
+DETECTED_DOMAIN_CACHE = None
+
+def detect_local_server_ip():
+    """Detecta automáticamente la IP privada LAN del servidor instalado."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.5)
+        s.connect(("1.1.1.1", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    return "192.168.50.2"
+
+SERVER_LOCAL_IP = detect_local_server_ip()
+
+def detect_system_dns_domain():
+    """
+    Busca automáticamente el dominio DNS público o local configurado en el ordenador instalado:
+    1. Variable de entorno PUBLIC_DOMAIN / SERVER_DOMAIN.
+    2. Archivos de configuración de proxy inverso (Caddyfile, Nginx) o scripts de DuckDNS.
+    3. FQDN del sistema (socket.getfqdn()).
+    """
+    global DETECTED_DOMAIN_CACHE
+    if DETECTED_DOMAIN_CACHE:
+        return DETECTED_DOMAIN_CACHE
+
+    env_dom = os.environ.get("PUBLIC_DOMAIN") or os.environ.get("SERVER_DOMAIN")
+    if env_dom and "." in env_dom:
+        DETECTED_DOMAIN_CACHE = env_dom.strip().lower()
+        return DETECTED_DOMAIN_CACHE
+
+    candidate_files = [
+        "/etc/caddy/Caddyfile",
+        "/home/servidor/Caddyfile",
+        "/home/servidor/servicios/caddy/Caddyfile",
+        "/home/servidor/docker/caddy/Caddyfile",
+        "/opt/caddy/Caddyfile",
+        "/etc/nginx/sites-enabled/default",
+        "/etc/nginx/nginx.conf",
+        "/home/servidor/duckdns/duck.sh",
+        "/home/servidor/servicios/duckdns/duck.sh",
+        "/etc/crontab"
+    ]
+
+    # También buscar en directorios de servicios comunes si existen
+    for base_search in ["/home/servidor", "/etc/nginx/conf.d", "/etc/nginx/sites-enabled"]:
+        if os.path.isdir(base_search):
+            try:
+                for entry in os.listdir(base_search):
+                    full_p = os.path.join(base_search, entry)
+                    if os.path.isfile(full_p) and any(k in entry.lower() for k in ["caddy", "duck", "nginx", "dns", ".conf"]):
+                        candidate_files.append(full_p)
+            except Exception:
+                pass
+
+    ignored_domains = {
+        "googleapis.com", "gstatic.com", "github.com", "docker.io",
+        "ubuntu.com", "archlinux.org", "debian.org", "cloudflare.com",
+        "letsencrypt.org", "example.com", "localhost.localdomain"
+    }
+
+    for fpath in candidate_files:
+        if not os.path.isfile(fpath):
+            continue
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read(32768)
+            # 1. Buscar dominios explícitos *.duckdns.org o *.ddns.net
+            m_duck = re.findall(r'\b([a-zA-Z0-9_-]+\.(?:duckdns\.org|ddns\.net|no-ip\.org|synology\.me|tail[a-z0-9]+\.ts\.net))\b', content, re.IGNORECASE)
+            if m_duck:
+                # Preferir el dominio raíz si hay subdominios como nextcloud.xxx.duckdns.org
+                for d in m_duck:
+                    d_low = d.lower()
+                    if not d_low.startswith(("www.", "nextcloud.", "emby.", "immich.", "pihole.")):
+                        DETECTED_DOMAIN_CACHE = d_low
+                        return DETECTED_DOMAIN_CACHE
+                DETECTED_DOMAIN_CACHE = m_duck[0].lower()
+                return DETECTED_DOMAIN_CACHE
+
+            # 2. Buscar parámetro domains= en scripts de DuckDNS
+            m_param = re.search(r'domains\s*=\s*["\']?([a-zA-Z0-9_-]+)["\']?', content, re.IGNORECASE)
+            if m_param and "duckdns.org" in content.lower():
+                DETECTED_DOMAIN_CACHE = f"{m_param.group(1).lower()}.duckdns.org"
+                return DETECTED_DOMAIN_CACHE
+
+            # 3. Buscar directivas de dominio en Caddyfile o server_name en Nginx
+            m_caddy = re.findall(r'(?:https?://|server_name\s+)([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', content)
+            for dom in m_caddy:
+                dom_l = dom.lower().strip(".")
+                if dom_l not in ignored_domains and not re.match(r'^\d+\.\d+\.\d+\.\d+$', dom_l):
+                    DETECTED_DOMAIN_CACHE = dom_l
+                    return DETECTED_DOMAIN_CACHE
+        except Exception:
+            continue
+
+    # 4. Intentar obtener desde contenedores Docker activos (ej. variables de entorno de Caddy / Nextcloud / DuckDNS)
+    try:
+        p_dock = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}"],
+            capture_output=True, text=True, timeout=1.5
+        )
+        if p_dock.returncode == 0:
+            for cname in p_dock.stdout.splitlines():
+                cname = cname.strip()
+                if any(k in cname.lower() for k in ["caddy", "duckdns", "nginx", "proxy", "nextcloud"]):
+                    p_insp = subprocess.run(
+                        ["docker", "inspect", "--format", "{{json .Config.Env}} {{json .Mounts}}", cname],
+                        capture_output=True, text=True, timeout=1.5
+                    )
+                    if p_insp.returncode == 0:
+                        m_env = re.findall(r'\b([a-zA-Z0-9_-]+\.(?:duckdns\.org|ddns\.net|ts\.net))\b', p_insp.stdout, re.IGNORECASE)
+                        if m_env:
+                            DETECTED_DOMAIN_CACHE = m_env[0].lower()
+                            return DETECTED_DOMAIN_CACHE
+    except Exception:
+        pass
+
+    # 5. Comprobar FQDN del sistema operativo
+    try:
+        fqdn = socket.getfqdn().strip().lower()
+        if "." in fqdn and not fqdn.startswith("localhost") and not fqdn.endswith(".local"):
+            DETECTED_DOMAIN_CACHE = fqdn
+            return DETECTED_DOMAIN_CACHE
+    except Exception:
+        pass
+
+    return f"{HOSTNAME}.local"
+
+def resolve_request_domain(handler=None):
+    """
+    Devuelve el dominio DNS del servidor, priorizando la detección en el equipo
+    o el Host con el que el cliente está navegando si es un dominio público válido.
+    """
+    sys_dom = detect_system_dns_domain()
+    if handler:
+        host_hdr = handler.headers.get("X-Forwarded-Host") or handler.headers.get("Host") or ""
+        host_clean = host_hdr.split(",")[0].strip().split(":")[0].lower()
+        if host_clean and "." in host_clean and not re.match(r'^\d+\.\d+\.\d+\.\d+$', host_clean):
+            if not host_clean.endswith((".run.app", "localhost", ".local")):
+                return host_clean
+            elif sys_dom.endswith(".local") and not host_clean.startswith("localhost"):
+                return host_clean
+    return sys_dom
+
+def get_version_info(force_refresh=False):
+    """
+    Obtiene la versión actual instalada localmente (Git commit, fecha, versión semántica)
+    y la compara en tiempo real con el repositorio remoto en GitHub (cminewarIA/recursos-ui).
+    """
+    now = time.time()
+    with VERSION_LOCK:
+        if not force_refresh and VERSION_CACHE["data"] and (now - VERSION_CACHE["timestamp"] < 90):
+            return dict(VERSION_CACHE["data"])
+
+    pkg_version = "2.0.0"
+    pkg_path = os.path.join(BASE_DIR, "package.json")
+    if os.path.isfile(pkg_path):
+        try:
+            with open(pkg_path, "r", encoding="utf-8") as pf:
+                pkg_json = json.load(pf)
+                pkg_version = pkg_json.get("version", "2.0.0")
+        except Exception:
+            pass
+
+    local_sha = "desconocido"
+    local_full_sha = ""
+    local_msg = "Versión local instalada"
+    local_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+    local_branch = GITHUB_BRANCH
+
+    try:
+        p_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+        if p_sha.returncode == 0 and p_sha.stdout.strip():
+            local_full_sha = p_sha.stdout.strip()
+            local_sha = local_full_sha[:7]
+
+        p_log = subprocess.run(["git", "log", "-1", "--format=%s|%ci|%an"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+        if p_log.returncode == 0 and "|" in p_log.stdout:
+            parts = p_log.stdout.strip().split("|")
+            local_msg = parts[0]
+            local_date = parts[1][:16] if len(parts) > 1 else local_date
+
+        p_br = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+        if p_br.returncode == 0 and p_br.stdout.strip():
+            local_branch = p_br.stdout.strip()
+    except Exception:
+        pass
+
+    remote_sha = local_sha
+    remote_full_sha = local_full_sha
+    remote_msg = local_msg
+    remote_date = local_date
+    remote_author = "cminewarIA"
+    recent_commits = []
+    github_reachable = False
+
+    # Consultar API pública de GitHub para obtener el último commit y historial de main
+    try:
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/commits?sha={GITHUB_BRANCH}&per_page=5"
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "User-Agent": "Recursos-Server-Monitor/2.0",
+                "Accept": "application/vnd.github.v3+json"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=3.5) as resp:
+            if resp.status == 200:
+                commits_data = json.loads(resp.read().decode("utf-8"))
+                if isinstance(commits_data, list) and len(commits_data) > 0:
+                    github_reachable = True
+                    latest = commits_data[0]
+                    remote_full_sha = latest.get("sha", "")
+                    remote_sha = remote_full_sha[:7] if remote_full_sha else local_sha
+                    commit_obj = latest.get("commit", {})
+                    remote_msg = commit_obj.get("message", "").splitlines()[0]
+                    raw_date = commit_obj.get("committer", {}).get("date", "")
+                    if raw_date:
+                        remote_date = raw_date.replace("T", " ").replace("Z", "")[:16]
+                    remote_author = commit_obj.get("author", {}).get("name", "cminewarIA")
+
+                    for c in commits_data:
+                        c_sha = (c.get("sha") or "")[:7]
+                        c_obj = c.get("commit", {})
+                        c_msg = (c_obj.get("message") or "").splitlines()[0]
+                        c_dt = (c_obj.get("committer", {}).get("date") or "").replace("T", " ").replace("Z", "")[:16]
+                        recent_commits.append({
+                            "sha": c_sha,
+                            "message": c_msg,
+                            "date": c_dt,
+                            "is_local_head": (c_sha == local_sha)
+                        })
+    except Exception:
+        # Fallback con git ls-remote si la API REST tiene límite o no responde
+        try:
+            p_ls = subprocess.run(
+                ["git", "ls-remote", f"https://github.com/{GITHUB_REPO}.git", f"refs/heads/{GITHUB_BRANCH}"],
+                cwd=BASE_DIR, capture_output=True, text=True, timeout=3
+            )
+            if p_ls.returncode == 0 and p_ls.stdout.strip():
+                github_reachable = True
+                remote_full_sha = p_ls.stdout.split()[0].strip()
+                remote_sha = remote_full_sha[:7]
+        except Exception:
+            pass
+
+    update_available = bool(
+        github_reachable and
+        remote_sha and
+        local_sha != "desconocido" and
+        remote_sha != local_sha
+    )
+
+    result = {
+        "version": pkg_version,
+        "repo": GITHUB_REPO,
+        "repo_url": f"https://github.com/{GITHUB_REPO}",
+        "branch": local_branch,
+        "local": {
+            "sha": local_sha,
+            "full_sha": local_full_sha,
+            "message": local_msg,
+            "date": local_date
+        },
+        "remote": {
+            "sha": remote_sha,
+            "full_sha": remote_full_sha,
+            "message": remote_msg,
+            "date": remote_date,
+            "author": remote_author,
+            "reachable": github_reachable
+        },
+        "update_available": update_available,
+        "recent_commits": recent_commits,
+        "public_domain": detect_system_dns_domain(),
+        "local_ip": SERVER_LOCAL_IP,
+        "checked_at": datetime.now().strftime("%H:%M:%S")
+    }
+
+    with VERSION_LOCK:
+        VERSION_CACHE["data"] = result
+        VERSION_CACHE["timestamp"] = now
+
+    return dict(result)
+
 
 # ==============================================================================
-# Security & Zero-Trust Local Pairing Functions
+# Security & Zero-Trust Local Pairing Functions (HMAC-SHA256 Signed Tokens)
 # ==============================================================================
+AUTH_SECRET_FILE = os.path.join(BASE_DIR, ".auth_secret")
+AUTH_SECRET_LOCK = threading.Lock()
+
+def get_auth_secret():
+    """Obtiene o genera la clave secreta de 256 bits para firmar tokens criptográficos."""
+    with AUTH_SECRET_LOCK:
+        if os.path.exists(AUTH_SECRET_FILE):
+            try:
+                with open(AUTH_SECRET_FILE, 'rb') as f:
+                    sec = f.read().strip()
+                    if len(sec) >= 32:
+                        return sec
+            except Exception:
+                pass
+        # Generar clave secreta criptográficamente segura de 32 bytes
+        new_secret = secrets.token_bytes(32)
+        try:
+            with open(AUTH_SECRET_FILE, 'wb') as f:
+                f.write(new_secret)
+            os.chmod(AUTH_SECRET_FILE, 0o600)
+        except Exception as e:
+            print(f"[-] Advertencia creando .auth_secret: {e}")
+        return new_secret
+
+def create_device_token(device_id):
+    """Genera un token firmado con HMAC-SHA256 para un ID de dispositivo."""
+    secret = get_auth_secret()
+    ts = int(time.time())
+    nonce = secrets.token_hex(16)
+    payload = f"{device_id}:{ts}:{nonce}"
+    sig = hmac.new(secret, payload.encode('utf-8'), hashlib.sha256).hexdigest()
+    return f"{device_id}.{ts}.{nonce}.{sig}"
+
+def verify_device_token(token_str):
+    """
+    Verifica criptográficamente la firma HMAC del token en tiempo constante.
+    Valida además que el token no haya expirado (máximo 1 año de validez).
+    Retorna el device_id si es válido, o None si es inválido o fue manipulado.
+    """
+    if not token_str or not isinstance(token_str, str):
+        return None
+    parts = token_str.split('.')
+    if len(parts) != 4:
+        return None
+    device_id, ts, nonce, sig = parts
+    try:
+        ts_int = int(ts)
+        if abs(time.time() - ts_int) > 31536000:  # 1 año en segundos
+            return None
+    except Exception:
+        return None
+    payload = f"{device_id}:{ts}:{nonce}"
+    secret = get_auth_secret()
+    expected_sig = hmac.new(secret, payload.encode('utf-8'), hashlib.sha256).hexdigest()
+    if hmac.compare_digest(sig, expected_sig):
+        return device_id
+    return None
+
 def load_trusted_devices():
+    """Carga el registro de dispositivos de confianza."""
     if not os.path.exists(TRUSTED_FILE):
         return {}
     try:
         with open(TRUSTED_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+            # Soporte de migración si el archivo usaba hashes antiguos como claves
+            normalized = {}
+            for k, v in data.items():
+                dev_id = v.get("id") or k
+                normalized[dev_id] = v
+            return normalized
     except Exception:
         return {}
 
 def save_trusted_devices(devices):
+    """Guarda de forma atómica el registro de dispositivos de confianza."""
     try:
-        with open(TRUSTED_FILE, 'w', encoding='utf-8') as f:
+        temp_file = TRUSTED_FILE + ".tmp"
+        with open(temp_file, 'w', encoding='utf-8') as f:
             json.dump(devices, f, indent=2, ensure_ascii=False)
+        os.replace(temp_file, TRUSTED_FILE)
     except Exception as e:
         print(f"[-] Error guardando dispositivos de confianza: {e}")
 
-def hash_token(token):
-    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+def get_cookie_header_value(handler, token):
+    """
+    Construye la cabecera Set-Cookie con HttpOnly estricto.
+    Ajusta SameSite y Secure según si la conexión es HTTPS/proxy o HTTP directo en LAN.
+    """
+    is_https = handler.headers.get('X-Forwarded-Proto') == 'https' or getattr(handler, 'is_https', False)
+    if is_https:
+        return f"_sysmon_trust={token}; Path=/; Max-Age=31536000; HttpOnly; SameSite=None; Secure; Partitioned"
+    else:
+        return f"_sysmon_trust={token}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax"
 
 def get_client_ip(handler):
     """
     Extrae la IP real del cliente con validación estricta anti-spoofing.
-    Si la conexión directa proviene de localhost (Caddy proxy), se extrae la IP sanitizada por Caddy
-    (X-Real-IP o la última IP de confianza en X-Forwarded-For).
+    Si la conexión directa proviene de localhost (Caddy proxy) o del servidor local,
+    se extrae la IP sanitizada por el proxy (X-Real-IP o el cliente original en X-Forwarded-For).
     """
     direct_ip = handler.client_address[0]
-    if direct_ip in ('127.0.0.1', '::1'):
+    if direct_ip in ('127.0.0.1', '::1', 'localhost', '192.168.50.2', SERVER_LOCAL_IP):
         x_real = handler.headers.get('X-Real-IP')
         if x_real:
             return x_real.strip()
@@ -195,17 +566,17 @@ def get_client_ip(handler):
         if xff:
             parts = [p.strip() for p in xff.split(',') if p.strip()]
             if parts:
-                return parts[-1]
+                return parts[0]
     return direct_ip
 
 def is_local_ip(ip_str):
     """
     Determina con total precisión si una dirección IP es local (LAN de casa, loopback o Tailscale).
-    Cualquier IP pública o externa fuera de estas subredes se considera EXTERIOR.
+    Cualquier IP pública o externa fuera de estas subredes se considera EXTERIOR (Datos móviles / WAN).
     """
     try:
         ip = ipaddress.ip_address(ip_str)
-        if ip.is_loopback:
+        if ip.is_loopback or ip.is_private or ip.is_link_local:
             return True
         for net in [ipaddress.ip_network('192.168.0.0/16'),
                     ipaddress.ip_network('10.0.0.0/8'),
@@ -251,8 +622,10 @@ def parse_user_agent(ua):
 
 def check_trust_status(handler):
     """
-    Verifica el origen de la petición y la presencia del token de confianza.
-    Retorna un diccionario con el estado de autenticación y si se generó un nuevo token.
+    Verifica el origen de la petición y valida la credencial criptográfica HMAC.
+    - Si conecta desde LAN local: emite credencial automática si no tiene, y autoriza.
+    - Si conecta desde red externa (datos móviles): valida token firmado y verifica que
+      fue emparejado previamente en LAN. Si no lo está, BLOQUEA el acceso.
     """
     client_ip = get_client_ip(handler)
     is_local = is_local_ip(client_ip)
@@ -271,8 +644,8 @@ def check_trust_status(handler):
             
     with TRUST_LOCK:
         devices = load_trusted_devices()
-        token_hash = hash_token(token) if token else None
-        device_entry = devices.get(token_hash) if token_hash else None
+        verified_device_id = verify_device_token(token) if token else None
+        device_entry = devices.get(verified_device_id) if verified_device_id else None
         new_token = None
         now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ua = handler.headers.get('User-Agent', '')
@@ -286,45 +659,55 @@ def check_trust_status(handler):
                     "is_trusted": True,
                     "client_ip": client_ip,
                     "device_info": {"id": "cli_local", "name": "Herramienta Local (CLI)", "trusted": True},
+                    "device_id": "cli_local",
                     "new_token": None
                 }
 
-            # Si es un navegador real en LAN y aún no tiene token o expiró, se le emite uno automáticamente.
-            if not device_entry or not token:
-                new_token = secrets.token_urlsafe(32)
-                t_hash = hash_token(new_token)
-                device_name = parse_user_agent(ua)
-                device_entry = {
-                    "id": f"dev_{secrets.token_hex(4)}",
-                    "name": device_name,
-                    "first_seen": now_iso,
-                    "last_seen": now_iso,
-                    "local_ip": client_ip,
-                    "user_agent": ua[:150],
-                    "verified_in_lan": True,
-                    "trusted": True
-                }
-                devices[t_hash] = device_entry
-                save_trusted_devices(devices)
-            else:
-                # Dispositivo local ya emparejado: refrescar fecha y datos
+            # Si el dispositivo ya tiene un token firmado válido y registrado en devices
+            if device_entry and device_entry.get("trusted", True):
                 device_entry["last_seen"] = now_iso
                 device_entry["local_ip"] = client_ip
                 device_entry["verified_in_lan"] = True
                 device_entry["trusted"] = True
                 save_trusted_devices(devices)
-                
-            return {
-                "is_local": True,
-                "is_trusted": True,
-                "client_ip": client_ip,
-                "device_info": device_entry,
-                "new_token": new_token
-            }
+                return {
+                    "is_local": True,
+                    "is_trusted": True,
+                    "client_ip": client_ip,
+                    "device_info": device_entry,
+                    "device_id": verified_device_id,
+                    "new_token": None
+                }
+            else:
+                # Dispositivo nuevo en LAN: emitir nueva credencial HMAC-SHA256
+                dev_id = f"dev_{secrets.token_hex(6)}"
+                new_token = create_device_token(dev_id)
+                device_name = parse_user_agent(ua)
+                device_entry = {
+                    "id": dev_id,
+                    "name": device_name,
+                    "first_seen": now_iso,
+                    "last_seen": now_iso,
+                    "local_ip": client_ip,
+                    "last_external_ip": "",
+                    "user_agent": ua[:150],
+                    "verified_in_lan": True,
+                    "trusted": True
+                }
+                devices[dev_id] = device_entry
+                save_trusted_devices(devices)
+                return {
+                    "is_local": True,
+                    "is_trusted": True,
+                    "client_ip": client_ip,
+                    "device_info": device_entry,
+                    "device_id": dev_id,
+                    "new_token": new_token
+                }
         else:
-            # Petición desde el EXTERIOR
+            # Petición desde el EXTERIOR (Datos móviles / WAN)
             if device_entry and device_entry.get("trusted", False) and device_entry.get("verified_in_lan", True):
-                # Dispositivo verificado previamente en la red local
+                # Dispositivo previamente emparejado en LAN con firma válida
                 device_entry["last_seen"] = now_iso
                 device_entry["last_external_ip"] = client_ip
                 save_trusted_devices(devices)
@@ -333,36 +716,46 @@ def check_trust_status(handler):
                     "is_trusted": True,
                     "client_ip": client_ip,
                     "device_info": device_entry,
+                    "device_id": verified_device_id,
                     "new_token": None
                 }
             else:
-                # Dispositivo NO verificado en la red local -> TOTALMENTE NO DE CONFIANZA
+                # Dispositivo NO verificado en LAN -> BLOQUEAR COMPLETAMENTE
                 return {
                     "is_local": False,
                     "is_trusted": False,
                     "client_ip": client_ip,
                     "device_info": None,
+                    "device_id": None,
                     "new_token": None
                 }
 
 def get_locked_page_html(client_ip):
-    """Página interactiva para autorizar dispositivos remotos mediante la clave maestra."""
+    """Página interactiva y segura para autorizar dispositivos remotos mediante la clave maestra."""
+    dom = detect_system_dns_domain()
     return f"""<!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Acceso al Servidor • Autorización Requerida</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>Acceso al Servidor • Autorización Requerida ({dom})</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   <style>
     :root {{
-      --bg: #1e1e1e;
-      --card-bg: #2d2d2d;
-      --border: rgba(255, 255, 255, 0.1);
-      --accent: #3584e4;
-      --accent-hover: #1c71d8;
-      --text: #ffffff;
-      --text-dim: #9a9996;
-      --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --bg: #0B0F17;
+      --card-bg: #111827;
+      --border: #1E293B;
+      --border-focus: #0EA5E9;
+      --primary: #0284C7;
+      --primary-hover: #0EA5E9;
+      --text: #F8FAFC;
+      --text-dim: #94A3B8;
+      --success: #10B981;
+      --error: #EF4444;
+      --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
     }}
     * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }}
     body {{
@@ -373,75 +766,144 @@ def get_locked_page_html(client_ip):
       align-items: center;
       justify-content: center;
       padding: 20px;
+      -webkit-font-smoothing: antialiased;
     }}
     .auth-card {{
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 32px 28px;
+      border-radius: 16px;
+      padding: 34px 30px;
       width: 100%;
-      max-width: 400px;
+      max-width: 440px;
       text-align: center;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
     }}
-    .auth-icon {{
-      font-size: 42px;
-      margin-bottom: 16px;
+    .auth-icon-squircle {{
+      width: 60px;
+      height: 60px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #0082c9, #005686);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      margin: 0 auto 18px;
+      box-shadow: 0 6px 18px rgba(0, 130, 201, 0.35);
     }}
     h1 {{
-      font-size: 20px;
+      font-size: 21px;
       font-weight: 700;
+      letter-spacing: -0.3px;
+      color: #ffffff;
       margin-bottom: 8px;
     }}
-    p {{
-      font-size: 13.5px;
-      color: var(--text-dim);
-      line-height: 1.5;
-      margin-bottom: 24px;
-    }}
-    .input-box {{
+    .badge-unpaired {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(255, 204, 0, 0.12);
+      border: 1px solid rgba(255, 204, 0, 0.3);
+      color: #ffd13b;
+      font-size: 11.5px;
+      font-weight: 600;
       margin-bottom: 16px;
     }}
-    input[type="password"] {{
-      width: 100%;
+    .desc {{
+      font-size: 13.5px;
+      color: var(--text-dim);
+      line-height: 1.55;
+      margin-bottom: 20px;
+      text-align: left;
+    }}
+    .info-box {{
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
       padding: 12px 14px;
+      font-size: 12px;
+      color: #bbbbbb;
+      line-height: 1.5;
+      text-align: left;
+      margin-bottom: 20px;
+    }}
+    .info-box strong {{
+      color: #ffffff;
+    }}
+    .input-box {{
+      position: relative;
+      margin-bottom: 16px;
+    }}
+    input[type="password"], input[type="text"] {{
+      width: 100%;
+      padding: 12px 42px 12px 14px;
       border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      background: #242424;
-      color: #fff;
+      border: 1px solid var(--border);
+      background: #181818;
+      color: #ffffff;
       font-size: 14px;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }}
-    input[type="password"]:focus {{
-      border-color: var(--accent);
+    input:focus {{
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(0, 145, 242, 0.25);
     }}
-    button {{
+    .toggle-pwd-btn {{
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }}
+    .toggle-pwd-btn:hover {{
+      color: #ffffff;
+    }}
+    button[type="submit"] {{
       width: 100%;
-      padding: 12px;
+      padding: 12px 16px;
       border-radius: 8px;
       border: none;
-      background: var(--accent);
-      color: #fff;
+      background: var(--primary);
+      color: #ffffff;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.15s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }}
-    button:hover {{
-      background: var(--accent-hover);
+    button[type="submit"]:hover:not(:disabled) {{
+      background: var(--primary-hover);
+    }}
+    button[type="submit"]:disabled {{
+      opacity: 0.5;
+      cursor: not-allowed;
     }}
     .status-msg {{
       margin-top: 14px;
-      font-size: 13px;
+      font-size: 12.5px;
+      line-height: 1.4;
       min-height: 20px;
     }}
     .badge-ip {{
       display: inline-block;
-      margin-top: 20px;
+      margin-top: 22px;
       font-size: 11px;
+      font-family: var(--font-mono);
       color: var(--text-dim);
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
       padding: 4px 10px;
       border-radius: 20px;
     }}
@@ -449,20 +911,74 @@ def get_locked_page_html(client_ip):
 </head>
 <body>
   <div class="auth-card">
-    <div class="auth-icon">🛡️</div>
-    <h1>Recursos del Servidor</h1>
-    <p>Este dispositivo no está emparejado en la red local. Introduce la clave maestra de administrador para autorizarlo.</p>
+    <div class="auth-icon-squircle">
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    </div>
+    <h1>Servidor Cminewar</h1>
+    <div class="badge-unpaired">🔒 Dispositivo Externo No Vinculado</div>
+    
+    <p class="desc">
+      El acceso remoto a través de datos móviles (4G/5G) o redes externas requiere que el dispositivo esté vinculado para prevenir intrusiones.
+    </p>
+
+    <div class="info-box">
+      <strong>¿Cómo acceder?</strong><br>
+      • <strong>Automático:</strong> Conecta este dispositivo a la red Wi-Fi local de casa una vez.<br>
+      • <strong>Inmediato:</strong> Introduce abajo la <strong>Clave Maestra de Rescate</strong> para vincularlo ahora mismo.
+    </div>
+
     <form id="authForm" onsubmit="handleAuth(event)">
       <div class="input-box">
         <input type="password" id="masterKey" placeholder="Clave maestra de administrador" autofocus required />
+        <button type="button" class="toggle-pwd-btn" onclick="togglePasswordVisibility()" title="Mostrar/ocultar clave">
+          <svg id="eyeIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
       </div>
-      <button type="submit" id="btnSubmit">Autorizar Dispositivo</button>
+      <button type="submit" id="btnSubmit">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Autorizar Dispositivo</span>
+      </button>
     </form>
     <div class="status-msg" id="statusMsg"></div>
     <div class="badge-ip">IP Origen: {client_ip}</div>
   </div>
 
   <script>
+    let countdownInterval = null;
+
+    function togglePasswordVisibility() {{
+      const input = document.getElementById('masterKey');
+      if (input.type === 'password') {{
+        input.type = 'text';
+      }} else {{
+        input.type = 'password';
+      }}
+    }}
+
+    function startLockoutCountdown(seconds) {{
+      const btn = document.getElementById('btnSubmit');
+      const msg = document.getElementById('statusMsg');
+      btn.disabled = true;
+      let remaining = seconds;
+
+      if (countdownInterval) clearInterval(countdownInterval);
+      countdownInterval = setInterval(() => {{
+        remaining--;
+        if (remaining <= 0) {{
+          clearInterval(countdownInterval);
+          btn.disabled = false;
+          btn.innerHTML = '<span>Intentar Nuevamente</span>';
+          msg.style.color = 'var(--text-dim)';
+          msg.textContent = 'El bloqueo temporal ha finalizado. Puedes volver a intentarlo.';
+        }} else {{
+          msg.style.color = 'var(--error)';
+          msg.textContent = `Demasiados intentos fallidos. IP temporalmente bloqueada (${{remaining}}s restantes).`;
+        }}
+      }}, 1000);
+    }}
+
     async function handleAuth(e) {{
       e.preventDefault();
       const key = document.getElementById('masterKey').value.trim();
@@ -471,7 +987,7 @@ def get_locked_page_html(client_ip):
       if (!key) return;
 
       btn.disabled = true;
-      btn.textContent = 'Verificando...';
+      btn.innerHTML = '<span>Verificando...</span>';
       msg.textContent = '';
 
       try {{
@@ -482,20 +998,23 @@ def get_locked_page_html(client_ip):
         }});
         const data = await res.json();
         if (res.ok && data.success) {{
-          msg.style.color = '#57e389';
-          msg.textContent = '¡Autorizado con éxito! Cargando monitor...';
+          msg.style.color = 'var(--success)';
+          msg.textContent = '¡Dispositivo autorizado con éxito! Recargando monitor...';
           setTimeout(() => {{ window.location.reload(); }}, 600);
+        }} else if (res.status === 429) {{
+          const retrySec = parseInt(res.headers.get('Retry-After') || '900', 10);
+          startLockoutCountdown(retrySec);
         }} else {{
-          msg.style.color = '#f87171';
+          msg.style.color = 'var(--error)';
           msg.textContent = data.error || 'Clave incorrecta.';
           btn.disabled = false;
-          btn.textContent = 'Autorizar Dispositivo';
+          btn.innerHTML = '<span>Autorizar Dispositivo</span>';
         }}
       }} catch (err) {{
-        msg.style.color = '#f87171';
+        msg.style.color = 'var(--error)';
         msg.textContent = 'Error conectando con el servidor.';
         btn.disabled = false;
-        btn.textContent = 'Autorizar Dispositivo';
+        btn.innerHTML = '<span>Autorizar Dispositivo</span>';
       }}
     }}
   </script>
@@ -1887,11 +2406,19 @@ def get_system_info():
             "kernel": KERNEL,
             "uptime_seconds": uptime_seconds,
             "uptime_str": uptime_str,
+            "public_domain": detect_system_dns_domain(),
+            "local_ip": SERVER_LOCAL_IP,
             "timestamp": time.time(),
             "time_str": time.strftime("%H:%M:%S")
         }
     except Exception:
-        return {"uptime_str": "Unknown", "hostname": HOSTNAME, "kernel": KERNEL}
+        return {
+            "uptime_str": "Unknown",
+            "hostname": HOSTNAME,
+            "kernel": KERNEL,
+            "public_domain": detect_system_dns_domain(),
+            "local_ip": SERVER_LOCAL_IP
+        }
 
 def background_collector():
     global METRICS_CACHE, METRICS_CACHE_BYTES, HISTORY
@@ -2060,11 +2587,34 @@ def background_collector():
 # ==============================================================================
 # HTTP Request Handler & Zero-Trust Enforcement
 # ==============================================================================
+VALID_WEB_ROUTES = {
+    "/",
+    "/index.html",
+    "/resumen",
+    "/procesador",
+    "/memoria",
+    "/grafica",
+    "/almacenamiento",
+    "/red",
+    "/seguridad",
+    "/aplicaciones",
+    "/multimedia",
+    "/procesos",
+    "/sistema"
+}
+
 class DashboardHTTPHandler(BaseHTTPRequestHandler):
     def send_security_headers(self):
+        dom = resolve_request_domain(self)
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
-        self.send_header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' data:; connect-src 'self' ws: wss:; frame-src 'self' https://*.cminewar.duckdns.org; frame-ancestors 'self' https://cminewar.duckdns.org https://nextcloud.cminewar.duckdns.org;")
+        self.send_header(
+            'Content-Security-Policy',
+            f"default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com data:; "
+            f"connect-src 'self' https://api.github.com ws: wss:; "
+            f"frame-src 'self' https://*.{dom}; "
+            f"frame-ancestors 'self' https://{dom} https://*.{dom};"
+        )
 
     def do_HEAD(self):
         self.do_GET()
@@ -2087,9 +2637,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         auth = check_trust_status(self)
+        clean_path = self.path.split('?')[0].rstrip('/') or '/'
+        req_domain = resolve_request_domain(self)
 
         # 1. API METRICS (Bloqueo 403 total si es externo no emparejado)
-        if self.path == "/api/metrics":
+        if clean_path == "/api/metrics":
             if not auth["is_trusted"]:
                 err_resp = json.dumps({
                     "error": "Acceso externo denegado. Este dispositivo no está emparejado en la red local Wi-Fi.",
@@ -2109,13 +2661,22 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             with METRICS_LOCK:
                 base_payload = dict(METRICS_CACHE)
 
-            # Inyectar estado de seguridad contextual para la UI
+            if "system" in base_payload and isinstance(base_payload["system"], dict):
+                base_payload["system"] = dict(base_payload["system"])
+                base_payload["system"]["public_domain"] = req_domain
+                base_payload["system"]["local_ip"] = SERVER_LOCAL_IP
+
+            # Inyectar estado de seguridad contextual y versión para la UI
             base_payload["auth_status"] = {
                 "is_local": auth["is_local"],
                 "is_trusted": auth["is_trusted"],
                 "client_ip": auth["client_ip"],
+                "public_domain": req_domain,
+                "local_ip": SERVER_LOCAL_IP,
                 "device_name": auth["device_info"]["name"] if auth.get("device_info") else "Dispositivo Local"
             }
+            base_payload["version_info"] = get_version_info(force_refresh=False)
+            base_payload["version_info"]["public_domain"] = req_domain
             data = json.dumps(base_payload).encode('utf-8')
 
             self.send_response(200)
@@ -2124,14 +2685,37 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_security_headers()
             if auth.get("new_token"):
-                self.send_header('Set-Cookie', f'_sysmon_trust={auth["new_token"]}; Path=/; Max-Age=31536000; SameSite=None; Secure; Partitioned')
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
             self.send_header('Content-Length', str(len(data)))
             self.end_headers()
             self.wfile.write(data)
             return
 
+        # 1b. API VERSION & GITHUB SYNC STATUS
+        elif clean_path == "/api/version":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            force_ref = ("refresh=1" in self.path or "refresh=true" in self.path)
+            ver_data = get_version_info(force_refresh=force_ref)
+            ver_data["public_domain"] = req_domain
+            ver_data["local_ip"] = SERVER_LOCAL_IP
+            resp = json.dumps(ver_data).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # 2. LISTADO DE DISPOSITIVOS EMPAREJADOS
-        elif self.path == "/api/auth/devices":
+        elif clean_path == "/api/auth/devices":
             if not auth["is_trusted"]:
                 self.send_response(403)
                 self.send_security_headers()
@@ -2140,26 +2724,33 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             with TRUST_LOCK:
                 devices = load_trusted_devices()
                 dev_list = []
+                caller_dev_id = auth.get("device_id")
                 for k, v in devices.items():
+                    dev_id = v.get("id") or k
                     dev_list.append({
-                        "id": v.get("id"),
-                        "name": v.get("name"),
-                        "first_seen": v.get("first_seen"),
-                        "last_seen": v.get("last_seen"),
+                        "id": dev_id,
+                        "name": v.get("name", "Dispositivo"),
+                        "first_seen": v.get("first_seen", ""),
+                        "last_seen": v.get("last_seen", ""),
                         "local_ip": v.get("local_ip", ""),
-                        "trusted": v.get("trusted", True)
+                        "last_external_ip": v.get("last_external_ip", ""),
+                        "verified_in_lan": v.get("verified_in_lan", True),
+                        "trusted": v.get("trusted", True),
+                        "is_current": (dev_id == caller_dev_id)
                     })
             resp = json.dumps(dev_list).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
             self.send_header('Content-Length', str(len(resp)))
             self.end_headers()
             self.wfile.write(resp)
             return
 
         # 2b. HISTORIAL COMPLETO ALL-TIME DE FAIL2BAN
-        elif self.path == "/api/fail2ban/history":
+        elif clean_path == "/api/fail2ban/history":
             if not auth["is_trusted"]:
                 self.send_response(403)
                 self.send_security_headers()
@@ -2176,8 +2767,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 3. INTERFAZ HTML PRINCIPAL (O Pantalla de Autorización si es externo no autorizado)
-        elif self.path == "/" or self.path == "/index.html":
+        # 3. RUTAS WEB LIMPIAS MULTIPÁGINA (History API + Acceso Directo)
+        elif clean_path in VALID_WEB_ROUTES:
             if not auth["is_trusted"]:
                 locked_page = get_locked_page_html(auth["client_ip"]).encode('utf-8')
                 self.send_response(200)
@@ -2202,7 +2793,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.send_header('Expires', '0')
                 self.send_security_headers()
                 if auth.get("new_token"):
-                    self.send_header('Set-Cookie', f'_sysmon_trust={auth["new_token"]}; Path=/; Max-Age=31536000; SameSite=None; Secure; Partitioned')
+                    self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
                 self.send_header('Content-Length', str(len(content)))
                 self.end_headers()
                 self.wfile.write(content)
@@ -2213,13 +2804,53 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(f"Error loading dashboard: {e}".encode('utf-8'))
             return
 
-        # 4. ARCHIVOS ESTÁTICOS / DESCARGAS
-        elif self.path in ["/visipics.rdp", "/visipics_externo.rdp", "/Asus_Router_CA.crt"]:
-            filename = self.path.lstrip("/")
+        # 4. ARCHIVOS ESTÁTICOS / DESCARGAS RDP CON DNS AUTODETECTADO
+        elif clean_path in ["/visipics.rdp", "/visipics_externo.rdp", "/Asus_Router_CA.crt"]:
+            filename = clean_path.lstrip("/")
             file_path = os.path.join(STATIC_DIR, filename)
             try:
-                with open(file_path, 'rb') as f:
-                    content = f.read()
+                if filename == "visipics_externo.rdp":
+                    rdp_text = (
+                        f"full address:s:{req_domain}:3389\n"
+                        "username:s:servidor\n"
+                        "prompt for credentials:i:0\n"
+                        "administrative session:i:1\n"
+                        "screen mode id:i:2\n"
+                        "use multimon:i:0\n"
+                        "desktopwidth:i:1920\n"
+                        "desktopheight:i:1080\n"
+                        "smart sizing:i:1\n"
+                        "dynamic resolution:i:1\n"
+                        "redirectclipboard:i:1\n"
+                        "autoreconnection enabled:i:1\n"
+                        "authentication level:i:0\n"
+                        "enableworkspacereconnect:i:1\n"
+                        "drivestoredirect:s:*\n"
+                    )
+                    content = rdp_text.encode('utf-8')
+                elif filename == "visipics.rdp":
+                    rdp_text = (
+                        f"full address:s:{SERVER_LOCAL_IP}:3389\n"
+                        "username:s:servidor\n"
+                        "prompt for credentials:i:0\n"
+                        "administrative session:i:1\n"
+                        "screen mode id:i:2\n"
+                        "use multimon:i:0\n"
+                        "desktopwidth:i:1920\n"
+                        "desktopheight:i:1080\n"
+                        "smart sizing:i:1\n"
+                        "dynamic resolution:i:1\n"
+                        "redirectclipboard:i:1\n"
+                        "autoreconnection enabled:i:1\n"
+                        "authentication level:i:0\n"
+                        "enableworkspacereconnect:i:1\n"
+                        "drivestoredirect:s:*\n"
+                    )
+                    content = rdp_text.encode('utf-8')
+                else:
+                    with open(file_path, 'rb') as f:
+                        content = f.read()
+
                 self.send_response(200)
                 if filename.endswith(".crt"):
                     self.send_header('Content-Type', 'application/x-x509-ca-cert')
@@ -2280,20 +2911,22 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             
             if hmac.compare_digest(entered_key, ADMIN_MASTER_KEY):
                 record_auth_success(client_ip)
-                new_token = secrets.token_urlsafe(32)
-                t_hash = hash_token(new_token)
+                dev_id = f"dev_{secrets.token_hex(6)}"
+                new_token = create_device_token(dev_id)
                 now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 device_name = parse_user_agent(ua) + " (Desbloqueo Remoto)"
                 
                 with TRUST_LOCK:
                     devices = load_trusted_devices()
-                    devices[t_hash] = {
-                        "id": f"dev_{secrets.token_hex(4)}",
+                    devices[dev_id] = {
+                        "id": dev_id,
                         "name": device_name,
                         "first_seen": now_iso,
                         "last_seen": now_iso,
                         "local_ip": f"Externo ({client_ip})",
+                        "last_external_ip": client_ip,
                         "user_agent": ua[:150],
+                        "verified_in_lan": True,
                         "trusted": True
                     }
                     save_trusted_devices(devices)
@@ -2302,7 +2935,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_security_headers()
-                self.send_header('Set-Cookie', f'_sysmon_trust={new_token}; Path=/; Max-Age=31536000; SameSite=None; Secure; Partitioned')
+                self.send_header('Set-Cookie', get_cookie_header_value(self, new_token))
                 self.send_header('Content-Length', str(len(resp)))
                 self.end_headers()
                 self.wfile.write(resp)
@@ -2322,7 +2955,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(resp)
             return
 
-        # 2. Revocación de dispositivo
+        # 2. Revocación individual de dispositivo
         elif self.path == "/api/auth/revoke":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
@@ -2347,18 +2980,54 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 
             with TRUST_LOCK:
                 devices = load_trusted_devices()
-                target_key = None
-                for k, v in devices.items():
-                    if v.get('id') == dev_id:
-                        target_key = k
-                        break
-                if target_key:
-                    del devices[target_key]
+                found = False
+                if dev_id in devices:
+                    del devices[dev_id]
+                    found = True
+                else:
+                    # Búsqueda por si dev_id estuviese anidado
+                    for k in list(devices.keys()):
+                        if devices[k].get('id') == dev_id:
+                            del devices[k]
+                            found = True
+                            break
+                if found:
                     save_trusted_devices(devices)
                     resp = json.dumps({"success": True}).encode('utf-8')
                 else:
                     resp = json.dumps({"success": False, "error": "Dispositivo no encontrado"}).encode('utf-8')
                     
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 2b. Revocación de todos los demás dispositivos (Pánico / Reset)
+        elif self.path == "/api/auth/revoke_all_others":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            caller_dev_id = auth.get("device_id")
+            with TRUST_LOCK:
+                devices = load_trusted_devices()
+                new_devices = {}
+                count_revoked = 0
+                for k, v in devices.items():
+                    cur_id = v.get("id") or k
+                    if caller_dev_id and cur_id == caller_dev_id:
+                        new_devices[cur_id] = v
+                    else:
+                        count_revoked += 1
+                save_trusted_devices(new_devices)
+
+            resp = json.dumps({"success": True, "revoked_count": count_revoked}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
@@ -2460,7 +3129,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(resp)
                 return
 
-            if target_ip in ["127.0.0.1", "::1", "192.168.50.2"]:
+            if target_ip in ["127.0.0.1", "::1", "192.168.50.2", SERVER_LOCAL_IP]:
                 resp = json.dumps({"success": False, "error": "No se puede bloquear la IP local o del servidor"}).encode('utf-8')
                 self.send_response(400)
                 self.send_header('Content-Type', 'application/json')
@@ -2655,6 +3324,70 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 threading.Thread(target=run_svc_action, daemon=True).start()
                 verb = "Reiniciando" if action == "restart" else ("Iniciando" if action == "start" else "Deteniendo")
                 resp = json.dumps({"success": True, "message": f"{verb} {target}..."}).encode('utf-8')
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 6. Actualización en 1 clic desde GitHub (git pull origin main + reinicio limpio)
+        elif self.path in ("/api/system/update", "/api/update"):
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            try:
+                p_fetch = subprocess.run(
+                    ["git", "fetch", "origin", GITHUB_BRANCH],
+                    cwd=BASE_DIR, capture_output=True, text=True, timeout=20
+                )
+                p_pull = subprocess.run(
+                    ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
+                    cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                )
+                if p_pull.returncode != 0:
+                    # Fallback con git pull estándar si hubiera ramas divergentes
+                    p_pull = subprocess.run(
+                        ["git", "pull", "origin", GITHUB_BRANCH],
+                        cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                    )
+
+                pull_out = (p_pull.stdout.strip() + "\n" + p_pull.stderr.strip()).strip()
+                updated_ver = get_version_info(force_refresh=True)
+
+                if p_pull.returncode == 0:
+                    def delayed_service_restart():
+                        time.sleep(1.5)
+                        try:
+                            subprocess.run(["sudo", "systemctl", "restart", "system-dashboard.service"], capture_output=True, timeout=15)
+                        except Exception:
+                            pass
+
+                    threading.Thread(target=delayed_service_restart, daemon=True).start()
+                    resp = json.dumps({
+                        "success": True,
+                        "message": "Actualización descargada desde GitHub correctamente. Reiniciando servicio system-dashboard...",
+                        "output": pull_out or "Already up to date.",
+                        "version_info": updated_ver
+                    }).encode('utf-8')
+                else:
+                    resp = json.dumps({
+                        "success": False,
+                        "error": f"Error al ejecutar git pull: {pull_out or 'Código ' + str(p_pull.returncode)}",
+                        "output": pull_out,
+                        "version_info": updated_ver
+                    }).encode('utf-8')
+            except Exception as e:
+                resp = json.dumps({
+                    "success": False,
+                    "error": f"Excepción durante la actualización desde GitHub: {str(e)}"
+                }).encode('utf-8')
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
