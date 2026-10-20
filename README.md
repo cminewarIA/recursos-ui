@@ -42,6 +42,7 @@ A diferencia de los paneles monolíticos tradicionales de página única por anc
 | `/descargas` | **Descargas & Emby** | Torrents activos en **qBittorrent** y últimas películas/series indexadas en **Emby** (`library.db`). |
 | `/procesos` | **Procesos** | Monitor de procesos del sistema ordenable por CPU, memoria privada, PID o nombre de binario. |
 | `/dispositivos` | **Dispositivos Confiables**| Panel de auditoría Zero-Trust con lista de dispositivos autorizados y revocación en 1 clic. |
+| `/dns` | **DNS & DuckDNS** | Panel DuckDNS en vivo, actualización forzada, visor de logs y tráfico DNS por IP (Pi-hole FTL). |
 | `/version` | **Versión & GitHub** | Comparador en vivo **Local vs GitHub (`cminewarIA/recursos-ui`)**, estado OTA y actualización en 1 clic. |
 
 > **Retrocompatibilidad**: Mantiene compatibilidad automática con enlaces antiguos por hash (`#processor`, `#security`, `#downloads`, etc.).
@@ -93,6 +94,23 @@ El proyecto sigue una estricta política de versionado unificado que elimina por
 - **Distribución Dinámica**: `server.py` lee este archivo en tiempo real mediante `get_app_version()` y lo propaga a través de `/api/metrics` y `/api/version`.
 - **Propagación en el Frontend**: La interfaz actualiza de inmediato todos los elementos visibles (badge del sidebar, botón de cabecera, tarjeta Bento en Vista General y la pantalla `/version`) con el valor de la API, previniendo incoherencias entre la interfaz y el servidor.
 - **Sincronización con `package.json`**: Se mantiene idéntico valor en `package.json` para coherencia del ecosistema de dependencias.
+
+---
+
+### 7. 🌐 Gestor DNS, DuckDNS en Vivo & Telemetría de Tráfico por IP
+En la vista **`/dns`** se integran las herramientas de dominio dinámico y monitorización de red:
+- **Control Directo de DuckDNS**:
+  - Lectura en vivo del script `/home/servidor/servicios/duckdns/duck.sh`.
+  - Comparativa en tiempo real entre la IP pública activa y la IP registrada en DuckDNS (`last_ip.txt`).
+  - Botón **"⚡ Forzar Actualización DuckDNS"** (`POST /api/dns/duckdns/update`) para sincronizar de inmediato la IP pública sin esperar al cron de 5 minutos.
+  - Editor modal de subdominios y token (`POST /api/dns/duckdns/config`) con soporte para múltiples dominios separados por comas.
+- **Consola de Logs en Pantalla (`duck.log`)**:
+  - Visor interactivo de terminal (`GET /api/dns/logs`) con recarga automática cada 10 segundos y resaltado sintáctico de cambios de IP, heartbeats y errores.
+- **Monitor de Tráfico DNS & Servicios por Dispositivo (Pi-hole FTL)**:
+  - Extracción en modo solo lectura desde `/etc/pihole/pihole-FTL.db` (`GET /api/dns/traffic`).
+  - Clasificación de dispositivos por IP con sus nombres de red locales detectados vía ARP/DHCP.
+  - Desglose de los servicios y dominios web más consultados por cada dispositivo de la red local (móviles, consolas, TV, servidor, etc.).
+  - Registro de las últimas 50 consultas DNS con indicación de estado (Permitido / Bloqueado por Pi-hole), servidor upstream y tiempo de respuesta en milisegundos.
 
 ---
 

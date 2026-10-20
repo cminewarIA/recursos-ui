@@ -1708,6 +1708,242 @@ def get_arp_and_pihole_names():
         pass
     return arp_map
 
+def get_ip_to_device_name_map():
+    arp_mac_map = get_arp_and_pihole_names()
+    ip_to_name = {}
+    for mac, data in arp_mac_map.items():
+        if isinstance(data, dict) and 'ip' in data and 'name' in data:
+            ip_to_name[data['ip']] = data['name']
+    return ip_to_name
+
+DUCKDNS_SCRIPT = "/home/servidor/servicios/duckdns/duck.sh"
+DUCKDNS_LOG_CANDIDATES = [
+    "/mnt/almacenamiento/logs/duckdns/duck.log",
+    "/home/servidor/servicios/duckdns/duck.log"
+]
+DUCKDNS_IP_CACHE = "/home/servidor/servicios/duckdns/last_ip.txt"
+
+def get_duckdns_log_file():
+    for p in DUCKDNS_LOG_CANDIDATES:
+        if os.path.isfile(p):
+            return p
+    return DUCKDNS_LOG_CANDIDATES[0]
+
+def get_duckdns_status():
+    domain = "cminewar"
+    token = ""
+    if os.path.isfile(DUCKDNS_SCRIPT):
+        try:
+            with open(DUCKDNS_SCRIPT, "r", encoding="utf-8") as f:
+                content = f.read()
+                m_dom = re.search(r'DOMAIN=["\']?([^"\'\s]+)["\']?', content)
+                m_tok = re.search(r'TOKEN=["\']?([^"\'\s]+)["\']?', content)
+                if m_dom:
+                    domain = m_dom.group(1)
+                if m_tok:
+                    token = m_tok.group(1)
+        except Exception:
+            pass
+
+    last_ip = ""
+    if os.path.isfile(DUCKDNS_IP_CACHE):
+        try:
+            with open(DUCKDNS_IP_CACHE, "r", encoding="utf-8") as f:
+                last_ip = f.read().strip()
+        except Exception:
+            pass
+
+    log_file = get_duckdns_log_file()
+    last_log_line = ""
+    last_update_time = ""
+    if os.path.isfile(log_file):
+        try:
+            with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+                lines = [l.strip() for l in f if l.strip()]
+                if lines:
+                    last_log_line = lines[-1]
+                    m_ts = re.search(r'\[(.*?)\]', last_log_line)
+                    if m_ts:
+                        last_update_time = m_ts.group(1)
+        except Exception:
+            pass
+
+    masked_token = (token[:4] + "*" * (len(token) - 8) + token[-4:]) if len(token) > 8 else "****"
+
+    upstream_dns = []
+    try:
+        with open("/etc/resolv.conf", "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("nameserver"):
+                    parts = line.split()
+                    if len(parts) > 1:
+                        upstream_dns.append(parts[1])
+    except Exception:
+        pass
+
+    return {
+        "installed": os.path.isfile(DUCKDNS_SCRIPT),
+        "domain": domain,
+        "full_domain": f"{domain}.duckdns.org",
+        "token": token,
+        "token_masked": masked_token,
+        "last_registered_ip": last_ip,
+        "last_log_entry": last_log_line,
+        "last_update_time": last_update_time,
+        "log_path": log_file,
+        "script_path": DUCKDNS_SCRIPT,
+        "upstream_dns": upstream_dns
+    }
+
+def get_duckdns_logs(limit=60):
+    log_file = get_duckdns_log_file()
+    if not os.path.isfile(log_file):
+        return []
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+            lines = [l.strip() for l in f if l.strip()]
+            return lines[-limit:]
+    except Exception as e:
+        return [f"Error leyendo log: {e}"]
+
+def update_duckdns_now():
+    if not os.path.isfile(DUCKDNS_SCRIPT):
+        return {"success": False, "message": "Script duck.sh no encontrado"}
+    try:
+        res = subprocess.run(["bash", DUCKDNS_SCRIPT], capture_output=True, text=True, timeout=25)
+        st = get_duckdns_status()
+        return {
+            "success": res.returncode == 0,
+            "returncode": res.returncode,
+            "stdout": res.stdout.strip(),
+            "stderr": res.stderr.strip(),
+            "status": st
+        }
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+def save_duckdns_config(new_domain, new_token):
+    if not new_domain or not new_token:
+        return {"success": False, "message": "Dominio y Token requeridos"}
+    clean_domain = re.sub(r'[^a-zA-Z0-9_-]', '', new_domain.strip())
+    clean_token = re.sub(r'[^a-zA-Z0-9_-]', '', new_token.strip())
+    if not clean_domain or not clean_token:
+        return {"success": False, "message": "Dominio o Token inválido"}
+
+    if not os.path.isfile(DUCKDNS_SCRIPT):
+        return {"success": False, "message": "Script duck.sh no encontrado"}
+
+    try:
+        with open(DUCKDNS_SCRIPT, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        with open(DUCKDNS_SCRIPT + ".bak", "w", encoding="utf-8") as bf:
+            bf.write(content)
+
+        new_content = re.sub(r'DOMAIN=["\']?.*?["\']?', f'DOMAIN="{clean_domain}"', content, count=1)
+        new_content = re.sub(r'TOKEN=["\']?.*?["\']?', f'TOKEN="{clean_token}"', new_content, count=1)
+
+        with open(DUCKDNS_SCRIPT, "w", encoding="utf-8") as f:
+            f.write(new_content)
+
+        return {"success": True, "message": "Configuración guardada correctamente en duck.sh"}
+    except Exception as e:
+        return {"success": False, "message": f"Error al guardar configuración: {e}"}
+
+def get_dns_traffic_stats(client_filter=None, limit=50):
+    db_path = "/etc/pihole/pihole-FTL.db"
+    if not os.path.isfile(db_path):
+        return {"available": False, "clients": [], "queries": []}
+
+    ip_to_name = get_ip_to_device_name_map()
+
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.5)
+        cur = conn.cursor()
+
+        sql_clients = (
+            "SELECT client, count(*) as count, "
+            "sum(CASE WHEN status IN (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16) THEN 1 ELSE 0 END) as blocked "
+            "FROM queries WHERE timestamp >= strftime('%s', 'now', '-24 hours') "
+            "GROUP BY client ORDER BY count DESC LIMIT 25;"
+        )
+        client_rows = cur.execute(sql_clients).fetchall()
+
+        clients_list = []
+        for row in client_rows:
+            c_ip = row[0]
+            c_total = int(row[1] or 0)
+            c_blocked = int(row[2] or 0)
+            c_name = ip_to_name.get(c_ip, c_ip)
+
+            sql_top_doms = (
+                "SELECT domain, count(*) as c FROM queries "
+                "WHERE client = ? AND timestamp >= strftime('%s', 'now', '-24 hours') "
+                "GROUP BY domain ORDER BY c DESC LIMIT 3;"
+            )
+            top_doms = [
+                {"domain": d_row[0], "count": int(d_row[1])}
+                for d_row in cur.execute(sql_top_doms, (c_ip,)).fetchall()
+                if d_row[0]
+            ]
+
+            clients_list.append({
+                "ip": c_ip,
+                "name": c_name,
+                "total": c_total,
+                "blocked": c_blocked,
+                "pct_blocked": round((c_blocked / c_total * 100), 1) if c_total > 0 else 0.0,
+                "top_domains": top_doms
+            })
+
+        if client_filter:
+            sql_recent = (
+                "SELECT timestamp, client, domain, status, forward, reply_time "
+                "FROM queries WHERE client = ? ORDER BY id DESC LIMIT ?;"
+            )
+            recent_rows = cur.execute(sql_recent, (client_filter, limit)).fetchall()
+        else:
+            sql_recent = (
+                "SELECT timestamp, client, domain, status, forward, reply_time "
+                "FROM queries ORDER BY id DESC LIMIT ?;"
+            )
+            recent_rows = cur.execute(sql_recent, (limit,)).fetchall()
+
+        conn.close()
+
+        queries_list = []
+        for q in recent_rows:
+            ts = int(q[0] or 0)
+            c_ip = q[1] or ""
+            domain = q[2] or ""
+            status = int(q[3] or 0)
+            forward = q[4] or "Sinkhole / Cache"
+            reply_time = round(float(q[5] or 0) * 1000, 1)
+
+            is_blocked = status in (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16)
+            dt_str = datetime.fromtimestamp(ts).strftime("%H:%M:%S")
+
+            queries_list.append({
+                "time": dt_str,
+                "timestamp": ts,
+                "client_ip": c_ip,
+                "client_name": ip_to_name.get(c_ip, c_ip),
+                "domain": domain,
+                "status": status,
+                "is_blocked": is_blocked,
+                "forward": forward,
+                "reply_ms": reply_time
+            })
+
+        return {
+            "available": True,
+            "clients": clients_list,
+            "recent_queries": queries_list
+        }
+    except Exception as e:
+        return {"available": False, "error": str(e), "clients": [], "recent_queries": []}
+
 def classify_device(name, mac):
     name_l = (name or "").lower()
     
@@ -2638,7 +2874,9 @@ VALID_WEB_ROUTES = {
     "/procesos",
     "/sistema",
     "/version",
-    "/dispositivos"
+    "/dispositivos",
+    "/dns",
+    "/duckdns"
 }
 
 class DashboardHTTPHandler(BaseHTTPRequestHandler):
@@ -2816,6 +3054,67 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             with SECURITY_LOCK:
                 history_data = SECURITY_CACHE.get("fail2ban", {}).get("all_time_banned", [])
             resp = json.dumps({"status": "ok", "total": len(history_data), "history": history_data}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 2c. GESTOR DNS & DUCKDNS STATUS
+        elif clean_path == "/api/dns/duckdns":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            st = get_duckdns_status()
+            resp = json.dumps(st).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 2d. LOGS EN VIVO DE DUCKDNS
+        elif clean_path == "/api/dns/logs":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            logs = get_duckdns_logs(limit=80)
+            resp = json.dumps({"status": "ok", "total": len(logs), "logs": logs}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 2e. MONITOR DE TRÁFICO DNS & SERVICIOS POR IP
+        elif clean_path == "/api/dns/traffic":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            client_ip = None
+            if "?" in self.path:
+                try:
+                    q_str = self.path.split("?", 1)[1]
+                    q_params = urllib.parse.parse_qs(q_str)
+                    client_ip = q_params.get("client", [None])[0]
+                except Exception:
+                    pass
+            traffic = get_dns_traffic_stats(client_filter=client_ip, limit=50)
+            resp = json.dumps(traffic).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
@@ -3450,6 +3749,48 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     "error": f"Excepción durante la actualización desde GitHub: {str(e)}"
                 }).encode('utf-8')
 
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 7. Forzar actualización de DuckDNS en vivo
+        elif self.path in ("/api/dns/duckdns/update", "/api/duckdns/update"):
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            res = update_duckdns_now()
+            resp = json.dumps(res).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 8. Guardar configuración de DuckDNS (dominio / token)
+        elif self.path in ("/api/dns/duckdns/config", "/api/duckdns/config"):
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode('utf-8')
+                data = json.loads(body)
+                res = save_duckdns_config(data.get("domain"), data.get("token"))
+            except Exception as e:
+                res = {"success": False, "message": f"Error procesando solicitud: {e}"}
+            resp = json.dumps(res).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()

@@ -1407,12 +1407,22 @@
             </li>
 
             <li>
-              <a href="/sistema" class="nav-item" id="navSystem" onclick="return navigateTo(event, 'system')">
+              <a href="/dns" class="nav-item" id="navDns" onclick="return navigateTo(event, 'dns')">
+                <div class="nav-left">
+                  <span class="nav-emoji">🌐</span>
+                  <span>DNS & DuckDNS</span>
+                </div>
+                <span class="nav-badge badge-blue" id="badgeNavDns">Sync</span>
+              </a>
+            </li>
+
+            <li>
+              <a href="/version" class="nav-item" id="navVersion" onclick="return navigateTo(event, 'version')">
                 <div class="nav-left">
                   <span class="nav-emoji">🔄</span>
-                  <span>Versión & Dominio</span>
+                  <span>Versión & GitHub</span>
                 </div>
-                <span class="nav-badge badge-blue" id="badgeNavSystem">Al día</span>
+                <span class="nav-badge badge-green" id="badgeNavVersion">v2.2.0</span>
               </a>
             </li>
           </ul>
@@ -1426,7 +1436,7 @@
         </div>
         <div class="host-pill" style="font-size: 11px;">
           <span>DNS:</span>
-          <a href="/sistema" onclick="return navigateTo(event, 'system')" id="lblSidebarDomain" style="font-family: var(--font-mono); color: var(--color-primary-element); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Detectando...</a>
+          <a href="/dns" onclick="return navigateTo(event, 'dns')" id="lblSidebarDomain" style="font-family: var(--font-mono); color: var(--color-primary-element); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Detectando...</a>
         </div>
         <div class="trust-badge-row" onclick="openTrustDialog()" title="Gestionar dispositivos autorizados Zero-Trust">
           <div style="display: flex; align-items: center; gap: 7px; min-width: 0;">
@@ -1477,7 +1487,7 @@
             <input type="text" id="filterInput" placeholder="Filtrar..." oninput="onFilterChange()">
           </div>
 
-          <a href="/sistema" class="btn-header" id="btnHeaderVersion" onclick="return navigateTo(event, 'system')" title="Ver estado de versión y actualizar desde GitHub">
+          <a href="/version" class="btn-header" id="btnHeaderVersion" onclick="return navigateTo(event, 'version')" title="Ver estado de versión y actualizar desde GitHub">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/>
             </svg>
@@ -1516,7 +1526,7 @@
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <h2 style="font-size: 18px; font-weight: 700; letter-spacing: -0.3px; color: #FFFFFF;" id="ovHostTitle">Servidor Principal</h2>
                     <span style="font-size: 12px; color: var(--color-text-dim);">·</span>
-                    <a href="/sistema" onclick="return navigateTo(event, 'system')" id="ovPublicDomainBadge" style="font-family: var(--font-mono); font-size: 12px; color: var(--color-primary-element); text-decoration: none;">Detectando DNS...</a>
+                    <a href="/dns" onclick="return navigateTo(event, 'dns')" id="ovPublicDomainBadge" style="font-family: var(--font-mono); font-size: 12px; color: var(--color-primary-element); text-decoration: none;">Detectando DNS...</a>
                   </div>
                   <p style="font-size: 12.5px; color: var(--adw-text-dim); margin-top: 3px;">
                     <span id="ovSysOs">Linux</span> · Kernel <span id="ovSysKernel" style="font-family: var(--font-mono);">--</span> · Actividad: <strong id="ovSysUptime" style="color: var(--adw-text-secondary); font-family: var(--font-mono);">--</strong>
@@ -1698,8 +1708,8 @@
               </div>
             </a>
 
-            <!-- 9. SISTEMA, DOMINIO DNS & ACTUALIZADOR GITHUB -->
-            <a href="/sistema" class="overview-card" onclick="return navigateTo(event, 'system')">
+            <!-- 9. SISTEMA & ACTUALIZADOR GITHUB -->
+            <a href="/version" class="overview-card" onclick="return navigateTo(event, 'version')">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
                   <span class="tile-emoji">🔄</span>
@@ -1709,13 +1719,34 @@
               </div>
 
               <div>
-                <div style="font-size: 19px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.3px; font-family: var(--font-mono);" id="ovVersionCommit">v2.0 • HEAD</div>
+                <div style="font-size: 19px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.3px; font-family: var(--font-mono);" id="ovVersionCommit">v2.2.0 • HEAD</div>
                 <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovVersionSub">Sincronizado con GitHub (main)</div>
               </div>
 
               <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
                 <span class="adw-badge badge-green" style="font-size: 11px;" id="ovVersionBadge">Al día con GitHub</span>
-                <span class="adw-badge badge-blue" style="font-size: 11px;" id="ovDnsAutoBadge">DNS Autodetectado</span>
+                <span class="adw-badge badge-purple" style="font-size: 11px;" id="ovBadgeGitVersion">Git OTA</span>
+              </div>
+            </a>
+
+            <!-- 10. GESTOR DNS & DUCKDNS -->
+            <a href="/dns" class="overview-card" onclick="return navigateTo(event, 'dns')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">🌐</span>
+                  <span>DNS & DuckDNS</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.3px; font-family: var(--font-mono);" id="ovDnsDomainTitle">cminewar.duckdns.org</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovDnsSub">Actualización periódica y telemetría de tráfico</div>
+              </div>
+
+              <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
+                <span class="adw-badge badge-green" style="font-size: 11px;" id="ovDnsSyncBadge">DuckDNS OK</span>
+                <span class="adw-badge badge-blue" style="font-size: 11px;" id="ovDnsClientsBadge">Tráfico por IP</span>
               </div>
             </a>
 
@@ -2529,6 +2560,189 @@
 
         </div>
 
+        <!-- ==================================================================
+             11. VISTA GESTOR DNS & DUCKDNS + TRÁFICO POR IP (/dns)
+             ================================================================== -->
+        <div class="view-container" id="viewDns" style="display: none;">
+
+          <!-- Hero Header Card -->
+          <div class="hero-chart-card" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <div class="app-icon-squircle" style="background: rgba(14, 165, 233, 0.14); color: var(--adw-blue); width: 48px; height: 48px; border-radius: 12px; border: 1px solid rgba(14, 165, 233, 0.25);">
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <h2 style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em; color: #F8FAFC;">Gestor DNS, DuckDNS & Tráfico por IP</h2>
+                    <span class="adw-badge badge-green" id="dnsDuckStatusBadge">DuckDNS Activo</span>
+                    <span class="adw-badge badge-blue" id="dnsPiholeTrafficBadge">Pi-hole Sinkhole</span>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--adw-text-secondary); margin-top: 4px;">
+                    Dominio principal: <strong style="color: var(--adw-blue); font-family: var(--font-mono);" id="dnsHeroFullDomain">cminewar.duckdns.org</strong> · Actualización periódica en cron (cada 5m)
+                  </p>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button class="btn-header" id="btnRefreshDnsNow" onclick="refreshDnsAllData(true)" title="Actualizar datos y logs">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  <span>Refrescar</span>
+                </button>
+                <button class="btn-header primary-cta" id="btnForceDuckUpdate" onclick="forceDuckDnsUpdate()" title="Ejecutar script de DuckDNS inmediatamente">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                  <span id="lblForceDuckUpdate">⚡ Forzar Actualización DuckDNS</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Bento Grid DuckDNS -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 20px;">
+              
+              <!-- Card 1: Dominio y Sincronización -->
+              <div class="adw-card" style="padding: 18px 20px; background: rgba(11, 15, 23, 0.55); border: 1px solid rgba(148, 163, 184, 0.14);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--adw-text-dim);">Dominio DuckDNS Configurado</span>
+                  <span class="adw-badge badge-green" id="dnsSyncStatusBadge">En Sincronía</span>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;">
+                  <code style="font-size: 19px; font-weight: 700; font-family: var(--font-mono); color: #F8FAFC;" id="dnsCardDomain">cminewar.duckdns.org</code>
+                  <button class="btn-header" style="height: 24px; padding: 0 8px; font-size: 11px;" onclick="copyDetectedDomain()">Copiar</button>
+                </div>
+                <div style="font-size: 12.5px; color: var(--adw-text-secondary); margin-bottom: 6px;">
+                  IP Registrada: <strong style="font-family: var(--font-mono); color: #FFFFFF;" id="dnsCardRegisteredIp">--</strong>
+                </div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); font-family: var(--font-mono);" id="dnsCardLastUpdate">
+                  Último Heartbeat: --
+                </div>
+              </div>
+
+              <!-- Card 2: Credencial y Script -->
+              <div class="adw-card" style="padding: 18px 20px; background: rgba(11, 15, 23, 0.55); border: 1px solid rgba(14, 165, 233, 0.22);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--adw-blue);">Token & Configuración</span>
+                  <button class="btn-header" style="height: 22px; padding: 0 8px; font-size: 10.5px;" onclick="openDuckConfigModal()">Editar ✏️</button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <code style="font-size: 13px; font-family: var(--font-mono); color: #E2E8F0; background: rgba(255,255,255,0.06); padding: 4px 8px; border-radius: 6px;" id="dnsCardToken">••••••••••••••••</code>
+                  <button class="btn-header" style="height: 26px; padding: 0 8px; font-size: 11px;" id="btnToggleToken" onclick="toggleDuckTokenView()">👁️ Ver</button>
+                </div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 6px;">
+                  Script: <code style="font-family: var(--font-mono); color: var(--adw-blue);">/home/servidor/servicios/duckdns/duck.sh</code>
+                </div>
+                <div style="font-size: 11.5px; color: var(--adw-text-dim); margin-top: 4px;">
+                  Ejecución automática: <code style="font-family: var(--font-mono);">crontab */5 * * * *</code>
+                </div>
+              </div>
+
+              <!-- Card 3: DNS Upstream del Sistema -->
+              <div class="adw-card" style="padding: 18px 20px; background: rgba(11, 15, 23, 0.55); border: 1px solid rgba(148, 163, 184, 0.14);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--adw-text-dim);">Servidores DNS Activos</span>
+                  <span class="adw-badge badge-blue">Resolv.conf</span>
+                </div>
+                <div id="dnsUpstreamList" style="display: flex; flex-direction: column; gap: 6px;">
+                  <div style="font-size: 12.5px; font-family: var(--font-mono); color: #F8FAFC;">● 127.0.0.1 (Pi-hole FTL Local)</div>
+                </div>
+                <div style="font-size: 11.5px; color: var(--adw-text-dim); margin-top: 10px;">
+                  Reenvíos externos: Cloudflare (1.1.1.1) · Google (8.8.8.8)
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Consola en Vivo de Logs de DuckDNS -->
+          <div class="adw-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div class="adw-group-title" style="margin-bottom: 0;">Registro en Vivo de Actualizaciones DuckDNS (duck.log)</div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <label style="font-size: 12px; color: var(--adw-text-dim); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" id="chkAutoRefreshDnsLog" onchange="toggleAutoRefreshDnsLog(this.checked)" checked>
+                  Auto-refresco (10s)
+                </label>
+                <button class="btn-header" onclick="loadDuckDnsLogs()" style="height: 26px; padding: 0 10px; font-size: 11px;">Recargar log</button>
+              </div>
+            </div>
+            <div class="adw-card" style="padding: 14px 18px; background: #0F172A; border: 1px solid rgba(148, 163, 184, 0.18);">
+              <pre id="duckDnsLogsPre" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: #CBD5E1; max-height: 220px; overflow-y: auto; margin: 0; white-space: pre-wrap; word-break: break-all;">Cargando registros de DuckDNS...</pre>
+            </div>
+          </div>
+
+          <!-- Telemetría de Tráfico DNS & Servicios Accedidos por IP -->
+          <div class="adw-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <div class="adw-group-title" style="margin-bottom: 2px;">Tráfico DNS y Servicios a los que accede cada Dispositivo (IP)</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim);">Telemetría en tiempo real desde la base de datos Pi-hole FTL</div>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <select id="selectDnsClientFilter" onchange="onDnsClientFilterChange(this.value)" class="adw-input" style="height: 32px; padding: 0 12px; font-size: 12px; width: auto; min-width: 200px;">
+                  <option value="">Todos los dispositivos</option>
+                </select>
+                <button class="btn-header" onclick="loadDnsTrafficData()" style="height: 32px; padding: 0 12px; font-size: 12px;">Actualizar Tráfico</button>
+              </div>
+            </div>
+
+            <!-- Bento Grid de Clientes Activos -->
+            <div class="adw-card" style="margin-bottom: 16px; padding: 16px 20px;">
+              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--adw-text-dim); margin-bottom: 12px;">
+                Top Dispositivos por Volumen de Consultas DNS (Últimas 24h)
+              </div>
+              <div id="dnsClientsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
+                <div style="color: var(--adw-text-dim); font-size: 12px;">Cargando dispositivos...</div>
+              </div>
+            </div>
+
+            <!-- Tabla de Consultas en Vivo -->
+            <div class="adw-card">
+              <div style="padding: 14px 18px; border-bottom: 1px solid var(--adw-card-border); display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 13px; font-weight: 600; color: #FFFFFF;">Últimas Consultas DNS & Servicios Destino</span>
+                <span class="adw-badge badge-blue" id="dnsTrafficQueriesCount">0 consultas</span>
+              </div>
+              <div style="max-height: 400px; overflow-y: auto;">
+                <table class="adw-table" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                  <thead>
+                    <tr style="border-bottom: 1px solid var(--adw-card-border); color: var(--adw-text-dim); text-align: left;">
+                      <th style="padding: 10px 16px;">Hora</th>
+                      <th style="padding: 10px 16px;">Dispositivo / IP</th>
+                      <th style="padding: 10px 16px;">Dominio / Servicio Consultado</th>
+                      <th style="padding: 10px 16px;">Estado Pi-hole</th>
+                      <th style="padding: 10px 16px;">Servidor Destino</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dnsTrafficTableBody">
+                    <tr>
+                      <td colspan="5" style="padding: 20px; text-align: center; color: var(--adw-text-dim);">Cargando telemetría DNS...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Guía para Añadir Otras DNS / Dominios Dinámicos -->
+          <div class="adw-group">
+            <div class="adw-group-title">Añadir Subdominios o Proveedores DNS Adicionales</div>
+            <div class="adw-card" style="padding: 18px 20px;">
+              <p style="font-size: 13px; color: var(--adw-text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                DuckDNS permite vincular <strong>múltiples subdominios</strong> a la misma IP pública bajo una misma cuenta. Para añadir dominios adicionales, edita la configuración y escribe los nombres separados por comas (por ejemplo: <code style="font-family: var(--font-mono); color: var(--adw-blue);">cminewar,subdominio2,backup</code>).
+              </p>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-header" onclick="openDuckConfigModal()">⚙️ Editar Dominios en DuckDNS</button>
+                <a href="https://www.duckdns.org" target="_blank" rel="noopener" class="btn-header" style="text-decoration: none;">
+                  Panel Oficial DuckDNS.org ↗
+                </a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
       </div>
     </main>
 
@@ -2618,6 +2832,42 @@
     </div>
   </div>
 
+  <!-- Modal Configuración DuckDNS -->
+  <div class="modal-overlay" id="duckConfigModal" onclick="if(event.target===this) closeDuckConfigModal()">
+    <div class="adw-dialog" style="max-width: 480px;">
+      <div class="adw-dialog-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="app-icon-squircle" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(14, 165, 233, 0.14); color: var(--adw-blue);">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <div>
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--color-main-text); letter-spacing: -0.01em;">Configuración de DuckDNS</h3>
+            <div style="font-size: 11px; color: var(--adw-text-dim);">Actualización directa en duck.sh</div>
+          </div>
+        </div>
+        <button class="adw-dialog-close" onclick="closeDuckConfigModal()">✕</button>
+      </div>
+      <div class="adw-dialog-body" style="padding: 18px 20px;">
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--color-text-dim); margin-bottom: 6px;">
+            Subdominio(s) DuckDNS (ej: cminewar o cminewar,sub2):
+          </label>
+          <input type="text" id="inputDuckDomain" class="adw-input" style="width: 100%; box-sizing: border-box;" placeholder="cminewar">
+        </div>
+        <div style="margin-bottom: 18px;">
+          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--color-text-dim); margin-bottom: 6px;">
+            Token Secreto DuckDNS (UUID):
+          </label>
+          <input type="text" id="inputDuckToken" class="adw-input" style="width: 100%; box-sizing: border-box; font-family: var(--font-mono);" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button class="btn-header" onclick="closeDuckConfigModal()">Cancelar</button>
+          <button class="btn-header primary-cta" id="btnSaveDuckConfig" onclick="saveDuckDnsConfigFromModal()">Guardar en duck.sh</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="appToast" style="position: fixed; bottom: 20px; right: 20px; z-index: 2500; padding: 12px 16px; border-radius: 10px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(14, 165, 233, 0.35); color: #F8FAFC; font-size: 12.5px; font-weight: 600; box-shadow: 0 16px 40px rgba(0,0,0,0.6); backdrop-filter: blur(12px); display: none; align-items: center; gap: 10px; max-width: 380px;">
     <span id="appToastIcon">✔</span>
     <span id="appToastText"></span>
@@ -2658,6 +2908,7 @@
       apps: '/aplicaciones',
       torrents: '/descargas',
       processes: '/procesos',
+      dns: '/dns',
       version: '/version'
     };
 
@@ -2692,6 +2943,11 @@
       '/emby': 'torrents',
       '/procesos': 'processes',
       '/processes': 'processes',
+      '/dns': 'dns',
+      '/duckdns': 'dns',
+      '/dominios': 'dns',
+      '/sistema': 'version',
+      '/system': 'version',
       '/version': 'version',
       '/actualizacion': 'version',
       '/github': 'version'
@@ -2708,6 +2964,7 @@
       apps: 'Aplicaciones & Contenedores',
       torrents: 'Descargas & Videoteca',
       processes: 'Procesos del Sistema',
+      dns: 'DNS, DuckDNS & Tráfico por IP',
       version: 'Versión & Actualización GitHub'
     };
 
@@ -2821,6 +3078,7 @@
     }
 
     function switchView(viewName, pushState = true) {
+      if (viewName === 'system' || viewName === 'sistema') viewName = 'version';
       const allViews = Object.keys(VIEW_TO_PATH);
       if (!allViews.includes(viewName)) {
         viewName = PATH_TO_VIEW['/' + viewName] || 'overview';
@@ -2885,6 +3143,8 @@
 
       if (viewName === 'version') {
         checkSystemVersion(false);
+      } else if (viewName === 'dns') {
+        loadDnsAllData();
       }
 
       renderActiveView();
@@ -3408,6 +3668,305 @@
         if (btn) btn.disabled = false;
         if (lbl) lbl.innerText = 'Actualizar desde GitHub';
       }
+    }
+
+    // =========================================================================
+    // GESTOR DNS, DUCKDNS & TRÁFICO POR IP (/dns)
+    // =========================================================================
+    let currentDuckData = null;
+    let isDuckTokenVisible = false;
+    let autoRefreshDnsLogTimer = null;
+    let selectedDnsClientIp = '';
+
+    function refreshDnsAllData(manual = false) {
+      loadDuckDnsStatus(manual);
+      loadDuckDnsLogs();
+      loadDnsTrafficData();
+      if (manual) showToast('Datos DNS y telemetría actualizados', 'info');
+    }
+
+    function loadDnsAllData() {
+      refreshDnsAllData(false);
+      toggleAutoRefreshDnsLog(true);
+    }
+
+    async function loadDuckDnsStatus(force = false) {
+      try {
+        const res = await fetch('/api/dns/duckdns', { headers: authHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        currentDuckData = data;
+        renderDuckDnsStatus(data);
+      } catch (e) {
+        console.warn('Error cargando estado de DuckDNS:', e);
+      }
+    }
+
+    function renderDuckDnsStatus(data) {
+      if (!data) return;
+      const fullDomain = data.full_domain || `${data.domain || 'cminewar'}.duckdns.org`;
+      const registeredIp = data.last_registered_ip || '--';
+
+      const heroDom = document.getElementById('dnsHeroFullDomain');
+      if (heroDom) heroDom.innerText = fullDomain;
+
+      const cardDom = document.getElementById('dnsCardDomain');
+      if (cardDom) cardDom.innerText = fullDomain;
+
+      const cardIp = document.getElementById('dnsCardRegisteredIp');
+      if (cardIp) cardIp.innerText = registeredIp;
+
+      const cardUpd = document.getElementById('dnsCardLastUpdate');
+      if (cardUpd) {
+        cardUpd.innerText = data.last_update_time ? `Último Heartbeat: ${data.last_update_time}` : 'Último Heartbeat: Reciente';
+      }
+
+      updateDuckTokenDisplay();
+
+      // Badges
+      const badgeNavDns = document.getElementById('badgeNavDns');
+      if (badgeNavDns) badgeNavDns.innerText = registeredIp ? 'OK' : 'Sync';
+
+      const ovDnsDomainTitle = document.getElementById('ovDnsDomainTitle');
+      if (ovDnsDomainTitle) ovDnsDomainTitle.innerText = fullDomain;
+
+      const ovDnsSub = document.getElementById('ovDnsSub');
+      if (ovDnsSub) ovDnsSub.innerText = `IP pública: ${registeredIp} · Cron cada 5m`;
+
+      // Upstream DNS list
+      const upListEl = document.getElementById('dnsUpstreamList');
+      if (upListEl && Array.isArray(data.upstream_dns) && data.upstream_dns.length > 0) {
+        upListEl.innerHTML = data.upstream_dns.map(ip => `
+          <div style="font-size: 12.5px; font-family: var(--font-mono); color: #F8FAFC;">
+            ● ${ip} ${ip === '127.0.0.1' ? '(Pi-hole FTL Local)' : '(Servidor DNS)'}
+          </div>
+        `).join('');
+      }
+    }
+
+    function toggleDuckTokenView() {
+      isDuckTokenVisible = !isDuckTokenVisible;
+      updateDuckTokenDisplay();
+    }
+
+    function updateDuckTokenDisplay() {
+      const tokenEl = document.getElementById('dnsCardToken');
+      const btnToggle = document.getElementById('btnToggleToken');
+      if (!tokenEl) return;
+      if (!currentDuckData) {
+        tokenEl.innerText = '••••••••••••••••';
+        return;
+      }
+      if (isDuckTokenVisible) {
+        tokenEl.innerText = currentDuckData.token || 'Sin token';
+        if (btnToggle) btnToggle.innerText = '🙈 Ocultar';
+      } else {
+        tokenEl.innerText = currentDuckData.token_masked || '••••••••••••••••';
+        if (btnToggle) btnToggle.innerText = '👁️ Ver';
+      }
+    }
+
+    async function forceDuckDnsUpdate() {
+      const btn = document.getElementById('btnForceDuckUpdate');
+      const lbl = document.getElementById('lblForceDuckUpdate');
+      if (btn) btn.disabled = true;
+      if (lbl) lbl.innerText = 'Actualizando IP...';
+
+      try {
+        const res = await fetch('/api/dns/duckdns/update', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(`DuckDNS actualizado con éxito: ${data.status ? data.status.last_registered_ip : 'OK'}`, 'success');
+          loadDuckDnsStatus(true);
+          loadDuckDnsLogs();
+        } else {
+          showToast(data.message || 'Error al ejecutar DuckDNS', 'error');
+        }
+      } catch (e) {
+        showToast('Error de conexión al forzar actualización', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+        if (lbl) lbl.innerText = '⚡ Forzar Actualización DuckDNS';
+      }
+    }
+
+    function openDuckConfigModal() {
+      const modal = document.getElementById('duckConfigModal');
+      const inDom = document.getElementById('inputDuckDomain');
+      const inTok = document.getElementById('inputDuckToken');
+      if (currentDuckData) {
+        if (inDom) inDom.value = currentDuckData.domain || 'cminewar';
+        if (inTok) inTok.value = currentDuckData.token || '';
+      }
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeDuckConfigModal() {
+      const modal = document.getElementById('duckConfigModal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    async function saveDuckDnsConfigFromModal() {
+      const inDom = document.getElementById('inputDuckDomain');
+      const inTok = document.getElementById('inputDuckToken');
+      const domainVal = inDom ? inDom.value.trim() : '';
+      const tokenVal = inTok ? inTok.value.trim() : '';
+
+      if (!domainVal || !tokenVal) {
+        showToast('Por favor completa el subdominio y el token', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btnSaveDuckConfig');
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/dns/duckdns/config', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ domain: domainVal, token: tokenVal })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast('Configuración guardada en duck.sh', 'success');
+          closeDuckConfigModal();
+          loadDuckDnsStatus(true);
+        } else {
+          showToast(data.message || 'Error guardando configuración', 'error');
+        }
+      } catch (e) {
+        showToast('Fallo al conectar con el servidor', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function loadDuckDnsLogs() {
+      const pre = document.getElementById('duckDnsLogsPre');
+      if (!pre) return;
+      try {
+        const res = await fetch('/api/dns/logs', { headers: authHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const logs = data.logs || [];
+        if (logs.length === 0) {
+          pre.innerText = 'Sin registros en duck.log.';
+          return;
+        }
+
+        // Resaltado sintáctico suave
+        pre.innerHTML = logs.map(line => {
+          let color = '#CBD5E1';
+          if (line.includes('CAMBIO DE IP') || line.includes('OK')) color = 'var(--adw-green)';
+          else if (line.includes('ERROR') || line.includes('fallo')) color = '#F87171';
+          else if (line.includes('HEARTBEAT')) color = 'var(--adw-blue)';
+          return `<span style="color: ${color};">${escapeHtml(line)}</span>`;
+        }).join('\n');
+
+        pre.scrollTop = pre.scrollHeight;
+      } catch (e) {
+        pre.innerText = 'Error al cargar registros: ' + e;
+      }
+    }
+
+    function toggleAutoRefreshDnsLog(enabled) {
+      if (autoRefreshDnsLogTimer) {
+        clearInterval(autoRefreshDnsLogTimer);
+        autoRefreshDnsLogTimer = null;
+      }
+      if (enabled) {
+        autoRefreshDnsLogTimer = setInterval(() => {
+          if (activeView === 'dns') {
+            loadDuckDnsLogs();
+          }
+        }, 10000);
+      }
+    }
+
+    async function loadDnsTrafficData() {
+      const grid = document.getElementById('dnsClientsGrid');
+      const tbody = document.getElementById('dnsTrafficTableBody');
+      const counter = document.getElementById('dnsTrafficQueriesCount');
+      const selFilter = document.getElementById('selectDnsClientFilter');
+
+      const url = '/api/dns/traffic' + (selectedDnsClientIp ? '?client=' + encodeURIComponent(selectedDnsClientIp) : '');
+      try {
+        const res = await fetch(url, { headers: authHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // 1. Llenar o actualizar el select de clientes
+        if (selFilter && selFilter.options.length <= 1 && Array.isArray(data.clients)) {
+          data.clients.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.ip;
+            opt.innerText = `${c.name} (${c.ip})`;
+            selFilter.appendChild(opt);
+          });
+        }
+
+        // 2. Renderizar Bento Grid de Top Clientes
+        if (grid && Array.isArray(data.clients)) {
+          if (data.clients.length === 0) {
+            grid.innerHTML = '<div style="color: var(--adw-text-dim); font-size: 12px;">No hay datos de consultas en las últimas 24h.</div>';
+          } else {
+            grid.innerHTML = data.clients.slice(0, 6).map(c => `
+              <div style="background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(148, 163, 184, 0.14); border-radius: 8px; padding: 12px 14px; cursor: pointer;" onclick="onDnsClientFilterChange('${c.ip}')">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <strong style="color: #FFFFFF; font-size: 13px;">${escapeHtml(c.name)}</strong>
+                  <span class="adw-badge ${c.pct_blocked > 10 ? 'badge-amber' : 'badge-green'}" style="font-size: 10px;">${c.pct_blocked}% bloq.</span>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 11.5px; color: var(--adw-blue); margin-bottom: 6px;">${c.ip}</div>
+                <div style="font-size: 11px; color: var(--adw-text-dim); margin-bottom: 6px;">Total: ${c.total.toLocaleString()} consultas (${c.blocked} filtradas)</div>
+                <div style="font-size: 10.5px; color: var(--adw-text-secondary); line-height: 1.3;">
+                  ${c.top_domains.map(d => `<span style="background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 4px; margin-right: 4px; display: inline-block;">${escapeHtml(d.domain)}</span>`).join('')}
+                </div>
+              </div>
+            `).join('');
+          }
+        }
+
+        // 3. Renderizar Tabla de Consultas
+        const queries = data.recent_queries || [];
+        if (counter) counter.innerText = `${queries.length} consultas recientes`;
+        if (tbody) {
+          if (queries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--adw-text-dim);">No se registraron consultas recientes para este filtro.</td></tr>';
+          } else {
+            tbody.innerHTML = queries.map(q => `
+              <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+                <td style="padding: 10px 16px; font-family: var(--font-mono); color: var(--adw-text-dim);">${escapeHtml(q.time)}</td>
+                <td style="padding: 10px 16px;">
+                  <div style="font-weight: 600; color: #F8FAFC;">${escapeHtml(q.client_name)}</div>
+                  <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--adw-text-dim);">${escapeHtml(q.client_ip)}</div>
+                </td>
+                <td style="padding: 10px 16px; font-family: var(--font-mono); color: #38BDF8;">${escapeHtml(q.domain)}</td>
+                <td style="padding: 10px 16px;">
+                  <span class="adw-badge ${q.is_blocked ? 'badge-red' : 'badge-green'}" style="font-size: 10.5px;">
+                    ${q.is_blocked ? '🛡️ Bloqueado' : '✔ Permitido'}
+                  </span>
+                </td>
+                <td style="padding: 10px 16px; font-size: 11px; color: var(--adw-text-secondary); font-family: var(--font-mono);">
+                  ${escapeHtml(q.forward || '--')} ${q.reply_ms ? `(${q.reply_ms}ms)` : ''}
+                </td>
+              </tr>
+            `).join('');
+          }
+        }
+
+      } catch (e) {
+        console.warn('Error cargando tráfico DNS:', e);
+      }
+    }
+
+    function onDnsClientFilterChange(clientIp) {
+      selectedDnsClientIp = clientIp || '';
+      const sel = document.getElementById('selectDnsClientFilter');
+      if (sel) sel.value = selectedDnsClientIp;
+      loadDnsTrafficData();
     }
 
     // =========================================================================
@@ -4661,7 +5220,7 @@
             }
 
             // Header, Host & Dynamic DNS Domain
-            const pubDomain = sys.public_domain || window.location.hostname || 'servidor.local';
+            const pubDomain = sys.public_domain || (latestVersionInfo && latestVersionInfo.public_domain) || window.location.hostname || 'cminewar.duckdns.org';
             const localSrvIp = sys.local_ip || '192.168.50.2';
 
             const lblHost = document.getElementById('lblHost');
@@ -4669,10 +5228,16 @@
             const lblUptime = document.getElementById('lblUptime');
             if (lblUptime) lblUptime.innerText = sys.uptime_str || '--';
 
+            const lblSidebarDomain = document.getElementById('lblSidebarDomain');
+            if (lblSidebarDomain) lblSidebarDomain.innerText = pubDomain;
+            const ovPublicDomainBadge = document.getElementById('ovPublicDomainBadge');
+            if (ovPublicDomainBadge) ovPublicDomainBadge.innerText = pubDomain;
             const ovPublicDomain = document.getElementById('ovPublicDomain');
             if (ovPublicDomain) ovPublicDomain.innerText = pubDomain;
             const dnsDetectedDomain = document.getElementById('dnsDetectedDomain');
             if (dnsDetectedDomain) dnsDetectedDomain.innerText = pubDomain;
+            const ovDnsDomainTitle = document.getElementById('ovDnsDomainTitle');
+            if (ovDnsDomainTitle) ovDnsDomainTitle.innerText = pubDomain;
             const dnsLocalServerInfo = document.getElementById('dnsLocalServerInfo');
             if (dnsLocalServerInfo) dnsLocalServerInfo.innerText = `${localSrvIp} • ${sys.hostname || 'servidor'}`;
             const trustDomLink = document.getElementById('trustPublicDomainLink');
