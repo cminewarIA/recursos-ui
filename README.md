@@ -97,10 +97,10 @@ Desde la vista **`/version`** o mediante el botón de actualización en la cabec
 │   └── visipics_externo.rdp   # Plantilla RDP externa (inyectada al vuelo con dominio dinámico)
 ├── index.html                 # Espejo sincronizado para previsualización en Google AI Studio
 ├── update.sh                  # Script CLI de sincronización rápida con GitHub y reinicio systemd
-├── planes/                    # Historial y planes de trabajo sincronizados
-│   ├── README.md              # Documentación de la carpeta de planes
-│   ├── implementation_plan.md # Plan de implementación activo
-│   ├── walkthrough.md         # Registro de cambios y pruebas verificadas
+├── planes/                    # Historial, Planes de Implementación y Walkthroughs
+│   ├── README.md              # Documentación y directrices de la carpeta planes
+│   ├── implementation_plan.md # Plan de implementación activo o más reciente
+│   ├── walkthrough.md         # Registro de cambios, diagnósticos y pruebas verificadas
 │   └── *.md                   # Bitácoras de versiones y arquitecturas previas
 ├── GEMINI.md                  # Reglas de desarrollo y sincronización con GitHub y Google AI Studio
 └── README.md                  # Documentación técnica completa del sistema
@@ -114,7 +114,7 @@ Para garantizar la coherencia absoluta entre el servidor local, el repositorio d
 
 1. **Sincronización Previa (`git pull`)**: Siempre se ejecuta `git pull origin main` antes de realizar cualquier cambio en el código o responder solicitudes de edición.
 2. **Publicación Automática (`git push`)**: Cualquier cambio en el backend, la web o los archivos de configuración se confirma con un commit descriptivo y se envía de inmediato a `origin main`.
-3. **Almacenamiento de Planes (`planes/`)**: Todos los planes de implementación, bitácoras y registros de pruebas se almacenan permanentemente en la carpeta `planes/`.
+3. **Almacenamiento de Planes y Walkthroughs (`planes/`)**: Todos los planes de implementación (`implementation_plan.md`), archivos de recorrido/resumen (`walkthrough.md`), bitácoras y registros de pruebas se almacenan obligatoriamente en la carpeta `planes/`.
 4. **Mantenimiento Continuo del README (`README.md`)**: El archivo `README.md` se actualiza obligatoriamente en cada intervención para reflejar con exactitud las características y cambios implementados.
 
 ---

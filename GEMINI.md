@@ -10,9 +10,9 @@
   - Rama: `main`
 - **Objetivo**: Mantener permanentemente sincronizado el proyecto para que los cambios se reflejen de inmediato en Google AI Studio y el móvil al pulsar *Pull Changes*.
 
-## 3. Almacenamiento Obligatorio de Planes de Implementación (`planes/`)
-- **Regla obligatoria**: Todos los planes de implementación (`implementation_plan.md`), bitácoras de trabajo y `walkthrough.md` deben guardarse siempre dentro de la carpeta `planes/` del proyecto (`/home/servidor/servicios/dashboard/planes/`).
-- **Objetivo**: Asegurar que tanto Google AI Studio en el móvil como Antigravity compartan siempre el contexto exacto de en qué se ha estado trabajando y puedan consultarlo tras sincronizar (`git pull`).
+## 3. Almacenamiento Obligatorio de Planes de Implementación y Walkthroughs (`planes/`)
+- **Regla obligatoria**: Todos los planes de implementación (`implementation_plan.md`), archivos de recorrido y verificación (`walkthrough.md`, `walkthrough_*.md`), bitácoras de trabajo, pruebas realizadas y documentación de avance deben guardarse SIEMPRE dentro de la carpeta `planes/` del proyecto (`/home/servidor/servicios/dashboard/planes/`). Jamás deben quedar limitados únicamente a carpetas internas temporales de las IA (`.gemini/antigravity/brain`).
+- **Objetivo**: Asegurar que tanto Google AI Studio en el móvil como Antigravity compartan siempre el contexto exacto de en qué se ha estado trabajando, qué se ha probado y cómo se ha implementado, pudiendo consultarlo tras sincronizar (`git pull`).
 
 ## 4. Actualización Obligatoria del README (`README.md`)
 - **Regla obligatoria**: Cada vez que se realice cualquier modificación, corrección, nueva funcionalidad, cambio de diseño o ajuste arquitectónico en el proyecto, se debe actualizar inmediatamente el archivo `README.md` con la descripción de los cambios y el estado actual del sistema.
