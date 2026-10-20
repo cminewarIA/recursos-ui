@@ -630,17 +630,25 @@ def check_trust_status(handler):
     client_ip = get_client_ip(handler)
     is_local = is_local_ip(client_ip)
     
-    # Extraer cookie _sysmon_trust
-    cookie_header = handler.headers.get('Cookie', '')
+    # Extraer credencial HMAC: verificar Authorization Bearer, cabecera X-Device-Token o Cookie _sysmon_trust
     token = None
-    if cookie_header:
-        c = cookies.SimpleCookie()
-        try:
-            c.load(cookie_header)
-            if '_sysmon_trust' in c:
-                token = c['_sysmon_trust'].value
-        except Exception:
-            pass
+    auth_hdr = handler.headers.get('Authorization', '')
+    if auth_hdr and auth_hdr.lower().startswith('bearer '):
+        token = auth_hdr[7:].strip()
+    if not token:
+        x_tok = handler.headers.get('X-Device-Token', '')
+        if x_tok:
+            token = x_tok.strip()
+    if not token:
+        cookie_header = handler.headers.get('Cookie', '')
+        if cookie_header:
+            c = cookies.SimpleCookie()
+            try:
+                c.load(cookie_header)
+                if '_sysmon_trust' in c:
+                    token = c['_sysmon_trust'].value
+            except Exception:
+                pass
             
     with TRUST_LOCK:
         devices = load_trusted_devices()
@@ -660,7 +668,8 @@ def check_trust_status(handler):
                     "client_ip": client_ip,
                     "device_info": {"id": "cli_local", "name": "Herramienta Local (CLI)", "trusted": True},
                     "device_id": "cli_local",
-                    "new_token": None
+                    "new_token": None,
+                    "token": None
                 }
 
             # Si el dispositivo ya tiene un token firmado válido y registrado en devices
@@ -676,7 +685,8 @@ def check_trust_status(handler):
                     "client_ip": client_ip,
                     "device_info": device_entry,
                     "device_id": verified_device_id,
-                    "new_token": None
+                    "new_token": None,
+                    "token": token
                 }
             else:
                 # Dispositivo nuevo en LAN: emitir nueva credencial HMAC-SHA256
@@ -702,7 +712,8 @@ def check_trust_status(handler):
                     "client_ip": client_ip,
                     "device_info": device_entry,
                     "device_id": dev_id,
-                    "new_token": new_token
+                    "new_token": new_token,
+                    "token": new_token
                 }
         else:
             # Petición desde el EXTERIOR (Datos móviles / WAN)
@@ -717,7 +728,8 @@ def check_trust_status(handler):
                     "client_ip": client_ip,
                     "device_info": device_entry,
                     "device_id": verified_device_id,
-                    "new_token": None
+                    "new_token": None,
+                    "token": token
                 }
             else:
                 # Dispositivo NO verificado en LAN -> BLOQUEAR COMPLETAMENTE
@@ -727,7 +739,8 @@ def check_trust_status(handler):
                     "client_ip": client_ip,
                     "device_info": None,
                     "device_id": None,
-                    "new_token": None
+                    "new_token": None,
+                    "token": None
                 }
 
 def get_locked_page_html(client_ip):
@@ -998,6 +1011,9 @@ def get_locked_page_html(client_ip):
         }});
         const data = await res.json();
         if (res.ok && data.success) {{
+          if (data.token) {{
+            try {{ localStorage.setItem('sysmon_device_token', data.token); }} catch(e) {{}}
+          }}
           msg.style.color = 'var(--success)';
           msg.textContent = '¡Dispositivo autorizado con éxito! Recargando monitor...';
           setTimeout(() => {{ window.location.reload(); }}, 600);
@@ -2599,8 +2615,11 @@ VALID_WEB_ROUTES = {
     "/seguridad",
     "/aplicaciones",
     "/multimedia",
+    "/descargas",
     "/procesos",
-    "/sistema"
+    "/sistema",
+    "/version",
+    "/dispositivos"
 }
 
 class DashboardHTTPHandler(BaseHTTPRequestHandler):
@@ -2608,12 +2627,24 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         dom = resolve_request_domain(self)
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
+        
+        # Permitir que el dashboard sea embebido de forma segura como Web App en Nextcloud Hub y accesos LAN/WAN
+        csp_ancestors = (
+            "'self' "
+            "https://cminewar.duckdns.org "
+            "https://*.cminewar.duckdns.org "
+            "https://*.duckdns.org "
+            "https://192.168.50.2 http://192.168.50.2 "
+            "https://servidor https://servidor.lan "
+            "http://localhost:* http://127.0.0.1:* "
+            f"https://{dom} https://*.{dom}"
+        )
         self.send_header(
             'Content-Security-Policy',
             f"default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com data:; "
-            f"connect-src 'self' https://api.github.com ws: wss:; "
-            f"frame-src 'self' https://*.{dom}; "
-            f"frame-ancestors 'self' https://{dom} https://*.{dom};"
+            f"connect-src 'self' https://api.github.com ws: wss: https://*.cminewar.duckdns.org https://*.duckdns.org; "
+            f"frame-src 'self' https://cminewar.duckdns.org https://*.cminewar.duckdns.org https://*.duckdns.org https://*.{dom}; "
+            f"frame-ancestors {csp_ancestors};"
         )
 
     def do_HEAD(self):
@@ -2673,6 +2704,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 "client_ip": auth["client_ip"],
                 "public_domain": req_domain,
                 "local_ip": SERVER_LOCAL_IP,
+                "token": auth.get("token") or auth.get("new_token") or "",
                 "device_name": auth["device_info"]["name"] if auth.get("device_info") else "Dispositivo Local"
             }
             base_payload["version_info"] = get_version_info(force_refresh=False)
@@ -2931,7 +2963,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     }
                     save_trusted_devices(devices)
                     
-                resp = json.dumps({"success": True, "message": "Dispositivo emparejado con éxito"}).encode('utf-8')
+                resp = json.dumps({"success": True, "token": new_token, "message": "Dispositivo emparejado con éxito"}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_security_headers()

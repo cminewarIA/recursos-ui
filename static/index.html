@@ -17,64 +17,64 @@
 
   <style>
     /* ==========================================================================
-       HIGH-PRECISION CLOUD TELEMETRY DESIGN SYSTEM (60-30-10 OBSIDIAN SLATE)
+       NEXTCLOUD HUB NATIVE DARK DESIGN SYSTEM (Edge-to-Edge Web Application)
        ========================================================================== */
     :root {
-      /* 60% Dominant Neutral Canvas (Deep Obsidian Slate) */
-      --color-main-background: #0B0F17;
-      --color-main-background-rgb: 11, 15, 23;
-      --color-sidebar-bg: #0E131F;
+      /* Nextcloud Hub Dominant Neutral Canvas */
+      --color-main-background: #181818;
+      --color-main-background-rgb: 24, 24, 24;
+      --color-sidebar-bg: #1c1c1c;
       
-      /* 30% Structural Surfaces & Crisp 1px Borders */
-      --color-background-dark: #111827;
-      --color-background-hover: #162032;
-      --color-background-darker: #1A2438;
-      --color-border: #1E293B;
-      --color-border-dark: #334155;
-      --color-border-strong: rgba(148, 163, 184, 0.18);
+      /* Nextcloud Structural Surfaces & 1px Borders */
+      --color-background-dark: #222222;
+      --color-background-hover: #292929;
+      --color-background-darker: #252525;
+      --color-border: #2e2e2e;
+      --color-border-dark: #3a3a3a;
+      --color-border-strong: rgba(255, 255, 255, 0.12);
 
-      /* High-Contrast Typography */
-      --color-main-text: #F8FAFC;
-      --color-text-maxcontrast: #CBD5E1;
-      --color-text-dim: #94A3B8;
-      --color-text-disabled: #64748B;
+      /* High-Contrast Nextcloud Typography */
+      --color-main-text: #FFFFFF;
+      --color-text-maxcontrast: #E0E0E0;
+      --color-text-dim: #A0A0A0;
+      --color-text-disabled: #666666;
 
-      /* 10% Functional Accents */
-      --color-primary: #0284C7;
-      --color-primary-element: #0EA5E9;
-      --color-primary-element-hover: #38BDF8;
+      /* Nextcloud Functional Accents (Nextcloud Blue) */
+      --color-primary: #0082c9;
+      --color-primary-element: #0091f2;
+      --color-primary-element-hover: #17a2ff;
       --color-primary-text: #FFFFFF;
-      --color-primary-light: rgba(14, 165, 233, 0.14);
+      --color-primary-light: rgba(0, 130, 201, 0.16);
 
-      /* Semantic Status Colors */
-      --color-element-success: #10B981;
-      --color-success-bg: rgba(16, 185, 129, 0.14);
-      --color-success-text: #A7F3D0;
+      /* Semantic Status Colors (Nextcloud Status Tokens) */
+      --color-element-success: #40a330;
+      --color-success-bg: rgba(64, 163, 48, 0.16);
+      --color-success-text: #8ae37b;
 
-      --color-element-warning: #F59E0B;
-      --color-warning-bg: rgba(245, 158, 11, 0.14);
-      --color-warning-text: #FDE68A;
+      --color-element-warning: #f5a623;
+      --color-warning-bg: rgba(245, 166, 35, 0.16);
+      --color-warning-text: #fed99b;
 
-      --color-element-error: #EF4444;
-      --color-error-bg: rgba(239, 68, 68, 0.14);
-      --color-error-text: #FECACA;
+      --color-element-error: #e9322d;
+      --color-error-bg: rgba(233, 50, 45, 0.16);
+      --color-error-text: #ffa8a6;
 
-      --color-element-info: #0EA5E9;
-      --color-info-bg: rgba(14, 165, 233, 0.14);
-      --color-info-text: #7DD3FC;
+      --color-element-info: #0091f2;
+      --color-info-bg: rgba(0, 145, 242, 0.16);
+      --color-info-text: #7dd3fc;
 
       --color-element-purple: #8B5CF6;
       --color-purple-bg: rgba(139, 92, 246, 0.15);
       --color-purple-text: #DDD6FE;
 
       /* Standard Architectural Radii */
-      --border-radius-container: 12px;
+      --border-radius-container: 14px;
       --border-radius-element: 8px;
       --border-radius-small: 6px;
-      --border-radius-pill: 8px;
+      --border-radius-pill: 9999px;
 
-      /* 2+1 Font Stack Discipline */
-      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      /* Font Stack Discipline */
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Plus Jakarta Sans', Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
       --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif;
 
@@ -138,11 +138,11 @@
       height: 7px;
     }
     *::-webkit-scrollbar-thumb {
-      background: #1E293B;
+      background: #333333;
       border-radius: 4px;
     }
     *::-webkit-scrollbar-thumb:hover {
-      background: #334155;
+      background: #444444;
     }
     *::-webkit-scrollbar-track {
       background: transparent;
@@ -151,12 +151,45 @@
     .app-window {
       display: flex;
       width: 100%;
-      height: 100vh;
+      height: 100%;
       max-width: 100%;
-      min-height: 100vh;
+      min-height: 100%;
+      max-height: 100%;
       background: var(--color-main-background);
       border: none;
       overflow: hidden;
+    }
+
+    /* Nextcloud Embedded Iframe Native Integration */
+    .in-nextcloud,
+    .in-nextcloud body {
+      height: 100% !important;
+      max-height: 100% !important;
+      min-height: 100% !important;
+      overflow: hidden !important;
+      background: #181818 !important;
+    }
+
+    .in-nextcloud .app-window {
+      height: 100% !important;
+      min-height: 100% !important;
+      max-height: 100% !important;
+      border: none !important;
+      border-radius: 0 !important;
+    }
+
+    .in-nextcloud .headerbar {
+      height: 52px;
+      padding: 0 20px;
+      background: rgba(28, 28, 28, 0.96);
+      border-bottom: 1px solid #2e2e2e;
+    }
+
+    .in-nextcloud .sidebar-header {
+      height: 52px;
+      padding: 0 16px;
+      background: #1c1c1c;
+      border-bottom: 1px solid #2e2e2e;
     }
 
     /* Emoji Typography Support */
@@ -319,12 +352,13 @@
       width: 32px;
       height: 32px;
       border-radius: 8px;
-      background: linear-gradient(135deg, #0EA5E9, #0284C7);
+      background: linear-gradient(135deg, #0082c9, #005686);
       display: flex;
       align-items: center;
       justify-content: center;
       color: #FFFFFF;
       flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0, 130, 201, 0.35);
     }
 
     .sidebar-nav {
@@ -373,15 +407,15 @@
     }
 
     .nav-item.active {
-      background: rgba(14, 165, 233, 0.12);
-      color: #38BDF8;
-      border-color: rgba(14, 165, 233, 0.28);
+      background: rgba(0, 130, 201, 0.16);
+      color: #0091f2;
+      border-color: rgba(0, 130, 201, 0.35);
       font-weight: 600;
     }
 
     .nav-item.active .nav-badge {
-      background: rgba(14, 165, 233, 0.2);
-      color: #E0F2FE;
+      background: rgba(0, 130, 201, 0.25);
+      color: #FFFFFF;
     }
 
     .nav-left {
@@ -409,7 +443,7 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      background: rgba(11, 15, 23, 0.5);
+      background: rgba(24, 24, 24, 0.6);
     }
 
     .host-pill {
@@ -473,14 +507,14 @@
     }
 
     .headerbar {
-      height: 58px;
-      padding: 0 28px;
+      height: 56px;
+      padding: 0 24px;
       border-bottom: 1px solid var(--color-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      background: rgba(11, 15, 23, 0.88);
+      background: rgba(24, 24, 24, 0.92);
       backdrop-filter: blur(14px);
       z-index: 10;
     }
@@ -2596,6 +2630,18 @@
     let procSort = 'cpu_percent';
     let procSortAsc = false;
 
+    // Inyector de credencial de dispositivo para persistencia en iframe (Cross-Site / Nextcloud)
+    function authHeaders(extra = {}) {
+      const h = Object.assign({}, extra);
+      try {
+        const token = localStorage.getItem('sysmon_device_token');
+        if (token && !h['X-Device-Token'] && !h['Authorization']) {
+          h['X-Device-Token'] = token;
+        }
+      } catch (e) {}
+      return h;
+    }
+
     // Mapa bidireccional entre Vistas y Rutas Web Limpias (Multi-Page Navigation)
     const VIEW_TO_PATH = {
       overview: '/',
@@ -3058,7 +3104,7 @@
       if (lbl) lbl.innerText = 'Consultando...';
 
       try {
-        const res = await fetch('/api/version' + (forceRefresh ? '?force=1' : ''));
+        const res = await fetch('/api/version' + (forceRefresh ? '?force=1' : ''), { headers: authHeaders() });
         if (!res.ok || !(res.headers.get('content-type') || '').includes('application/json')) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         latestVersionInfo = data;
@@ -3283,7 +3329,7 @@
       try {
         const res = await fetch('/api/system/update', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: authHeaders({ 'Content-Type': 'application/json' })
         });
         const data = await res.json();
         if (res.ok && data.success) {
@@ -3437,7 +3483,7 @@
         list.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--color-text-dim); padding: 20px;">Cargando dispositivos autorizados...</div>';
       }
 
-      fetch('/api/auth/devices')
+      fetch('/api/auth/devices', { headers: authHeaders() })
         .then(r => {
           if (!r.ok || !(r.headers.get('content-type') || '').includes('application/json')) throw new Error('HTTP ' + r.status);
           return r.json();
@@ -3518,7 +3564,7 @@
           try {
             const res = await fetch('/api/auth/revoke', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: authHeaders({ 'Content-Type': 'application/json' }),
               body: JSON.stringify({ id: deviceId })
             });
             const data = await res.json();
@@ -3556,7 +3602,7 @@
           try {
             const res = await fetch('/api/auth/revoke_all_others', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' }
+              headers: authHeaders({ 'Content-Type': 'application/json' })
             });
             const data = await res.json();
             if (res.ok && data.success) {
@@ -4465,7 +4511,7 @@
 
       fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload)
       })
       .then(r => r.json())
@@ -4501,7 +4547,7 @@
     // Main Polling Loop
     let isRedirectingAuth = false;
     function updateMetrics() {
-      fetch('/api/metrics')
+      fetch('/api/metrics', { headers: authHeaders() })
         .then(res => {
           if (res.status === 403) {
             if (!isRedirectingAuth) {
@@ -4516,6 +4562,9 @@
         })
         .then(data => {
           if (!data) return;
+          if (data.auth_status && data.auth_status.token) {
+            try { localStorage.setItem('sysmon_device_token', data.auth_status.token); } catch(e) {}
+          }
           applyMetricsToDOM(data);
         })
         .catch(err => {
@@ -4824,7 +4873,7 @@
         () => {
           fetch('/api/service/action', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: authHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify({type: type, target: target, action: action})
           })
           .then(r => r.json())
@@ -4845,7 +4894,7 @@
     function wakeDevice(mac, name) {
       fetch('/api/wol/wake', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: authHeaders({'Content-Type': 'application/json'}),
         body: JSON.stringify({mac: mac})
       })
       .then(r => r.json())
