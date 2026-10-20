@@ -1,0 +1,6 @@
+{
+  "name": "RecursosHub - Plataforma de Gestión y Biblioteca de Recursos",
+  "description": "Centro integral de gestión de recursos, inventario de activos, biblioteca de herramientas digitales y planificador de capacidad.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
