@@ -9,3 +9,8 @@
   - Repositorio remoto: `https://github.com/cminewarIA/recursos-ui`
   - Rama: `main`
 - **Objetivo**: Mantener permanentemente sincronizado el proyecto para que los cambios se reflejen de inmediato en Google AI Studio y el móvil al pulsar *Pull Changes*.
+
+## 3. Almacenamiento Obligatorio de Planes de Implementación (`planes/`)
+- **Regla obligatoria**: Todos los planes de implementación (`implementation_plan.md`), bitácoras de trabajo y `walkthrough.md` deben guardarse siempre dentro de la carpeta `planes/` del proyecto (`/home/servidor/servicios/dashboard/planes/`).
+- **Objetivo**: Asegurar que tanto Google AI Studio en el móvil como Antigravity compartan siempre el contexto exacto de en qué se ha estado trabajando y puedan consultarlo tras sincronizar (`git pull`).
+

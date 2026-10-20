@@ -2786,16 +2786,34 @@
     }
 
     // Navegación multi-página con soporte nativo para botones Atrás / Adelante del navegador
-    function navigateTo(viewName, event = null) {
-      if (event) {
-        // Permitir Ctrl+Click o Cmd+Click para abrir en pestaña nueva como cualquier web normal
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1) {
+    function navigateTo(arg1, arg2 = null) {
+      let ev = null;
+      let view = 'overview';
+      if (arg1 && typeof arg1 === 'object' && ('preventDefault' in arg1 || 'target' in arg1)) {
+        ev = arg1;
+        view = typeof arg2 === 'string' ? arg2 : 'overview';
+      } else if (typeof arg1 === 'string') {
+        view = arg1;
+        ev = (arg2 && typeof arg2 === 'object') ? arg2 : null;
+      }
+      if (ev) {
+        if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button === 1) {
           return true;
         }
-        event.preventDefault();
+        if (typeof ev.preventDefault === 'function') {
+          ev.preventDefault();
+        }
       }
-      switchView(viewName, true);
+      switchView(view, true);
       return false;
+    }
+
+    function navigateHistoryBack() {
+      window.history.back();
+    }
+
+    function navigateHistoryForward() {
+      window.history.forward();
     }
 
     function switchView(viewName, pushState = true) {
@@ -2830,7 +2848,7 @@
       const titleEl = document.getElementById('currentViewTitle');
       if (titleEl) titleEl.innerText = pageTitle;
 
-      const routeTagEl = document.getElementById('currentRouteTag');
+      const routeTagEl = document.getElementById('currentRouteBadge') || document.getElementById('currentRouteTag');
       if (routeTagEl) routeTagEl.innerText = targetPath;
 
       document.title = `${pageTitle} • Recursos`;
@@ -3822,7 +3840,7 @@
                 </div>
                 <div style="font-size: 11.5px; color: var(--adw-text-dim); font-family: var(--font-mono); margin-top: 2px;">
                   <span style="color: #78aeed;">${c.ip}</span> • ${c.mac}
-                  ${c.mac ? `<button onclick="event.stopPropagation(); wakeDevice('${c.mac}', '${(c.name || '').replace(/'/g, "\\'")}')" style="margin-left: 8px; padding: 2px 8px; background: rgba(53,132,228,0.15); border: 1px solid rgba(53,132,228,0.3); border-radius: 4px; color: #78aeed; font-size: 10px; cursor: pointer;" title="Enviar paquete Wake-on-LAN">⚡ Despertar (WoWLAN)</button>` : ''}
+                  ${c.mac ? `<button onclick="event.stopPropagation(); wakeDevice('${c.mac}', '${encodeURIComponent(c.name || '')}')" style="margin-left: 8px; padding: 2px 8px; background: rgba(53,132,228,0.15); border: 1px solid rgba(53,132,228,0.3); border-radius: 4px; color: #78aeed; font-size: 10px; cursor: pointer;" title="Enviar paquete Wake-on-LAN">⚡ Despertar (WoWLAN)</button>` : ''}
                 </div>
               </div>
 
@@ -4891,7 +4909,8 @@
       );
     }
 
-    function wakeDevice(mac, name) {
+    function wakeDevice(mac, encName) {
+      const name = decodeURIComponent(encName || '');
       fetch('/api/wol/wake', {
         method: 'POST',
         headers: authHeaders({'Content-Type': 'application/json'}),

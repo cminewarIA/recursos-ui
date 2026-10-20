@@ -2623,6 +2623,12 @@ VALID_WEB_ROUTES = {
 }
 
 class DashboardHTTPHandler(BaseHTTPRequestHandler):
+    def handle(self):
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def send_security_headers(self):
         dom = resolve_request_domain(self)
         self.send_header('X-Content-Type-Options', 'nosniff')
