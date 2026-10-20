@@ -1,173 +1,75 @@
-# 🛡️ Recursos — Consola de Telemetría, Red, Seguridad Zero-Trust y Actualización OTA
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v3.0.0`)
 
-![Plataforma](https://img.shields.io/badge/Plataforma-Linux%20Server-0EA5E9?style=for-the-badge&logo=linux&logoColor=white)
-![Nextcloud](https://img.shields.io/badge/Nextcloud%20Hub-Integraci%C3%B3n%20Nativa%20UI-0082c9?style=for-the-badge&logo=nextcloud&logoColor=white)
-![Seguridad](https://img.shields.io/badge/Seguridad-Zero--Trust%20Dual--Token-10B981?style=for-the-badge&logo=shield&logoColor=white)
-![Arquitectura](https://img.shields.io/badge/Navegaci%C3%B3n-Multi--P%C3%A1gina%20History%20API-6366F1?style=for-the-badge)
-![Actualización](https://img.shields.io/badge/GitHub%20OTA-1--Clic%20Auto--Sync-F59E0B?style=for-the-badge&logo=github&logoColor=black)
-
-**Recursos** es una consola web de alto rendimiento y cero dependencias externas, diseñada para la monitorización integral de servidores Linux, control de contenedores **Docker** y servicios `systemd`, auditoría de red (Ethernet Gigabit + Repetidor Wi-Fi 6 ASUS RT-AX56U), protección activa DNS/IPS (**Pi-hole** + **Fail2ban**), gestión de descargas (**qBittorrent** + **Emby** SQLite), **Seguridad Zero-Trust con autenticación de doble vía (Dual-Token)** e **integración visual nativa con Nextcloud Hub 9/10**.
+Panel de control de alto rendimiento, telemetría de hardware en tiempo real, auditoría de red y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
 
-## ✨ Novedades y Arquitectura Principal
+## ✨ Novedades Principales en `v3.0.0` (Aether Obsidian Telemetry OS)
 
-### 1. ☁️ Integración Visual Nativa con Nextcloud Hub 9/10
-La interfaz gráfica de **Recursos** ha sido diseñada para mimetizarse fluidamente tanto en modo independiente como incrustada como aplicación web (*External Sites*) dentro de **Nextcloud Hub**:
-- **Paleta de Color Oficial Nextcloud**:
-  - Fondo primario oscuro: `#181818`.
-  - Superficies de paneles y tarjetas Bento: `#222222`.
-  - Bordes y líneas divisorias sutiles: `#2d2d2d`.
-  - Color de acento e interactividad: Azul Nextcloud (`#0082c9` / `#0091f2`).
-  - Tipografía del sistema de Nextcloud: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`.
-- **Detección Dinámica de Entorno Embebido (`isEmbeddedInNextcloud`)**:
-  - El dashboard detecta automáticamente si se está ejecutando dentro de un `<iframe>` de Nextcloud (por ejemplo, en `https://cminewar.duckdns.org/apps/external/3/` o `/apps/external/1/`).
-  - Optimiza márgenes, barras de navegación y alturas de scroll para evitar barras de desplazamiento dobles y ofrecer la experiencia de una app integrada oficial de Nextcloud.
+1. **Rediseño Integral de Interfaz Gráfica (Aether Obsidian UI)**:
+   - Estética de centro de mando de sistemas con modo oscuro de alto contraste (`#060911` / `#0C1220`), bordes especulares de 1px, tipografía técnica (`Space Grotesk` + `JetBrains Mono` con `tabular-nums`) y jerarquía visual de alta densidad.
+   - **Medidores Radiales SVG y Osciloscopios en Tiempo Real**: Gráficas vectoriales en Canvas de alta precisión con marcadores de pulso activo en vivo para CPU, Memoria RAM, GPU y Caudal de Red.
+2. **Política Estricta de Cero Hardcoding (100% Detección Dinámica del Sistema Operativo)**:
+   - **Prohibición absoluta de especificaciones estáticas o simuladas**: Ningún campo del HTML o JavaScript contiene nombres de procesadores, tarjetas gráficas ni cifras predefinidas.
+   - **Estados de carga limpios (`.hw-detecting`)**: Mientras se realiza el sondeo inicial al kernel, la interfaz muestra indicadores elegantes de detección (`Detectando hardware...`, `Sondeando sensores...`).
+   - **Procesador (`/procesador`)**: Modelo exacto, fabricante, arquitectura (`x86_64`/`aarch64`), caché L3, núcleos físicos/hilos lógicos, frecuencia actual/máxima en MHz, temperatura del encapsulado y matriz de carga individual por hilo lógico leídos desde `/proc/cpuinfo`, `lscpu`, `cpufreq` y `hwmon`.
+   - **Memoria RAM (`/memoria`)**: Cantidad total instalada, memoria activa en uso, memoria disponible real, caché/buffers del kernel y barra de composición física en vivo leídos directamente desde `/proc/meminfo` y `/proc/swaps`.
+   - **Tarjeta Gráfica (`/grafica`)**: Detección automática mediante `nvidia-smi`, sensores del kernel Linux (`/sys/class/drm`) y bus PCIe (`lspci`), reportando modelo real, VRAM usada/total, porcentaje de carga, temperatura, ventilador y consumo en vatios.
+   - **Red e Interfaces (`/red`)**: Inspector de interfaces de red activas del sistema (nombre del adaptador, IPv4 local, dirección MAC, velocidad de enlace en Mbps, MTU y tráfico RX/TX acumulado), velocidad de subida/bajada en tiempo real y tabla de dispositivos conectados en LAN/Wi-Fi.
+3. **Navegación Multipágina con Rutas Limpias (`History API`)**:
+   - Cada módulo opera como una página web independiente con su propia ruta limpia (`/`, `/procesador`, `/memoria`, `/grafica`, `/almacenamiento`, `/red`, `/seguridad`, `/aplicaciones`, `/descargas`, `/procesos`, `/dns`, `/version`).
+   - Soporte nativo completo para las flechas **Atrás** y **Adelante** del navegador y botones de historial integrados en la cabecera.
+4. **Autodetección Dinámica de Dominio DNS (`/dns`)**:
+   - Detección automática del dominio público o local inspeccionando scripts de DuckDNS (`duck.sh`), configuración de Caddy (`Caddyfile`), Nginx, cabeceras HTTP `Host` / `X-Forwarded-Host` y hostname del sistema.
+5. **Control de Versión Unificado y Actualización OTA desde GitHub (`/version`)**:
+   - Punto único de verdad en el archivo `/VERSION` (`3.0.0`).
+   - Comparación en vivo entre el commit local y la rama `main` de `cminewarIA/recursos-ui` con actualización en 1 clic (`POST /api/system/update`) y reinicio automático del servicio.
+6. **Seguridad Zero-Trust por Dispositivo**:
+   - Autenticación persistente por dispositivo (`X-Device-Token` + Cookie `HttpOnly`), panel de auditoría de sesiones activas con revocación instantánea e integración en tiempo real con **Pi-hole v6** y **Fail2ban**.
 
 ---
 
-### 2. 🧭 Navegación Web Multi-Página Real (HTML5 History API)
-A diferencia de los paneles monolíticos tradicionales de página única por anclas, **Recursos** separa cada área operativa en rutas web limpias e independientes. Soporta nativamente las flechas **Atrás** y **Adelante** del navegador (en escritorio y mediante gestos de deslizamiento en dispositivos móviles) y apertura en pestañas (`Ctrl+Clic`):
+## 🗺️ Mapa de Rutas Web y Endpoints API
 
-| Ruta Web | Vista / Módulo | Descripción |
+### Rutas de Usuario (Frontend Multipágina)
+| Ruta | Vista | Descripción |
 | :--- | :--- | :--- |
-| `/` | **Vista General** | Bento Grid de telemetría rápida, estado del sistema, dominio público detectado y versión Git. |
-| `/procesador` | **Procesador (CPU)** | Uso global, frecuencia en tiempo real, temperatura, *Load Average* y carga por hilo lógico. |
-| `/memoria` | **Memoria Física** | Desglose de RAM usada, disponible, caché/búferes y estado de paginación Swap/Zram. |
-| `/grafica` | **Tarjeta Gráfica** | Telemetría NVIDIA (`nvidia-smi`), VRAM dedicada, temperatura, ventilador y procesos CUDA. |
-| `/almacenamiento` | **Almacenamiento** | Velocidad de lectura/escritura E/S en vivo y ocupación/temperatura por partición NVMe/HDD/NAS. |
-| `/red` | **Red & Wi-Fi** | Tráfico Ethernet vs Wi-Fi, clientes del repetidor ASUS RT-AX56U (5 GHz / 2.4 GHz) y Wake-on-LAN. |
-| `/seguridad` | **Seguridad & DNS** | Estadísticas de bloqueo **Pi-hole FTL**, jaulas **Fail2ban** activas e historial completo ordenable. |
-| `/aplicaciones` | **Aplicaciones** | Control de servicios nativos (`systemd`), contenedores **Docker** en vivo y Control Parental. |
-| `/descargas` | **Descargas & Emby** | Torrents activos en **qBittorrent** y últimas películas/series indexadas en **Emby** (`library.db`). |
-| `/procesos` | **Procesos** | Monitor de procesos del sistema ordenable por CPU, memoria privada, PID o nombre de binario. |
-| `/dispositivos` | **Dispositivos Confiables**| Panel de auditoría Zero-Trust con lista de dispositivos autorizados y revocación en 1 clic. |
-| `/dns` | **DNS & DuckDNS** | Panel DuckDNS en vivo, actualización forzada, visor de logs y tráfico DNS por IP (Pi-hole FTL). |
-| `/version` | **Versión & GitHub** | Comparador en vivo **Local vs GitHub (`cminewarIA/recursos-ui`)**, estado OTA y actualización en 1 clic. |
+| `/` | **Vista General** | Resumen ejecutivo con 4 pilares radiales (CPU, RAM, GPU, Disco) y 6 módulos operativos |
+| `/procesador` | **Procesador (CPU)** | Osciloscopio de carga, especificaciones del kernel y matriz de hilos lógicos |
+| `/memoria` | **Memoria RAM** | Osciloscopio de memoria, barra de composición física y estado de Swap/Zram |
+| `/grafica` | **Tarjeta Gráfica** | Carga de GPU, uso de VRAM, temperatura, potencia y driver activo |
+| `/almacenamiento` | **Almacenamiento** | Velocidad de E/S en vivo y tarjetas detalladas por volumen montado y NVMe/SMART |
+| `/red` | **Red & Interfaces** | Caudal RX/TX, inspector de tarjetas de red (NICs) activas y clientes LAN/Wi-Fi |
+| `/seguridad` | **Seguridad & DNS** | Bloqueo DNS Pi-hole, dominios permitidos/bloqueados y jaulas Fail2ban |
+| `/aplicaciones` | **Contenedores & Servicios** | Estado y control (iniciar/reiniciar) de contenedores Docker y unidades `systemd` |
+| `/descargas` | **Descargas & Videoteca** | Torrents activos en qBittorrent y catálogo multimedia Emby Server |
+| `/procesos` | **Monitor de Procesos** | Tabla en vivo de procesos del sistema ordenables por uso de CPU y RAM |
+| `/dns` | **DNS & DuckDNS** | Estado del dominio detectado, actualización forzada DuckDNS y analizador DNS por cliente |
+| `/version` | **Versión & GitHub OTA** | Comparativa de versión local vs GitHub, historial de commits y actualización OTA en 1 clic |
 
-> **Retrocompatibilidad**: Mantiene compatibilidad automática con enlaces antiguos por hash (`#processor`, `#security`, `#downloads`, etc.).
-
----
-
-### 3. 🔐 Seguridad Zero-Trust con Autenticación Dual-Token
-El sistema implementa una arquitectura de confianza cero que protege el acceso exterior sin requerir credenciales manuales repetitivas en el entorno doméstico:
-
-1. **Emparejamiento Transparente en Red Local (LAN)**:
-   - Al acceder desde el Wi-Fi local (`192.168.50.0/24` o cualquier rango privado RFC1918), el servidor autoriza el dispositivo y genera un token criptográfico firmado con **HMAC-SHA256** utilizando una clave secreta de 256 bits (`/etc/system-dashboard/secret.key`).
-2. **Arquitectura Dual-Token para Compatibilidad Total con Iframes**:
-   - Para resolver el bloqueo de cookies de terceros en iframes (Safari ITP, Google Chrome CHIPS, Firefox ETP) dentro de Nextcloud, el sistema implementa una vía de autenticación dual:
-     - **Vía 1: Encabezado HTTP `X-Device-Token` / `Authorization: Bearer`**: Almacenado de forma segura en `localStorage` (`recursos_device_token`) e inyectado automáticamente en cada llamada `fetch()` a la API.
-     - **Vía 2: Cookie HttpOnly con atributo Partitioned**: Emitida como `SameSite=None; Partitioned; Secure; HttpOnly; Path=/` para sesiones HTTPS y `SameSite=Lax` para conexiones locales.
-   - El backend `server.py` evalúa con prioridad el token en la cabecera HTTP y, en su defecto, la cookie de sesión, permitiendo que Nextcloud cargue los datos sin interrupciones ni pantallas de bloqueo.
-3. **Acceso desde Redes Móviles (4G / 5G / WAN)**:
-   - Los dispositivos previamente emparejados en LAN navegan de forma transparente desde el exterior.
-4. **Pantalla de Bloqueo y Clave Maestra de Rescate**:
-   - Dispositivos desconocidos externos reciben una pantalla `403 Forbidden` con opción a introducir la **Clave Maestra de Rescate** (`/etc/system-dashboard/master.pass`).
-   - Protección activa contra fuerza bruta: **5 intentos fallidos bloquean la IP durante 15 minutos**.
-5. **Revocación Inmediata de Dispositivos**:
-   - En `/dispositivos`, los administradores pueden inspeccionar las sesiones activas (nombre del dispositivo, IP LAN original, última IP WAN de conexión y fecha) y revocar el acceso de cualquier terminal con un clic.
+### Endpoints del Backend (`server.py`)
+- `GET /api/metrics`: Telemetría completa en tiempo real (CPU, RAM, GPU, discos, interfaces de red, clientes Wi-Fi/LAN, Docker, systemd, Pi-hole, Fail2ban, qBittorrent, Emby, dominio detectado y estado de versión).
+- `GET /api/version`: Comparación en vivo entre la versión local (`VERSION` + commit git) y el repositorio remoto en GitHub (`?force=1` para consulta inmediata).
+- `POST /api/system/update`: Ejecuta `git pull origin main`, sincroniza archivos y reinicia el servicio automáticamente.
+- `GET /api/dns/duckdns` y `POST /api/dns/duckdns/update`: Estado de sincronización de IP pública con DuckDNS y forzado de actualización.
+- `GET /api/dns/<ip>`: Historial de consultas DNS realizadas por un cliente específico en Pi-hole FTL.
+- `GET /api/auth/devices`, `POST /api/auth/login`, `POST /api/auth/revoke`: Gestión de seguridad Zero-Trust y sesiones autorizadas.
+- `POST /api/service/action`: Inicio o reinicio de contenedores Docker y servicios `systemd`.
+- `POST /api/wol/wake`: Envío de paquetes mágicos Wake-on-LAN (WoL).
 
 ---
 
-### 4. 🌐 Autodetección Dinámica de Dominio DNS
-El sistema no utiliza dominios fijos en el código. El motor `detect_system_dns_domain` de `server.py` averigua dinámicamente el dominio público siguiendo esta jerarquía:
-1. Variable de entorno `PUBLIC_DOMAIN`.
-2. Bloques de configuración de servidor en `/etc/caddy/Caddyfile` y `/etc/nginx/sites-enabled/*`.
-3. Scripts y tareas programadas de **DuckDNS** (`~/duckdns/duck.sh`, `/etc/cron*`, `/opt/duckdns/*`).
-4. Hostname FQDN (`socket.getfqdn()`).
-5. Cabecera `X-Forwarded-Host` o `Host` provista por el proxy inverso Caddy.
-
-Al descargar el archivo de escritorio remoto **`/static/visipics_externo.rdp`**, se autoinyecta en tiempo real el dominio público activo (`full address:s:<dominio_detectado>:3389`).
-
----
-
-### 5. 🔄 Actualización OTA en 1 Clic desde GitHub
-Desde la vista **`/version`** o mediante el botón de actualización en la cabecera:
-- Inspección del commit SHA local frente al último publicado en la rama `main` del repositorio oficial (`https://github.com/cminewarIA/recursos-ui`).
-- Actualización atómica con verificación de permisos Zero-Trust (`POST /api/system/update`), ejecución de `git fetch` y `git pull`, y reinicio automático de `system-dashboard.service`.
-
----
-
-### 6. 🏷️ Control de Versión Unificado y Archivo Canónico (`VERSION`)
-El proyecto sigue una estricta política de versionado unificado que elimina por completo los números de versión duplicados o hardcodeados en el código:
-- **Punto Único de Verdad**: La versión activa reside exclusivamente en el archivo de texto plano [`VERSION`](file:///home/servidor/servicios/dashboard/VERSION) en la raíz del proyecto.
-- **Distribución Dinámica**: `server.py` lee este archivo en tiempo real mediante `get_app_version()` y lo propaga a través de `/api/metrics` y `/api/version`.
-- **Propagación en el Frontend**: La interfaz actualiza de inmediato todos los elementos visibles (badge del sidebar, botón de cabecera, tarjeta Bento en Vista General y la pantalla `/version`) con el valor de la API, previniendo incoherencias entre la interfaz y el servidor.
-- **Sincronización con `package.json`**: Se mantiene idéntico valor en `package.json` para coherencia del ecosistema de dependencias.
-
----
-
-### 7. 🌐 Gestor DNS, DuckDNS en Vivo & Telemetría de Tráfico por IP
-En la vista **`/dns`** se integran las herramientas de dominio dinámico y monitorización de red:
-- **Control y Telemetría de DuckDNS**:
-  - Lectura en vivo del script `/home/servidor/servicios/duckdns/duck.sh` (modo protegido de solo lectura).
-  - Comparativa en tiempo real entre la IP pública activa y la IP registrada en DuckDNS (`last_ip.txt`).
-  - Botón **"⚡ Forzar Actualización DuckDNS"** (`POST /api/dns/duckdns/update`) para sincronizar de inmediato la IP pública sin esperar al cron de 5 minutos.
-  - Credenciales protegidas con visualización de token enmascarado y sanitización HTML segura contra XSS (`escapeHtml`).
-- **Consola de Logs en Pantalla (`duck.log`)**:
-  - Visor interactivo de terminal (`GET /api/dns/logs`) con recarga automática cada 10 segundos y resaltado sintáctico de cambios de IP, heartbeats y errores.
-- **Monitor de Tráfico DNS & Servicios por Dispositivo (Pi-hole FTL)**:
-  - Extracción en modo solo lectura desde `/etc/pihole/pihole-FTL.db` (`GET /api/dns/traffic`).
-  - Clasificación de dispositivos por IP con sus nombres de red locales detectados vía ARP/DHCP.
-  - Desglose de los servicios y dominios web más consultados por cada dispositivo de la red local (móviles, consolas, TV, servidor, etc.).
-  - Registro de las últimas 50 consultas DNS con indicación de estado (Permitido / Bloqueado por Pi-hole), servidor upstream y tiempo de respuesta en milisegundos.
-
----
-
-## 🛠️ Estructura del Proyecto
+## 📁 Estructura del Proyecto
 
 ```text
-/home/servidor/servicios/dashboard/
-├── VERSION                    # Punto único de verdad de la versión semántica activa
-├── server.py                  # Servidor HTTP/API Python 3 (Zero-Trust Dual-Token, Telemetría, OTA)
+/
+├── VERSION                  # Punto único de verdad para la versión del sistema (3.0.0)
+├── server.py                # Servidor backend Python (puerto 8085) con colectores reales del SO
+├── index.html               # Interfaz principal Aether Obsidian Telemetry OS v3.0.0
 ├── static/
-│   ├── index.html             # Interfaz Web Multi-Página (Diseño Nativo Nextcloud Hub 9/10)
-│   └── visipics_externo.rdp   # Plantilla RDP externa (inyectada al vuelo con dominio dinámico)
-├── index.html                 # Espejo sincronizado para previsualización en Google AI Studio
-├── update.sh                  # Script CLI de sincronización rápida con GitHub y reinicio systemd
-├── package.json               # Metadatos del proyecto sincronizados con VERSION
-├── planes/                    # Historial, Planes de Implementación y Walkthroughs
-│   ├── README.md              # Documentación y directrices de la carpeta planes
-│   ├── implementation_plan.md # Plan de implementación activo o más reciente
-│   ├── walkthrough.md         # Registro de cambios, diagnósticos y pruebas verificadas
-│   └── *.md                   # Bitácoras de versiones y arquitecturas previas
-├── GEMINI.md                  # Reglas de desarrollo y sincronización con GitHub y Google AI Studio
-└── README.md                  # Documentación técnica completa del sistema
+│   └── index.html           # Copia sincronizada servida directamente por server.py
+├── vite.config.ts           # Configuración Vite + middleware de telemetría real para entorno preview
+├── planes/                  # Planes de implementación, bitácoras y walkthroughs de verificación
+├── GEMINI.md                # Reglas obligatorias de sincronización, versionado y despliegue
+└── README.md                # Documentación oficial del proyecto
 ```
-
----
-
-## 📋 Reglas Operativas de Sincronización y Desarrollo
-
-Para garantizar la coherencia absoluta entre el servidor local, el repositorio de GitHub y el entorno móvil de Google AI Studio, el proyecto sigue cinco reglas obligatorias estipuladas en `GEMINI.md`:
-
-1. **Sincronización Previa (`git pull`)**: Siempre se ejecuta `git pull origin main` antes de realizar cualquier cambio en el código o responder solicitudes de edición.
-2. **Publicación Automática (`git push`)**: Cualquier cambio en el backend, la web o los archivos de configuración se confirma con un commit descriptivo y se envía de inmediato a `origin main`.
-3. **Almacenamiento de Planes y Walkthroughs (`planes/`)**: Todos los planes de implementación (`implementation_plan.md`), archivos de recorrido/resumen (`walkthrough.md`), bitácoras y registros de pruebas se almacenan obligatoriamente en la carpeta `planes/`.
-4. **Mantenimiento Continuo del README (`README.md`)**: El archivo `README.md` se actualiza obligatoriamente en cada intervención para reflejar con exactitud las características y cambios implementados.
-5. **Control de Versión Unificado (`VERSION`)**: Se identifica la versión al inicio de cualquier tarea y se incrementa en `VERSION` (y `package.json`) al concluir antes de hacer el commit y push.
-
----
-
-## 🚀 Instalación, Uso y Mantenimiento
-
-### Comprobar estado del servicio
-```bash
-sudo systemctl status system-dashboard.service
-```
-
-### Reiniciar el servicio manualmente
-```bash
-sudo systemctl restart system-dashboard.service
-```
-
-### Actualización manual desde terminal
-```bash
-cd /home/servidor/servicios/dashboard
-./update.sh
-```
-
-### Archivos de Configuración y Seguridad Zero-Trust
-- `/etc/system-dashboard/secret.key`: Clave HMAC-SHA256 de 256 bits (permisos `0600`).
-- `/etc/system-dashboard/master.pass`: Clave maestra de rescate para autorizar nuevos dispositivos remotos.
-- `/etc/system-dashboard/trusted_devices.json`: Registro persistente de dispositivos autorizados y metadatos de acceso.

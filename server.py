@@ -140,19 +140,43 @@ HISTORY = {
 }
 MAX_HISTORY = 40
 
-# Static Hardware & OS Information (Cached at startup)
-CPU_MODEL = "Intel(R) Core(TM) Processor"
-try:
-    with open("/proc/cpuinfo", "r") as f:
-        for line in f:
-            if "model name" in line:
-                CPU_MODEL = line.split(":", 1)[1].strip()
-                break
-except Exception:
-    pass
+# Dynamic Hardware & OS Information (Queried directly from OS kernel at startup)
+def _detect_cpu_static_specs():
+    model = ""
+    vendor = ""
+    cache_size = ""
+    arch = os.uname().machine
+    try:
+        with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if ":" not in line:
+                    continue
+                k, v = [x.strip() for x in line.split(":", 1)]
+                kl = k.lower()
+                if kl in ("model name", "hardware", "processor", "cpu model") and not model and not v.isdigit():
+                    model = v
+                elif kl == "vendor_id" and not vendor:
+                    vendor = v
+                elif kl == "cache size" and not cache_size:
+                    cache_size = v
+    except Exception:
+        pass
+    if not model:
+        try:
+            out = subprocess.check_output(["lscpu"], timeout=2).decode("utf-8", errors="ignore")
+            for line in out.splitlines():
+                if "Model name:" in line or "Nombre del modelo:" in line:
+                    model = line.split(":", 1)[1].strip()
+                    break
+        except Exception:
+            pass
+    if not model:
+        model = f"CPU ({arch})"
+    return model, arch, vendor, cache_size
 
-CORES_LOGICAL = psutil.cpu_count(logical=True) or 4
-CORES_PHYSICAL = psutil.cpu_count(logical=False) or 2
+CPU_MODEL, CPU_ARCH, CPU_VENDOR, CPU_CACHE = _detect_cpu_static_specs()
+CORES_LOGICAL = psutil.cpu_count(logical=True) or os.cpu_count() or 1
+CORES_PHYSICAL = psutil.cpu_count(logical=False) or CORES_LOGICAL
 HOSTNAME = os.uname().nodename
 KERNEL = os.uname().release
 BOOT_TIME = psutil.boot_time()
@@ -439,16 +463,46 @@ def get_version_info(force_refresh=False):
         remote_sha != local_sha
     )
 
+    local_clean = True
+    try:
+        p_st = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+        if p_st.returncode == 0:
+            local_clean = (len(p_st.stdout.strip()) == 0)
+    except Exception:
+        pass
+
+    behind_count = 0
+    if update_available and recent_commits:
+        for idx, rc in enumerate(recent_commits):
+            if rc.get("sha") == local_sha:
+                behind_count = idx
+                break
+        if behind_count == 0:
+            behind_count = 1
+
+    pub_dom = detect_system_dns_domain()
     result = {
         "version": pkg_version,
         "repo": GITHUB_REPO,
         "repo_url": f"https://github.com/{GITHUB_REPO}",
         "branch": local_branch,
+        "local_hash": local_sha,
+        "local_full_hash": local_full_sha,
+        "local_subject": local_msg,
+        "local_date": local_date,
+        "local_clean": local_clean,
+        "remote_hash": remote_sha,
+        "remote_full_hash": remote_full_sha,
+        "remote_subject": remote_msg,
+        "remote_date": remote_date,
+        "remote_author": remote_author,
+        "behind_count": behind_count,
         "local": {
             "sha": local_sha,
             "full_sha": local_full_sha,
             "message": local_msg,
-            "date": local_date
+            "date": local_date,
+            "clean": local_clean
         },
         "remote": {
             "sha": remote_sha,
@@ -460,7 +514,7 @@ def get_version_info(force_refresh=False):
         },
         "update_available": update_available,
         "recent_commits": recent_commits,
-        "public_domain": detect_system_dns_domain(),
+        "public_domain": pub_dom,
         "local_ip": SERVER_LOCAL_IP,
         "checked_at": datetime.now().strftime("%H:%M:%S")
     }
@@ -1065,37 +1119,57 @@ def get_cpu_info():
         per_cpu = psutil.cpu_percent(interval=None, percpu=True)
         cpu_percent = round(sum(per_cpu) / len(per_cpu), 1) if per_cpu else 0.0
         freq = psutil.cpu_freq()
-        freq_current = round(freq.current, 1) if freq else 0
-        cpu_temp = 0.0
+        freq_current = round(freq.current, 1) if freq and freq.current else 0.0
+        freq_max = round(freq.max, 1) if freq and freq.max else 0.0
+        freq_min = round(freq.min, 1) if freq and freq.min else 0.0
+        if freq_current <= 0:
+            try:
+                with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as f:
+                    freqs = []
+                    for line in f:
+                        if "cpu MHz" in line:
+                            freqs.append(float(line.split(":", 1)[1].strip()))
+                    if freqs:
+                        freq_current = round(sum(freqs) / len(freqs), 1)
+            except Exception:
+                pass
+        cpu_temp = None
         try:
-            for hw in os.listdir("/sys/class/hwmon"):
-                hw_dir = os.path.join("/sys/class/hwmon", hw)
-                name_f = os.path.join(hw_dir, "name")
-                if os.path.exists(name_f):
-                    with open(name_f, "r") as nf:
-                        if "coretemp" in nf.read():
-                            t1 = os.path.join(hw_dir, "temp1_input")
-                            if os.path.exists(t1):
-                                with open(t1, "r") as tf:
-                                    cpu_temp = round(int(tf.read().strip()) / 1000.0, 1)
-                            break
+            if os.path.isdir("/sys/class/hwmon"):
+                for hw in os.listdir("/sys/class/hwmon"):
+                    hw_dir = os.path.join("/sys/class/hwmon", hw)
+                    name_f = os.path.join(hw_dir, "name")
+                    if os.path.exists(name_f):
+                        with open(name_f, "r") as nf:
+                            hw_name = nf.read().strip().lower()
+                            if any(k in hw_name for k in ("coretemp", "k10temp", "zenpower", "cpu_thermal", "acpitz", "package")):
+                                t1 = os.path.join(hw_dir, "temp1_input")
+                                if os.path.exists(t1):
+                                    with open(t1, "r") as tf:
+                                        cpu_temp = round(int(tf.read().strip()) / 1000.0, 1)
+                                break
         except Exception:
             pass
         load1, load5, load15 = os.getloadavg()
         return {
             "model": CPU_MODEL,
+            "architecture": CPU_ARCH,
+            "vendor": CPU_VENDOR,
+            "cache_size": CPU_CACHE,
             "logical_cores": CORES_LOGICAL,
             "physical_cores": CORES_PHYSICAL,
             "usage_percent": cpu_percent,
             "per_core_percent": per_cpu,
             "freq_mhz": freq_current,
+            "freq_max_mhz": freq_max,
+            "freq_min_mhz": freq_min,
             "temp_c": cpu_temp,
             "load_1m": round(load1, 2),
             "load_5m": round(load5, 2),
             "load_15m": round(load15, 2)
         }
     except Exception as e:
-        return {"error": str(e), "usage_percent": 0.0, "per_core_percent": [], "temp_c": 0.0}
+        return {"error": str(e), "model": CPU_MODEL, "architecture": CPU_ARCH, "usage_percent": 0.0, "per_core_percent": [], "temp_c": None}
 
 def get_gpu_info():
     try:
@@ -1105,32 +1179,32 @@ def get_gpu_info():
         if gpu is None:
             return {"available": False, "gpu_procs_map": {}}
         
-        name = gpu.findtext('product_name', 'NVIDIA GeForce GTX 1650')
-        driver = root.findtext('driver_version', '') or gpu.findtext('driver_version', '595.84')
-        cuda = root.findtext('cuda_version', '13.2')
-        temp_str = gpu.findtext('temperature/gpu_temp', '0')
-        temp = int(temp_str.replace('C', '').strip()) if temp_str else 0
+        name = (gpu.findtext('product_name') or '').strip()
+        driver = (root.findtext('driver_version') or gpu.findtext('driver_version') or '').strip()
+        cuda = (root.findtext('cuda_version') or '').strip()
+        temp_str = gpu.findtext('temperature/gpu_temp', '')
+        temp = int(temp_str.replace('C', '').strip()) if temp_str and temp_str != 'N/A' else None
         
         gpu_util_str = gpu.findtext('utilization/gpu_util', '0')
-        gpu_util = int(gpu_util_str.replace('%', '').strip()) if gpu_util_str else 0
+        gpu_util = int(gpu_util_str.replace('%', '').strip()) if gpu_util_str and gpu_util_str != 'N/A' else 0
         
         mem_util_str = gpu.findtext('utilization/memory_util', '0')
-        mem_util = int(mem_util_str.replace('%', '').strip()) if mem_util_str else 0
+        mem_util = int(mem_util_str.replace('%', '').strip()) if mem_util_str and mem_util_str != 'N/A' else 0
         
         mem_total_str = gpu.findtext('fb_memory_usage/total', '0')
-        mem_total = int(mem_total_str.replace('MiB', '').strip()) if mem_total_str else 0
+        mem_total = int(mem_total_str.replace('MiB', '').strip()) if mem_total_str and mem_total_str != 'N/A' else 0
         
         mem_used_str = gpu.findtext('fb_memory_usage/used', '0')
-        mem_used = int(mem_used_str.replace('MiB', '').strip()) if mem_used_str else 0
+        mem_used = int(mem_used_str.replace('MiB', '').strip()) if mem_used_str and mem_used_str != 'N/A' else 0
         
         mem_free_str = gpu.findtext('fb_memory_usage/free', '0')
-        mem_free = int(mem_free_str.replace('MiB', '').strip()) if mem_free_str else 0
+        mem_free = int(mem_free_str.replace('MiB', '').strip()) if mem_free_str and mem_free_str != 'N/A' else 0
         
-        fan_str = gpu.findtext('fan_speed', '0')
-        fan = int(fan_str.replace('%', '').strip()) if fan_str and fan_str != 'N/A' else 0
+        fan_str = gpu.findtext('fan_speed', '')
+        fan = int(fan_str.replace('%', '').strip()) if fan_str and fan_str != 'N/A' else None
         
-        power_str = gpu.findtext('gpu_power_readings/power_draw', '0') or gpu.findtext('power_readings/power_draw', '0')
-        power = float(power_str.replace('W', '').strip()) if power_str and power_str != 'N/A' else 0.0
+        power_str = gpu.findtext('gpu_power_readings/power_draw', '') or gpu.findtext('power_readings/power_draw', '')
+        power = float(power_str.replace('W', '').strip()) if power_str and power_str != 'N/A' else None
         
         processes = []
         gpu_procs_map = {}
@@ -1140,17 +1214,15 @@ def get_gpu_info():
             pmem = p.findtext('used_memory', '')
             ptype = p.findtext('type', '')
             
-            # Limpiar nombre del comando/ejecutable eliminando argumentos de línea de comandos
             clean_cmd = pname.strip() if pname else ''
             first_token = clean_cmd.split()[0] if clean_cmd else ''
-            clean_name = os.path.basename(first_token) if first_token else 'Desconocido'
+            clean_name = os.path.basename(first_token) if first_token else 'Proceso GPU'
             
             try:
                 pid_int = int(pid_str)
                 vram_num = float(pmem.replace('MiB', '').replace('MB', '').strip())
                 gpu_procs_map[pid_int] = {"vram_mb": vram_num, "type": ptype}
                 
-                # Si el proceso existe en el sistema, obtener su nombre limpio de proceso
                 if psutil.pid_exists(pid_int):
                     p_comm = psutil.Process(pid_int).name()
                     if p_comm:
@@ -1158,7 +1230,6 @@ def get_gpu_info():
             except Exception:
                 pass
                 
-            # Asignar nombres limpios y descriptivos para procesos conocidos
             lower = clean_name.lower()
             if 'chrome' in lower:
                 display_name = 'Google Chrome (GPU / Render)'
@@ -1209,7 +1280,32 @@ def get_gpu_info():
             "gpu_procs_map": gpu_procs_map
         }
     except Exception as e:
-        return {"available": False, "error": str(e), "gpu_procs_map": {}}
+        # Fallback dinámico para GPU AMD / Intel integrada mediante sysfs / lspci
+        try:
+            lspci_out = subprocess.check_output(['lspci'], timeout=2).decode('utf-8', errors='ignore')
+            for line in lspci_out.splitlines():
+                if any(k in line for k in ('VGA compatible controller:', '3D controller:', 'Display controller:')):
+                    gpu_name = line.split(':', 2)[-1].strip()
+                    return {
+                        "available": True,
+                        "name": gpu_name,
+                        "driver": "Linux Kernel DRM",
+                        "cuda": "",
+                        "temp_c": None,
+                        "gpu_util_percent": 0,
+                        "mem_util_percent": 0,
+                        "vram_total_mb": 0,
+                        "vram_used_mb": 0,
+                        "vram_free_mb": 0,
+                        "vram_percent": 0,
+                        "fan_percent": None,
+                        "power_watts": None,
+                        "processes": [],
+                        "gpu_procs_map": {}
+                    }
+        except Exception:
+            pass
+        return {"available": False, "name": "", "error": str(e), "gpu_procs_map": {}}
 
 def fetch_gpu_worker():
     global GPU_CACHE
@@ -2669,22 +2765,60 @@ def background_collector():
     last_time = time.time()
     psutil.cpu_percent(interval=None, percpu=True)
     
-    def get_real_net():
+    def get_real_net(prev_ifaces=None, dt_sec=1.0):
         per_nic = psutil.net_io_counters(pernic=True)
+        if_addrs = psutil.net_if_addrs() if hasattr(psutil, 'net_if_addrs') else {}
+        if_stats = psutil.net_if_stats() if hasattr(psutil, 'net_if_stats') else {}
         rx, tx = 0, 0
         interfaces = {}
+        interfaces_list = []
         for nic_name, stats in per_nic.items():
             if nic_name == "lo" or nic_name.startswith(("veth", "docker", "br-")):
                 continue
             rx += stats.bytes_recv
             tx += stats.bytes_sent
-            interfaces[nic_name] = {
+
+            ipv4_addr = ""
+            ipv6_addr = ""
+            mac_addr = ""
+            for snic in if_addrs.get(nic_name, []):
+                fam_name = getattr(snic.family, 'name', str(snic.family))
+                if fam_name == 'AF_INET' or snic.family == socket.AF_INET:
+                    ipv4_addr = snic.address
+                elif fam_name == 'AF_INET6' or snic.family == socket.AF_INET6:
+                    if not ipv6_addr:
+                        ipv6_addr = snic.address.split('%')[0]
+                elif 'PACKET' in fam_name or 'LINK' in fam_name or snic.address.count(':') == 5:
+                    if snic.address and snic.address != '00:00:00:00:00:00':
+                        mac_addr = snic.address.upper()
+
+            st_info = if_stats.get(nic_name)
+            is_up = bool(st_info.isup) if st_info else True
+            speed_mbps = int(st_info.speed) if st_info and st_info.speed and st_info.speed > 0 else 0
+            mtu = int(st_info.mtu) if st_info and st_info.mtu else 1500
+
+            prev_nic = (prev_ifaces or {}).get(nic_name, {})
+            nic_rx_sec = max(0.0, (stats.bytes_recv - prev_nic.get("bytes_recv", stats.bytes_recv)) / max(dt_sec, 0.001)) if prev_ifaces else 0.0
+            nic_tx_sec = max(0.0, (stats.bytes_sent - prev_nic.get("bytes_sent", stats.bytes_sent)) / max(dt_sec, 0.001)) if prev_ifaces else 0.0
+
+            nic_obj = {
+                "name": nic_name,
+                "ip": ipv4_addr,
+                "ipv6": ipv6_addr,
+                "mac": mac_addr,
+                "is_up": is_up,
+                "speed_mbps": speed_mbps,
+                "mtu": mtu,
                 "bytes_sent": stats.bytes_sent,
                 "bytes_recv": stats.bytes_recv,
                 "packets_sent": stats.packets_sent,
-                "packets_recv": stats.packets_recv
+                "packets_recv": stats.packets_recv,
+                "rx_bytes_sec": round(nic_rx_sec, 1),
+                "tx_bytes_sec": round(nic_tx_sec, 1)
             }
-        return rx, tx, interfaces
+            interfaces[nic_name] = nic_obj
+            interfaces_list.append(nic_obj)
+        return rx, tx, interfaces, interfaces_list
 
     def get_real_disk():
         per_disk = psutil.disk_io_counters(perdisk=True) or {}
@@ -2696,7 +2830,7 @@ def background_collector():
             w_bytes += d_st.write_bytes
         return r_bytes, w_bytes
 
-    last_rx, last_tx, _ = get_real_net()
+    last_rx, last_tx, prev_ifaces_map, _ = get_real_net()
     last_r, last_w = get_real_disk()
     cycle_counter = 0
     cached_procs = []
@@ -2708,7 +2842,8 @@ def background_collector():
             last_time = now
             cycle_counter += 1
             
-            curr_rx, curr_tx, interfaces = get_real_net()
+            curr_rx, curr_tx, interfaces, interfaces_list = get_real_net(prev_ifaces_map, dt)
+            prev_ifaces_map = interfaces
             rx_bytes_sec = max(0, (curr_rx - last_rx) / dt)
             tx_bytes_sec = max(0, (curr_tx - last_tx) / dt)
             last_rx, last_tx = curr_rx, curr_tx
@@ -2766,7 +2901,9 @@ def background_collector():
                 "tx_bytes_sec": tx_bytes_sec,
                 "rx_total_bytes": curr_rx,
                 "tx_total_bytes": curr_tx,
-                "interfaces": interfaces
+                "local_ip": SERVER_LOCAL_IP,
+                "interfaces": interfaces,
+                "interfaces_list": interfaces_list
             }
             
             disk_io_info = {
@@ -3116,8 +3253,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 with open(index_path, 'r', encoding='utf-8') as f:
                     content_str = f.read()
                 current_ver = get_app_version()
-                # Reemplazo de marcadores de versión para carga instantánea coherente
-                content_str = content_str.replace('id="sidebarVersionTag">v2.0<', f'id="sidebarVersionTag">v{current_ver}<')
+                content_str = content_str.replace('id="sidebarVersionTag">Sincronizando...<', f'id="sidebarVersionTag">v{current_ver}<')
                 content = content_str.encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
