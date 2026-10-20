@@ -1,3 +1,10 @@
+# Node / Vite / Web
+node_modules/
+build/
+dist/
+coverage/
+*.log
+
 # Python
 __pycache__/
 *.py[cod]
@@ -10,7 +17,8 @@ venv/
 
 # Datos y sesiones locales sensibles
 trusted_devices.json
-.env
+.env*
+!.env.example
 
 # Entorno de escritorio / Sistema
 .directory
