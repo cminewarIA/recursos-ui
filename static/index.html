@@ -1,0 +1,3742 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>Recursos • Servidor Cminewar</title>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       GNOME LIBADWAITA / RESOURCES (net.nokyan.Resources) THEME
+       ========================================================================== */
+    :root {
+      /* GNOME Dark Palette */
+      --adw-bg-window: #1e1e1e;
+      --adw-bg-sidebar: #242424;
+      --adw-bg-card: #2e2e2e;
+      --adw-bg-card-hover: #383838;
+      --adw-bg-card-active: #404040;
+      --adw-border: rgba(255, 255, 255, 0.08);
+      --adw-border-strong: rgba(255, 255, 255, 0.14);
+
+      /* Typography & Accents */
+      --adw-text: #ffffff;
+      --adw-text-secondary: rgba(255, 255, 255, 0.7);
+      --adw-text-dim: rgba(255, 255, 255, 0.45);
+      --adw-text-disabled: rgba(255, 255, 255, 0.25);
+
+      /* Semantic GNOME Accent Colors */
+      --adw-blue: #3584e4;
+      --adw-blue-bg: rgba(53, 132, 228, 0.15);
+      --adw-green: #33d17a;
+      --adw-green-bg: rgba(51, 209, 122, 0.15);
+      --adw-amber: #f6d32d;
+      --adw-orange: #ff7800;
+      --adw-red: #e01b24;
+      --adw-purple: #9141ac;
+      --adw-teal: #26a269;
+      --adw-cyan: #1c71d8;
+
+      /* UI Metrics */
+      --radius-window: 14px;
+      --radius-card: 12px;
+      --radius-row: 9px;
+      --radius-pill: 9999px;
+
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Cantarell", "Ubuntu", sans-serif;
+      --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: #121212;
+      color: var(--adw-text);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      padding: 12px;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        padding: 0;
+      }
+    }
+
+    /* Emoji Typography Support (Universal & HD) */
+    .emoji {
+      font-family: var(--font-emoji) !important;
+      font-style: normal !important;
+      font-weight: normal !important;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1 !important;
+      vertical-align: -0.1em;
+      letter-spacing: normal !important;
+      user-select: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* Emojis de Estado (🟢 y 🟡) nítidos y proporcionados */
+    .emoji-status {
+      font-family: var(--font-emoji) !important;
+      font-size: 13px !important;
+      font-weight: normal !important;
+      font-style: normal !important;
+      line-height: 1 !important;
+      display: inline-block !important;
+      vertical-align: -1px !important;
+      margin-right: 5px !important;
+      letter-spacing: normal !important;
+      text-shadow: none !important;
+    }
+
+    .device-emoji {
+      font-family: var(--font-emoji) !important;
+      font-size: 22px;
+      font-weight: normal !important;
+      font-style: normal !important;
+      line-height: 1 !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .nav-emoji {
+      font-family: var(--font-emoji) !important;
+      font-size: 18px;
+      font-weight: normal !important;
+      font-style: normal !important;
+      line-height: 1 !important;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+      user-select: none;
+    }
+
+    .tile-emoji {
+      font-family: var(--font-emoji) !important;
+      font-size: 20px;
+      font-weight: normal !important;
+      font-style: normal !important;
+      line-height: 1 !important;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 6px;
+      user-select: none;
+    }
+
+    /* Crisp Adwaita Status Indicators */
+    .status-indicator-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    .status-indicator-dot.online {
+      background-color: #33d17a;
+      box-shadow: 0 0 6px rgba(51, 209, 122, 0.6);
+    }
+    .status-indicator-dot.idle {
+      background-color: #f6d32d;
+      box-shadow: 0 0 6px rgba(246, 211, 45, 0.5);
+    }
+
+    .banned-ip-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(237, 51, 59, 0.12);
+      border: 1px solid rgba(237, 51, 59, 0.3);
+      color: #ff7b80;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+    }
+    .banned-ip-chip:hover {
+      background: rgba(237, 51, 59, 0.2);
+    }
+
+    /* Outer GNOME Window Wrapper */
+    .app-window {
+      display: flex;
+      width: 100%;
+      max-width: 1440px;
+      min-height: calc(100vh - 24px);
+      background: var(--adw-bg-window);
+      border-radius: var(--radius-window);
+      border: 1px solid var(--adw-border);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+
+    @media (max-width: 900px) {
+      .app-window {
+        border-radius: 0;
+        border: none;
+        min-height: 100vh;
+      }
+    }
+
+    /* ==========================================================================
+       SIDEBAR NAVIGATION (LIBADWAITA STYLE)
+       ========================================================================== */
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: var(--adw-bg-sidebar);
+      border-right: 1px solid var(--adw-border);
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    .sidebar-header {
+      padding: 18px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .app-icon-squircle {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #3584e4, #1c71d8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(53, 132, 228, 0.35);
+      flex-shrink: 0;
+    }
+
+    .app-header-text h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      color: var(--adw-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .app-header-text p {
+      font-size: 11px;
+      color: var(--adw-text-dim);
+      font-weight: 500;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 12px 10px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .nav-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--adw-text-dim);
+      padding: 0 12px 4px;
+    }
+
+    .nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      border-radius: var(--radius-row);
+      color: var(--adw-text-secondary);
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+      font-size: 13.5px;
+      font-weight: 500;
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--adw-text);
+    }
+
+    .nav-item.active {
+      background: var(--adw-blue);
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .nav-item.active .nav-icon {
+      color: #ffffff;
+    }
+
+    .nav-item.active .nav-badge {
+      background: rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .nav-icon {
+      width: 18px;
+      height: 18px;
+      color: var(--adw-text-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s ease;
+    }
+
+    .nav-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--adw-text-dim);
+      font-family: var(--font-mono);
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .sidebar-footer {
+      padding: 14px 14px;
+      border-top: 1px solid var(--adw-border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    .host-pill {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--adw-text-dim);
+    }
+
+    .trust-badge-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--adw-border);
+      border-radius: var(--radius-pill);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--adw-text-secondary);
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .trust-badge-row:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--adw-border-strong);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--adw-green);
+      box-shadow: 0 0 6px var(--adw-green);
+      flex-shrink: 0;
+    }
+
+    .status-dot-sm {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--adw-green);
+      box-shadow: 0 0 5px var(--adw-green);
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    /* ==========================================================================
+       CONTENT PANE & ADWAITA HEADERBAR
+       ========================================================================== */
+    .content-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--adw-bg-window);
+    }
+
+    .headerbar {
+      height: 54px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--adw-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--adw-bg-window);
+      z-index: 10;
+    }
+
+    .headerbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .view-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--adw-text);
+      letter-spacing: -0.2px;
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      background: transparent;
+      border: none;
+      color: var(--adw-text);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+    }
+
+    .headerbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* GNOME SearchEntry */
+    .search-entry {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--adw-border);
+      border-radius: 8px;
+      padding: 0 10px;
+      height: 32px;
+      width: 240px;
+      transition: all 0.15s ease;
+    }
+
+    .search-entry:focus-within {
+      background: rgba(255, 255, 255, 0.09);
+      border-color: var(--adw-blue);
+      box-shadow: 0 0 0 2px rgba(53, 132, 228, 0.25);
+    }
+
+    .search-entry svg {
+      width: 14px;
+      height: 14px;
+      color: var(--adw-text-dim);
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .search-entry input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--adw-text);
+      font-size: 12.5px;
+      width: 100%;
+      font-family: var(--font-sans);
+    }
+
+    .search-entry input::placeholder {
+      color: var(--adw-text-dim);
+    }
+
+    .btn-header {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--adw-border);
+      color: var(--adw-text-secondary);
+      border-radius: 8px;
+      height: 32px;
+      padding: 0 12px;
+      font-size: 12.5px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+
+    .btn-header:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--adw-text);
+      border-color: var(--adw-border-strong);
+    }
+
+    /* Content Scroll Area */
+    .content-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 28px 48px;
+    }
+
+    .view-container {
+      max-width: 980px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    /* ==========================================================================
+       HERO CARD WITH REAL-TIME SMOOTH CHART (RESOURCES SIGNATURE)
+       ========================================================================== */
+    .hero-chart-card {
+      background: var(--adw-bg-card);
+      border: 1px solid var(--adw-border);
+      border-radius: var(--radius-card);
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .hero-top-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .hero-metric-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--adw-text-secondary);
+    }
+
+    .hero-metric-big {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--adw-text);
+      font-family: var(--font-sans);
+      margin-top: 2px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .hero-metric-sub {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--adw-text-dim);
+    }
+
+    .hero-chart-canvas-box {
+      width: 100%;
+      height: 150px;
+      position: relative;
+      margin-top: 10px;
+    }
+
+    .hero-chart-canvas-box canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ==========================================================================
+       VISTA GENERAL: OVERVIEW GRID (6 CORE SYSTEMS)
+       ========================================================================== */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 16px;
+    }
+
+    .overview-card {
+      background: var(--adw-bg-card);
+      border: 1px solid var(--adw-border);
+      border-radius: var(--radius-card);
+      padding: 18px 20px;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    }
+
+    .overview-card:hover {
+      background: var(--adw-bg-card-hover);
+      border-color: var(--adw-border-strong);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .row-arrow {
+      color: var(--adw-text-dim);
+      font-size: 15px;
+      font-weight: 600;
+      transition: transform 0.15s ease, color 0.15s ease;
+    }
+
+    .overview-card:hover .row-arrow {
+      color: var(--adw-text);
+      transform: translateX(3px);
+    }
+
+    /* ==========================================================================
+       LIBADWAITA PREFERENCES GROUP & ACTION ROWS
+       ========================================================================== */
+    .adw-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .adw-group-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--adw-text);
+      padding-left: 6px;
+      letter-spacing: -0.1px;
+    }
+
+    .adw-group-subtitle {
+      font-size: 12px;
+      color: var(--adw-text-dim);
+      padding-left: 6px;
+      margin-top: -4px;
+      margin-bottom: 4px;
+    }
+
+    .adw-card {
+      background: var(--adw-bg-card);
+      border: 1px solid var(--adw-border);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+    }
+
+    .adw-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 18px;
+      border-bottom: 1px solid var(--adw-border);
+      font-size: 13.5px;
+      transition: background 0.15s ease;
+    }
+
+    .adw-action-row:last-child {
+      border-bottom: none;
+    }
+
+    .adw-action-row:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .row-title-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .row-icon {
+      width: 20px;
+      height: 20px;
+      color: var(--adw-text-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .row-label {
+      font-weight: 500;
+      color: var(--adw-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .row-sublabel {
+      font-size: 11.5px;
+      color: var(--adw-text-dim);
+      margin-top: 1px;
+    }
+
+    .row-value {
+      font-weight: 600;
+      color: var(--adw-text-secondary);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    /* Cores Grid Matrix */
+    .cores-adw-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      gap: 8px;
+      padding: 14px;
+      background: var(--adw-bg-card);
+      border: 1px solid var(--adw-border);
+      border-radius: var(--radius-card);
+    }
+
+    .core-adw-box {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--adw-border);
+      border-radius: 8px;
+      padding: 8px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .core-adw-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .core-adw-bar-fill {
+      height: 100%;
+      background: var(--adw-blue);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .core-adw-title {
+      font-size: 10.5px;
+      color: var(--adw-text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .core-adw-val {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--adw-text);
+      font-family: var(--font-mono);
+    }
+
+    /* Network Filter Pills (Libadwaita Segmented Button) */
+    .segmented-pills {
+      display: inline-flex;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 4px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--adw-border);
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .pill-btn {
+      background: transparent;
+      border: none;
+      color: var(--adw-text-dim);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 14px;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill-btn:hover {
+      color: var(--adw-text);
+    }
+
+    .pill-btn.active {
+      background: var(--adw-bg-card-hover);
+      color: #ffffff;
+      font-weight: 600;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Badges */
+    .adw-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      white-space: nowrap;
+    }
+
+    .badge-blue { background: rgba(53, 132, 228, 0.15); color: #78aeed; border: 1px solid rgba(53, 132, 228, 0.3); }
+    .badge-purple { background: rgba(145, 65, 172, 0.15); color: #c061cb; border: 1px solid rgba(145, 65, 172, 0.3); }
+    .badge-green { background: rgba(51, 209, 122, 0.15); color: #57e389; border: 1px solid rgba(51, 209, 122, 0.3); }
+    .badge-amber { background: rgba(246, 211, 45, 0.15); color: #f8e45c; border: 1px solid rgba(246, 211, 45, 0.3); }
+    .badge-red { background: rgba(224, 27, 36, 0.15); color: #ed333b; border: 1px solid rgba(224, 27, 36, 0.3); }
+
+    /* Custom Avatar Circle */
+    .device-circle {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--adw-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--adw-text-secondary);
+      flex-shrink: 0;
+    }
+
+    /* Modal Overlay (Adwaita Dialog) */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .adw-dialog {
+      background: #282828;
+      border: 1px solid var(--adw-border-strong);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 520px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .adw-dialog-header {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--adw-border);
+    }
+
+    .adw-dialog-header h3 {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .adw-dialog-close {
+      background: transparent;
+      border: none;
+      color: var(--adw-text-dim);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      border-radius: 6px;
+      transition: color 0.15s ease;
+    }
+
+    .adw-dialog-close:hover {
+      color: var(--adw-text);
+    }
+
+    .adw-dialog-body {
+      padding: 20px;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+
+    /* History Navigation Controls (Back / Forward) */
+    .nav-history-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--adw-border);
+      border-radius: 8px;
+      padding: 2px 3px;
+    }
+
+    .btn-history {
+      background: transparent;
+      border: none;
+      color: var(--adw-text);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    .btn-history:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn-history:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+    }
+
+    /* Brand Badges & SVG Logos */
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.2;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      white-space: nowrap;
+    }
+
+    .brand-logo-svg {
+      width: 14px;
+      height: 14px;
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    .brand-nintendo {
+      border-color: rgba(230, 0, 18, 0.35);
+      background: rgba(230, 0, 18, 0.12);
+      color: #ff5252;
+    }
+
+    .brand-xbox {
+      border-color: rgba(16, 124, 16, 0.35);
+      background: rgba(16, 124, 16, 0.14);
+      color: #5cd65c;
+    }
+
+    .brand-samsung {
+      border-color: rgba(20, 40, 160, 0.4);
+      background: rgba(20, 40, 160, 0.14);
+      color: #82b1ff;
+    }
+
+    .brand-xiaomi {
+      border-color: rgba(255, 103, 0, 0.4);
+      background: rgba(255, 103, 0, 0.14);
+      color: #ffa726;
+    }
+
+    .brand-google {
+      border-color: rgba(66, 133, 244, 0.35);
+      background: rgba(66, 133, 244, 0.12);
+      color: #90caf9;
+    }
+
+    .brand-asus {
+      border-color: rgba(0, 83, 155, 0.4);
+      background: rgba(0, 83, 155, 0.14);
+      color: #64b5f6;
+    }
+
+    .brand-vodafone {
+      border-color: rgba(230, 0, 0, 0.35);
+      background: rgba(230, 0, 0, 0.12);
+      color: #ff5252;
+    }
+
+    .brand-synology {
+      border-color: rgba(0, 128, 203, 0.4);
+      background: rgba(0, 128, 203, 0.14);
+      color: #4fc3f7;
+    }
+
+    .brand-tplink {
+      border-color: rgba(0, 164, 228, 0.35);
+      background: rgba(0, 164, 228, 0.12);
+      color: #4dd0e1;
+    }
+
+    .brand-espressif {
+      border-color: rgba(231, 53, 47, 0.35);
+      background: rgba(231, 53, 47, 0.12);
+      color: #ff8a80;
+    }
+
+    .brand-tuya {
+      border-color: rgba(255, 87, 34, 0.35);
+      background: rgba(255, 87, 34, 0.12);
+      color: #ffab91;
+    }
+
+    .brand-sony {
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: #e0e0e0;
+    }
+
+    .brand-apple {
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+
+    .brand-acer {
+      border-color: rgba(131, 184, 26, 0.35);
+      background: rgba(131, 184, 26, 0.14);
+      color: #c5e1a5;
+    }
+
+    .brand-ubuntu {
+      border-color: rgba(233, 84, 32, 0.35);
+      background: rgba(233, 84, 32, 0.14);
+      color: #ff8a65;
+    }
+
+    .brand-generic {
+      border-color: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--adw-text-secondary);
+    }
+
+    /* Responsive Queries */
+    @media (max-width: 900px) {
+      .sidebar {
+        display: none;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 50;
+        box-shadow: 8px 0 24px rgba(0, 0, 0, 0.7);
+      }
+      .sidebar.open {
+        display: flex;
+      }
+      .mobile-menu-btn {
+        display: flex;
+      }
+      .content-scroll {
+        padding: 16px 14px;
+      }
+      .search-entry {
+        width: 140px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-window">
+    
+    <!-- ======================================================================
+         SIDEBAR: GNOME LIBADWAITA RESOURCES NAVIGATION
+         ====================================================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <div class="app-icon-squircle">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="app-header-text">
+          <h1>Recursos <span class="status-dot" title="En vivo"></span></h1>
+          <p>Servidor Cminewar</p>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <!-- VISTA GENERAL -->
+        <div class="nav-section">
+          <div class="nav-section-title">Principal</div>
+          <ul class="nav-list">
+            <li>
+              <a class="nav-item active" id="navOverview" onclick="switchView('overview')">
+                <div class="nav-left">
+                  <span class="nav-emoji">📊</span>
+                  <span>Vista General</span>
+                </div>
+                <span class="nav-badge" id="badgeNavOverview" style="background: rgba(51, 209, 122, 0.2); color: #57e389;">Activo</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- HARDWARE -->
+        <div class="nav-section">
+          <div class="nav-section-title">Hardware</div>
+          <ul class="nav-list">
+            <li>
+              <a class="nav-item" id="navProcessor" onclick="switchView('processor')">
+                <div class="nav-left">
+                  <span class="nav-emoji">⚡</span>
+                  <span>Procesador</span>
+                </div>
+                <span class="nav-badge" id="badgeNavCpu">--%</span>
+              </a>
+            </li>
+
+            <li>
+              <a class="nav-item" id="navMemory" onclick="switchView('memory')">
+                <div class="nav-left">
+                  <span class="nav-emoji">🧠</span>
+                  <span>Memoria</span>
+                </div>
+                <span class="nav-badge" id="badgeNavRam">-- GB</span>
+              </a>
+            </li>
+
+            <li>
+              <a class="nav-item" id="navGpu" onclick="switchView('gpu')">
+                <div class="nav-left">
+                  <span class="nav-emoji">🎮</span>
+                  <span>Tarjeta Gráfica</span>
+                </div>
+                <span class="nav-badge" id="badgeNavGpu">-- °C</span>
+              </a>
+            </li>
+
+            <li>
+              <a class="nav-item" id="navDrives" onclick="switchView('drives')">
+                <div class="nav-left">
+                  <span class="nav-emoji">💾</span>
+                  <span>Almacenamiento</span>
+                </div>
+                <span class="nav-badge" id="badgeNavDisk">SSD</span>
+              </a>
+            </li>
+
+            <li>
+              <a class="nav-item" id="navNetwork" onclick="switchView('network')">
+                <div class="nav-left">
+                  <span class="nav-emoji">🌐</span>
+                  <span>Red & Consumos</span>
+                </div>
+                <span class="nav-badge" id="badgeNavNet">20 disp.</span>
+              </a>
+            </li>
+
+            <li>
+              <a class="nav-item" id="navSecurity" onclick="switchView('security')">
+                <div class="nav-left">
+                  <span class="nav-emoji">🛡️</span>
+                  <span>Seguridad & DNS</span>
+                </div>
+                <span class="nav-badge badge-green" id="badgeNavSec">Activo</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- TAREAS -->
+        <div class="nav-section">
+          <div class="nav-section-title">Tareas</div>
+          <ul class="nav-list">
+            <li>
+              <a class="nav-item" id="navApps" onclick="switchView('apps')">
+                <div class="nav-left">
+                  <span class="nav-emoji">🐳</span>
+                  <span>Aplicaciones (Docker)</span>
+                </div>
+                <span class="nav-badge" id="badgeNavApps">0</span>
+              </a>
+            </li>
+
+            <li>
+              <a class="nav-item" id="navTorrents" onclick="switchView('torrents')">
+                <div class="nav-left">
+                  <span class="nav-emoji">📥</span>
+                  <span>Descargas & Emby</span>
+                </div>
+                <span class="nav-badge" id="badgeNavTorrents">0</span>
+              </a>
+            </li>
+
+            <li>
+              <a class="nav-item" id="navProcesses" onclick="switchView('processes')">
+                <div class="nav-left">
+                  <span class="nav-emoji">⚙️</span>
+                  <span>Procesos</span>
+                </div>
+                <span class="nav-badge" id="badgeNavProc">0</span>
+              </a>
+            </li>
+
+          </ul>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="host-pill">
+          <span>Equipo: <strong id="lblHost">servidor</strong></span>
+          <span id="lblUptime">--</span>
+        </div>
+        <div class="trust-badge-row" onclick="openTrustDialog()" title="Haz clic para ver la autenticación Zero-Trust">
+          <span class="status-dot" id="dotTrust"></span>
+          <span id="lblTrust">Comprobando red...</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         MAIN CONTENT PANE (HEADERBAR + VIEWS)
+         ====================================================================== -->
+    <main class="content-pane">
+      
+      <header class="headerbar">
+        <div class="headerbar-left">
+          <button class="mobile-menu-btn" onclick="toggleSidebar()">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+          <div class="nav-history-controls">
+            <button class="btn-history" id="btnHistoryBack" onclick="navigateHistoryBack()" title="Atrás en el historial" disabled>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="btn-history" id="btnHistoryForward" onclick="navigateHistoryForward()" title="Adelante en el historial" disabled>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+          <div class="view-title" id="currentViewTitle">Vista General</div>
+        </div>
+
+        <div class="headerbar-right">
+          <!-- Dynamic Search Entry for Apps / Processes / Network -->
+          <div class="search-entry" id="searchBox" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="filterInput" placeholder="Filtrar..." oninput="onFilterChange()">
+          </div>
+
+          <button class="btn-header" onclick="openTrustDialog()" title="Seguridad de Acceso">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <span>Seguridad</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="content-scroll">
+
+        <!-- ==================================================================
+             0. VISTA GENERAL (OVERVIEW SUMMARY DASHBOARD)
+             ================================================================== -->
+        <div class="view-container" id="viewOverview">
+          
+          <!-- System Welcome Banner -->
+          <div class="hero-chart-card" style="padding: 22px 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <div class="app-icon-squircle" style="width: 48px; height: 48px; border-radius: 12px;">
+                  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                    <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                    <line x1="6" y1="6" x2="6.01" y2="6"/>
+                    <line x1="6" y1="18" x2="6.01" y2="18"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 style="font-size: 19px; font-weight: 700; letter-spacing: -0.3px; color: #ffffff;">Servidor Cminewar</h2>
+                  <p style="font-size: 12.5px; color: var(--adw-text-dim); margin-top: 2px;">
+                    <span id="ovSysOs">Arch Linux</span> • Kernel <span id="ovSysKernel">--</span> • Actividad: <strong id="ovSysUptime" style="color: var(--adw-text-secondary);">--</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <span class="adw-badge badge-green" id="ovBadgeStatus">
+                  <span class="status-dot" style="margin-right: 2px;"></span> Sistema Estable
+                </span>
+                <span class="adw-badge badge-blue" id="ovBadgeTrust">Red Local</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6-CARD OVERVIEW GRID -->
+          <div class="overview-grid">
+            
+            <!-- 1. CPU -->
+            <div class="overview-card" onclick="switchView('processor')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">⚡</span>
+                  <span>Procesador</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovCpuPercent">0.0%</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovCpuSub">Intel Xeon E5-2680 v4 (28 hilos)</div>
+              </div>
+
+              <div style="height: 48px; width: 100%;">
+                <canvas id="ovCanvasCpu" style="width: 100%; height: 100%;"></canvas>
+              </div>
+            </div>
+
+            <!-- 2. MEMORIA RAM -->
+            <div class="overview-card" onclick="switchView('memory')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">🧠</span>
+                  <span>Memoria RAM</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovRamUsed">0.0 GB</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovRamSub">de 15.5 GB (DDR4)</div>
+              </div>
+
+              <div style="height: 48px; width: 100%;">
+                <canvas id="ovCanvasRam" style="width: 100%; height: 100%;"></canvas>
+              </div>
+            </div>
+
+            <!-- 3. GPU NVIDIA -->
+            <div class="overview-card" onclick="switchView('gpu')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">🎮</span>
+                  <span>Tarjeta Gráfica</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovGpuVal">0% • 0 °C</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;">NVIDIA GeForce GTX 1650 (4 GB)</div>
+              </div>
+
+              <div style="height: 48px; width: 100%;">
+                <canvas id="ovCanvasGpu" style="width: 100%; height: 100%;"></canvas>
+              </div>
+            </div>
+
+            <!-- 4. RED & CONSUMOS -->
+            <div class="overview-card" onclick="switchView('network')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">🌐</span>
+                  <span>Red & Consumos</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovNetSpeed">↓ 0 B/s • ↑ 0 B/s</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovNetSub">20 dispositivos en red (3DS, Switch, PC)</div>
+              </div>
+
+              <div style="height: 48px; width: 100%;">
+                <canvas id="ovCanvasNet" style="width: 100%; height: 100%;"></canvas>
+              </div>
+            </div>
+
+            <!-- 5. ALMACENAMIENTO -->
+            <div class="overview-card" onclick="switchView('drives')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">💾</span>
+                  <span>Almacenamiento SSD</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovDiskRootUsage">SSD Raíz: --%</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovDiskSub">NVMe Btrfs + Synology NAS montado</div>
+              </div>
+
+              <div style="width: 100%; height: 7px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; margin-top: 10px;">
+                <div id="ovDiskBar" style="width: 0%; height: 100%; background: var(--adw-orange); border-radius: 4px; transition: width 0.3s ease;"></div>
+              </div>
+            </div>
+
+            <!-- 6. APLICACIONES DOCKER -->
+            <div class="overview-card" onclick="switchView('apps')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">🐳</span>
+                  <span>Aplicaciones (Docker)</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;" id="ovDockerCount">6 Activos</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;">Emby, Immich, Pi-hole, Caddy, NodeODM</div>
+              </div>
+
+              <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px;">
+                <span class="adw-badge badge-green">Todos en Ejecución</span>
+              </div>
+            </div>
+
+            <!-- 7. SEGURIDAD & DNS (PI-HOLE + FAIL2BAN) -->
+            <div class="overview-card" onclick="switchView('security')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">🛡️</span>
+                  <span>Seguridad & DNS</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px;" id="ovSecPihole">Pi-hole: 15.7k bloq. (44%)</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovSecF2b">Fail2ban: 60 IPs baneadas</div>
+              </div>
+
+              <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
+                <span class="adw-badge badge-green" style="font-size: 11px;"><span class="emoji">🛡️</span> Pi-hole Activo</span>
+                <span class="adw-badge badge-purple" style="font-size: 11px;"><span class="emoji">🔒</span> Fail2ban Activo</span>
+              </div>
+            </div>
+
+            <!-- 8. DESCARGAS & VIDEOTECA (QBITTORRENT + EMBY) -->
+            <div class="overview-card" onclick="switchView('torrents')">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px;">
+                  <span class="tile-emoji">📥</span>
+                  <span>Descargas & Videoteca</span>
+                </div>
+                <span class="row-arrow">→</span>
+              </div>
+
+              <div>
+                <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px;" id="ovTorrentSpeed">↓ 0 B/s • ↑ 0 B/s</div>
+                <div style="font-size: 12px; color: var(--adw-text-dim); margin-top: 2px;" id="ovTorrentSub">qBittorrent: 0 descargas activas</div>
+              </div>
+
+              <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
+                <span class="adw-badge badge-blue" style="font-size: 11px;" id="ovTorrentBadge"><span class="emoji">📥</span> qBittorrent</span>
+                <span class="adw-badge badge-purple" style="font-size: 11px;" id="ovEmbyBadge"><span class="emoji">🎬</span> Emby: 445 pelis • 2.8k caps</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        
+        <!-- ==================================================================
+             1. VISTA PROCESADOR (CPU)
+             ================================================================== -->
+        <div class="view-container" id="viewProcessor" style="display: none;">
+          <div class="hero-chart-card">
+            <div class="hero-top-row">
+              <div>
+                <div class="hero-metric-label">Uso del Procesador</div>
+                <div class="hero-metric-big">
+                  <span id="cpuBigPercent">0.0%</span>
+                  <span class="hero-metric-sub" id="cpuBigFreq">@ 0 MHz</span>
+                </div>
+              </div>
+              <span class="adw-badge badge-blue">Intel Xeon E5-2680 v4</span>
+            </div>
+            <div class="hero-chart-canvas-box">
+              <canvas id="canvasCpu"></canvas>
+            </div>
+          </div>
+
+          <div class="adw-group">
+            <div class="adw-group-title">Especificaciones del Sistema</div>
+            <div class="adw-card">
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                  </span>
+                  <div>
+                    <div class="row-label">Modelo del Procesador</div>
+                    <div class="row-sublabel" id="cpuModelDetailed">Intel Xeon Processor</div>
+                  </div>
+                </div>
+                <div class="row-value" id="cpuCoresLabel">14C / 28T</div>
+              </div>
+
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  </span>
+                  <div class="row-label">Frecuencia & Temperatura CPU</div>
+                </div>
+                <div class="row-value" id="cpuFreqVal">-- MHz</div>
+              </div>
+
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                  </span>
+                  <div class="row-label">Carga Media (Load Average 1m / 5m / 15m)</div>
+                </div>
+                <div class="row-value" id="cpuLoadVal">-- / -- / --</div>
+              </div>
+
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  </span>
+                  <div class="row-label">Tiempo de Actividad (Uptime)</div>
+                </div>
+                <div class="row-value" id="cpuUptimeVal">--</div>
+              </div>
+
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></svg>
+                  </span>
+                  <div class="row-label">Kernel Linux & Distribución</div>
+                </div>
+                <div class="row-value" id="cpuKernelVal">Ubuntu Linux</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="adw-group">
+            <div class="adw-group-title">Uso por Núcleo Lógico (28 Hilos)</div>
+            <div class="cores-adw-grid" id="cpuCoresGrid"></div>
+          </div>
+        </div>
+
+        <!-- ==================================================================
+             2. VISTA MEMORIA (RAM & SWAP)
+             ================================================================== -->
+        <div class="view-container" id="viewMemory" style="display: none;">
+          <div class="hero-chart-card">
+            <div class="hero-top-row">
+              <div>
+                <div class="hero-metric-label">Uso de Memoria Física</div>
+                <div class="hero-metric-big">
+                  <span id="ramBigUsed">0.0 GB</span>
+                  <span class="hero-metric-sub">de <span id="ramBigTotal">15.5 GB</span></span>
+                </div>
+              </div>
+              <span class="adw-badge badge-purple" id="ramPercentBadge">0% Usada</span>
+            </div>
+            <div class="hero-chart-canvas-box">
+              <canvas id="canvasRam"></canvas>
+            </div>
+          </div>
+
+          <div class="adw-group">
+            <div class="adw-group-title">Desglose de Memoria RAM</div>
+            <div class="adw-card">
+              <div class="adw-action-row">
+                <div class="row-label">Memoria Usada por Procesos</div>
+                <div class="row-value" id="ramUsedVal" style="color: var(--adw-purple);">0 MB</div>
+              </div>
+              <div class="adw-action-row">
+                <div class="row-label">Memoria Disponible</div>
+                <div class="row-value" id="ramAvailVal" style="color: var(--adw-green);">0 MB</div>
+              </div>
+              <div class="adw-action-row">
+                <div class="row-label">Memoria en Caché & Búferes</div>
+                <div class="row-value" id="ramCachedVal">0 MB</div>
+              </div>
+              <div class="adw-action-row">
+                <div class="row-label">Total Físico Instalado</div>
+                <div class="row-value">15.5 GiB DDR4 2133 MHz</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="adw-group">
+            <div class="adw-group-title">Espacio de Intercambio (Swap)</div>
+            <div class="adw-card">
+              <div class="adw-action-row">
+                <div class="row-label">Swap Usada / Total</div>
+                <div class="row-value" id="swapUsageVal">0 B / 0 B</div>
+              </div>
+              <div class="adw-action-row">
+                <div class="row-label">Estado de la Paginación</div>
+                <div class="row-value" style="color: var(--adw-green);">Óptimo (Zram/Disco inactivo)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================================================================
+             3. VISTA TARJETA GRÁFICA (GPU)
+             ================================================================== -->
+        <div class="view-container" id="viewGpu" style="display: none;">
+          <div class="hero-chart-card">
+            <div class="hero-top-row">
+              <div>
+                <div class="hero-metric-label">Uso de GPU NVIDIA</div>
+                <div class="hero-metric-big">
+                  <span id="gpuBigPercent">0%</span>
+                  <span class="hero-metric-sub" id="gpuBigTemp">@ 0 °C</span>
+                </div>
+              </div>
+              <span class="adw-badge badge-green" id="gpuModelBadge">GeForce GTX 1650</span>
+            </div>
+            <div class="hero-chart-canvas-box">
+              <canvas id="canvasGpu"></canvas>
+            </div>
+          </div>
+
+          <div class="adw-group">
+            <div class="adw-group-title">Hardware & Telemetría GPU</div>
+            <div class="adw-card">
+              <div class="adw-action-row">
+                <div class="row-label">Memoria de Vídeo VRAM</div>
+                <div class="row-value" id="gpuVramVal">0 / 4096 MB</div>
+              </div>
+              <div class="adw-action-row">
+                <div class="row-label">Temperatura del Chip</div>
+                <div class="row-value" id="gpuTempVal">0 °C</div>
+              </div>
+              <div class="adw-action-row">
+                <div class="row-label">Velocidad del Ventilador (Fan)</div>
+                <div class="row-value" id="gpuFanVal">0% (Silencioso)</div>
+              </div>
+              <div class="adw-action-row">
+                <div class="row-label">Controlador Oficial NVIDIA</div>
+                <div class="row-value" id="gpuDriverVal">Proprietary Driver</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="adw-group">
+            <div class="adw-group-title">Procesos Gráficos & CUDA Activos</div>
+            <div class="adw-card" id="gpuProcCard">
+              <div class="adw-action-row" style="color: var(--adw-text-dim); justify-content: center;">
+                No hay aplicaciones aceleradas por GPU en este momento
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================================================================
+             4. VISTA ALMACENAMIENTO (DISKS)
+             ================================================================== -->
+        <div class="view-container" id="viewDrives" style="display: none;">
+          <div class="hero-chart-card">
+            <div class="hero-top-row">
+              <div>
+                <div class="hero-metric-label">Actividad de Entrada / Salida (E/S)</div>
+                <div class="hero-metric-big">
+                  <span id="diskBigW">0.0 MB/s</span>
+                  <span class="hero-metric-sub">Escritura • Lectura: <strong id="diskBigR">0.0 MB/s</strong></span>
+                </div>
+              </div>
+              <span class="adw-badge badge-blue">NVMe & Red NAS</span>
+            </div>
+            <div class="hero-chart-canvas-box">
+              <canvas id="canvasDisk"></canvas>
+            </div>
+          </div>
+
+          <div class="adw-group">
+            <div class="adw-group-title">Unidades de Almacenamiento & Particiones</div>
+            <div id="drivesList" style="display: flex; flex-direction: column; gap: 12px;"></div>
+          </div>
+        </div>
+
+        <!-- ==================================================================
+             5. VISTA RED (CABLE & WI-FI)
+             ================================================================== -->
+        <div class="view-container" id="viewNetwork" style="display: none;">
+          <div class="hero-chart-card">
+            <div class="hero-top-row">
+              <div>
+                <div class="hero-metric-label">Tráfico de Red en Vivo</div>
+                <div class="hero-metric-big">
+                  <span id="netBigRx" style="color: var(--adw-green);">↓ 0.0 KB/s</span>
+                  <span class="hero-metric-sub" id="netBigTx" style="color: #78aeed;">↑ 0.0 KB/s</span>
+                </div>
+              </div>
+              <span class="adw-badge badge-blue">Ethernet Gigabit & Wi-Fi 6</span>
+            </div>
+            <div class="hero-chart-canvas-box">
+              <canvas id="canvasNet"></canvas>
+            </div>
+          </div>
+
+          <!-- Tráfico Acumulado: Cable vs Wi-Fi -->
+          <div class="adw-group">
+            <div class="adw-group-title">Consumo Total de Datos Acumulados</div>
+            <div class="adw-card">
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon" style="color: #c061cb;">
+                    <span class="emoji" style="font-size: 20px;">🔌</span>
+                  </span>
+                  <div>
+                    <div class="row-label">Conexiones de Cable (Ethernet)</div>
+                    <div class="row-sublabel">Switches Gigabit, Servidor & Router Uplink</div>
+                  </div>
+                </div>
+                <div class="row-value" id="netCableTrafficVal">↓ 0 B • ↑ 0 B</div>
+              </div>
+
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon" style="color: #57e389;">
+                    <span class="emoji" style="font-size: 20px;">📶</span>
+                  </span>
+                  <div>
+                    <div class="row-label">Conexiones Inalámbricas (Wi-Fi)</div>
+                    <div class="row-sublabel">Consolas, Móviles, Tablets & Repetidor ASUS</div>
+                  </div>
+                </div>
+                <div class="row-value" id="netWifiTrafficVal">↓ 0 B • ↑ 0 B</div>
+              </div>
+
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon" style="color: #78aeed;">
+                    <span class="emoji" style="font-size: 20px;">📡</span>
+                  </span>
+                  <div>
+                    <div class="row-label">Repetidor ASUS RT-AX56U</div>
+                    <div class="row-sublabel">192.168.50.10 • Modo Repetidor Wi-Fi 6</div>
+                  </div>
+                </div>
+                <div class="row-value" id="netSyncVal">Sondeo: --</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dispositivos y Clientes -->
+          <div class="adw-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <div class="adw-group-title">Dispositivos en Red (<span id="cntDevicesTotal">0</span>)</div>
+              
+              <!-- Segmented filter buttons with clear, colorful emojis -->
+              <div class="segmented-pills">
+                <button class="pill-btn active" id="fNetAll" onclick="setNetSubfilter('all')">
+                  <span class="emoji">🌐</span> Todos (<span id="cntFAll">0</span>)
+                </button>
+                <button class="pill-btn" id="fNetCable" onclick="setNetSubfilter('cable')">
+                  <span class="emoji">🔌</span> Cable (<span id="cntFCable">0</span>)
+                </button>
+                <button class="pill-btn" id="fNet5g" onclick="setNetSubfilter('5g')">
+                  <span class="emoji">📡</span> 5 GHz (<span id="cntF5g">0</span>)
+                </button>
+                <button class="pill-btn" id="fNet24g" onclick="setNetSubfilter('24g')">
+                  <span class="emoji">📶</span> 2.4 GHz (<span id="cntF24g">0</span>)
+                </button>
+              </div>
+            </div>
+
+            <div class="adw-card" id="networkDevicesList">
+              <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 28px;">
+                Cargando dispositivos de la red...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================================================================
+             VISTA SEGURIDAD & DNS (PI-HOLE + FAIL2BAN)
+             ================================================================== -->
+        <div class="view-container" id="viewSecurity" style="display: none;">
+          <!-- Hero Card de Seguridad Activa -->
+          <div class="hero-chart-card" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; margin-bottom: 20px;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <div class="app-icon-squircle" style="background: rgba(51, 209, 122, 0.12); color: var(--adw-green); width: 48px; height: 48px; border-radius: 12px;">
+                  <span class="emoji" style="font-size: 26px;">🛡️</span>
+                </div>
+                <div>
+                  <h2 style="font-size: 19px; font-weight: 700; letter-spacing: -0.3px; color: #ffffff;">Protección Activa del Servidor</h2>
+                  <p style="font-size: 12.5px; color: var(--adw-text-dim); margin-top: 2px;">
+                    DNS Sinkhole (Pi-hole FTL) y Prevención de Intrusiones (Fail2ban IPS)
+                  </p>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <span class="adw-badge badge-green" id="secPiholeBadge"><span class="emoji">🛡️</span> Pi-hole Online</span>
+                <span class="adw-badge badge-purple" id="secF2bBadge"><span class="emoji">🔒</span> Fail2ban Online</span>
+              </div>
+            </div>
+
+            <!-- Grid de 4 Métricas Clave -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+              <div class="adw-card" style="padding: 16px; margin: 0; background: rgba(255,255,255,0.03);">
+                <div style="font-size: 11.5px; font-weight: 600; color: var(--adw-text-dim); text-transform: uppercase; letter-spacing: 0.5px;">Lista Negra Pi-hole</div>
+                <div style="font-size: 24px; font-weight: 800; color: #ffffff; margin-top: 4px; font-family: var(--font-mono);" id="secDomBlocked">--</div>
+                <div style="font-size: 11.5px; color: var(--adw-green); margin-top: 2px;">Dominios bloqueados</div>
+              </div>
+
+              <div class="adw-card" style="padding: 16px; margin: 0; background: rgba(255,255,255,0.03);">
+                <div style="font-size: 11.5px; font-weight: 600; color: var(--adw-text-dim); text-transform: uppercase; letter-spacing: 0.5px;">Consultas DNS Hoy</div>
+                <div style="font-size: 24px; font-weight: 800; color: #78aeed; margin-top: 4px; font-family: var(--font-mono);" id="secQueriesToday">--</div>
+                <div style="font-size: 11.5px; color: var(--adw-text-dim); margin-top: 2px;">Peticiones resueltas</div>
+              </div>
+
+              <div class="adw-card" style="padding: 16px; margin: 0; background: rgba(255,255,255,0.03);">
+                <div style="font-size: 11.5px; font-weight: 600; color: var(--adw-text-dim); text-transform: uppercase; letter-spacing: 0.5px;">Ratio de Bloqueo</div>
+                <div style="font-size: 24px; font-weight: 800; color: var(--adw-green); margin-top: 4px; font-family: var(--font-mono);" id="secAdsPct">--%</div>
+                <div style="font-size: 11.5px; color: var(--adw-text-dim); margin-top: 2px;" id="secAdsBlockedSub">-- bloqueados</div>
+              </div>
+
+              <div class="adw-card" style="padding: 16px; margin: 0; background: rgba(255,255,255,0.03);">
+                <div style="font-size: 11.5px; font-weight: 600; color: var(--adw-text-dim); text-transform: uppercase; letter-spacing: 0.5px;">IPs Maliciosas Baneadas</div>
+                <div style="font-size: 24px; font-weight: 800; color: var(--adw-orange); margin-top: 4px; font-family: var(--font-mono);" id="secBannedIps">--</div>
+                <div style="font-size: 11.5px; color: var(--adw-text-dim); margin-top: 2px;" id="secTotalBannedSub">-- ataques neutralizados</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Dominios Bloqueados de Pi-hole -->
+          <div class="adw-group">
+            <div class="adw-group-title">Pi-hole DNS: Top Dominios y Rastreadores Bloqueados Hoy</div>
+            <div class="adw-card" id="secTopBlockedList">
+              <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 24px;">
+                Cargando estadísticas de telemetría y dominios...
+              </div>
+            </div>
+          </div>
+
+          <!-- Estado de Jaulas Fail2ban -->
+          <div class="adw-group">
+            <div class="adw-group-title">Fail2ban IPS: Jaulas de Protección Activas</div>
+            <div class="adw-card" id="secJailsList">
+              <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 24px;">
+                Cargando estado de jaulas de seguridad...
+              </div>
+            </div>
+          </div>
+
+          <!-- Gestión y Ajustes de Bloqueos Fail2ban & Nextcloud -->
+          <div class="adw-group">
+            <div class="adw-group-title">Ajustes y Gestión Manual de Bloqueos (Fail2ban & Nextcloud)</div>
+            <div class="adw-card" style="padding: 18px;">
+              <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+                <div style="flex: 1; min-width: 200px;">
+                  <label style="display: block; font-size: 12px; font-weight: 600; color: var(--adw-text-dim); margin-bottom: 6px;">Dirección IP objetivo</label>
+                  <input type="text" id="f2bInputIp" placeholder="Ej: 198.51.100.42" style="width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #ffffff; font-family: var(--font-mono); font-size: 13px; outline: none; box-sizing: border-box;">
+                </div>
+                <div style="min-width: 170px;">
+                  <label style="display: block; font-size: 12px; font-weight: 600; color: var(--adw-text-dim); margin-bottom: 6px;">Cárcel / Servicio</label>
+                  <select id="f2bSelectJail" style="width: 100%; padding: 10px 14px; background: #242424; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #ffffff; font-size: 13px; outline: none; box-sizing: border-box;">
+                    <option value="nextcloud">☁️ Nextcloud</option>
+                    <option value="sshd">🔐 SSH</option>
+                    <option value="caddy-scan">🌐 Caddy / Web</option>
+                    <option value="recidive">🛑 Recidive</option>
+                    <option value="all">⚡ Todas las cárceles</option>
+                  </select>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button onclick="handleF2bAction('unban')" class="pill-btn active" style="padding: 10px 16px; background: rgba(51, 209, 122, 0.2); color: var(--adw-green); border: 1px solid var(--adw-green); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                    <span>🔓</span> Desbloquear IP
+                  </button>
+                  <button onclick="handleF2bAction('ban')" class="pill-btn" style="padding: 10px 16px; background: rgba(237, 51, 59, 0.2); color: var(--adw-red); border: 1px solid var(--adw-red); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                    <span>⛔</span> Bloquear IP
+                  </button>
+                </div>
+              </div>
+              <div id="f2bActionMsg" style="margin-top: 12px; font-size: 12.5px; display: none; padding: 8px 12px; border-radius: 6px;"></div>
+            </div>
+          </div>
+
+          <!-- Nube y Listado de IPs Bloqueadas (Activas e Historial Todo el Tiempo) -->
+          <div class="adw-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div class="adw-group-title" style="margin-bottom: 0;">Registro de Bloqueos Fail2ban</div>
+                <div class="pills-container" style="display: inline-flex; background: rgba(255,255,255,0.05); padding: 3px; border-radius: var(--radius-pill); border: 1px solid rgba(255,255,255,0.08);">
+                  <button class="pill-btn active" id="tabF2bActive" onclick="switchF2bTab('active')">
+                    🛡️ Activos Ahora (<span id="secBannedCount">0</span>)
+                  </button>
+                  <button class="pill-btn" id="tabF2bHistory" onclick="switchF2bTab('history')">
+                    📜 Todo el Tiempo (<span id="secHistoryCount">0</span>)
+                  </button>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <select id="secJailFilter" onchange="filterF2bData()" style="padding: 6px 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #ffffff; font-size: 12px; font-family: var(--font-mono); outline: none;">
+                  <option value="all">Todas las jaulas</option>
+                  <option value="sshd">sshd (SSH)</option>
+                  <option value="nextcloud">nextcloud (Web/DAV)</option>
+                  <option value="caddy-bad-bots">caddy-bad-bots (HTTP)</option>
+                  <option value="recidive">recidive (Reincidentes)</option>
+                </select>
+                <input type="text" id="secIpSearch" oninput="filterF2bData()" placeholder="Buscar IP, cárcel o fecha..." style="padding: 6px 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #ffffff; font-size: 12px; font-family: var(--font-mono); outline: none; min-width: 190px;">
+              </div>
+            </div>
+
+            <!-- Vista 1: Nube de IPs actualmente activas -->
+            <div id="secActiveContainer" class="adw-card" style="padding: 16px;">
+              <div id="secBannedIpsCloud" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <div style="color: var(--adw-text-dim); font-size: 12px; padding: 8px;">No hay IPs baneadas actualmente</div>
+              </div>
+            </div>
+
+            <!-- Vista 2: Tabla de Historial Todo el Tiempo (Ordenable por Columnas) -->
+            <div id="secHistoryContainer" class="adw-card" style="padding: 0; display: none; overflow: hidden;">
+              <div style="padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.07); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+                <span style="font-size: 12.5px; color: var(--adw-text-dim);">Historial acumulado de ataques neutralizados en el servidor (haz clic en los títulos para ordenar)</span>
+                <span id="secHistorySummary" style="font-size: 12px; font-family: var(--font-mono); color: var(--adw-blue); font-weight: 600;">0 registros</span>
+              </div>
+              <div style="max-height: 480px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: left;">
+                  <thead>
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: var(--adw-text-dim); font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                      <th onclick="setF2bSort('ip')" style="padding: 10px 16px; cursor: pointer; user-select: none;" title="Ordenar por Dirección IP">
+                        Dirección IP <span id="sortIcon_ip" style="color: var(--adw-blue); font-size: 10px;">▲</span>
+                      </th>
+                      <th onclick="setF2bSort('jail')" style="padding: 10px 16px; cursor: pointer; user-select: none;" title="Ordenar por Servicio/Jaula">
+                        Jaula / Servicio <span id="sortIcon_jail" style="color: var(--adw-blue); font-size: 10px;"></span>
+                      </th>
+                      <th onclick="setF2bSort('date')" style="padding: 10px 16px; cursor: pointer; user-select: none;" title="Ordenar por Fecha">
+                        Fecha de Bloqueo <span id="sortIcon_date" style="color: var(--adw-blue); font-size: 10px;"></span>
+                      </th>
+                      <th onclick="setF2bSort('bancount')" style="padding: 10px 16px; text-align: center; cursor: pointer; user-select: none;" title="Ordenar por Reincidencia">
+                        Reincidencia <span id="sortIcon_bancount" style="color: var(--adw-blue); font-size: 10px;"></span>
+                      </th>
+                      <th onclick="setF2bSort('is_active')" style="padding: 10px 16px; text-align: center; cursor: pointer; user-select: none;" title="Ordenar por Estado">
+                        Estado <span id="sortIcon_is_active" style="color: var(--adw-blue); font-size: 10px;"></span>
+                      </th>
+                      <th style="padding: 10px 16px; text-align: right;">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="secHistoryTableBody">
+                    <tr>
+                      <td colspan="6" style="padding: 24px; text-align: center; color: var(--adw-text-dim);">Cargando historial de bloqueos...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================================================================
+             6. VISTA APLICACIONES (DOCKER & SERVICIOS NATIVOS)
+             ================================================================== -->
+        <div class="view-container" id="viewApps" style="display: none;">
+          <div class="adw-group">
+            <div class="adw-group-title">Servicios Nativos Principales (Systemd)</div>
+            <div class="adw-card" id="systemdAppsList">
+              <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 20px;">
+                Cargando servicios de sistema...
+              </div>
+            </div>
+          </div>
+
+          <div class="adw-group">
+            <div class="adw-group-title">Contenedores Docker (<span id="cntApps">0</span>)</div>
+            <div class="adw-card" id="dockerAppsList">
+              <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 28px;">
+                Cargando contenedores Docker...
+              </div>
+            </div>
+          </div>
+
+          <div class="adw-group">
+            <div class="adw-group-title">Descargas qBittorrent & Control Parental</div>
+            <div class="adw-card" id="torrentsAppsList">
+              <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 20px;">
+                Cargando actividad de torrents...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================================================================
+             8. VISTA DESCARGAS & VIDEOTECA (TORRENTS & EMBY)
+             ================================================================== -->
+        <div class="view-container" id="viewTorrents" style="display: none;">
+          
+          <!-- Hero Header Card -->
+          <div class="hero-chart-card" style="padding: 22px 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <div class="app-icon-squircle" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(53, 132, 228, 0.2); color: #3584e4; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+                  📥
+                </div>
+                <div>
+                  <h2 style="font-size: 19px; font-weight: 700; letter-spacing: -0.3px; color: #ffffff;">Descargas Torrent & Videoteca</h2>
+                  <p style="font-size: 12.5px; color: var(--adw-text-dim); margin-top: 2px;">
+                    qBittorrent en vivo • Base de datos SQLite de Emby (<code style="color: var(--adw-accent); font-family: monospace;">library.db</code>)
+                  </p>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <span class="adw-badge badge-green" id="torrentLiveStatus">
+                  <span class="status-dot" style="margin-right: 2px;"></span> Conectado
+                </span>
+                <a href="http://192.168.50.2:8082" target="_blank" class="btn-header" style="text-decoration: none;" title="Abrir WebUI qBittorrent">
+                  <span>qBittorrent</span>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                </a>
+                <a href="http://192.168.50.2:8096" target="_blank" class="btn-header" style="text-decoration: none;" title="Abrir Emby Server">
+                  <span>Emby</span>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4-Card Summary Grid -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 20px;">
+            <!-- 1. Velocidad Descarga -->
+            <div class="adw-card" style="padding: 16px 18px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 12.5px; font-weight: 600; color: var(--adw-text-dim);">Velocidad Descarga</span>
+                <span style="font-size: 16px; color: #57e389;">↓</span>
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #57e389;" id="torrentStatsDlSpeed">0 B/s</div>
+              <div style="font-size: 11.5px; color: var(--adw-text-dim); margin-top: 4px;" id="torrentStatsDlTotal">Total: 0 GB</div>
+            </div>
+
+            <!-- 2. Velocidad Subida -->
+            <div class="adw-card" style="padding: 16px 18px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 12.5px; font-weight: 600; color: var(--adw-text-dim);">Velocidad Subida</span>
+                <span style="font-size: 16px; color: #3584e4;">↑</span>
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #3584e4;" id="torrentStatsUpSpeed">0 B/s</div>
+              <div style="font-size: 11.5px; color: var(--adw-text-dim); margin-top: 4px;" id="torrentStatsUpTotal">Total: 0 GB</div>
+            </div>
+
+            <!-- 3. Actividad Torrents -->
+            <div class="adw-card" style="padding: 16px 18px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 12.5px; font-weight: 600; color: var(--adw-text-dim);">Torrents en qBittorrent</span>
+                <span style="font-size: 16px;">⚡</span>
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #ffffff;" id="torrentStatsActiveCount">0 Torrents</div>
+              <div style="font-size: 11.5px; color: var(--adw-text-dim); margin-top: 4px;" id="torrentStatsSubCount">0 descargando • 0 sembrando</div>
+            </div>
+
+            <!-- 4. Catálogo Emby -->
+            <div class="adw-card" style="padding: 16px 18px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 12.5px; font-weight: 600; color: var(--adw-text-dim);">Videoteca Emby</span>
+                <span style="font-size: 16px;">🎬</span>
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #f6d32d;" id="embyStatsMediaCount">-- Medios</div>
+              <div style="font-size: 11.5px; color: var(--adw-text-dim); margin-top: 4px;" id="embyStatsSub">-- Películas • -- Series</div>
+            </div>
+          </div>
+
+          <!-- Section 1: Descargas de qBittorrent en Vivo -->
+          <div class="adw-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div class="adw-group-title" style="margin-bottom: 0;">Descargas Activas (qBittorrent)</div>
+              <span class="adw-badge badge-blue" id="torrentCountBadge">0 descargas</span>
+            </div>
+            <div class="adw-card" id="torrentsFullListContainer">
+              <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 24px;">
+                Cargando descargas de qBittorrent...
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Catálogo Reciente de Emby (library.db) -->
+          <div class="adw-group" style="margin-top: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div class="adw-group-title" style="margin-bottom: 0;">Últimas Incorporaciones a la Videoteca (Emby SQLite)</div>
+              <span class="adw-badge badge-purple" id="embyRecentBadge">library.db</span>
+            </div>
+            <div class="adw-card" id="embyRecentListContainer">
+              <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 24px;">
+                Cargando historial de la base de datos de Emby...
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ==================================================================
+             7. VISTA PROCESOS
+             ================================================================== -->
+        <div class="view-container" id="viewProcesses" style="display: none;">
+          <div class="adw-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div class="adw-group-title">Procesos del Sistema (<span id="cntProcesses">0</span>)</div>
+              
+              <div class="segmented-pills">
+                <button class="pill-btn active" id="btnSortCpu" onclick="setProcSort('cpu_percent')">CPU %</button>
+                <button class="pill-btn" id="btnSortRam" onclick="setProcSort('priv_mb')">Memoria</button>
+                <button class="pill-btn" id="btnSortPid" onclick="setProcSort('pid')">PID</button>
+                <button class="pill-btn" id="btnSortName" onclick="setProcSort('name')">Nombre</button>
+              </div>
+            </div>
+
+            <div class="adw-card" id="processesList">
+              <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 28px;">
+                Cargando lista de procesos...
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ======================================================================
+       MODAL DIALOG: DISPOSITIVOS AUTORIZADOS ZERO-TRUST
+       ====================================================================== -->
+  <div class="modal-overlay" id="trustDialog" onclick="if(event.target===this) closeTrustDialog()">
+    <div class="adw-dialog">
+      <div class="adw-dialog-header">
+        <h3>Dispositivos Autorizados</h3>
+        <button class="adw-dialog-close" onclick="closeTrustDialog()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="adw-dialog-body">
+        <p style="font-size: 13px; color: var(--adw-text-secondary); margin-bottom: 16px; line-height: 1.5;">
+          El sistema otorga un pase criptográfico a los dispositivos que se conectan de manera local a tu Wi-Fi para que puedan consultar este monitor de forma segura desde el exterior (<code style="color: #78aeed;">cminewar.duckdns.org</code>).
+        </p>
+
+        <div class="adw-card" id="trustDevicesCard" style="max-height: 280px; overflow-y: auto;">
+          <div class="adw-action-row" style="text-align: center; color: var(--adw-text-dim); justify-content: center; padding: 18px;">
+            Cargando dispositivos autorizados...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       REACTIVE CONTROLLER ENGINE (PURE JS, ZERO DEPENDENCIES)
+       ====================================================================== -->
+  <script>
+    let activeView = 'overview';
+    let latestMetrics = null;
+    let netSubfilter = 'all';
+    let procSort = 'cpu_percent';
+    let procSortAsc = false;
+
+    // Historial de Navegación (Adelante / Atrás)
+    let historyStack = [];
+    let historyIdx = -1;
+
+    function updateHistoryButtons() {
+      const btnBack = document.getElementById('btnHistoryBack');
+      const btnFwd = document.getElementById('btnHistoryForward');
+      if (btnBack) btnBack.disabled = (historyIdx <= 0);
+      if (btnFwd) btnFwd.disabled = (historyIdx >= historyStack.length - 1);
+    }
+
+    function navigateHistoryBack() {
+      if (historyIdx > 0) {
+        window.history.back();
+      }
+    }
+
+    function navigateHistoryForward() {
+      if (historyIdx < historyStack.length - 1) {
+        window.history.forward();
+      }
+    }
+
+    // Selector de Vistas Reactivo
+    function switchView(viewName, pushState = true) {
+      const views = ['overview', 'processor', 'memory', 'gpu', 'drives', 'network', 'security', 'apps', 'torrents', 'processes'];
+      if (!views.includes(viewName)) {
+        viewName = 'overview';
+      }
+
+      if (pushState) {
+        if (historyStack[historyIdx] !== viewName) {
+          historyStack = historyStack.slice(0, historyIdx + 1);
+          historyStack.push(viewName);
+          historyIdx = historyStack.length - 1;
+          try {
+            window.history.pushState({ view: viewName, idx: historyIdx }, '', '#' + viewName);
+          } catch(e) {}
+        }
+      }
+      updateHistoryButtons();
+
+      activeView = viewName;
+
+      const titles = {
+        overview: 'Vista General',
+        processor: 'Procesador',
+        memory: 'Memoria',
+        gpu: 'Tarjeta Gráfica',
+        drives: 'Almacenamiento',
+        network: 'Red & Consumos',
+        security: 'Seguridad & DNS',
+        apps: 'Aplicaciones (Docker)',
+        torrents: 'Descargas & Videoteca',
+        processes: 'Procesos'
+      };
+
+      views.forEach(v => {
+        const navEl = document.getElementById('nav' + v.charAt(0).toUpperCase() + v.slice(1));
+        const viewEl = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
+        if (navEl) navEl.classList.toggle('active', v === viewName);
+        if (viewEl) viewEl.style.display = (v === viewName) ? 'flex' : 'none';
+      });
+
+      document.getElementById('currentViewTitle').innerText = titles[viewName] || 'Recursos';
+
+      // Toggle search entry for apps/processes/network/torrents
+      const searchBox = document.getElementById('searchBox');
+      if (viewName === 'apps' || viewName === 'processes' || viewName === 'network' || viewName === 'torrents') {
+        searchBox.style.display = 'flex';
+        document.getElementById('filterInput').placeholder = viewName === 'network' ? 'Buscar IP, MAC o nombre...' : (viewName === 'torrents' ? 'Buscar torrent o medio...' : 'Filtrar lista...');
+      } else {
+        searchBox.style.display = 'none';
+      }
+
+      // Close mobile sidebar if open
+      document.getElementById('appSidebar').classList.remove('open');
+
+      renderActiveView();
+    }
+
+    // Escuchar navegación del navegador (Atrás / Adelante con gestos o botones)
+    window.addEventListener('popstate', (e) => {
+      const hash = window.location.hash.replace('#', '') || 'overview';
+      if (e.state && typeof e.state.idx === 'number') {
+        historyIdx = e.state.idx;
+      } else {
+        const found = historyStack.lastIndexOf(hash);
+        if (found !== -1) historyIdx = found;
+      }
+      switchView(hash, false);
+      updateHistoryButtons();
+    });
+
+    function toggleSidebar() {
+      document.getElementById('appSidebar').classList.toggle('open');
+    }
+
+    function onFilterChange() {
+      renderActiveView();
+    }
+
+    function setNetSubfilter(sub) {
+      netSubfilter = sub;
+      ['all', 'cable', '5g', '24g'].forEach(s => {
+        const btn = document.getElementById('fNet' + (s === 'all' ? 'All' : (s === 'cable' ? 'Cable' : (s === '5g' ? '5g' : '24g'))));
+        if (btn) btn.classList.toggle('active', s === sub);
+      });
+      renderActiveView();
+    }
+
+    function setProcSort(field) {
+      if (procSort === field) {
+        procSortAsc = !procSortAsc;
+      } else {
+        procSort = field;
+        procSortAsc = false;
+      }
+      ['Cpu', 'Ram', 'Pid', 'Name'].forEach(k => {
+        const btn = document.getElementById('btnSort' + k);
+        const match = (k === 'Cpu' && field === 'cpu_percent') || (k === 'Ram' && field === 'priv_mb') || (k === 'Pid' && field === 'pid') || (k === 'Name' && field === 'name');
+        if (btn) btn.classList.toggle('active', match);
+      });
+      renderActiveView();
+    }
+
+    // Formatters
+    function formatBytes(bytes, decimals = 1) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    function formatSpeed(bytesPerSec) {
+      if (!bytesPerSec || bytesPerSec === 0) return '0.0 KB/s';
+      if (bytesPerSec < 1024) return bytesPerSec.toFixed(0) + ' B/s';
+      if (bytesPerSec < 1024 * 1024) return (bytesPerSec / 1024).toFixed(1) + ' KB/s';
+      return (bytesPerSec / (1024 * 1024)).toFixed(2) + ' MB/s';
+    }
+
+    function formatDuration(sec) {
+      if (!sec || sec <= 0) return '0s';
+      const d = Math.floor(sec / 86400);
+      const h = Math.floor((sec % 86400) / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      if (d > 0) return `${d}d ${h}h`;
+      if (h > 0) return `${h}h ${m}m`;
+      return `${m}m`;
+    }
+
+    // High-DPI Smooth Libadwaita Curves
+    function drawAdwaitaChart(canvasId, series1, color1, series2 = null, color2 = null, fixedMax = 100) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+      }
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Subtle horizontal gridlines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 3; i++) {
+        const y = (h / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      function renderLine(data, strokeColor, fillColor) {
+        if (!data || data.length < 2) return;
+        let maxVal = fixedMax;
+        if (maxVal === null) {
+          maxVal = Math.max(...data, 1);
+        }
+
+        const step = w / (data.length - 1);
+        const points = data.map((val, idx) => ({
+          x: idx * step,
+          y: h - (Math.min(Math.max(val, 0), maxVal) / maxVal) * (h - 6) - 3
+        }));
+
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 0; i < points.length - 1; i++) {
+          const xc = (points[i].x + points[i + 1].x) / 2;
+          const yc = (points[i].y + points[i + 1].y) / 2;
+          ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+        }
+        ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        if (fillColor) {
+          ctx.lineTo(w, h);
+          ctx.lineTo(0, h);
+          ctx.closePath();
+          const grad = ctx.createLinearGradient(0, 0, 0, h);
+          grad.addColorStop(0, fillColor);
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
+      }
+
+      if (series2) {
+        renderLine(series2, color2, null);
+      }
+      renderLine(series1, color1, color1.replace(')', ', 0.25)').replace('rgb', 'rgba'));
+      ctx.restore();
+    }
+
+    // Device Icons & Emojis
+    function getDeviceEmoji(type) {
+      if (type === 'server' || type === 'nas') return '🖥️';
+      if (type === 'router' || type === 'network') return '🌐';
+      if (type === 'gamepad' || type === 'xbox' || type === 'game_console' || type === 'nintendo') return '🎮';
+      if (type === 'mobile' || type === 'phone') return '📱';
+      if (type === 'tablet') return '📱';
+      if (type === 'tv' || type === 'smart_tv') return '📺';
+      if (type === 'speaker') return '🔊';
+      if (type === 'plug' || type === 'iot') return '💡';
+      if (type === 'laptop' || type === 'computer') return '💻';
+      return '📶';
+    }
+
+    // Logos Oficiales de Empresas y Fabricantes (SVG Vectoriales Optimizados)
+    function getBrandLogoSvg(brand) {
+      const b = (brand || '').toLowerCase();
+      switch(b) {
+        case 'nintendo':
+          // Icono oficial estilo Nintendo / Switch Joy-Cons
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#e60012"><path d="M11 2.05C6.05 2.55 2.15 6.64 2 11.6v.8c.15 4.96 4.05 9.05 9 9.55v-2c-3.86-.48-6.9-3.66-7-7.55v-.8c.1-3.89 3.14-7.07 7-7.55V2.05zM7 7.5c-1.38 0-2.5 1.12-2.5 2.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5-1.12-2.5-2.5-2.5zm6 0v14.45c4.95-.5 8.85-4.59 9-9.55v-.8c-.15-4.96-4.05-9.05-9-9.55V7.5zm4 7c-1.38 0-2.5 1.12-2.5 2.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5-1.12-2.5-2.5-2.5z"/></svg>`;
+        case 'xbox':
+          // Icono esfera oficial Xbox
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#107c10"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 3.25c2.32 0 4.44.86 6.06 2.29-1.25 1.13-2.92 2.45-5.06 4.14-2.14-1.69-3.81-3.01-5.06-4.14A10.23 10.23 0 0 1 12 3.25zm-7.7 3.52c1.37 1.25 3.23 2.76 5.58 4.62-1.92 2.23-3.9 5.25-5.26 8.52A9.97 9.97 0 0 1 4.3 6.77zm15.4 0c-.8 2.05-2.02 4.65-3.62 7.02-1.36-3.27-3.34-6.29-5.26-8.52 2.35-1.86 4.21-3.37 5.58-4.62a9.97 9.97 0 0 1 3.3 6.12zM12 21.75c-2.32 0-4.44-.86-6.06-2.29 1.4-1.27 3.25-2.8 5.06-4.14 1.81 1.34 3.66 2.87 5.06 4.14-1.62 1.43-3.74 2.29-6.06 2.29z"/></svg>`;
+        case 'samsung':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#3584e4"><path d="M2.5 12c0-3.5 4.25-6.5 9.5-6.5s9.5 3 9.5 6.5-4.25 6.5-9.5 6.5-9.5-3-9.5-6.5zm3.8 1.1c.3.7 1.1 1.1 2.2 1.1 1.3 0 2-.6 2-1.4 0-.8-.7-1.1-1.8-1.4l-.8-.2c-1.6-.4-2.5-1.2-2.5-2.5 0-1.8 1.6-3 3.6-3 1.8 0 3.2.9 3.5 2.5h-1.8c-.2-.6-.8-1-1.7-1-1 0-1.7.5-1.7 1.3 0 .7.6 1.1 1.8 1.4l.7.2c1.7.4 2.6 1.2 2.6 2.6 0 1.9-1.6 3.1-3.8 3.1-2.2 0-3.6-1.1-4-2.7h1.9z"/></svg>`;
+        case 'xiaomi':
+          // Logo oficial Mi (naranja con monograma)
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#ff6700"/><path d="M6 8h3v5.5c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5V8h3v5.5c0 2.5-2 4.5-4.5 4.5S6 16 6 13.5V8zm10.5 0H18v10h-1.5V8z" fill="#ffffff"/></svg>`;
+        case 'google':
+          // 'G' oficial de Google multicolor
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.7 12.3c0-.8-.1-1.5-.2-2.1H12v4.5h6.6c-.3 1.5-1.1 2.8-2.4 3.7v3.1h3.9c2.3-2.1 3.6-5.2 3.6-9.2z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.9-3.1c-1.1.7-2.5 1.2-4 1.2-3.1 0-5.8-2.1-6.7-4.9H1.2v3.1C3.3 21.4 7.3 24 12 24z"/><path fill="#FBBC05" d="M5.3 14.3c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3V6.6H1.2C.5 8.2 0 10 0 12s.5 3.8 1.2 5.4l4.1-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.4.6 4.6 1.8l3.4-3.4C18 1.2 15.2 0 12 0 7.3 0 3.3 2.6 1.2 6.6l4.1 3.1c.9-2.8 3.6-4.9 6.7-4.9z"/></svg>`;
+        case 'asus':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#3584e4"><path d="M2.5 16h2.2l.9-2.3h3.8l.9 2.3h2.3L8.6 6.5H6.4L2.5 16zm4-4.2l1.4-3.7 1.4 3.7H6.5zm8.2-1.3c.3-.5.9-.8 1.8-.8 1.2 0 1.9.5 2 1.4-.4-.1-.9-.2-1.5-.2-1.8 0-3 .7-3 2.1 0 1.3 1 2 2.3 2 1.1 0 1.8-.5 2.2-1.2v1h2V12c0-2-1.4-3-3.7-3-1.6 0-2.8.6-3.4 1.7l1.3 1.1zm2.3 3.5c-.7 0-1.2-.4-1.2-1 0-.7.6-1.1 1.4-1.1.5 0 .8.1 1 .2v.7c-.2.8-.7 1.2-1.2 1.2z"/></svg>`;
+        case 'vodafone':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#e60000"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14.5c-2.48 0-4.5-2.02-4.5-4.5 0-1.66.9-3.11 2.24-3.89-.16.42-.24.89-.24 1.39 0 2.21 1.79 4 4 4 .5 0 .97-.08 1.39-.24-.78 1.34-2.23 2.24-3.89 2.24z"/></svg>`;
+        case 'synology':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#0080cb"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15H9V7h2v10zm4 0h-2V7h2v10z"/></svg>`;
+        case 'tplink':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#00a4e4"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm6-5c-.55 0-1-.45-1-1 0-2.76-2.24-5-5-5-.55 0-1-.45-1-1s.45-1 1-1c3.87 0 7 3.13 7 7 0 .55-.45 1-1 1z"/></svg>`;
+        case 'espressif':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#e7352f"><path d="M6 4h12v16H6V4zm2 2v12h8V6H8zm2 2h4v3h-4V8zm0 5h4v3h-4v-3zM4 7h1v2H4V7zm0 4h1v2H4v-2zm0 4h1v2H4v-2zm15-8h1v2h-1V7zm0 4h1v2h-1v-2zm0 4h1v2h-1v-2z"/></svg>`;
+        case 'tuya':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#ff5722"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 14.5h-2v-5h2v5zm0-7h-2V7h2v2.5z"/></svg>`;
+        case 'sony':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#ffffff"><path d="M2 10.5h4v1.5H3.5v1.5H5c1 0 1.8.7 1.8 1.6 0 1-.8 1.9-1.9 1.9H2v-1.5h2.5V14H3c-1 0-1.8-.7-1.8-1.6 0-1 .8-1.9 1.9-1.9zm7 0h3.5c1.4 0 2.5 1.1 2.5 2.5s-1.1 2.5-2.5 2.5H9v-5zm1.8 1.5v2h1.5c.6 0 1-.4 1-1s-.4-1-1-1h-1.5zm6.2-1.5h1.8l2.2 3.2 2.2-3.2H23l-3.2 4.4v2.1h-1.8v-2.1L17 10.5z"/></svg>`;
+        case 'apple':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#ffffff"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.63-.77 1.06-1.85.94-2.93-.91.04-2.02.61-2.67 1.38-.58.67-1.09 1.77-.95 2.82 1.02.08 2.05-.5 2.68-1.27z"/></svg>`;
+        case 'acer':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#83b81a"><path d="M3 15h2.5l1.2-2.5h3.6l1.2 2.5H14L9.5 6h-2L3 15zm4.8-4.5l1.2-2.5 1.2 2.5H7.8zm8.2 4.5h2.5V8.5h-2.5V15zm5-4.5c-.5-.4-1.2-.6-2-.6v1.8c.4 0 .8.1 1 .3.3.2.4.6.4 1 0 .5-.2.8-.5 1-.3.2-.8.3-1.4.3h-1.5V15h1.5c1.1 0 1.9-.3 2.5-.8.6-.6.9-1.3.9-2.2 0-.8-.3-1.5-.9-2z"/></svg>`;
+        case 'ubuntu':
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#e95420"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.82.62-3.49 1.64-4.83l2.02 1.17c-.42.79-.66 1.7-.66 2.66 0 2.21 1.79 4 4 4 1.3 0 2.45-.63 3.19-1.6l1.96 1.13C15.01 18.96 13.58 20 12 20zm6.36-5.17l-1.96-1.13c.38-.79.6-1.68.6-2.62s-.22-1.83-.6-2.62l1.96-1.13c.64 1.13 1 2.42 1 3.75s-.36 2.62-1 3.75z"/></svg>`;
+        default:
+          return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3"/></svg>`;
+      }
+    }
+
+    // Modal Trust
+    function openTrustDialog() {
+      document.getElementById('trustDialog').classList.add('open');
+      fetch('/api/auth/devices')
+        .then(r => r.json())
+        .then(devs => {
+          const list = document.getElementById('trustDevicesCard');
+          if (!devs || devs.length === 0) {
+            list.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim);">No hay dispositivos emparejados</div>';
+            return;
+          }
+          list.innerHTML = devs.map(d => `
+            <div class="adw-action-row">
+              <div>
+                <div class="row-label">${d.name}</div>
+                <div class="row-sublabel">IP: ${d.local_ip || '--'} • Visto: ${d.last_seen || '--'}</div>
+              </div>
+              <span class="adw-badge badge-green">Autorizado</span>
+            </div>
+          `).join('');
+        })
+        .catch(err => {
+          console.error(err);
+        });
+    }
+
+    function closeTrustDialog() {
+      document.getElementById('trustDialog').classList.remove('open');
+    }
+
+    // Render Data into Active View
+    function renderActiveView() {
+      if (!latestMetrics) return;
+      const q = (document.getElementById('filterInput').value || '').trim().toLowerCase();
+
+      // 0. OVERVIEW VIEW
+      if (activeView === 'overview') {
+        const hist = latestMetrics.history || {};
+        drawAdwaitaChart('ovCanvasCpu', hist.cpu || [], '#3584e4', null, null, 100);
+        drawAdwaitaChart('ovCanvasRam', hist.ram || [], '#9141ac', null, null, 100);
+        drawAdwaitaChart('ovCanvasGpu', hist.gpu || [], '#33d17a', null, null, 100);
+        drawAdwaitaChart('ovCanvasNet', hist.net_rx || [], '#33d17a', hist.net_tx || [], '#3584e4', null);
+      }
+
+      // 1. PROCESSOR VIEW
+      else if (activeView === 'processor') {
+        const hist = latestMetrics.history || {};
+        drawAdwaitaChart('canvasCpu', hist.cpu || [], '#3584e4', null, null, 100);
+      }
+
+      // 2. MEMORY VIEW
+      else if (activeView === 'memory') {
+        const hist = latestMetrics.history || {};
+        drawAdwaitaChart('canvasRam', hist.ram || [], '#9141ac', null, null, 100);
+      }
+
+      // 3. GPU VIEW
+      else if (activeView === 'gpu') {
+        const hist = latestMetrics.history || {};
+        drawAdwaitaChart('canvasGpu', hist.gpu || [], '#33d17a', null, null, 100);
+
+        const gpu = latestMetrics.gpu || {};
+        const procs = gpu.processes || [];
+        const card = document.getElementById('gpuProcCard');
+        if (procs.length === 0) {
+          card.innerHTML = '<div class="adw-action-row" style="color: var(--adw-text-dim); justify-content: center; padding: 20px;">No hay aplicaciones activas en la GPU NVIDIA</div>';
+        } else {
+          card.innerHTML = procs.map(p => {
+            const typeLabel = (p.type === 'C') ? 'Cómputo / CUDA' : ((p.type === 'C+G') ? 'Cómputo & Gráficos' : 'Gráficos');
+            const typeBadgeColor = (p.type === 'C') ? 'badge-blue' : ((p.type === 'C+G') ? 'badge-purple' : 'badge-green');
+            return `
+              <div class="adw-action-row" style="padding: 12px 16px;">
+                <div class="row-title-box">
+                  <span class="row-icon" style="color: var(--adw-green);"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg></span>
+                  <div>
+                    <div class="row-label" style="font-weight: 600; font-size: 13.5px; color: #ffffff;">${p.name}</div>
+                    <div class="row-sublabel" style="display: flex; align-items: center; gap: 8px; margin-top: 3px;">
+                      <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--adw-text-dim);">PID: ${p.pid}</span>
+                      <span class="adw-badge ${typeBadgeColor}" style="font-size: 10px; padding: 1px 6px;">${typeLabel}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="row-value" style="color: #78aeed; font-family: var(--font-mono); font-weight: 700; font-size: 13.5px;">${p.used_memory}</div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // 4. DRIVES VIEW
+      else if (activeView === 'drives') {
+        const hist = latestMetrics.history || {};
+        drawAdwaitaChart('canvasDisk', hist.disk_w || [], '#3584e4', hist.disk_r || [], '#ff7800', null);
+
+        const disks = latestMetrics.disks || [];
+        const container = document.getElementById('drivesList');
+        container.innerHTML = disks.map(d => {
+          const usedStr = formatBytes(d.used_bytes);
+          const totalStr = formatBytes(d.total_bytes);
+          const freeStr = formatBytes(d.free_bytes);
+          const pct = d.percent || 0;
+          let badgeClass = 'badge-blue';
+          if (pct > 85) badgeClass = 'badge-red';
+          else if (pct > 70) badgeClass = 'badge-amber';
+          const fstypeStr = (d.fstype || 'fs').toUpperCase();
+          const tempBadge = d.temp_c ? `<span class="adw-badge badge-green" style="margin-right: 6px;">🌡️ ${d.temp_c} °C</span>` : '';
+
+          return `
+            <div class="adw-card" style="padding: 18px 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                <div>
+                  <div style="font-weight: 700; font-size: 14.5px; color: #ffffff;">${d.label || d.mountpoint}</div>
+                  <div style="font-size: 11.5px; color: var(--adw-text-dim); font-family: var(--font-mono); margin-top: 2px;">${d.mountpoint} • ${d.device || '--'} • ${fstypeStr}</div>
+                </div>
+                <div>
+                  ${tempBadge}
+                  <span class="adw-badge ${badgeClass}">${pct}% Usado</span>
+                </div>
+              </div>
+              
+              <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; margin: 10px 0;">
+                <div style="width: ${pct}%; height: 100%; background: var(--adw-blue); border-radius: 4px;"></div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--adw-text-secondary); font-family: var(--font-mono);">
+                <span>Usado: <strong>${usedStr}</strong></span>
+                <span>Libre: <strong style="color: var(--adw-green);">${freeStr}</strong></span>
+                <span>Total: ${totalStr}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 5. NETWORK VIEW
+      else if (activeView === 'network') {
+        const hist = latestMetrics.history || {};
+        drawAdwaitaChart('canvasNet', hist.net_rx || [], '#33d17a', hist.net_tx || [], '#3584e4', null);
+
+        const clients = latestMetrics.wifi_clients || [];
+        let filtered = clients.filter(c => 
+          (c.name || '').toLowerCase().includes(q) || 
+          (c.ip || '').toLowerCase().includes(q) || 
+          (c.mac || '').toLowerCase().includes(q)
+        );
+
+        if (netSubfilter === 'cable') {
+          filtered = filtered.filter(c => c.conn_type === 'cable');
+        } else if (netSubfilter === '5g') {
+          filtered = filtered.filter(c => c.conn_type !== 'cable' && (c.band === '5 GHz' || (c.band && c.band.includes('5'))));
+        } else if (netSubfilter === '24g') {
+          filtered = filtered.filter(c => c.conn_type !== 'cable' && (c.band === '2.4 GHz' || (c.band && c.band.includes('2.4'))));
+        }
+
+        // Sort by traffic
+        filtered.sort((a, b) => (b.tx_bytes || 0) - (a.tx_bytes || 0));
+
+        const listEl = document.getElementById('networkDevicesList');
+        if (filtered.length === 0) {
+          listEl.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim); padding: 24px;">No se encontraron dispositivos con el filtro actual</div>';
+          return;
+        }
+
+        const maxTx = Math.max(...filtered.map(c => c.tx_bytes || 0), 1);
+
+        listEl.innerHTML = filtered.map(c => {
+          let badgeHtml = '';
+          let signalHtml = '';
+
+          if (c.conn_type === 'cable') {
+            const isUplink = (c.band || '').toLowerCase().includes('uplink') || (c.iface || '').toLowerCase().includes('wan');
+            if (isUplink) {
+              badgeHtml = `<span class="adw-badge badge-blue"><span class="emoji" style="font-size: 13px; margin-right: 4px;">🌐</span>Uplink WAN</span>`;
+            } else {
+              badgeHtml = `<span class="adw-badge badge-purple"><span class="emoji" style="font-size: 13px; margin-right: 4px;">🔌</span>Cable Gigabit</span>`;
+            }
+            signalHtml = `<span style="color: var(--adw-green); font-size: 12px; font-weight: 600;">1000 Mbps</span>`;
+          } else {
+            badgeHtml = c.band === '5 GHz' 
+              ? `<span class="adw-badge badge-blue"><span class="emoji" style="font-size: 13px; margin-right: 4px;">📡</span>5 GHz</span>` 
+              : `<span class="adw-badge badge-amber"><span class="emoji" style="font-size: 13px; margin-right: 4px;">📶</span>2.4 GHz</span>`;
+            signalHtml = c.status === 'idle' 
+              ? `<span style="color: var(--adw-text-dim); font-size: 11px;">En reposo</span>`
+              : `<span style="color: var(--adw-green); font-size: 12px; font-weight: 600;">${c.rssi || 0} dBm</span>`;
+          }
+
+          const isIdle = (c.status === 'idle');
+          const isDownloading = (c.speed_down && c.speed_down > 25000);
+          const isUploading = (c.speed_up && c.speed_up > 25000);
+
+          let trafficHtml = '';
+          if (isIdle) {
+            trafficHtml = '<span style="color: var(--adw-amber); font-size: 12px; font-weight: 600;"><span class="emoji emoji-status">🟡</span>En Reposo</span>';
+          } else if (isDownloading || isUploading) {
+            trafficHtml = `
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                <span style="color: var(--adw-green); font-size: 13.5px; font-weight: 700; letter-spacing: -0.2px;">
+                  ${isDownloading ? `↓ ${formatSpeed(c.speed_down)}` : ''} ${isUploading ? `↑ ${formatSpeed(c.speed_up)}` : ''}
+                </span>
+                <span style="font-size: 11px; color: var(--adw-text-dim);">Total: ↓ ${formatBytes(c.tx_bytes)}</span>
+              </div>
+            `;
+          } else if ((c.tx_bytes || 0) > 0) {
+            trafficHtml = `<span style="color: var(--adw-green); font-size: 12px; font-weight: 600;"><span class="emoji emoji-status">🟢</span>↓ ${formatBytes(c.tx_bytes)} <span style="font-size: 11px; color: var(--adw-text-dim); margin-left: 2px;">↑ ${formatBytes(c.rx_bytes)}</span></span>`;
+          } else {
+            trafficHtml = '<span style="color: var(--adw-green); font-size: 12px; font-weight: 600;"><span class="emoji emoji-status">🟢</span>En Línea</span>';
+          }
+
+          const brandClass = 'brand-' + (c.brand || 'generic');
+          const brandName = c.brand_name || (c.brand ? (c.brand.charAt(0).toUpperCase() + c.brand.slice(1)) : '');
+          const brandBadgeHtml = (c.brand && c.brand !== 'generic') 
+            ? `<span class="brand-badge ${brandClass}" title="Fabricante / Marca: ${brandName}">${getBrandLogoSvg(c.brand)} <span>${brandName}</span></span>` 
+            : '';
+
+          return `
+            <div class="adw-action-row" style="align-items: center; gap: 14px; ${isIdle ? 'opacity: 0.85;' : ''}">
+              <div class="device-circle" style="${isIdle ? 'background: rgba(255,255,255,0.04);' : 'background: rgba(255,255,255,0.08);'}">
+                <span class="device-emoji">${getDeviceEmoji(c.dev_icon || c.dev_type)}</span>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <strong style="color: var(--adw-text); font-size: 13.5px;">${c.name}</strong>
+                  ${brandBadgeHtml}
+                  ${badgeHtml}
+                </div>
+                <div style="font-size: 11.5px; color: var(--adw-text-dim); font-family: var(--font-mono); margin-top: 2px;">
+                  <span style="color: #78aeed;">${c.ip}</span> • ${c.mac}
+                  ${c.mac ? `<button onclick="event.stopPropagation(); wakeDevice('${c.mac}', '${(c.name || '').replace(/'/g, "\\'")}')" style="margin-left: 8px; padding: 2px 8px; background: rgba(53,132,228,0.15); border: 1px solid rgba(53,132,228,0.3); border-radius: 4px; color: #78aeed; font-size: 10px; cursor: pointer;" title="Enviar paquete Wake-on-LAN">⚡ Despertar (WoWLAN)</button>` : ''}
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
+                <div style="font-size: 12.5px; font-weight: 700; font-family: var(--font-mono);">
+                  ${trafficHtml}
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  ${signalHtml}
+                  ${c.in_network ? `<span style="font-size: 11px; color: var(--adw-text-dim);">${formatDuration(c.in_network)}</span>` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 6. SECURITY & DNS VIEW
+      else if (activeView === 'security') {
+        renderSecurityView(latestMetrics.security);
+      }
+
+      // 7. APPS (DOCKER & SYSTEMD & TORRENTS) VIEW
+      else if (activeView === 'apps') {
+        const sysdList = document.getElementById('systemdAppsList');
+        const sysdServices = (latestMetrics.systemd_services || []).filter(s =>
+          (s.name || '').toLowerCase().includes(q) || (s.unit || '').toLowerCase().includes(q)
+        );
+        if (sysdList) {
+          if (sysdServices.length === 0) {
+            sysdList.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim); padding: 20px;">No hay servicios nativos coincidentes</div>';
+          } else {
+            sysdList.innerHTML = sysdServices.map(s => `
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon" style="color: ${s.active ? 'var(--adw-green)' : 'var(--adw-red)'};">⚙️</span>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                      <strong style="color: #ffffff;">${s.name}</strong>
+                      <span class="adw-badge ${s.active ? 'badge-green' : 'badge-red'}">${s.active ? 'Activo' : s.state}</span>
+                      <span class="adw-badge badge-blue" style="font-size: 10.5px;">${s.role}</span>
+                    </div>
+                    <div class="row-sublabel" style="font-family: var(--font-mono);">${s.unit}</div>
+                  </div>
+                </div>
+                <div>
+                  <button onclick="serviceAction('systemd', '${s.unit}', '${s.active ? 'restart' : 'start'}')" style="padding: 5px 10px; background: rgba(53,132,228,0.16); border: 1px solid rgba(53,132,228,0.35); border-radius: 6px; color: #78aeed; font-size: 11.5px; font-weight: 600; cursor: pointer;">
+                    ${s.active ? '🔄 Reiniciar' : '▶️ Iniciar'}
+                  </button>
+                </div>
+              </div>
+            `).join('');
+          }
+        }
+
+        const apps = latestMetrics.docker_activities || [];
+        const filtered = apps.filter(a => (a.name || '').toLowerCase().includes(q));
+        const list = document.getElementById('dockerAppsList');
+        if (list) {
+          if (filtered.length === 0) {
+            list.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim); padding: 24px;">No hay contenedores coincidentes</div>';
+          } else {
+            list.innerHTML = filtered.map(a => {
+              const isRun = (a.state || 'running') === 'running';
+              const vramBadge = (a.vram_mb && a.vram_mb > 0) ? `<span class="adw-badge badge-purple" style="font-size: 10.5px;">🎮 ${a.vram_mb} MB VRAM</span>` : '';
+              return `
+                <div class="adw-action-row">
+                  <div class="row-title-box">
+                    <span class="row-icon" style="color: ${isRun ? '#78aeed' : 'var(--adw-red)'};">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/></svg>
+                    </span>
+                    <div>
+                      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <strong style="color: #ffffff;">${a.name}</strong>
+                        <span class="adw-badge ${isRun ? 'badge-green' : 'badge-red'}">${isRun ? 'Activo' : 'Detenido'}</span>
+                        ${vramBadge}
+                      </div>
+                      <div class="row-sublabel">Estado: ${a.status || 'Up'} • Memoria: ${a.mem_usage} • Red: ${a.net_io} • Hilos: ${a.pids}</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="text-align: right;">
+                      <div style="font-weight: 700; color: ${parseFloat(a.cpu_percent) > 50 ? 'var(--adw-red)' : 'var(--adw-blue)'}; font-family: var(--font-mono); font-size: 13.5px;">
+                        ${a.cpu_percent} CPU
+                      </div>
+                      <div style="font-size: 10.5px; color: var(--adw-text-dim); font-family: var(--font-mono);">
+                        ${a.cpu_norm_percent || 0}% Global
+                      </div>
+                    </div>
+                    <button onclick="serviceAction('docker', '${a.name}', '${isRun ? 'restart' : 'start'}')" style="padding: 5px 10px; background: rgba(53,132,228,0.16); border: 1px solid rgba(53,132,228,0.35); border-radius: 6px; color: #78aeed; font-size: 11.5px; font-weight: 600; cursor: pointer;">
+                      ${isRun ? '🔄' : '▶️ Iniciar'}
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+        }
+
+        const tBox = document.getElementById('torrentsAppsList');
+        if (tBox) {
+          const torrents = latestMetrics.torrents || [];
+          const parental = latestMetrics.parental_control || {};
+          const pRow = `
+            <div class="adw-action-row">
+              <div class="row-title-box">
+                <span class="row-icon">🔒</span>
+                <div>
+                  <div class="row-label" style="font-weight: 600; color: #ffffff;">Control Parental (TV Sala de Estar, Xiaomi TV Stick & Xbox Series S)</div>
+                  <div class="row-sublabel">Portal cautivo regido exclusivamente por la conexión del Samsung Galaxy A8</div>
+                </div>
+              </div>
+              <span class="adw-badge ${parental.authorized ? 'badge-green' : 'badge-amber'}">
+                ${parental.authorized ? 'Desbloqueado (Galaxy A8 en casa)' : 'Bloqueado (Portal Cautivo Activo)'}
+              </span>
+            </div>
+          `;
+          const tRows = torrents.map(t => `
+            <div class="adw-action-row">
+              <div style="flex: 1; min-width: 0; padding-right: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <strong style="color: #ffffff; font-size: 13px;">📥 ${t.name}</strong>
+                  <span class="adw-badge ${t.progress >= 100 ? 'badge-green' : 'badge-blue'}">${t.progress}%</span>
+                </div>
+                <div class="row-sublabel" style="font-family: var(--font-mono); margin-top: 3px;">
+                  Tamaño: ${formatBytes(t.size)} • Estado: ${t.state} • ↓ ${formatSpeed(t.dlspeed)} • ↑ ${formatSpeed(t.upspeed)}
+                </div>
+              </div>
+            </div>
+          `).join('');
+          tBox.innerHTML = pRow + tRows;
+        }
+      }
+
+      // 7. TORRENTS & EMBY VIEW
+      else if (activeView === 'torrents') {
+        renderTorrentsView(q);
+      }
+
+      // 8. PROCESSES VIEW
+      else if (activeView === 'processes') {
+        const procs = (latestMetrics.system_processes || []).map(p => ({
+          ...p,
+          cpu_percent: parseFloat(p.cpu_percent) || 0,
+          priv_mb: parseFloat(p.priv_mb) || 0,
+          pid: parseInt(p.pid) || 0
+        }));
+
+        let filtered = procs.filter(p => (p.name || '').toLowerCase().includes(q) || String(p.pid).includes(q));
+
+        filtered.sort((a, b) => {
+          let va = a[procSort];
+          let vb = b[procSort];
+          if (typeof va === 'string') {
+            return procSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+          }
+          return procSortAsc ? (va - vb) : (vb - va);
+        });
+
+        const list = document.getElementById('processesList');
+        if (filtered.length === 0) {
+          list.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim); padding: 24px;">No hay procesos coincidentes</div>';
+          return;
+        }
+
+        list.innerHTML = filtered.slice(0, 80).map(p => `
+          <div class="adw-action-row">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+              <code style="font-size: 11px; color: var(--adw-text-dim); min-width: 48px;">${p.pid}</code>
+              <div style="min-width: 0;">
+                <div style="font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 380px;">${p.name}</div>
+                <div style="font-size: 11px; color: var(--adw-text-dim);">${p.user} • RSS: ${p.mem_mb} MB</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <span style="font-family: var(--font-mono); font-size: 12px; color: var(--adw-purple);">${p.priv_mb.toFixed(1)} MB</span>
+              <strong style="font-family: var(--font-mono); font-size: 13px; color: ${p.cpu_percent > 10 ? 'var(--adw-orange)' : '#78aeed'}; min-width: 52px; text-align: right;">${p.cpu_percent.toFixed(1)}%</strong>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // 8. DESCARGAS & VIDEOTECA VIEW (TORRENTS & EMBY)
+    function renderTorrentsView(q = '') {
+      if (!latestMetrics) return;
+      const torrents = latestMetrics.torrents || [];
+      const trStats = latestMetrics.torrent_stats || {};
+      const emby = latestMetrics.emby || {};
+
+      // 1. Stats Cards
+      const dlSpeedEl = document.getElementById('torrentStatsDlSpeed');
+      if (dlSpeedEl) dlSpeedEl.innerText = formatSpeed(trStats.dl_info_speed || 0);
+      const dlTotEl = document.getElementById('torrentStatsDlTotal');
+      if (dlTotEl) dlTotEl.innerText = 'Total descargado: ' + formatBytes(trStats.dl_info_data || 0);
+
+      const upSpeedEl = document.getElementById('torrentStatsUpSpeed');
+      if (upSpeedEl) upSpeedEl.innerText = formatSpeed(trStats.up_info_speed || 0);
+      const upTotEl = document.getElementById('torrentStatsUpTotal');
+      if (upTotEl) upTotEl.innerText = 'Total subido: ' + formatBytes(trStats.up_info_data || 0);
+
+      const actCntEl = document.getElementById('torrentStatsActiveCount');
+      if (actCntEl) actCntEl.innerText = torrents.length + (torrents.length === 1 ? ' Torrent' : ' Torrents');
+      const subCntEl = document.getElementById('torrentStatsSubCount');
+      if (subCntEl) subCntEl.innerText = `${trStats.downloading_count || 0} descargando • ${trStats.seeding_count || 0} sembrando`;
+
+      const embyCntEl = document.getElementById('embyStatsMediaCount');
+      if (embyCntEl) embyCntEl.innerText = ((emby.movies_count || 0) + (emby.episodes_count || 0)) + ' Medios';
+      const embySubEl = document.getElementById('embyStatsSub');
+      if (embySubEl) embySubEl.innerText = `${emby.movies_count || 0} Películas • ${emby.series_count || 0} Series • ${emby.episodes_count || 0} Capítulos`;
+
+      // 2. Torrents List
+      const tBox = document.getElementById('torrentsFullListContainer');
+      const tBadge = document.getElementById('torrentCountBadge');
+      if (tBadge) tBadge.innerText = torrents.length + (torrents.length === 1 ? ' descarga' : ' descargas');
+
+      if (tBox) {
+        const filteredTorrents = torrents.filter(t => (t.name || '').toLowerCase().includes(q));
+        if (filteredTorrents.length === 0) {
+          tBox.innerHTML = `
+            <div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim); padding: 36px; flex-direction: column; gap: 8px;">
+              <span style="font-size: 28px;">📥</span>
+              <div style="font-size: 14px; font-weight: 600; color: #ffffff;">No hay descargas activas en este momento</div>
+              <div style="font-size: 12px; color: var(--adw-text-dim);">qBittorrent está a la espera de nuevas descargas.</div>
+            </div>
+          `;
+        } else {
+          tBox.innerHTML = filteredTorrents.map(t => {
+            const isDone = t.progress >= 100;
+            const isDL = t.dlspeed > 0;
+            let badgeClass = 'badge-blue';
+            let stateLabel = t.state || 'Activo';
+            if (isDone) {
+              badgeClass = 'badge-green';
+              stateLabel = 'Completado / Sembrando';
+            } else if (isDL) {
+              badgeClass = 'badge-blue';
+              stateLabel = 'Descargando';
+            } else if ((t.state || '').toLowerCase().includes('pause')) {
+              badgeClass = 'badge-amber';
+              stateLabel = 'En pausa';
+            }
+
+            const etaStr = (t.eta && t.eta < 864000) ? (t.eta > 3600 ? `${Math.floor(t.eta/3600)}h ${Math.floor((t.eta%3600)/60)}m` : `${Math.floor(t.eta/60)}m ${t.eta%60}s`) : 'N/A';
+
+            return `
+              <div class="adw-action-row" style="flex-direction: column; align-items: stretch; gap: 10px; padding: 16px 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
+                    <span style="font-size: 20px;">${isDone ? '✅' : '📥'}</span>
+                    <div style="min-width: 0;">
+                      <div style="font-weight: 700; color: #ffffff; font-size: 14px; word-break: break-all;">${t.name}</div>
+                      <div class="row-sublabel" style="margin-top: 3px; font-family: var(--font-mono); font-size: 11.5px;">
+                        Tamaño: ${formatBytes(t.size)} • Ratio: ${t.ratio || 0} • Semillas: ${t.num_seeds || 0} • Pares: ${t.num_leechs || 0}
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="adw-badge ${badgeClass}">${stateLabel}</span>
+                    <span style="font-weight: 700; color: #ffffff; font-family: var(--font-mono); font-size: 14px;">${t.progress}%</span>
+                  </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                  <div style="width: ${Math.min(100, t.progress)}%; height: 100%; background: ${isDone ? 'var(--adw-green)' : 'var(--adw-blue)'}; border-radius: 4px; transition: width 0.3s ease;"></div>
+                </div>
+
+                <!-- Speeds & ETA -->
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--adw-text-dim); font-family: var(--font-mono); flex-wrap: wrap; gap: 8px;">
+                  <div>
+                    <span style="color: #57e389;">↓ ${formatSpeed(t.dlspeed)}</span> • 
+                    <span style="color: #3584e4;">↑ ${formatSpeed(t.upspeed)}</span>
+                  </div>
+                  <div>
+                    ${!isDone ? `<span>Restante (ETA): <strong style="color: #ffffff;">${etaStr}</strong></span>` : '<span style="color: #57e389;">Descarga finalizada</span>'}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // 3. Emby Recent Media List
+      const eBox = document.getElementById('embyRecentListContainer');
+      if (eBox) {
+        const recent = emby.recent_media || [];
+        const filteredRecent = recent.filter(m => (m.title || '').toLowerCase().includes(q) || (m.series_name || '').toLowerCase().includes(q));
+        if (filteredRecent.length === 0) {
+          eBox.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim); padding: 24px;">No hay registros multimedia coincidentes</div>';
+        } else {
+          eBox.innerHTML = filteredRecent.map(m => {
+            const isMovie = m.type === 'movie';
+            const icon = isMovie ? '🎬' : '📺';
+            const badgeType = isMovie ? '<span class="adw-badge badge-blue">Película</span>' : `<span class="adw-badge badge-purple">T${m.season || 1} • E${m.episode || 1}</span>`;
+            const dateStr = m.date_created ? new Date(m.date_created * 1000).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--';
+
+            return `
+              <div class="adw-action-row">
+                <div class="row-title-box">
+                  <span class="row-icon" style="font-size: 20px;">${icon}</span>
+                  <div style="min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                      <strong style="color: #ffffff; font-size: 13.5px;">${m.title}</strong>
+                      ${badgeType}
+                    </div>
+                    <div class="row-sublabel" style="font-family: var(--font-mono); font-size: 11px; margin-top: 2px;">
+                      ${m.path ? m.path.replace('/home/servidor/nas/video/CINE Y SERIES/', 'NAS: ') : ''}
+                    </div>
+                  </div>
+                </div>
+                <div style="text-align: right; font-size: 12px; color: var(--adw-text-dim); font-family: var(--font-mono); white-space: nowrap;">
+                  <span class="adw-badge badge-green" style="font-size: 11px;">Catalogado</span>
+                  <div style="margin-top: 3px; font-size: 11px;">${dateStr}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    // 7. SEGURIDAD & DNS VIEW (PI-HOLE + FAIL2BAN)
+    function renderSecurityView(sec) {
+      if (!sec) return;
+      const pi = sec.pihole || {};
+      const f2b = sec.fail2ban || {};
+
+      // Badges superiores
+      const piBadge = document.getElementById('secPiholeBadge');
+      if (piBadge) {
+        piBadge.className = 'adw-badge ' + (pi.available ? 'badge-green' : 'badge-red');
+        piBadge.innerHTML = pi.available ? '<span class="emoji">🛡️</span> Pi-hole FTL Activo' : '<span class="emoji">⚠️</span> Pi-hole Detenido';
+      }
+      const f2bBadge = document.getElementById('secF2bBadge');
+      if (f2bBadge) {
+        f2bBadge.className = 'adw-badge ' + (f2b.available ? 'badge-purple' : 'badge-red');
+        f2bBadge.innerHTML = f2b.available ? '<span class="emoji">🔒</span> Fail2ban Activo' : '<span class="emoji">⚠️</span> Fail2ban Inactivo';
+      }
+
+      // 4 Cajas métricas
+      const domEl = document.getElementById('secDomBlocked');
+      if (domEl) domEl.innerText = (pi.domains_being_blocked || 0).toLocaleString('es-ES');
+
+      const queriesEl = document.getElementById('secQueriesToday');
+      if (queriesEl) queriesEl.innerText = (pi.dns_queries_today || 0).toLocaleString('es-ES');
+
+      const adsPctEl = document.getElementById('secAdsPct');
+      if (adsPctEl) adsPctEl.innerText = (pi.ads_percentage_today || 0) + '%';
+
+      const adsSubEl = document.getElementById('secAdsBlockedSub');
+      if (adsSubEl) adsSubEl.innerText = (pi.ads_blocked_today || 0).toLocaleString('es-ES') + ' bloqueados hoy';
+
+      const banEl = document.getElementById('secBannedIps');
+      if (banEl) banEl.innerText = (f2b.currently_banned || 0);
+
+      const banSubEl = document.getElementById('secTotalBannedSub');
+      if (banSubEl) {
+        const histTotal = (f2b.total_all_time_count || (f2b.all_time_banned ? f2b.all_time_banned.length : f2b.total_banned || 0));
+        banSubEl.innerText = histTotal + ' en historial (todo el tiempo)';
+      }
+
+      const banCountEl = document.getElementById('secBannedCount');
+      if (banCountEl) banCountEl.innerText = (f2b.currently_banned || 0);
+
+      const histCountEl = document.getElementById('secHistoryCount');
+      if (histCountEl) histCountEl.innerText = (f2b.total_all_time_count || (f2b.all_time_banned ? f2b.all_time_banned.length : 0));
+
+      // Top Dominios Bloqueados de Pi-hole
+      const topListEl = document.getElementById('secTopBlockedList');
+      if (topListEl) {
+        const top = pi.top_blocked || [];
+        if (top.length === 0) {
+          topListEl.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim); padding: 24px;">No hay dominios bloqueados registrados hoy</div>';
+        } else {
+          const maxCount = Math.max(...top.map(t => t.count || 0), 1);
+          topListEl.innerHTML = top.map(item => {
+            const pct = Math.round((item.count / maxCount) * 100);
+            return `
+              <div class="adw-action-row" style="flex-direction: column; align-items: stretch; gap: 8px; padding: 14px 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                    <span class="emoji" style="color: var(--adw-red); font-size: 15px; margin-right: 4px;">⛔</span>
+                    <strong style="color: #ffffff; font-size: 13.5px; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.domain}</strong>
+                  </div>
+                  <span style="font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; color: var(--adw-red); white-space: nowrap; margin-left: 12px;">${item.count.toLocaleString('es-ES')} peticiones</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;">
+                  <div style="width: ${pct}%; height: 100%; background: var(--adw-red); border-radius: 3px; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // Jaulas Fail2ban
+      const jailsEl = document.getElementById('secJailsList');
+      if (jailsEl) {
+        const jails = f2b.jails || {};
+        const jailNames = Object.keys(jails);
+        if (jailNames.length === 0) {
+          jailsEl.innerHTML = '<div class="adw-action-row" style="justify-content: center; color: var(--adw-text-dim); padding: 24px;">No se encontraron jaulas activas</div>';
+        } else {
+          jailsEl.innerHTML = jailNames.map(jName => {
+            const j = jails[jName];
+            const isSsh = jName === 'sshd';
+            let icon = '🛡️';
+            let desc = 'Filtro de seguridad';
+            if (isSsh) {
+              icon = '🔐';
+              desc = 'Protección contra fuerza bruta SSH (Puerto 22)';
+            } else if (jName === 'nextcloud') {
+              icon = '☁️';
+              desc = 'Protección contra fuerza bruta y logins sospechosos en Nextcloud (Web/DAV)';
+            } else if (jName.includes('scan')) {
+              icon = '🌐';
+              desc = 'Filtro contra escáneres HTTP / URLs vulnerables en Caddy';
+            } else if (jName.includes('recidive')) {
+              icon = '🛑';
+              desc = 'Baneo persistente de larga duración para atacantes reincidentes';
+            }
+            
+            return `
+              <div class="adw-action-row" style="padding: 14px 18px;">
+                <div class="row-title-box">
+                  <span class="emoji" style="font-size: 18px; margin-right: 6px;">${icon}</span>
+                  <div>
+                    <div class="row-label" style="display: flex; align-items: center; gap: 8px;">
+                      <span>${jName}</span>
+                      <span class="adw-badge ${j.currently_banned > 0 ? 'badge-amber' : 'badge-blue'}" style="font-size: 10.5px;">${j.currently_banned} baneadas</span>
+                    </div>
+                    <div class="row-sublabel">${desc}</div>
+                  </div>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-family: var(--font-mono); font-size: 12px;">
+                  <span style="color: var(--adw-text-dim);">Fallos recientes: <strong style="color: #ffffff;">${j.currently_failed || 0}</strong></span>
+                  <span style="color: var(--adw-text-dim);">Total mitigados: <strong style="color: var(--adw-green);">${j.total_banned || 0}</strong></span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // Lista de IPs bloqueadas activas y todo el tiempo
+      const details = f2b.banned_details || (f2b.banned_ips || []).map(ip => ({ ip: ip, jail: 'sshd' }));
+      window.currentBannedDetails = details;
+      window.currentF2bHistory = f2b.all_time_banned || [];
+      filterF2bData();
+    }
+
+    window.currentF2bTab = 'active';
+
+    function switchF2bTab(tab) {
+      window.currentF2bTab = tab;
+      const tabActive = document.getElementById('tabF2bActive');
+      const tabHistory = document.getElementById('tabF2bHistory');
+      const boxActive = document.getElementById('secActiveContainer');
+      const boxHistory = document.getElementById('secHistoryContainer');
+
+      if (tab === 'active') {
+        if (tabActive) tabActive.classList.add('active');
+        if (tabHistory) tabHistory.classList.remove('active');
+        if (boxActive) boxActive.style.display = 'block';
+        if (boxHistory) boxHistory.style.display = 'none';
+      } else {
+        if (tabActive) tabActive.classList.remove('active');
+        if (tabHistory) tabHistory.classList.add('active');
+        if (boxActive) boxActive.style.display = 'none';
+        if (boxHistory) boxHistory.style.display = 'block';
+      }
+      filterF2bData();
+    }
+
+    function renderBannedIps(items) {
+      const cloudEl = document.getElementById('secBannedIpsCloud');
+      if (!cloudEl) return;
+      if (!items || items.length === 0) {
+        cloudEl.innerHTML = '<div style="color: var(--adw-text-dim); font-size: 12px; padding: 8px;">No hay IPs baneadas actualmente que coincidan con la búsqueda.</div>';
+        return;
+      }
+      cloudEl.innerHTML = items.map(item => `
+        <span class="banned-ip-chip" style="display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px;" title="Bloqueada en ${item.jail}">
+          <span style="font-weight: 700; color: #ffffff;">${item.ip}</span>
+          <span class="adw-badge badge-purple" style="font-size: 10px; padding: 1px 6px;">${item.jail}</span>
+          <button onclick="handleF2bUnbanChip('${item.ip}', '${item.jail}')" title="Desbloquear ${item.ip}" style="background: rgba(237,51,59,0.25); border: 1px solid rgba(237,51,59,0.5); color: #ff9999; border-radius: 4px; padding: 2px 6px; font-size: 10.5px; cursor: pointer; font-weight: 700;">Desbloquear</button>
+        </span>
+      `).join('');
+    }
+
+    function renderHistoryTable(items) {
+      const tbody = document.getElementById('secHistoryTableBody');
+      const summary = document.getElementById('secHistorySummary');
+      if (!tbody) return;
+      const totalAll = window.currentF2bHistory?.length || 0;
+      if (summary) summary.innerText = `${items.length} de ${totalAll} registros`;
+
+      if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--adw-text-dim);">No se encontraron registros de IPs en el historial</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = items.map(r => {
+        const isActive = r.is_active;
+        const statusBadge = isActive 
+          ? '<span class="adw-badge badge-red" style="font-size: 10px; font-weight: 700;">🛡️ Activo</span>'
+          : '<span class="adw-badge badge-blue" style="font-size: 10px; opacity: 0.85;">⏱️ Expirado</span>';
+        
+        const countBadge = (r.bancount && r.bancount > 1)
+          ? `<span class="adw-badge badge-amber" style="font-size: 10px; font-family: var(--font-mono); font-weight: 700;">x${r.bancount}</span>`
+          : `<span style="color: var(--adw-text-dim); font-size: 11px;">1 vez</span>`;
+
+        let jailBadgeClass = 'badge-purple';
+        if (r.jail === 'sshd') jailBadgeClass = 'badge-purple';
+        else if (r.jail === 'nextcloud') jailBadgeClass = 'badge-green';
+        else if (r.jail?.includes('bad-bots') || r.jail?.includes('caddy')) jailBadgeClass = 'badge-amber';
+        else if (r.jail?.includes('recidive')) jailBadgeClass = 'badge-red';
+
+        const actionBtn = isActive
+          ? `<button onclick="handleF2bUnbanChip('${r.ip}', '${r.jail}')" title="Desbloquear ${r.ip}" style="background: rgba(237,51,59,0.2); border: 1px solid rgba(237,51,59,0.5); color: #ff9999; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-weight: 700;">Desbloquear</button>`
+          : `<button onclick="handleF2bBanChip('${r.ip}', '${r.jail}')" title="Volver a Bloquear ${r.ip}" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #e0e0e0; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;">Bloquear</button>`;
+
+        return `
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 10px 16px; font-family: var(--font-mono); font-weight: 700; color: #ffffff;">
+              <span style="cursor: pointer;" onclick="document.getElementById('secIpSearch').value='${r.ip}'; filterF2bData();" title="Filtrar esta IP">${r.ip}</span>
+            </td>
+            <td style="padding: 10px 16px;">
+              <span class="adw-badge ${jailBadgeClass}" style="font-size: 10.5px;">${r.jail}</span>
+            </td>
+            <td style="padding: 10px 16px; font-family: var(--font-mono); font-size: 12px; color: var(--adw-text-dim);">
+              ${r.date || '—'}
+            </td>
+            <td style="padding: 10px 16px; text-align: center;">
+              ${countBadge}
+            </td>
+            <td style="padding: 10px 16px; text-align: center;">
+              ${statusBadge}
+            </td>
+            <td style="padding: 10px 16px; text-align: right;">
+              ${actionBtn}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    window.currentF2bSort = 'date';
+    window.currentF2bSortAsc = false;
+
+    function setF2bSort(col) {
+      if (window.currentF2bSort === col) {
+        window.currentF2bSortAsc = !window.currentF2bSortAsc;
+      } else {
+        window.currentF2bSort = col;
+        window.currentF2bSortAsc = (col === 'ip' || col === 'jail');
+      }
+
+      // Actualizar indicadores visuales en las cabeceras
+      ['ip', 'jail', 'date', 'bancount', 'is_active'].forEach(c => {
+        const iconEl = document.getElementById('sortIcon_' + c);
+        if (iconEl) {
+          if (c === window.currentF2bSort) {
+            iconEl.innerText = window.currentF2bSortAsc ? '▲' : '▼';
+          } else {
+            iconEl.innerText = '';
+          }
+        }
+      });
+
+      filterF2bData();
+    }
+
+    function filterF2bData() {
+      const q = (document.getElementById('secIpSearch')?.value || '').toLowerCase().trim();
+      const jailFilter = (document.getElementById('secJailFilter')?.value || 'all').toLowerCase();
+
+      // Filtrar Activos
+      const allActive = window.currentBannedDetails || [];
+      const filteredActive = allActive.filter(it => {
+        const matchesQ = !q || it.ip.toLowerCase().includes(q) || (it.jail || '').toLowerCase().includes(q);
+        const matchesJail = (jailFilter === 'all') || (it.jail || '').toLowerCase() === jailFilter;
+        return matchesQ && matchesJail;
+      });
+      renderBannedIps(filteredActive);
+
+      // Filtrar Historial Todo el Tiempo
+      const allHistory = window.currentF2bHistory || [];
+      let filteredHistory = allHistory.filter(it => {
+        const matchesQ = !q || it.ip.toLowerCase().includes(q) || (it.jail || '').toLowerCase().includes(q) || (it.date || '').toLowerCase().includes(q);
+        const matchesJail = (jailFilter === 'all') || (it.jail || '').toLowerCase() === jailFilter;
+        return matchesQ && matchesJail;
+      });
+
+      // Ordenar Historial por Columna Seleccionada
+      filteredHistory.sort((a, b) => {
+        if (window.currentF2bSort === 'ip') {
+          const parseIp = (ip) => (ip || '').split('.').map(n => parseInt(n, 10) || 0);
+          const pA = parseIp(a.ip);
+          const pB = parseIp(b.ip);
+          for (let i = 0; i < 4; i++) {
+            if (pA[i] !== pB[i]) {
+              return window.currentF2bSortAsc ? pA[i] - pB[i] : pB[i] - pA[i];
+            }
+          }
+          return 0;
+        } else if (window.currentF2bSort === 'jail') {
+          const valA = (a.jail || '').toLowerCase();
+          const valB = (b.jail || '').toLowerCase();
+          return window.currentF2bSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else if (window.currentF2bSort === 'date') {
+          const valA = a.timestamp || 0;
+          const valB = b.timestamp || 0;
+          return window.currentF2bSortAsc ? valA - valB : valB - valA;
+        } else if (window.currentF2bSort === 'bancount') {
+          const valA = a.bancount || 0;
+          const valB = b.bancount || 0;
+          return window.currentF2bSortAsc ? valA - valB : valB - valA;
+        } else if (window.currentF2bSort === 'is_active') {
+          const valA = a.is_active ? 1 : 0;
+          const valB = b.is_active ? 1 : 0;
+          return window.currentF2bSortAsc ? valA - valB : valB - valA;
+        }
+        return 0;
+      });
+
+      renderHistoryTable(filteredHistory);
+    }
+
+    function handleF2bUnbanChip(ip, jail) {
+      if (!confirm(`¿Desbloquear la IP ${ip} de la jaula ${jail || 'Fail2ban'}?`)) return;
+      if (document.getElementById('f2bInputIp')) document.getElementById('f2bInputIp').value = ip;
+      if (jail && document.getElementById('f2bSelectJail')) {
+        document.getElementById('f2bSelectJail').value = jail;
+      }
+      handleF2bAction('unban', ip, jail);
+    }
+
+    function handleF2bBanChip(ip, jail) {
+      if (!confirm(`¿Volver a bloquear la IP ${ip} en la jaula ${jail || 'Fail2ban'}?`)) return;
+      if (document.getElementById('f2bInputIp')) document.getElementById('f2bInputIp').value = ip;
+      if (jail && document.getElementById('f2bSelectJail')) {
+        document.getElementById('f2bSelectJail').value = jail;
+      }
+      handleF2bAction('ban', ip, jail);
+    }
+
+    function handleF2bAction(action, directIp, directJail) {
+      const ip = (directIp || document.getElementById('f2bInputIp')?.value || '').trim();
+      const jail = directJail || document.getElementById('f2bSelectJail')?.value || 'nextcloud';
+      const msgEl = document.getElementById('f2bActionMsg');
+
+      if (!ip) {
+        if (msgEl) {
+          msgEl.style.display = 'block';
+          msgEl.style.background = 'rgba(237, 51, 59, 0.15)';
+          msgEl.style.color = '#ff7b80';
+          msgEl.innerText = 'Por favor, introduce una dirección IP válida.';
+        }
+        return;
+      }
+
+      const endpoint = action === 'ban' ? '/api/fail2ban/ban' : '/api/fail2ban/unban';
+      const payload = { ip: ip, jail: jail === 'all' ? '' : jail };
+
+      if (msgEl) {
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(255,255,255,0.06)';
+        msgEl.style.color = '#ffffff';
+        msgEl.innerText = action === 'ban' ? `Bloqueando IP ${ip}...` : `Desbloqueando IP ${ip}...`;
+      }
+
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (msgEl) {
+          msgEl.style.display = 'block';
+          if (res.success) {
+            msgEl.style.background = 'rgba(51, 209, 122, 0.15)';
+            msgEl.style.color = 'var(--adw-green)';
+            msgEl.innerText = '✔ ' + (res.message || 'Operación completada con éxito');
+            if (action === 'ban' && document.getElementById('f2bInputIp')) document.getElementById('f2bInputIp').value = '';
+          } else {
+            msgEl.style.background = 'rgba(237, 51, 59, 0.15)';
+            msgEl.style.color = '#ff7b80';
+            msgEl.innerText = '❌ Error: ' + (res.error || 'No se pudo completar la acción');
+          }
+        }
+        setTimeout(updateMetrics, 800);
+      })
+      .catch(err => {
+        if (msgEl) {
+          msgEl.style.display = 'block';
+          msgEl.style.background = 'rgba(237, 51, 59, 0.15)';
+          msgEl.style.color = '#ff7b80';
+          msgEl.innerText = '❌ Error de conexión: ' + err.message;
+        }
+      });
+    }
+
+    // Main Polling Loop
+    let isRedirectingAuth = false;
+    function updateMetrics() {
+      fetch('/api/metrics')
+        .then(res => {
+          if (res.status === 403) {
+            if (!isRedirectingAuth) {
+              isRedirectingAuth = true;
+              console.warn('Acceso denegado a /api/metrics (403). Redirigiendo a autorización...');
+              window.location.reload();
+            }
+            return null;
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (!data) return;
+          latestMetrics = data;
+
+          try {
+            // Sidebar badges
+            const cpu = data.cpu || {};
+            const ram = data.ram || {};
+            const gpu = data.gpu || {};
+            const wSummary = data.wifi_summary || {};
+            const wClients = data.wifi_clients || [];
+            const docker = data.docker_activities || [];
+            const procs = data.system_processes || [];
+            const disks = data.disks || [];
+            const diskIo = data.disk_io || {};
+            const net = data.net || {};
+            const sys = data.system || {};
+
+            const badgeCpu = document.getElementById('badgeNavCpu');
+            if (badgeCpu) badgeCpu.innerText = (cpu.usage_percent || 0).toFixed(0) + '%';
+            const ramUsedGb = ((ram.used_bytes || 0) / (1024 * 1024 * 1024)).toFixed(1);
+            const badgeRam = document.getElementById('badgeNavRam');
+            if (badgeRam) badgeRam.innerText = ramUsedGb + ' GB';
+            const badgeGpu = document.getElementById('badgeNavGpu');
+            if (badgeGpu) badgeGpu.innerText = (gpu.temp_c || 0) + ' °C';
+            const badgeNet = document.getElementById('badgeNavNet');
+            if (badgeNet) badgeNet.innerText = wClients.length + ' disp.';
+            const badgeApps = document.getElementById('badgeNavApps');
+            if (badgeApps) badgeApps.innerText = docker.length;
+            const badgeProc = document.getElementById('badgeNavProc');
+            if (badgeProc) badgeProc.innerText = procs.length;
+
+            const trStats = data.torrent_stats || {};
+            const torrents = data.torrents || [];
+            const badgeNavTorrents = document.getElementById('badgeNavTorrents');
+            if (badgeNavTorrents) {
+              if (trStats.dl_info_speed > 1024) {
+                badgeNavTorrents.innerText = '↓ ' + formatSpeed(trStats.dl_info_speed);
+                badgeNavTorrents.className = 'nav-badge badge-green';
+              } else if (torrents.length > 0) {
+                badgeNavTorrents.innerText = torrents.length + (torrents.length === 1 ? ' tor.' : ' tor.');
+                badgeNavTorrents.className = 'nav-badge badge-blue';
+              } else {
+                badgeNavTorrents.innerText = '0';
+                badgeNavTorrents.className = 'nav-badge';
+              }
+            }
+
+            // Header & Host
+            const lblHost = document.getElementById('lblHost');
+            if (lblHost) lblHost.innerText = sys.hostname || 'servidor';
+            const lblUptime = document.getElementById('lblUptime');
+            if (lblUptime) lblUptime.innerText = sys.uptime_str || '--';
+
+            // Security Trust Status
+            const auth = data.auth_status || {};
+            const dot = document.getElementById('dotTrust');
+            const lbl = document.getElementById('lblTrust');
+            if (dot && lbl) {
+              if (auth.is_local) {
+                dot.style.background = 'var(--adw-green)';
+                lbl.innerText = 'Red Local Wi-Fi';
+              } else {
+                dot.style.background = 'var(--adw-blue)';
+                lbl.innerText = 'Acceso Remoto Seguro';
+              }
+            }
+
+            // === UPDATE OVERVIEW TILES ===
+            const ovSysOs = document.getElementById('ovSysOs');
+            if (ovSysOs) ovSysOs.innerText = sys.os || 'Arch Linux';
+            const ovSysKernel = document.getElementById('ovSysKernel');
+            if (ovSysKernel) ovSysKernel.innerText = sys.kernel || '';
+            const ovSysUptime = document.getElementById('ovSysUptime');
+            if (ovSysUptime) ovSysUptime.innerText = sys.uptime_str || '--';
+            const ovBadgeTrust = document.getElementById('ovBadgeTrust');
+            if (ovBadgeTrust) ovBadgeTrust.innerText = auth.is_local ? 'Red Local' : 'Acceso Remoto';
+
+            const ovCpuPercent = document.getElementById('ovCpuPercent');
+            if (ovCpuPercent) ovCpuPercent.innerText = `${(cpu.usage_percent || 0).toFixed(1)}%${cpu.temp_c ? ' • ' + cpu.temp_c + ' °C' : ''}`;
+            const ovCpuSub = document.getElementById('ovCpuSub');
+            if (ovCpuSub) ovCpuSub.innerText = `${cpu.model || 'Intel Xeon'} (${cpu.logical_cores || 28} hilos)`;
+
+            const totalRamGb = ((ram.total_bytes || 0) / (1024 * 1024 * 1024)).toFixed(1);
+            const ramPct = Math.round(((ram.used_bytes || 0) / (ram.total_bytes || 1)) * 100);
+            const ovRamUsed = document.getElementById('ovRamUsed');
+            if (ovRamUsed) ovRamUsed.innerText = `${ramUsedGb} GB (${ramPct}%)`;
+            const ovRamSub = document.getElementById('ovRamSub');
+            if (ovRamSub) ovRamSub.innerText = `de ${totalRamGb} GB (DDR4)`;
+
+            const ovGpuVal = document.getElementById('ovGpuVal');
+            if (ovGpuVal) ovGpuVal.innerText = `${gpu.gpu_util_percent || 0}% • ${gpu.temp_c || 0} °C`;
+
+            const ovNetSpeed = document.getElementById('ovNetSpeed');
+            if (ovNetSpeed) ovNetSpeed.innerText = `↓ ${formatSpeed(net.rx_bytes_sec)} • ↑ ${formatSpeed(net.tx_bytes_sec)}`;
+            const ovNetSub = document.getElementById('ovNetSub');
+            if (ovNetSub) ovNetSub.innerText = `${wClients.length} dispositivos en red (3DS, Switch, PC)`;
+
+            const rootDisk = disks.find(d => d.mountpoint === '/') || (disks[0] || {});
+            const ovDiskRoot = document.getElementById('ovDiskRootUsage');
+            if (ovDiskRoot) ovDiskRoot.innerText = `SSD Raíz: ${rootDisk.percent || 0}%`;
+            const ovDiskBar = document.getElementById('ovDiskBar');
+            if (ovDiskBar) ovDiskBar.style.width = (rootDisk.percent || 0) + '%';
+
+            const ovDockerCount = document.getElementById('ovDockerCount');
+            if (ovDockerCount) ovDockerCount.innerText = `${docker.filter(d => (d.state || 'running') === 'running').length} Activos`;
+
+            // Security Overview Card & Badge
+            const sec = data.security || {};
+            const pi = sec.pihole || {};
+            const f2b = sec.fail2ban || {};
+            const ovSecPihole = document.getElementById('ovSecPihole');
+            if (ovSecPihole) {
+              const blockedStr = pi.ads_blocked_today ? (pi.ads_blocked_today > 1000 ? (pi.ads_blocked_today/1000).toFixed(1) + 'k' : pi.ads_blocked_today) : '0';
+              ovSecPihole.innerText = `Pi-hole: ${blockedStr} bloq. (${pi.ads_percentage_today || 0}%)`;
+            }
+            const ovSecF2b = document.getElementById('ovSecF2b');
+            if (ovSecF2b) {
+              ovSecF2b.innerText = `Fail2ban: ${f2b.currently_banned || 0} IPs baneadas`;
+            }
+            const badgeNavSec = document.getElementById('badgeNavSec');
+            if (badgeNavSec) {
+              badgeNavSec.innerText = `${f2b.currently_banned || 0} bans`;
+            }
+
+            // Descargas & Videoteca Overview Card
+            const emby = data.emby || {};
+            const ovTorrentSpeed = document.getElementById('ovTorrentSpeed');
+            if (ovTorrentSpeed) {
+              ovTorrentSpeed.innerText = `↓ ${formatSpeed(trStats.dl_info_speed)} • ↑ ${formatSpeed(trStats.up_info_speed)}`;
+            }
+            const ovTorrentSub = document.getElementById('ovTorrentSub');
+            if (ovTorrentSub) {
+              const dlActive = trStats.downloading_count || 0;
+              const upActive = trStats.seeding_count || 0;
+              ovTorrentSub.innerText = `qBittorrent: ${dlActive} descargando • ${upActive} sembrando`;
+            }
+            const ovTorrentBadge = document.getElementById('ovTorrentBadge');
+            if (ovTorrentBadge) {
+              if (trStats.dl_info_speed > 1024) {
+                ovTorrentBadge.className = 'adw-badge badge-green';
+                ovTorrentBadge.innerHTML = `<span class="emoji">📥</span> ↓ ${formatSpeed(trStats.dl_info_speed)}`;
+              } else if (torrents.length > 0) {
+                ovTorrentBadge.className = 'adw-badge badge-blue';
+                ovTorrentBadge.innerHTML = `<span class="emoji">📥</span> ${torrents.length} torrents`;
+              } else {
+                ovTorrentBadge.className = 'adw-badge';
+                ovTorrentBadge.innerHTML = `<span class="emoji">📥</span> qBittorrent`;
+              }
+            }
+            const ovEmbyBadge = document.getElementById('ovEmbyBadge');
+            if (ovEmbyBadge && emby.available) {
+              const epK = emby.episodes_count > 1000 ? (emby.episodes_count / 1000).toFixed(1) + 'k' : emby.episodes_count;
+              ovEmbyBadge.innerHTML = `<span class="emoji">🎬</span> Emby: ${emby.movies_count || 0} pelis • ${epK} caps`;
+            }
+
+            // === PROCESSOR VIEW STATS ===
+            const cpuBigPercent = document.getElementById('cpuBigPercent');
+            if (cpuBigPercent) cpuBigPercent.innerText = (cpu.usage_percent || 0).toFixed(1) + '%';
+            const cpuBigFreq = document.getElementById('cpuBigFreq');
+            if (cpuBigFreq) cpuBigFreq.innerText = `@ ${(cpu.freq_mhz || 0)} MHz${cpu.temp_c ? ' • ' + cpu.temp_c + ' °C' : ''}`;
+            const cpuModelDetailed = document.getElementById('cpuModelDetailed');
+            if (cpuModelDetailed) cpuModelDetailed.innerText = cpu.model || 'Intel Xeon Processor';
+            const cpuCoresLabel = document.getElementById('cpuCoresLabel');
+            if (cpuCoresLabel) cpuCoresLabel.innerText = `${cpu.physical_cores || 14}C / ${cpu.logical_cores || 28}T`;
+            const cpuFreqVal = document.getElementById('cpuFreqVal');
+            if (cpuFreqVal) cpuFreqVal.innerText = `${(cpu.freq_mhz || 0)} MHz${cpu.temp_c ? ' • 🌡️ ' + cpu.temp_c + ' °C' : ''}`;
+            const cpuLoadVal = document.getElementById('cpuLoadVal');
+            if (cpuLoadVal) cpuLoadVal.innerText = `${cpu.load_1m || 0} / ${cpu.load_5m || 0} / ${cpu.load_15m || 0}`;
+            const cpuUptimeVal = document.getElementById('cpuUptimeVal');
+            if (cpuUptimeVal) cpuUptimeVal.innerText = sys.uptime_str || '--';
+            const cpuKernelVal = document.getElementById('cpuKernelVal');
+            if (cpuKernelVal) cpuKernelVal.innerText = `${sys.os || 'Linux'} (${sys.kernel || ''})`;
+
+            // CPU Cores Grid
+            const coresGrid = document.getElementById('cpuCoresGrid');
+            if (coresGrid) {
+              if (cpu.per_core_percent && coresGrid.children.length === 0) {
+                coresGrid.innerHTML = cpu.per_core_percent.map((p, i) => `
+                  <div class="core-adw-box">
+                    <span class="core-adw-title">C${i}</span>
+                    <div class="core-adw-bar-bg">
+                      <div class="core-adw-bar-fill" id="coreBar${i}" style="width: ${p}%;"></div>
+                    </div>
+                    <span class="core-adw-val" id="coreVal${i}">${p.toFixed(0)}%</span>
+                  </div>
+                `).join('');
+              } else if (cpu.per_core_percent) {
+                cpu.per_core_percent.forEach((p, i) => {
+                  const bar = document.getElementById('coreBar' + i);
+                  const val = document.getElementById('coreVal' + i);
+                  if (bar) bar.style.width = p + '%';
+                  if (val) val.innerText = p.toFixed(0) + '%';
+                });
+              }
+            }
+
+            // === MEMORY VIEW STATS ===
+            const ramBigUsed = document.getElementById('ramBigUsed');
+            if (ramBigUsed) ramBigUsed.innerText = ramUsedGb + ' GiB';
+            const ramBigTotal = document.getElementById('ramBigTotal');
+            if (ramBigTotal) ramBigTotal.innerText = totalRamGb + ' GiB';
+            const ramPercentBadge = document.getElementById('ramPercentBadge');
+            if (ramPercentBadge) ramPercentBadge.innerText = ramPct + '% Usada';
+            const ramUsedVal = document.getElementById('ramUsedVal');
+            if (ramUsedVal) ramUsedVal.innerText = formatBytes(ram.used_bytes);
+            const ramAvailVal = document.getElementById('ramAvailVal');
+            if (ramAvailVal) ramAvailVal.innerText = formatBytes(ram.available_bytes);
+            const ramCachedVal = document.getElementById('ramCachedVal');
+            if (ramCachedVal) ramCachedVal.innerText = formatBytes(ram.cached_bytes);
+            const swapUsageVal = document.getElementById('swapUsageVal');
+            if (swapUsageVal) swapUsageVal.innerText = `${formatBytes(ram.swap_used_bytes || 0)} / ${formatBytes(ram.swap_total_bytes || 0)}`;
+
+            // === GPU VIEW STATS ===
+            const gpuBigPercent = document.getElementById('gpuBigPercent');
+            if (gpuBigPercent) gpuBigPercent.innerText = (gpu.gpu_util_percent || 0) + '%';
+            const gpuBigTemp = document.getElementById('gpuBigTemp');
+            if (gpuBigTemp) gpuBigTemp.innerText = `@ ${(gpu.temp_c || 0)} °C`;
+            const gpuVramVal = document.getElementById('gpuVramVal');
+            if (gpuVramVal) gpuVramVal.innerText = `${gpu.vram_used_mb || 0} / ${gpu.vram_total_mb || 4096} MB`;
+            const gpuTempVal = document.getElementById('gpuTempVal');
+            if (gpuTempVal) gpuTempVal.innerText = (gpu.temp_c || 0) + ' °C';
+            const gpuFanVal = document.getElementById('gpuFanVal');
+            if (gpuFanVal) gpuFanVal.innerText = (gpu.fan_percent || gpu.fan_speed_percent || 0) + '%';
+            const gpuDriverVal = document.getElementById('gpuDriverVal');
+            if (gpuDriverVal) gpuDriverVal.innerText = gpu.driver || 'NVIDIA';
+
+            // === DISKS VIEW STATS ===
+            const diskBigW = document.getElementById('diskBigW');
+            if (diskBigW) diskBigW.innerText = formatSpeed(diskIo.write_bytes_sec);
+            const diskBigR = document.getElementById('diskBigR');
+            if (diskBigR) diskBigR.innerText = formatSpeed(diskIo.read_bytes_sec);
+
+            // === NETWORK VIEW STATS ===
+            const netBigRx = document.getElementById('netBigRx');
+            if (netBigRx) netBigRx.innerText = `↓ ${formatSpeed(net.rx_bytes_sec)}`;
+            const netBigTx = document.getElementById('netBigTx');
+            if (netBigTx) netBigTx.innerText = `↑ ${formatSpeed(net.tx_bytes_sec)}`;
+            const netCableTraffic = document.getElementById('netCableTrafficVal');
+            if (netCableTraffic) netCableTraffic.innerText = `↓ ${formatBytes(wSummary.cable_tx_bytes || 0)} • ↑ ${formatBytes(wSummary.cable_rx_bytes || 0)}`;
+            const netWifiTraffic = document.getElementById('netWifiTrafficVal');
+            if (netWifiTraffic) netWifiTraffic.innerText = `↓ ${formatBytes(wSummary.wifi_tx_bytes || 0)} • ↑ ${formatBytes(wSummary.wifi_rx_bytes || 0)}`;
+            const netSyncVal = document.getElementById('netSyncVal');
+            if (netSyncVal) netSyncVal.innerText = `Sondeo: ${wSummary.last_update || '--'}`;
+
+            // Device counts & filters
+            const cntTotal = wClients.length;
+            const cntCable = wClients.filter(c => c.conn_type === 'cable').length;
+            const cnt5g = wClients.filter(c => c.conn_type !== 'cable' && (c.band === '5 GHz' || (c.band && c.band.includes('5')))).length;
+            const cnt24g = wClients.filter(c => c.conn_type !== 'cable' && (c.band === '2.4 GHz' || (c.band && c.band.includes('2.4')))).length;
+
+            const cntDevTotal = document.getElementById('cntDevicesTotal');
+            if (cntDevTotal) cntDevTotal.innerText = cntTotal;
+            const cntFAll = document.getElementById('cntFAll');
+            if (cntFAll) cntFAll.innerText = cntTotal;
+            const cntFCable = document.getElementById('cntFCable');
+            if (cntFCable) cntFCable.innerText = cntCable;
+            const cntF5g = document.getElementById('cntF5g');
+            if (cntF5g) cntF5g.innerText = cnt5g;
+            const cntF24g = document.getElementById('cntF24g');
+            if (cntF24g) cntF24g.innerText = cnt24g;
+
+            const cntApps = document.getElementById('cntApps');
+            if (cntApps) cntApps.innerText = docker.length;
+            const cntProcesses = document.getElementById('cntProcesses');
+            if (cntProcesses) cntProcesses.innerText = procs.length;
+
+            renderActiveView();
+          } catch (renderErr) {
+            console.error('Error procesando métricas en el DOM:', renderErr);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching metrics:', err);
+        });
+    }
+
+    function serviceAction(type, target, action) {
+      const verb = action === 'restart' ? 'reiniciar' : 'iniciar';
+      if (!confirm(`¿Deseas ${verb} ${target}?`)) return;
+      fetch('/api/service/action', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: type, target: target, action: action})
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.success) alert(d.error || 'Error al ejecutar acción');
+        setTimeout(updateMetrics, 1200);
+      })
+      .catch(e => alert('Error: ' + e));
+    }
+
+    function wakeDevice(mac, name) {
+      fetch('/api/wol/wake', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mac: mac})
+      })
+      .then(r => r.json())
+      .then(d => {
+        alert(d.message || `Paquete mágico enviado a ${name || mac}`);
+      })
+      .catch(e => alert('Error al enviar Wake-on-LAN: ' + e));
+    }
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+
+      // Inicializar según Hash de la URL o default 'overview'
+      const initialHash = window.location.hash.replace('#', '') || 'overview';
+      historyStack = [initialHash];
+      historyIdx = 0;
+      try {
+        window.history.replaceState({ view: initialHash, idx: 0 }, '', '#' + initialHash);
+      } catch(e) {}
+      switchView(initialHash, false);
+      updateHistoryButtons();
+
+      updateMetrics();
+      setInterval(updateMetrics, 2000);
+      window.addEventListener('resize', () => {
+        renderActiveView();
+      });
+    });
+
+  </script>
+</body>
+</html>

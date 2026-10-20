@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Datos y sesiones locales sensibles
+trusted_devices.json
+.env
+
+# Entorno de escritorio / Sistema
+.directory
+.DS_Store
+*.swp
+*.swo
