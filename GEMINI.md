@@ -14,3 +14,7 @@
 - **Regla obligatoria**: Todos los planes de implementación (`implementation_plan.md`), bitácoras de trabajo y `walkthrough.md` deben guardarse siempre dentro de la carpeta `planes/` del proyecto (`/home/servidor/servicios/dashboard/planes/`).
 - **Objetivo**: Asegurar que tanto Google AI Studio en el móvil como Antigravity compartan siempre el contexto exacto de en qué se ha estado trabajando y puedan consultarlo tras sincronizar (`git pull`).
 
+## 4. Actualización Obligatoria del README (`README.md`)
+- **Regla obligatoria**: Cada vez que se realice cualquier modificación, corrección, nueva funcionalidad, cambio de diseño o ajuste arquitectónico en el proyecto, se debe actualizar inmediatamente el archivo `README.md` con la descripción de los cambios y el estado actual del sistema.
+- **Objetivo**: Garantizar que la documentación del repositorio refleje fielmente en todo momento las características, estructura de directorios, endpoints y funcionamiento real del proyecto tanto en GitHub como en Google AI Studio.
+

@@ -1,18 +1,33 @@
 # 🛡️ Recursos — Consola de Telemetría, Red, Seguridad Zero-Trust y Actualización OTA
 
 ![Plataforma](https://img.shields.io/badge/Plataforma-Linux%20Server-0EA5E9?style=for-the-badge&logo=linux&logoColor=white)
-![Seguridad](https://img.shields.io/badge/Seguridad-Zero--Trust%20HMAC%20%2B%20Fail2ban-10B981?style=for-the-badge&logo=shield&logoColor=white)
+![Nextcloud](https://img.shields.io/badge/Nextcloud%20Hub-Integraci%C3%B3n%20Nativa%20UI-0082c9?style=for-the-badge&logo=nextcloud&logoColor=white)
+![Seguridad](https://img.shields.io/badge/Seguridad-Zero--Trust%20Dual--Token-10B981?style=for-the-badge&logo=shield&logoColor=white)
 ![Arquitectura](https://img.shields.io/badge/Navegaci%C3%B3n-Multi--P%C3%A1gina%20History%20API-6366F1?style=for-the-badge)
 ![Actualización](https://img.shields.io/badge/GitHub%20OTA-1--Clic%20Auto--Sync-F59E0B?style=for-the-badge&logo=github&logoColor=black)
 
-**Recursos** es una consola web de alta precisión y cero dependencias externas diseñada para la monitorización integral del servidor Linux, gestión de contenedores Docker y servicios `systemd`, auditoría de red (Ethernet Gigabit + Repetidor Wi-Fi 6 ASUS RT-AX56U), protección activa DNS/IPS (**Pi-hole** + **Fail2ban**), control de descargas (**qBittorrent** + **Emby SQLite**), **Seguridad Zero-Trust por emparejamiento criptográfico de dispositivos** y **Gestor de Versiones con actualización OTA en 1 clic desde GitHub**.
+**Recursos** es una consola web de alto rendimiento y cero dependencias externas, diseñada para la monitorización integral de servidores Linux, control de contenedores **Docker** y servicios `systemd`, auditoría de red (Ethernet Gigabit + Repetidor Wi-Fi 6 ASUS RT-AX56U), protección activa DNS/IPS (**Pi-hole** + **Fail2ban**), gestión de descargas (**qBittorrent** + **Emby** SQLite), **Seguridad Zero-Trust con autenticación de doble vía (Dual-Token)** e **integración visual nativa con Nextcloud Hub 9/10**.
 
 ---
 
 ## ✨ Novedades y Arquitectura Principal
 
-### 1. 🧭 Navegación Web Multi-Página Real (HTML5 History API)
-A diferencia de los paneles monolíticos tradicionales, **Recursos** separa cada área operativa en rutas web limpias e independientes con soporte nativo para las flechas **Atrás** y **Adelante** del navegador (tanto en escritorio como con gestos táctiles en móviles) y apertura en pestañas nuevas (`Ctrl+Clic`):
+### 1. ☁️ Integración Visual Nativa con Nextcloud Hub 9/10
+La interfaz gráfica de **Recursos** ha sido diseñada para mimetizarse fluidamente tanto en modo independiente como incrustada como aplicación web (*External Sites*) dentro de **Nextcloud Hub**:
+- **Paleta de Color Oficial Nextcloud**:
+  - Fondo primario oscuro: `#181818`.
+  - Superficies de paneles y tarjetas Bento: `#222222`.
+  - Bordes y líneas divisorias sutiles: `#2d2d2d`.
+  - Color de acento e interactividad: Azul Nextcloud (`#0082c9` / `#0091f2`).
+  - Tipografía del sistema de Nextcloud: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`.
+- **Detección Dinámica de Entorno Embebido (`isEmbeddedInNextcloud`)**:
+  - El dashboard detecta automáticamente si se está ejecutando dentro de un `<iframe>` de Nextcloud (por ejemplo, en `https://cminewar.duckdns.org/apps/external/3/` o `/apps/external/1/`).
+  - Optimiza márgenes, barras de navegación y alturas de scroll para evitar barras de desplazamiento dobles y ofrecer la experiencia de una app integrada oficial de Nextcloud.
+
+---
+
+### 2. 🧭 Navegación Web Multi-Página Real (HTML5 History API)
+A diferencia de los paneles monolíticos tradicionales de página única por anclas, **Recursos** separa cada área operativa en rutas web limpias e independientes. Soporta nativamente las flechas **Atrás** y **Adelante** del navegador (en escritorio y mediante gestos de deslizamiento en dispositivos móviles) y apertura en pestañas (`Ctrl+Clic`):
 
 | Ruta Web | Vista / Módulo | Descripción |
 | :--- | :--- | :--- |
@@ -21,54 +36,54 @@ A diferencia de los paneles monolíticos tradicionales, **Recursos** separa cada
 | `/memoria` | **Memoria Física** | Desglose de RAM usada, disponible, caché/búferes y estado de paginación Swap/Zram. |
 | `/grafica` | **Tarjeta Gráfica** | Telemetría NVIDIA (`nvidia-smi`), VRAM dedicada, temperatura, ventilador y procesos CUDA. |
 | `/almacenamiento` | **Almacenamiento** | Velocidad de lectura/escritura E/S en vivo y ocupación/temperatura por partición NVMe/HDD/NAS. |
-| `/red` | **Red & Dispositivos** | Tráfico Ethernet vs Wi-Fi, clientes del repetidor ASUS RT-AX56U (5 GHz / 2.4 GHz) y Wake-on-LAN. |
+| `/red` | **Red & Wi-Fi** | Tráfico Ethernet vs Wi-Fi, clientes del repetidor ASUS RT-AX56U (5 GHz / 2.4 GHz) y Wake-on-LAN. |
 | `/seguridad` | **Seguridad & DNS** | Estadísticas de bloqueo **Pi-hole FTL**, jaulas **Fail2ban** activas e historial completo ordenable. |
 | `/aplicaciones` | **Aplicaciones** | Control de servicios nativos (`systemd`), contenedores **Docker** en vivo y Control Parental. |
 | `/descargas` | **Descargas & Emby** | Torrents activos en **qBittorrent** y últimas películas/series indexadas en **Emby** (`library.db`). |
-| `/procesos` | **Procesos** | Monitor de procesos del sistema ordenable por porcentaje de CPU, memoria privada, PID o nombre. |
-| `/version` | **Versión & GitHub** | Comparador en vivo **Local vs GitHub (`cminewarIA/recursos-ui`)**, autodetección DNS y actualización en 1 clic. |
+| `/procesos` | **Procesos** | Monitor de procesos del sistema ordenable por CPU, memoria privada, PID o nombre de binario. |
+| `/dispositivos` | **Dispositivos Confiables**| Panel de auditoría Zero-Trust con lista de dispositivos autorizados y revocación en 1 clic. |
+| `/version` | **Versión & GitHub** | Comparador en vivo **Local vs GitHub (`cminewarIA/recursos-ui`)**, estado OTA y actualización en 1 clic. |
 
-> **Compatibilidad con Nextcloud**: El enrutador mantiene retrocompatibilidad automática con enlaces por hash (`#processor`, `#security`, etc.) y detecta si se ejecuta embebido dentro de *Nextcloud External Sites*.
+> **Retrocompatibilidad**: Mantiene compatibilidad automática con enlaces antiguos por hash (`#processor`, `#security`, `#downloads`, etc.).
 
 ---
 
-### 2. 🔐 Seguridad Zero-Trust con Emparejamiento Local Automático
-El servidor implementa una capa de seguridad criptográfica diseñada para proteger el acceso externo sin sacrificar la comodidad dentro de casa:
+### 3. 🔐 Seguridad Zero-Trust con Autenticación Dual-Token
+El sistema implementa una arquitectura de confianza cero que protege el acceso exterior sin requerir credenciales manuales repetitivas en el entorno doméstico:
 
 1. **Emparejamiento Transparente en Red Local (LAN)**:
-   - Cuando cualquier dispositivo (móvil, tablet o portátil) accede al dashboard conectado al Wi-Fi local (`192.168.50.0/24` / RFC1918), el servidor lo registra automáticamente en `/etc/system-dashboard/trusted_devices.json`.
-   - Se emite una cookie segura `HttpOnly; SameSite=Lax; Path=/` (`recursos_device_trust`) firmada con **HMAC-SHA256** utilizando una clave secreta de 256 bits exclusiva del servidor (`/etc/system-dashboard/secret.key`).
-2. **Acceso Transparente desde Datos Móviles (4G / 5G / WAN)**:
-   - Al salir de casa y conectarse por datos móviles a través del dominio público, el servidor verifica la firma criptográfica HMAC-SHA256 y comprueba que el identificador del dispositivo no haya sido revocado, permitiendo el paso de forma transparente.
-3. **Bloqueo Estricto y Clave Maestra de Rescate**:
-   - Cualquier visitante externo sin credencial válida recibe una pantalla de bloqueo `403 Forbidden` y todas las rutas `/api/*` quedan blindadas.
-   - Si accedes por primera vez desde fuera de casa con un dispositivo nuevo, puedes autorizarlo introduciendo la **Clave Maestra de Rescate** (`/etc/system-dashboard/master.pass`), protegida con limitación de intentos (**5 intentos fallidos = bloqueo de IP durante 15 minutos**).
-4. **Panel de Administración y Revocación de Dispositivos**:
-   - Desde el botón de estado de seguridad en la cabecera puedes inspeccionar todos los dispositivos vinculados (nombre del dispositivo, IP LAN, última IP WAN, fecha de última conexión) y **revocar el acceso** individualmente o cerrar todas las demás sesiones con un clic.
+   - Al acceder desde el Wi-Fi local (`192.168.50.0/24` o cualquier rango privado RFC1918), el servidor autoriza el dispositivo y genera un token criptográfico firmado con **HMAC-SHA256** utilizando una clave secreta de 256 bits (`/etc/system-dashboard/secret.key`).
+2. **Arquitectura Dual-Token para Compatibilidad Total con Iframes**:
+   - Para resolver el bloqueo de cookies de terceros en iframes (Safari ITP, Google Chrome CHIPS, Firefox ETP) dentro de Nextcloud, el sistema implementa una vía de autenticación dual:
+     - **Vía 1: Encabezado HTTP `X-Device-Token` / `Authorization: Bearer`**: Almacenado de forma segura en `localStorage` (`recursos_device_token`) e inyectado automáticamente en cada llamada `fetch()` a la API.
+     - **Vía 2: Cookie HttpOnly con atributo Partitioned**: Emitida como `SameSite=None; Partitioned; Secure; HttpOnly; Path=/` para sesiones HTTPS y `SameSite=Lax` para conexiones locales.
+   - El backend `server.py` evalúa con prioridad el token en la cabecera HTTP y, en su defecto, la cookie de sesión, permitiendo que Nextcloud cargue los datos sin interrupciones ni pantallas de bloqueo.
+3. **Acceso desde Redes Móviles (4G / 5G / WAN)**:
+   - Los dispositivos previamente emparejados en LAN navegan de forma transparente desde el exterior.
+4. **Pantalla de Bloqueo y Clave Maestra de Rescate**:
+   - Dispositivos desconocidos externos reciben una pantalla `403 Forbidden` con opción a introducir la **Clave Maestra de Rescate** (`/etc/system-dashboard/master.pass`).
+   - Protección activa contra fuerza bruta: **5 intentos fallidos bloquean la IP durante 15 minutos**.
+5. **Revocación Inmediata de Dispositivos**:
+   - En `/dispositivos`, los administradores pueden inspeccionar las sesiones activas (nombre del dispositivo, IP LAN original, última IP WAN de conexión y fecha) y revocar el acceso de cualquier terminal con un clic.
 
 ---
 
-### 3. 🌐 Autodetección Dinámica de Dominio DNS (Sin Dominios Fijos)
-Se han eliminado todas las referencias fijas a dominios estáticos en el código. El backend `server.py` descubre y actualiza dinámicamente el dominio público del servidor (`detect_system_dns_domain`) siguiendo una cadena de prioridad inteligente:
+### 4. 🌐 Autodetección Dinámica de Dominio DNS
+El sistema no utiliza dominios fijos en el código. El motor `detect_system_dns_domain` de `server.py` averigua dinámicamente el dominio público siguiendo esta jerarquía:
+1. Variable de entorno `PUBLIC_DOMAIN`.
+2. Bloques de configuración de servidor en `/etc/caddy/Caddyfile` y `/etc/nginx/sites-enabled/*`.
+3. Scripts y tareas programadas de **DuckDNS** (`~/duckdns/duck.sh`, `/etc/cron*`, `/opt/duckdns/*`).
+4. Hostname FQDN (`socket.getfqdn()`).
+5. Cabecera `X-Forwarded-Host` o `Host` provista por el proxy inverso Caddy.
 
-1. Variable de entorno `PUBLIC_DOMAIN` (si se define manualmente).
-2. Escaneo automático de bloques de dominio en `/etc/caddy/Caddyfile` y `/etc/nginx/sites-enabled/*`.
-3. Escaneo de scripts o crons de actualización **DuckDNS** (`~/duckdns/duck.sh`, `/etc/cron*`, `/opt/duckdns/*`).
-4. Hostname FQDN del sistema (`/etc/hostname` / `socket.getfqdn()`).
-5. Cabecera HTTP `X-Forwarded-Host` o `Host` recibida desde el proxy inverso.
-
-Además, al descargar el archivo de escritorio remoto **`/static/visipics_externo.rdp`**, el servidor inyecta al vuelo el dominio público autodetectado (`full address:s:<dominio_detectado>:3389`).
+Al descargar el archivo de escritorio remoto **`/static/visipics_externo.rdp`**, se autoinyecta en tiempo real el dominio público activo (`full address:s:<dominio_detectado>:3389`).
 
 ---
 
-### 4. 🔄 Gestor de Versiones y Actualización OTA desde GitHub en 1 Clic
-En la página **`/version`** (y mediante el indicador en vivo de la barra superior y lateral):
-
-- **Comparación Local vs GitHub en Vivo**: Muestra el commit SHA local (`git rev-parse --short HEAD`), mensaje, fecha y estado del árbol de trabajo frente al último commit publicado en GitHub (`https://github.com/cminewarIA/recursos-ui`, rama `main`).
-- **Actualización en 1 Clic (`POST /api/system/update`)**:
-  - Verifica que el dispositivo esté autorizado mediante Zero-Trust.
-  - Ejecuta `git fetch origin main --prune` y `git pull --ff-only origin main` (con respaldo automático si hubiera cambios locales).
-  - Muestra la salida detallada de la terminal en pantalla y reinicia automáticamente el servicio `system-dashboard.service` en segundo plano, reconectando la interfaz tras unos segundos.
+### 5. 🔄 Actualización OTA en 1 Clic desde GitHub
+Desde la vista **`/version`** o mediante el botón de actualización en la cabecera:
+- Inspección del commit SHA local frente al último publicado en la rama `main` del repositorio oficial (`https://github.com/cminewarIA/recursos-ui`).
+- Actualización atómica con verificación de permisos Zero-Trust (`POST /api/system/update`), ejecución de `git fetch` y `git pull`, y reinicio automático de `system-dashboard.service`.
 
 ---
 
@@ -76,31 +91,53 @@ En la página **`/version`** (y mediante el indicador en vivo de la barra superi
 
 ```text
 /home/servidor/servicios/dashboard/
-├── server.py                  # Servidor HTTP/API en Python 3 (Zero-Trust, Telemetría, DNS, OTA GitHub)
+├── server.py                  # Servidor HTTP/API Python 3 (Zero-Trust Dual-Token, Telemetría, OTA)
 ├── static/
-│   ├── index.html             # Aplicación Web Multi-Página (Diseño Obsidian Slate & Telemetría en Vivo)
-│   └── visipics_externo.rdp   # Plantilla RDP externa (inyectada dinámicamente con el DNS detectado)
+│   ├── index.html             # Interfaz Web Multi-Página (Diseño Nativo Nextcloud Hub 9/10)
+│   └── visipics_externo.rdp   # Plantilla RDP externa (inyectada al vuelo con dominio dinámico)
 ├── index.html                 # Espejo sincronizado para previsualización en Google AI Studio
 ├── update.sh                  # Script CLI de sincronización rápida con GitHub y reinicio systemd
-└── README.md                  # Documentación técnica del sistema
+├── planes/                    # Historial y planes de trabajo sincronizados
+│   ├── README.md              # Documentación de la carpeta de planes
+│   ├── implementation_plan.md # Plan de implementación activo
+│   ├── walkthrough.md         # Registro de cambios y pruebas verificadas
+│   └── *.md                   # Bitácoras de versiones y arquitecturas previas
+├── GEMINI.md                  # Reglas de desarrollo y sincronización con GitHub y Google AI Studio
+└── README.md                  # Documentación técnica completa del sistema
 ```
+
+---
+
+## 📋 Reglas Operativas de Sincronización y Desarrollo
+
+Para garantizar la coherencia absoluta entre el servidor local, el repositorio de GitHub y el entorno móvil de Google AI Studio, el proyecto sigue cuatro reglas obligatorias estipuladas en `GEMINI.md`:
+
+1. **Sincronización Previa (`git pull`)**: Siempre se ejecuta `git pull origin main` antes de realizar cualquier cambio en el código o responder solicitudes de edición.
+2. **Publicación Automática (`git push`)**: Cualquier cambio en el backend, la web o los archivos de configuración se confirma con un commit descriptivo y se envía de inmediato a `origin main`.
+3. **Almacenamiento de Planes (`planes/`)**: Todos los planes de implementación, bitácoras y registros de pruebas se almacenan permanentemente en la carpeta `planes/`.
+4. **Mantenimiento Continuo del README (`README.md`)**: El archivo `README.md` se actualiza obligatoriamente en cada intervención para reflejar con exactitud las características y cambios implementados.
 
 ---
 
 ## 🚀 Instalación, Uso y Mantenimiento
 
-### Consultar estado del servicio
+### Comprobar estado del servicio
 ```bash
 sudo systemctl status system-dashboard.service
 ```
 
-### Actualizar desde terminal (o desde el botón en `/version`)
+### Reiniciar el servicio manualmente
+```bash
+sudo systemctl restart system-dashboard.service
+```
+
+### Actualización manual desde terminal
 ```bash
 cd /home/servidor/servicios/dashboard
 ./update.sh
 ```
 
-### Archivos de Seguridad Zero-Trust en el Servidor
-- `/etc/system-dashboard/secret.key`: Clave criptográfica HMAC-SHA256 de 256 bits (generada automáticamente con permisos `0600`).
-- `/etc/system-dashboard/master.pass`: Clave maestra de rescate para autorizar dispositivos nuevos desde fuera de la red LAN.
-- `/etc/system-dashboard/trusted_devices.json`: Registro persistente de dispositivos autorizados y sus metadatos de conexión.
+### Archivos de Configuración y Seguridad Zero-Trust
+- `/etc/system-dashboard/secret.key`: Clave HMAC-SHA256 de 256 bits (permisos `0600`).
+- `/etc/system-dashboard/master.pass`: Clave maestra de rescate para autorizar nuevos dispositivos remotos.
+- `/etc/system-dashboard/trusted_devices.json`: Registro persistente de dispositivos autorizados y metadatos de acceso.

@@ -46,6 +46,10 @@ Se ha diagnosticado y resuelto el fallo que impedía que el dashboard cargara co
   - Integración de iframe (`.in-nextcloud`): Altura ajustada a `100%` para eliminar barras de desplazamiento duplicadas y márgenes dobles.
   - Soporte de navegación por hash (`#security`, `#overview`) para sincronizar con los enlaces externos de Nextcloud.
 
+### 3. Documentación y Reglas Operativas
+- **Regla 4 en [GEMINI.md](file:///home/servidor/servicios/dashboard/GEMINI.md)**: Registrada la obligatoriedad de mantener actualizado `README.md` en cada modificación técnica o de diseño.
+- **[README.md](file:///home/servidor/servicios/dashboard/README.md)**: Actualizado por completo con la documentación de diseño Nextcloud Hub 9/10, arquitectura Dual-Token Zero-Trust (`X-Device-Token` + Partitioned Cookie), matriz de 12 rutas web y árbol de directorios con `planes/`.
+
 ---
 
 ## Verificación Realizada
@@ -53,9 +57,9 @@ Se ha diagnosticado y resuelto el fallo que impedía que el dashboard cargara co
 1. **Prueba de cabeceras CSP vía HTTPS (Caddy)**:
    - `curl -s -k -I https://recursos.cminewar.duckdns.org/` confirmó que `frame-ancestors` incluye `https://cminewar.duckdns.org` y subdominios.
 2. **Prueba de rutas**:
-   - `/descargas` y `/seguridad` devuelven `HTTP/2 200 OK`.
+   - `/descargas`, `/version` y `/seguridad` devuelven `HTTP/2 200 OK`.
 3. **Prueba de autenticación**:
-   - `/api/metrics` genera y valida tokens vía `X-Device-Token`.
+   - `/api/metrics` genera y valida tokens vía `X-Device-Token` y Cookie HttpOnly.
 4. **Servicio y Git**:
    - `system-dashboard.service` reiniciado y en ejecución activa.
-   - Commit `e165372` subido exitosamente a GitHub (`cminewarIA/recursos-ui` rama `main`).
+   - Sincronización continua de código y documentación en GitHub (`cminewarIA/recursos-ui`, rama `main`).
