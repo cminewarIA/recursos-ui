@@ -1,6 +1,6 @@
 {
-  "name": "RecursosHub - Plataforma de Gestión y Biblioteca de Recursos",
-  "description": "Centro integral de gestión de recursos, inventario de activos, biblioteca de herramientas digitales y planificador de capacidad.",
+  "name": "Recursos - Dashboard de Telemetría y Servidor",
+  "description": "Panel de control y monitoreo en tiempo real de recursos del servidor: CPU, RAM, GPU, discos, Docker, systemd, red Wi-Fi ASUS, Pi-hole y servicios multimedia.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
