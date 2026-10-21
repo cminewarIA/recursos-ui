@@ -1,46 +1,39 @@
-# Plan de Implementación: Agrupamiento Dinámico por Zoom y Exclusión de Conexiones Locales
+# Plan de Implementación: Traducción de IPs Locales y Externas mediante Pi-hole (`v4.12.0`)
 
 ## 1. Contexto y Objetivos del Usuario
-1. **Cero Texto Hardcodeado / Fijo**: Ningún nombre de ciudad, proveedor o texto estático en la lógica de agrupación o renderizado del mapa. Todas las etiquetas y títulos deben calcularse de forma 100% dinámica a partir de los datos recibidos (`remote_ip`, `city`, `country`, `isp`).
-2. **Agrupamiento Dinámico según el Zoom (Clustering por Distancia de Píxeles en Pantalla)**:
-   - Al hacer zoom hacia afuera (alejarse), los marcadores próximos en pantalla (< 48px) se combinan dinámicamente en una insignia de grupo (`🔀 N`) para no solaparse.
-   - Al hacer zoom hacia adentro (acercarse), a medida que los puntos se separan visualmente en la pantalla, se desempaquetan dinámicamente en pines individuales o subgrupos independientes.
-   - Escuchar el evento `'zoomend'` de Leaflet para recalcular instantáneamente los clusters.
-3. **Excluir Conexiones Locales (LAN) del Mapa**:
-   - No mostrar IPs privadas locales (`192.168.x.x`, `10.x.x.x`, `172.x.x.x`, `127.x.x.x`, etc.) como pines en el mapa.
-   - Únicamente el nodo anfitrión central del servidor se ubica en Gran Canaria.
-4. **Mostrar las IPs Públicas a las que se conectan los dispositivos de la casa**:
-   - Integrar la lectura de kernel conntrack (`sudo -n conntrack -L`) en `server.py` para capturar todos los flujos activos y recientes de red entre los dispositivos de la casa (`192.168.50.x`) y las IPs públicas externas de Internet a las que acceden.
-5. **Persistencia del Popup Abierto**:
-   - Mantener abierto el popup de la IP seleccionada durante los refrescos periódicos de métricas y los eventos de zoom del mapa hasta que el usuario decida cerrarlo con el botón `[X]`.
-6. **Incremento de Versión Semántica**:
-   - Siguiendo la regla de control de versión (`0.0.X` para ajustes de detalle / corrección sin cambio mayor de diseño): pasar de `v4.11.0` a `v4.11.1`.
+- El usuario ha solicitado: *"traduce las ip locales y las externa si pi hole las tiene"*.
+- Objetivos:
+  1. **IPs Locales (LAN)**: Traducir las direcciones de red interna (`192.168.50.x`) a nombres amigables de dispositivos del hogar utilizando la base de datos de Pi-hole FTL (`/etc/pihole/pihole-FTL.db`), `/etc/pihole/custom.list` y `/etc/hosts` (ej. `192.168.50.16` -> `tab-s9-ultra-de-yonah`, `192.168.50.187` -> `tv-de-la-sala-de-estar`, `192.168.50.74` -> `nintendo-switch-oled`, `192.168.50.252` -> `s25-yonah`).
+  2. **IPs Externas (WAN)**: Traducir las direcciones IP públicas remotas a los nombres de dominio reales resueltos por Pi-hole mediante el análisis incremental y ultrarrápido de `/var/log/pihole/pihole.log` (`reply <domain> is <ip>`) y resolución PTR inversa de fallback (ej. `20.250.119.72` -> `api.github.com`, `172.217.119.4` -> `play.googleapis.com`, `1.1.1.1` -> `one.one.one.one`).
+  3. **Visualización en el Dashboard**:
+     - Mostrar los nombres de host locales en los detalles de las conexiones (saber exactamente qué dispositivo de la casa se conecta).
+     - Mostrar los nombres de dominio en las insignias de los marcadores del mapa, en el diálogo popup de inspección y en la tabla interactiva de conexiones de red.
+  4. **Control de Versión**:
+     - Al tratarse de una nueva función, incrementar a `v4.12.0` (`0.X.0` según criterio de versión de `GEMINI.md`).
 
 ---
 
 ## 2. Cambios Propuestos
 
 ### Backend (`server.py`)
-- En `fetch_connections_geo_worker()`:
-  - Mantener la exclusión de IPs privadas para que no se generen pines LAN falsos ni órbitas.
-  - Añadir lectura de kernel conntrack con `sudo -n conntrack -L`:
-    - Identificar flujos donde el origen sea una IP privada de la casa (`192.168.50.x`) y el destino sea una IP pública externa (o viceversa).
-    - Registrar el socket con su servicio y `source_hint` dinámico ("Servidor" o "Dispositivo 192.168.50.x").
-    - Añadir estas IPs públicas a la cola de resolución GeoIP (`ip-api.com`).
+- Crear la clase `PiholeDnsTranslator`:
+  - `refresh_local_names()`: Lee `/etc/pihole/custom.list`, `network_addresses` de `/etc/pihole/pihole-FTL.db`, `/etc/hosts` y `DEVICE_FRIENDLY_NAMES`.
+  - `refresh_external_domains()`: Lector de log incremental sobre `/var/log/pihole/pihole.log` que extrae en menos de 1 ms las respuestas DNS (`reply domain is ip` y `reply ip is domain`).
+  - Cache en memoria sincronizado en el hilo worker `fetch_connections_geo_worker()`.
+- Enriquecer cada objeto de conexión en `connections_out`:
+  - Campo `"local_hostname"`: Nombre del dispositivo LAN si Pi-hole lo tiene.
+  - Campo `"domain"`: Dominio resuelto si Pi-hole lo tiene.
+  - Actualizar `service` y `details` para incorporar el nombre del dispositivo local y el dominio.
 
 ### Frontend (`static/index.html` e `index.html`)
-- En `NetworkConnectionsMapEngine`:
-  - Almacenar `_currentConns` y `_currentSrv`.
-  - Escuchar `this._leafletMap.on('zoomend', () => this.renderDynamicClusters())`.
-  - Crear función `clusterConnections(conns)` que proyecte cada coordenada a píxeles de pantalla con `this._leafletMap.latLngToLayerPoint([lat, lng])` y agrupe aquellos con distancia `< 48px`.
-  - Crear función `renderDynamicClusters()`:
-    - Etiquetado 100% dinámico con `getDynamicClusterLabel(items)`.
-    - Generación de marcadores y polilíneas hacia el nodo servidor.
-    - Retención inteligente del popup activo mediante `activeConnId` y `activeIp`.
-  - En `renderFromMetrics`: filtrar `conns.filter(c => !c.is_lan && typeof c.lat === 'number' && typeof c.lng === 'number')` y delegar a `renderDynamicClusters()`.
+- Actualizar `getDynamicClusterLabel`: Si la conexión tiene `c.domain`, utilizarlo de forma preferente para que el marcador en el mapa muestre el dominio amigable (ej. `↓ play.googleapis.com`).
+- Actualizar `buildInfoWindowNode`: Mostrar distintivo de dominio DNS Pi-hole y nombre del dispositivo de origen.
+- Actualizar `buildGroupInfoWindowNode`: Mostrar dominios y nombres de dispositivos locales en la lista interactiva.
+- Actualizar la tabla de conexiones (`networkConnectionsTableList`): Mostrar el distintivo `🌐 Dominio` y el nombre del dispositivo origen.
 
 ### Versión y Documentación
-- `VERSION` -> `4.11.1`
-- `package.json` -> `"version": "4.11.1"`
-- `README.md` actualizado con las novedades de la versión `4.11.1`.
-- `planes/2026-10-21_cluster_dinamico_zoom_y_excluir_lan.md` y `planes/walkthrough.md`.
+- `GEMINI.md`: Mantener reglas actualizadas.
+- `VERSION` -> `4.12.0`
+- `package.json` -> `"version": "4.12.0"`
+- `README.md` -> Añadir sección `## ✨ Novedades en v4.12.0`.
+- Documentar en `planes/2026-10-21_traduccion_ips_locales_y_externas_pihole.md` y `planes/walkthrough.md`.

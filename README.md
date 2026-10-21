@@ -1,8 +1,25 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.11.2`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.12.0`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.11.2`)**, telemetría de hardware en tiempo real, auditoría de red con **Persistencia Absoluta de Popups en Mapa (Multi-tier Matching Antidesaparición)**, **Regla Estricta de Cero Hardcoding (`GEMINI.md`)**, **Agrupamiento Dinámico según Nivel de Zoom en Pantalla (Pixel Distance Clustering)**, **Exclusión Estricta de LAN en Mapa y Geolocalización Mundial de Destinos de Dispositivos del Hogar (Kernel Conntrack)**, **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Motor de Mapa Geoespacial Libre (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.12.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Traducción de IPs Locales y Externas mediante Pi-hole DNS (`PiholeDnsTranslator`)**, **Persistencia Absoluta de Popups en Mapa (Multi-tier Matching Antidesaparición)**, **Regla Estricta de Cero Hardcoding (`GEMINI.md`)**, **Agrupamiento Dinámico según Nivel de Zoom en Pantalla (Pixel Distance Clustering)**, **Exclusión Estricta de LAN en Mapa y Geolocalización Mundial de Destinos de Dispositivos del Hogar (Kernel Conntrack)**, **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Motor de Mapa Geoespacial Libre (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.12.0`
+- **Traducción en Tiempo Real de IPs Locales y Externas mediante Pi-hole DNS**:
+  - **Traducción Automática de IPs Locales a Nombres de Dispositivo**:
+    - Motor integrado `PiholeDnsTranslator` en `server.py` que consulta `/etc/pihole/custom.list`, la base de datos de red `/etc/pihole/pihole-FTL.db` (`network_addresses`) y `/etc/hosts`.
+    - Traduce de inmediato direcciones privadas como `192.168.50.16` a `tab-s9-ultra-de-yonah`, `192.168.50.187` a `tv-de-la-sala-de-estar`, `192.168.50.252` a `s25-yonah`, `192.168.50.5` a `xbox-one-x`, `192.168.50.6` a `nintendo-switch-oled`, etc.
+  - **Traducción Dinámica de IPs Públicas Remotas a Nombres de Dominio Reales**:
+    - Lector asíncrono e incremental de `/var/log/pihole/pihole.log` que extrae en milisegundos todas las respuestas y resoluciones DNS (`reply`, `cached`, `cached-stale <dominio> is <ip>`), complementado con fallback de caché rDNS (`socket.gethostbyaddr`).
+    - Asocia de forma transparente IPs públicas con sus nombres de dominio: `20.250.119.72` -> `api.github.com`, `1.1.1.1` -> `one.one.one.one`, `208.95.112.1` -> `ip-api.com`, `token-icons.llamao.fi`, etc.
+  - **Visualización Integral en Mapa y Tablas de Red**:
+    - **Insignias de Marcador**: Priorizan el nombre de dominio resuelto (`api.github.com`, `one.one.one.one`) sobre la IP numérica pura en los pines del mapa.
+    - **Ventanas Emergentes (Popups)**: Incluyen tarjeta distintiva `🌐 Dominio DNS (Pi-hole)` y detallan con precisión el nombre del dispositivo doméstico emisor y su puerto (`tab-s9-ultra-de-yonah:54321`).
+    - **Listas de Grupos de Conexiones**: Cada fila muestra el dominio o IP y el equipo de origen (`← s25-yonah`).
+    - **Tabla de Conexiones de Red**: Incorpora insignias azules `🌐 <dominio>` y nombres amigables de host para máxima claridad operativa.
+  - **Principio Estricto de Cero Hardcoding y Ultra Alto Rendimiento**:
+    - 100% dinámico y derivado de la telemetría viva de la red local sin valores ni cadenas fijas.
+    - Lectura incremental optimizada mediante puntero de archivo (seek), consumiendo menos de 0.2 ms por ciclo de comprobación.
 
 ## ✨ Novedades en `v4.11.2`
 - **Corrección Definitiva de Persistencia de Popups en el Mapa (Cero Desapariciones)**:

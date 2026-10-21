@@ -9844,11 +9844,15 @@
         if (!Array.isArray(items) || items.length === 0) return 'Remoto';
         const first = items[0];
         if (items.length === 1) {
-          return first.remote_ip || 'Remoto';
+          return first.domain || first.remote_ip || 'Remoto';
+        }
+        const allSameDomain = items.every(c => c.domain && c.domain === first.domain);
+        if (allSameDomain && first.domain) {
+          return first.domain;
         }
         const allSameIp = items.every(c => c.remote_ip === first.remote_ip);
         if (allSameIp) {
-          return first.remote_ip;
+          return first.domain || first.remote_ip;
         }
         const firstCity = (first.city || '').trim();
         if (firstCity && !firstCity.includes('Resolviendo') && items.every(c => (c.city || '').trim() === firstCity)) {
@@ -9862,7 +9866,8 @@
         if (firstIsp && !firstIsp.includes('En cola') && items.every(c => (c.isp || '').trim() === firstIsp)) {
           return firstIsp;
         }
-        return `${first.remote_ip} (+${items.length - 1})`;
+        const label = first.domain || first.remote_ip;
+        return `${label} (+${items.length - 1})`;
       },
 
       buildInfoWindowNode(item, isServerHost = false, groupKey = null, groupLength = 1) {
@@ -9961,19 +9966,34 @@
           `;
         }
 
+        const domainBadgeHtml = item.domain ? `
+          <div style="font-size: 11px; font-weight: 700; color: #0284c7; background: #f0f9ff; border: 1px solid #bae6fd; padding: 4px 8px; border-radius: 6px; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
+            <span>🌐</span> <span>${escapeHtml(item.domain)}</span>
+          </div>
+        ` : '';
+
+        const localDisplay = item.local_hostname
+          ? `<strong>${escapeHtml(item.local_hostname)}</strong> <span style="color: #64748b; font-size: 10px;">(${escapeHtml(item.local_ip)}:${item.local_port})</span>`
+          : `<strong>${escapeHtml(item.local_ip)}:${item.local_port}</strong>`;
+
+        const remoteDisplay = item.domain
+          ? `<strong>${escapeHtml(item.remote_ip)}${item.remote_port ? ':' + item.remote_port : ''}</strong> <span style="color: #0284c7; font-size: 10px;">(${escapeHtml(item.domain)})</span>`
+          : `<strong>${escapeHtml(item.remote_ip)}${item.remote_port ? ':' + item.remote_port : ''}</strong>`;
+
         wrap.innerHTML = `
           ${returnBarHtml}
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${dirColor}; margin-bottom: 4px;">
             ${dirLabel} · ${escapeHtml(item.protocol || 'TCP')}
           </div>
+          ${domainBadgeHtml}
           <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px; line-height: 1.3;">
             ${escapeHtml(item.service || 'Socket Activo')}
           </div>
           ${procHtml}
           ${detailsHtml}
           <div style="font-size: 11px; color: #1e293b; font-family: monospace; background: #f1f5f9; padding: 6px 8px; border-radius: 6px; margin: 6px 0;">
-            Remoto: <strong>${escapeHtml(item.remote_ip)}${item.remote_port ? ':' + item.remote_port : ''}</strong><br>
-            Local: <strong>${escapeHtml(item.local_ip)}:${item.local_port}</strong> (${escapeHtml(item.state || 'ACTIVE')})
+            Remoto: ${remoteDisplay}<br>
+            Local: ${localDisplay} (${escapeHtml(item.state || 'ACTIVE')})
           </div>
           <div style="font-size: 11px; color: #334155;">
             📍 <strong>${escapeHtml(item.city || 'Nodo Remoto')}${item.country ? ', ' + escapeHtml(item.country) : ''}</strong><br>
@@ -10040,11 +10060,11 @@
                   <div style="min-width: 0; flex: 1;">
                     <div style="font-size: 11.5px; font-family: monospace; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 5px;">
                       <span style="color: ${color}; font-weight: 800;">${arrow}</span>
-                      <span>${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
-                      <span style="color: #64748b; font-weight: 400; font-size: 10px;">→ :${c.local_port}</span>
+                      <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(c.domain || c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
+                      <span style="color: #64748b; font-weight: 400; font-size: 10px; flex-shrink: 0;">← ${escapeHtml(c.local_hostname || c.local_ip)}</span>
                     </div>
                     <div style="font-size: 10.5px; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
-                      <strong style="color: #1e293b;">${escapeHtml(c.service || 'Socket')}</strong> ${c.process ? '· (' + escapeHtml(c.process) + ')' : ''}
+                      <strong style="color: #1e293b;">${escapeHtml(c.service || 'Socket')}</strong> ${c.domain ? '· IP: ' + escapeHtml(c.remote_ip) : ''}
                     </div>
                   </div>
                   <div style="font-size: 10px; font-weight: 700; color: #2563eb; background: rgba(37, 99, 235, 0.12); padding: 3px 7px; border-radius: 6px; flex-shrink: 0;">
@@ -10177,7 +10197,8 @@
             badgeHtml = `<div class="gmp-conn-marker ${dirClass} grouped"><span class="group-count-pill">🔀 ${items.length}</span><span>${escapeHtml(dynamicLabel)}</span></div>`;
           } else {
             const arrowChar = first.direction === 'incoming' ? '↓' : (first.direction === 'blocked' ? '🛡️' : '↑');
-            badgeHtml = `<div class="gmp-conn-marker ${dirClass}"><span>${arrowChar}</span><span>${escapeHtml(first.remote_ip)}</span></div>`;
+            const displayLabel = first.domain || first.remote_ip;
+            badgeHtml = `<div class="gmp-conn-marker ${dirClass}"><span>${arrowChar}</span><span>${escapeHtml(displayLabel)}</span></div>`;
           }
 
           const icon = L.divIcon({
@@ -10188,7 +10209,7 @@
 
           const markerTitle = isGroup
             ? `${items.length} conexiones (${this.getDynamicClusterLabel(items)})`
-            : `${first.service || first.remote_ip} (${first.remote_ip})`;
+            : `${first.domain ? first.domain + ' · ' : ''}${first.service || first.remote_ip} (${first.remote_ip})`;
 
           const marker = L.marker([cl.lat, cl.lng], {
             icon: icon,
@@ -10428,8 +10449,9 @@
                     <div style="min-width: 0; flex: 1;">
                       <div style="font-weight: 700; font-size: 12.5px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                         <span class="mono">${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
-                        <span style="color: var(--text-muted); font-weight: 400;">→</span>
-                        <span class="mono" style="color: var(--accent-cyan-bright);">:${c.local_port}</span>
+                        ${c.domain ? `<span class="adw-badge badge-blue" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #3b82f6;" title="Dominio DNS Pi-hole">🌐 ${escapeHtml(c.domain)}</span>` : ''}
+                        <span style="color: var(--text-muted); font-weight: 400;">←</span>
+                        <span class="mono" style="color: var(--accent-cyan-bright);">${escapeHtml(c.local_hostname || c.local_ip)}:${c.local_port}</span>
                         <span class="adw-badge badge-blue" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700;" title="Servicio al que se conecta">${escapeHtml(c.service)}</span>
                         ${procInfo}
                         <span class="conn-geo-tag ${escapeHtml(geoSt)}">${geoTagLabel}</span>

@@ -550,9 +550,155 @@ def resolve_geoip_batch_from_ip_api(ip_list):
         save_geoip_disk_cache(force=False)
     return resolved_now
 
+class PiholeDnsTranslator:
+    """Traduce en tiempo real IPs locales (a nombres de host amigables)
+    e IPs remotas WAN (a nombres de dominio resueltos) consultando Pi-hole
+    (custom.list, pihole-FTL.db, /var/log/pihole/pihole.log) y rDNS."""
+    def __init__(self):
+        self.local_cache = {}
+        self.last_local_refresh = 0.0
+        self.ext_cache = {}
+        self.ext_log_offset = 0
+        self.ext_log_inode = None
+        self.last_ext_refresh = 0.0
+        self.rdns_cache = {}
+        self.rdns_negative = {}
+
+    def refresh_local_names(self):
+        now = time.time()
+        if now - self.last_local_refresh < 45.0 and self.local_cache:
+            return
+        self.last_local_refresh = now
+        new_map = {}
+
+        # 1. /etc/pihole/custom.list (nombres manuales y sincronizados)
+        cpath = "/etc/pihole/custom.list"
+        if os.path.exists(cpath):
+            try:
+                with open(cpath, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            ip = parts[0].strip()
+                            names = parts[1:]
+                            clean_names = [n for n in names if not n.endswith(".duckdns.org")]
+                            chosen = clean_names[-1] if clean_names else names[0]
+                            new_map[ip] = chosen
+            except Exception:
+                pass
+
+        # 2. /etc/pihole/pihole-FTL.db (arrendamientos DHCP dinámicos)
+        dbpath = "/etc/pihole/pihole-FTL.db"
+        if os.path.exists(dbpath):
+            try:
+                con = sqlite3.connect(f"file:{dbpath}?mode=ro", uri=True, timeout=1.0)
+                cur = con.cursor()
+                cur.execute("SELECT ip, name FROM network_addresses WHERE name IS NOT NULL AND name != ''")
+                for ip, name in cur.fetchall():
+                    ip = ip.strip()
+                    name = name.strip()
+                    if ip and name and ip not in new_map:
+                        new_map[ip] = name
+                con.close()
+            except Exception:
+                pass
+
+        # 3. /etc/hosts
+        hpath = "/etc/hosts"
+        if os.path.exists(hpath):
+            try:
+                with open(hpath, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            ip = parts[0].strip()
+                            if ip not in new_map and not ip.startswith("127."):
+                                new_map[ip] = parts[1].strip()
+            except Exception:
+                pass
+
+        if new_map:
+            self.local_cache = new_map
+
+    def refresh_external_domains(self):
+        lpath = "/var/log/pihole/pihole.log"
+        if not os.path.exists(lpath):
+            return
+        try:
+            st = os.stat(lpath)
+            curr_inode = getattr(st, "st_ino", 0)
+            curr_size = st.st_size
+
+            # Manejar rotación de log o lectura inicial
+            if self.ext_log_inode != curr_inode or curr_size < self.ext_log_offset:
+                self.ext_log_inode = curr_inode
+                # En la primera ejecución leer los últimos 3 MB para tener historial inmediato
+                self.ext_log_offset = max(0, curr_size - 3_000_000)
+
+            with open(lpath, "r", encoding="utf-8", errors="ignore") as f:
+                f.seek(self.ext_log_offset)
+                chunk = f.read()
+                self.ext_log_offset = f.tell()
+
+            if chunk:
+                # Patrones de respuesta de dnsmasq en Pi-hole
+                matches = re.findall(
+                    r"(?:reply|cached|cached-stale)\s+([a-zA-Z0-9\.\-_]+)\s+is\s+([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})",
+                    chunk
+                )
+                for dom, ip in matches:
+                    if not _is_private_ip(ip):
+                        self.ext_cache[ip] = dom.lower()
+
+            # Evitar crecimiento ilimitado de memoria
+            if len(self.ext_cache) > 25000:
+                keys = list(self.ext_cache.keys())
+                for k in keys[:5000]:
+                    del self.ext_cache[k]
+        except Exception:
+            pass
+
+    def translate_local(self, ip, server_ip=None):
+        if not ip:
+            return ""
+        if server_ip and ip == server_ip:
+            return "Servidor"
+        return self.local_cache.get(ip, "")
+
+    def translate_external(self, ip):
+        if not ip or _is_private_ip(ip):
+            return ""
+        dom = self.ext_cache.get(ip)
+        if dom:
+            return dom
+        now = time.time()
+        if ip in self.rdns_cache:
+            dom_cached, exp = self.rdns_cache[ip]
+            if now < exp:
+                return dom_cached
+            else:
+                del self.rdns_cache[ip]
+        if ip in self.rdns_negative and (now - self.rdns_negative[ip] < 1800):
+            return ""
+        try:
+            name, _, _ = socket.gethostbyaddr(ip)
+            if name and name != ip:
+                self.rdns_cache[ip] = (name, now + 21600)
+                return name
+        except Exception:
+            self.rdns_negative[ip] = now
+        return ""
+
 def fetch_connections_geo_worker():
     global CONNECTIONS_MAP_CACHE, SERVER_SELF_GEO
     load_geoip_disk_cache()
+    pihole_translator = PiholeDnsTranslator()
     resolved_outbound_hosts = {}
     outbound_targets = [
         ("api.github.com", 443, "TCP", "GitHub OTA Sync (api.github.com)"),
@@ -564,6 +710,9 @@ def fetch_connections_geo_worker():
     while True:
         try:
             now = time.time()
+            # 0. Actualizar traductor de DNS de Pi-hole (nombres locales y dominios externos)
+            pihole_translator.refresh_local_names()
+            pihole_translator.refresh_external_domains()
             # 1. Resolve server's own public WAN IP & GeoIP once or every 30 min
             if not SERVER_SELF_GEO or (now - SERVER_SELF_GEO.get("ts", 0) > 1800):
                 try:
@@ -697,16 +846,27 @@ def fetch_connections_geo_worker():
                                 svc_label = PORT_SERVICE_LABELS.get(svc_port, f"LAN Servicio :{svc_port}")
                         else:
                             svc_label = PORT_SERVICE_LABELS.get(svc_port, f"{proto_str} Puerto :{svc_port}")
+                    norm_loc_ip = loc_ip if loc_ip != "0.0.0.0" else SERVER_LOCAL_IP
+                    loc_name = pihole_translator.translate_local(norm_loc_ip, SERVER_LOCAL_IP)
+                    ext_dom = pihole_translator.translate_external(rem_ip)
+                    target_label = f"{ext_dom} ({rem_ip})" if ext_dom else rem_ip
+
+                    if is_in:
+                        details_str = f"Entrante desde {target_label} hacia {svc_label}"
+                    else:
                         p_info = f" desde {proc_name}" if proc_name else ""
-                        details_str = f"Saliente{p_info} hacia {svc_label} ({rem_ip})"
+                        loc_info = f" ({loc_name})" if loc_name else ""
+                        details_str = f"Saliente{p_info}{loc_info} hacia {svc_label} ({target_label})"
 
                     raw_sockets.append({
                         "direction": direction,
                         "protocol": proto_str,
-                        "local_ip": loc_ip if loc_ip != "0.0.0.0" else SERVER_LOCAL_IP,
+                        "local_ip": norm_loc_ip,
+                        "local_hostname": loc_name,
                         "local_port": loc_port,
                         "remote_ip": rem_ip,
                         "remote_port": rem_port,
+                        "domain": ext_dom,
                         "state": c.status or "ACTIVE",
                         "service": svc_label,
                         "process": proc_name,
@@ -749,19 +909,25 @@ def fetch_connections_geo_worker():
                         target_port = loc_port if dir_str == "incoming" else rem_port
                         svc_label = PORT_SERVICE_LABELS.get(target_port, f"{proto_str} Puerto :{target_port}")
 
-                        source_hint = "Servidor" if loc_ip == SERVER_LOCAL_IP else f"Dispositivo {loc_ip}"
+                        loc_name = pihole_translator.translate_local(loc_ip, SERVER_LOCAL_IP)
+                        ext_dom = pihole_translator.translate_external(rem_ip)
+                        source_hint = loc_name if loc_name else ("Servidor" if loc_ip == SERVER_LOCAL_IP else f"Dispositivo {loc_ip}")
+                        target_info = f"{ext_dom} ({rem_ip})" if ext_dom else rem_ip
+
                         if dir_str == "incoming":
-                            details_str = f"Entrante desde {rem_ip} hacia {svc_label} ({source_hint})"
+                            details_str = f"Entrante desde {target_info} hacia {svc_label} ({source_hint})"
                         else:
-                            details_str = f"Saliente desde {source_hint} hacia {svc_label} ({rem_ip})"
+                            details_str = f"Saliente desde {source_hint} hacia {svc_label} ({target_info})"
 
                         raw_sockets.append({
                             "direction": dir_str,
                             "protocol": proto_str,
                             "local_ip": loc_ip,
+                            "local_hostname": loc_name,
                             "local_port": loc_port,
                             "remote_ip": rem_ip,
                             "remote_port": rem_port,
+                            "domain": ext_dom,
                             "state": state_str,
                             "service": svc_label,
                             "process": "Kernel Conntrack",
@@ -861,8 +1027,13 @@ def fetch_connections_geo_worker():
                     asn = ""
                     geo_status = "pending"
 
+                ext_domain = s.get("domain") or pihole_translator.translate_external(r_ip)
+                loc_hostname = s.get("local_hostname") or pihole_translator.translate_local(s["local_ip"], SERVER_LOCAL_IP)
                 svc_title = s["service"]
-                if geo and s["direction"] == "outgoing":
+
+                if ext_domain:
+                    svc_title = f"{ext_domain} (:{s['remote_port']})"
+                elif geo and s["direction"] == "outgoing":
                     isp_str = (geo.get("isp", "") + " " + geo.get("asn", "")).lower()
                     if "telegram" in isp_str:
                         svc_title = f"Telegram API / Bot (:{s['remote_port']})"
@@ -882,9 +1053,11 @@ def fetch_connections_geo_worker():
                     "direction": s["direction"],
                     "protocol": s["protocol"],
                     "local_ip": s["local_ip"],
+                    "local_hostname": loc_hostname,
                     "local_port": s["local_port"],
                     "remote_ip": r_ip,
                     "remote_port": s["remote_port"],
+                    "domain": ext_domain,
                     "service": svc_title,
                     "process": s.get("process", ""),
                     "jail": s.get("jail", "caddy-scan"),
@@ -912,9 +1085,11 @@ def fetch_connections_geo_worker():
                         "direction": "outgoing",
                         "protocol": ep["protocol"],
                         "local_ip": SERVER_LOCAL_IP,
+                        "local_hostname": "Servidor",
                         "local_port": 48120 + (ep["port"] % 500),
                         "remote_ip": ep["ip"],
                         "remote_port": ep["port"],
+                        "domain": ep["host"],
                         "service": ep["service"],
                         "process": "python3 (dashboard)",
                         "jail": "caddy-scan",
@@ -941,18 +1116,21 @@ def fetch_connections_geo_worker():
                     continue
                 if not any(c["remote_ip"] == b_ip and c["direction"] == "blocked" for c in connections_out):
                     b_jail = b_item.get("jail", "sshd")
+                    b_domain = pihole_translator.translate_external(b_ip)
                     connections_out.append({
                         "id": f"blk_{b_ip}",
                         "direction": "blocked",
                         "protocol": "TCP",
                         "local_ip": SERVER_LOCAL_IP,
+                        "local_hostname": "Servidor",
                         "local_port": 22 if b_jail == "sshd" else 443,
                         "remote_ip": b_ip,
                         "remote_port": 0,
-                        "service": f"Fail2ban IPS ({b_jail})",
+                        "domain": b_domain,
+                        "service": f"Fail2ban IPS ({b_jail})" + (f" · {b_domain}" if b_domain else ""),
                         "process": "fail2ban",
                         "jail": b_jail,
-                        "details": f"IP bloqueada en firewall por Fail2ban (jail {b_jail})",
+                        "details": f"IP bloqueada en firewall por Fail2ban (jail {b_jail}){': ' + b_domain if b_domain else ''}",
                         "state": "BANNED",
                         "lat": geo["lat"],
                         "lng": geo["lng"],
@@ -992,8 +1170,9 @@ def fetch_connections_geo_worker():
                     "geoip_worker": worker_summary
                 }
             save_geoip_disk_cache(force=False)
-        except Exception:
-            pass
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
         # Wait up to 6 seconds or wake immediately when new remote IPs are enqueued
         GEOIP_WAKE_EVENT.wait(timeout=6.0)
         GEOIP_WAKE_EVENT.clear()
