@@ -3954,7 +3954,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 "token": auth.get("token") or auth.get("new_token") or "",
                 "device_name": auth["device_info"]["name"] if auth.get("device_info") else "Dispositivo Local"
             }
-            base_payload["maps_api_key"] = os.environ.get("VITE_GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY") or ""
+            base_payload["maps_engine"] = "leaflet"
             base_payload["version_info"] = get_version_info(force_refresh=False)
             base_payload["version_info"]["public_domain"] = req_domain
             with CUSTOM_LOGOS_LOCK:
@@ -3996,14 +3996,12 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 1.1 CONFIGURACIÓN Y ESTADO DE MOTOR DE MAPAS (OpenStreetMap / Google Maps)
+        # 1.1 CONFIGURACIÓN Y ESTADO DE MOTOR DE MAPAS (OpenStreetMap / CartoDB)
         elif clean_path == "/api/maps/config":
-            k = os.environ.get("VITE_GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY") or ""
-            masked = f"{k[:4]}****{k[-4:]}" if len(k) > 8 else ("****" if k else "")
             resp = json.dumps({
-                "has_key": bool(k),
-                "masked_key": masked,
-                "engine": "google" if k else "leaflet"
+                "engine": "leaflet",
+                "provider": "OpenStreetMap",
+                "free": True
             }).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -4967,47 +4965,9 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 10. Configuración del Motor de Mapas y Clave de API
+        # 10. Configuración del Motor de Mapas (Modo Libre Fijo)
         elif clean_path == "/api/maps/config":
-            auth = check_trust_status(self)
-            if not auth["is_trusted"]:
-                self.send_response(403)
-                self.send_security_headers()
-                self.end_headers()
-                return
-
-            try:
-                content_length = int(self.headers.get('Content-Length', 0))
-                post_data = self.rfile.read(content_length).decode('utf-8')
-                body = json.loads(post_data) if post_data else {}
-                api_key = str(body.get("api_key", "")).strip()
-
-                env_path = os.path.join(BASE_DIR, ".env")
-                lines = []
-                found = False
-                if os.path.exists(env_path):
-                    with open(env_path, "r", encoding="utf-8") as f:
-                        for l in f:
-                            if l.strip().startswith("VITE_GOOGLE_MAPS_API_KEY="):
-                                lines.append(f'VITE_GOOGLE_MAPS_API_KEY="{api_key}"\n')
-                                found = True
-                            else:
-                                lines.append(l)
-                if not found:
-                    lines.append(f'VITE_GOOGLE_MAPS_API_KEY="{api_key}"\n')
-
-                with open(env_path, "w", encoding="utf-8") as f:
-                    f.writelines(lines)
-
-                os.environ["VITE_GOOGLE_MAPS_API_KEY"] = api_key
-                resp = json.dumps({
-                    "success": True,
-                    "has_key": bool(api_key),
-                    "engine": "google" if api_key else "leaflet"
-                }).encode('utf-8')
-            except Exception as e:
-                resp = json.dumps({"success": False, "error": str(e)}).encode('utf-8')
-
+            resp = json.dumps({"success": True, "engine": "leaflet", "provider": "OpenStreetMap"}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()

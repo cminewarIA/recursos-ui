@@ -1,62 +1,26 @@
-# Recorrido y Verificación: Motor Dual de Mapa de Red (OpenStreetMap / Leaflet Gratuito + Google Maps Opcional) - v4.8.0
+# Recorrido de Verificación: Motor Exclusivo Libre OpenStreetMap (v4.9.0)
 
-Se ha solucionado el bloqueo que mostraba el aviso *"Esperando configuración de VITE_GOOGLE_MAPS_API_KEY..."* en la sección de Red mediante la implementación de una arquitectura de **Motor Dual de Mapas**, habilitando **OpenStreetMap (Leaflet.js + CartoDB Dark Matter)** de forma predeterminada y 100% gratuita sin requerir claves de API, manteniendo al mismo tiempo el soporte opcional de Google Maps Platform con configurador interactivo.
+Se ha completado la configuración para dejar de manera exclusiva el **mapa gratuito y libre de OpenStreetMap / CartoDB Dark Matter**, eliminando por completo cualquier dependencia, clave de API o modal de Google Maps.
 
----
+## Cambios Realizados
+1. **Frontend (`index.html` y `static/index.html`):**
+   - Eliminado el diálogo `#mapEngineModal` y los controles de selección de motor cartográfico.
+   - Reemplazado el botón de configuración por la insignia informativa `🗺️ OpenStreetMap (Libre)`.
+   - Simplificado el overlay de inicialización (`#networkConnectionsMapStatus`), eliminando botones redundantes.
+   - Refactorizado `NetworkConnectionsMapEngine` para operar exclusivamente con **Leaflet.js**:
+     - Carga directa y reactiva con teselas CartoDB Dark Matter (`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`).
+     - Renderizado de nodo servidor, conexiones remotas (entrantes en verde `#10B981`, salientes en cian `#06B6D4`, bloqueadas en rojo `#F43F5E`) y polilíneas direccionales.
+     - Conservadas las funciones de auto-encuadre `fitAllBounds()`, centrado de host `focusServerNode()` y enfoque por ID `focusConnectionById()`.
+     - Eliminadas funciones obsoletas y bloques de script superfluos.
+2. **Backend (`server.py`):**
+   - Endpoint `/api/maps/config` simplificado para responder de inmediato `{ "engine": "leaflet", "provider": "OpenStreetMap", "free": true }`.
+   - Eliminada la inyección de claves de Google Maps en el payload de métricas.
+3. **Versión y Repositorio:**
+   - Versión incrementada a `4.9.0` en `VERSION` y `package.json`.
+   - Actualizado `README.md` con la sección `## ✨ Novedades en v4.9.0`.
+   - Documentación y planes guardados en `planes/`.
 
-## 1. Problema Diagnosticado
-
-- **Causa**: La integración inicial del mapa geoespacial (`NetworkConnectionsMapEngine`) en `v4.2.0` estaba acoplada de forma obligatoria a `google.maps.importLibrary('maps')`.
-- Al no contar el servidor local con una clave `VITE_GOOGLE_MAPS_API_KEY` (debido a que Google Cloud exige registro y facturación), la función `ensureInitialized()` mostraba un cartel de bloqueo permanente, impidiendo visualizar las decenas de flujos de red reales detectados por el kernel.
-
----
-
-## 2. Solución Implementada
-
-### A. Motor Predeterminado OpenStreetMap (Leaflet.js + CartoDB Dark Matter)
-- **Cero Claves y Cero Configuración**: Si no hay clave de Google Maps configurada, el mapa arranca automáticamente en modo OpenStreetMap.
-- **Estética Dark Nativa**: Se integró la capa de teselas **CartoDB Dark Matter** (`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`), encajando con la paleta de colores del sistema.
-- **Visualización Completa de Sockets**:
-  - **Nodo Host Central**: Marcador azul con icono de servidor y ficha técnica (IP LAN, WAN, ISP, GeoIP).
-  - **Conexiones Entrantes (`↓ RX`)**: Marcadores verdes (`#10B981`) y líneas con trazo discontinuo.
-  - **Conexiones Salientes (`↑ TX`)**: Marcadores cian (`#06B6D4`) y líneas continuas.
-  - **Defensa IPS (`🛡️ Bloqueadas`)**: Marcadores rojos (`#F43F5E`) con las IPs neutralizadas por Fail2ban.
-  - **Popups e Interacción Bidireccional**: Al pulsar cualquier fila de la tabla inferior de conexiones, el mapa se desplaza suavemente (`setView`) y abre el popup informativo del flujo.
-
-### B. Selector y Configurador en la Interfaz (`#mapEngineModal`)
-- Se añadió un botón en la barra de herramientas del mapa: `🗺️ OpenStreetMap (Gratis) ⚙️`.
-- Al pulsarlo, se abre un diálogo modal para:
-  1. Alternar entre **OpenStreetMap / CartoDB (Gratis)** y **Google Maps Platform**.
-  2. Introducir o actualizar la clave `VITE_GOOGLE_MAPS_API_KEY` si el usuario desea utilizar Google Maps.
-  3. Guardar la configuración de forma persistente tanto en el backend (`.env`) como en el frontend (`localStorage`).
-- En caso de que se intente usar Google Maps sin clave o con fallo de autenticación, el overlay ofrece un botón rápido de un clic para volver a OpenStreetMap sin recargar la página.
-
-### C. Backend y Cabeceras de Seguridad ([server.py](file:///home/servidor/servicios/dashboard/server.py))
-- **Content-Security-Policy (CSP)**: Actualizado para autorizar teselas de `*.basemaps.cartocdn.com`, `*.tile.openstreetmap.org`, librerías desde `cdn.jsdelivr.net` / `unpkg.com` y resolución GeoIP desde `ip-api.com`.
-- **Endpoints de Configuración**:
-  - `GET /api/maps/config`: Informa al cliente si existe clave configurada y cuál es el motor activo.
-  - `POST /api/maps/config`: Permite guardar o revocar de forma segura la clave en el archivo `.env` del servidor.
-
----
-
-## 3. Pruebas y Verificación
-
-1. **Consulta de Configuración de Mapas**:
-   ```bash
-   curl -s http://127.0.0.1:8085/api/maps/config
-   # Respuesta: {"has_key": false, "masked_key": "", "engine": "leaflet"}
-   ```
-2. **Consulta de Versión Canónica**:
-   ```bash
-   curl -s http://127.0.0.1:8085/api/version
-   # Confirma "version": "4.8.0"
-   ```
-3. **Verificación de Cabeceras CSP**:
-   ```bash
-   curl -s -I http://127.0.0.1:8085/ | grep -i content-security-policy
-   # Confirma autorización de basemaps.cartocdn.com, tile.openstreetmap.org y cdn.jsdelivr.net
-   ```
-4. **Telemetría de Conexiones Activas**:
-   - `connections_map` en `/api/metrics` recolecta más de 70 conexiones de red activas, listas para ser proyectadas geográficamente sin bloqueos de clave.
-5. **Estado del Servicio**:
-   - `systemctl is-active system-dashboard.service` $\rightarrow$ `active`.
+## Pruebas Realizadas
+- `sudo systemctl restart system-dashboard.service`: Servicio reiniciado y en ejecución activa.
+- `curl -s http://127.0.0.1:8085/api/maps/config`: Verificado retorno de `{ "engine": "leaflet", "provider": "OpenStreetMap", "free": true }`.
+- `curl -s http://127.0.0.1:8085/api/version`: Verificada versión `4.9.0`.

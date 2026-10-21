@@ -3243,11 +3243,10 @@
                 </div>
                 <button class="seg-btn" style="background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 6px 11px;" onclick="fitConnectionsMapBounds()" title="Ajustar zoom a todas las conexiones">🌍 Encuadrar Todo</button>
                 <button class="seg-btn" style="background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 6px 11px;" onclick="focusServerNodeOnMap()" title="Centrar en el nodo del servidor">🖥️ Nodo Host</button>
-                <button class="seg-btn" id="btnMapEngineConfig" style="background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 6px 11px; display: inline-flex; align-items: center; gap: 6px;" onclick="openMapEngineModal()" title="Configurar proveedor de mapa y clave API">
+                <div class="adw-badge badge-green" style="font-size: 11px; padding: 5px 10px; display: inline-flex; align-items: center; gap: 5px;" title="Motor geoespacial autónomo y libre basado en OpenStreetMap y CartoDB">
                   <span>🗺️</span>
-                  <span id="lblActiveMapEngine">OpenStreetMap (Gratis)</span>
-                  <span style="font-size: 11px; opacity: 0.7;">⚙️</span>
-                </button>
+                  <span>OpenStreetMap (Libre)</span>
+                </div>
               </div>
             </div>
 
@@ -3281,9 +3280,6 @@
                   <div style="font-size: 24px;">🗺️</div>
                   <div style="font-weight: 700; color: var(--text-primary); font-size: 14px;" id="networkConnectionsMapStatusTitle">Inicializando Mapa Geoespacial de Red...</div>
                   <div style="font-size: 12px; max-width: 440px;" id="networkConnectionsMapStatusDesc">Cargando mapa interactivo de conexiones entrantes y salientes en tiempo real.</div>
-                  <div id="mapStatusActionWrap" style="margin-top: 10px; display: none;">
-                    <button class="btn-header primary-cta" onclick="switchToLeafletEngine()" style="font-size: 12px; padding: 6px 14px;">Usar OpenStreetMap (Gratis, sin clave)</button>
-                  </div>
                 </div>
                 <div class="connections-map-overlay-legend" id="networkConnectionsMapLegend">
                   <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: #38bdf8; display: inline-block; box-shadow: 0 0 6px #38bdf8;"></span> Nodo Host</span>
@@ -4204,72 +4200,6 @@
     </div>
   </div>
 
-  <!-- ======================================================================
-       MODAL: MOTOR DE MAPA GEOESPACIAL (OPENSTREETMAP LEAFLET / GOOGLE MAPS)
-       ====================================================================== -->
-  <div class="modal-overlay" id="mapEngineModal" onclick="if(event.target===this) closeMapEngineModal()">
-    <div class="adw-dialog" style="max-width: 520px;">
-      <div class="adw-dialog-header">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div class="app-icon-squircle" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(56, 189, 248, 0.14); color: #38BDF8; display: flex; align-items: center; justify-content: center; font-size: 16px;">
-            🗺️
-          </div>
-          <div>
-            <h3 style="font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em;">Motor de Mapa Geoespacial</h3>
-            <div style="font-size: 11px; color: var(--text-muted);">Visualización de sockets y nodos de red del servidor</div>
-          </div>
-        </div>
-        <button class="adw-dialog-close" onclick="closeMapEngineModal()">✕</button>
-      </div>
-      <div class="adw-dialog-body" style="padding: 18px 20px;">
-        <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px;">
-          Selecciona el proveedor para renderizar el mapa interactivo de conexiones entrantes, salientes y de defensa IPS:
-        </p>
-
-        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
-          <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 10px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-subtle); cursor: pointer;">
-            <input type="radio" name="mapEngineChoice" value="leaflet" id="radioEngineLeaflet" style="margin-top: 3px;" checked onchange="onMapEngineChoiceChanged()">
-            <div>
-              <div style="font-size: 13px; font-weight: 700; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
-                OpenStreetMap · CartoDB Dark
-                <span class="adw-badge badge-green" style="font-size: 10px;">100% Gratis · Sin clave</span>
-              </div>
-              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
-                Modo oscuro nativo de alto rendimiento con Leaflet.js. No requiere registro, facturación ni cuotas de Google Cloud.
-              </div>
-            </div>
-          </label>
-
-          <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 10px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-subtle); cursor: pointer;">
-            <input type="radio" name="mapEngineChoice" value="google" id="radioEngineGoogle" style="margin-top: 3px;" onchange="onMapEngineChoiceChanged()">
-            <div>
-              <div style="font-size: 13px; font-weight: 700; color: #FFFFFF;">
-                Google Maps Platform
-              </div>
-              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
-                Utiliza la API oficial de Google Maps con renderizado de vectores y Advanced Markers. Requiere clave de API.
-              </div>
-            </div>
-          </label>
-        </div>
-
-        <div id="googleMapsKeyFieldWrap" style="display: none; margin-bottom: 16px; padding: 12px 14px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.25);">
-          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
-            Clave de API Google Maps (VITE_GOOGLE_MAPS_API_KEY):
-          </label>
-          <input type="text" id="inputGoogleMapsApiKey" class="adw-input" style="width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: 12px;" placeholder="AIzaSy...">
-          <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 6px; line-height: 1.4;">
-            La clave debe tener activada <em>Maps JavaScript API</em> en Google Cloud. Se guardará de forma persistente en tu servidor.
-          </div>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button class="btn-header" onclick="closeMapEngineModal()">Cancelar</button>
-          <button class="btn-header primary-cta" id="btnSaveMapEngine" onclick="saveMapEngineConfig()">Aplicar y Guardar</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- ======================================================================
        REAL-TIME TELEMETRY ENGINE (100% OS-DRIVEN, ZERO HARDCODED SPECS)
@@ -7285,9 +7215,6 @@
         const sec = data.security || {};
         const auth = data.auth_status || {};
 
-        if (data.maps_api_key && !window.__VITE_GOOGLE_MAPS_API_KEY__) {
-          window.__VITE_GOOGLE_MAPS_API_KEY__ = data.maps_api_key;
-        }
 
         if (data.version_info) {
           latestVersionInfo = data.version_info;
@@ -9625,103 +9552,10 @@
       NetworkConnectionsMapEngine.focusConnectionById(connId);
     }
 
-    function openMapEngineModal() {
-      const modal = document.getElementById('mapEngineModal');
-      const curEngine = NetworkConnectionsMapEngine.getEngine();
-      const radLeaflet = document.getElementById('radioEngineLeaflet');
-      const radGoogle = document.getElementById('radioEngineGoogle');
-      const keyWrap = document.getElementById('googleMapsKeyFieldWrap');
-      const inKey = document.getElementById('inputGoogleMapsApiKey');
-
-      if (radLeaflet && radGoogle) {
-        if (curEngine === 'google') {
-          radGoogle.checked = true;
-          if (keyWrap) keyWrap.style.display = 'block';
-        } else {
-          radLeaflet.checked = true;
-          if (keyWrap) keyWrap.style.display = 'none';
-        }
-      }
-      if (inKey) {
-        inKey.value = NetworkConnectionsMapEngine.getApiKey() || '';
-      }
-      if (modal) modal.classList.add('open');
-    }
-
-    function closeMapEngineModal() {
-      const modal = document.getElementById('mapEngineModal');
-      if (modal) modal.classList.remove('open');
-    }
-
-    function onMapEngineChoiceChanged() {
-      const radGoogle = document.getElementById('radioEngineGoogle');
-      const keyWrap = document.getElementById('googleMapsKeyFieldWrap');
-      if (keyWrap && radGoogle) {
-        keyWrap.style.display = radGoogle.checked ? 'block' : 'none';
-      }
-    }
-
-    async function saveMapEngineConfig() {
-      const radGoogle = document.getElementById('radioEngineGoogle');
-      const inKey = document.getElementById('inputGoogleMapsApiKey');
-      const choice = (radGoogle && radGoogle.checked) ? 'google' : 'leaflet';
-      const keyVal = inKey ? inKey.value.trim() : '';
-
-      if (choice === 'google' && !keyVal) {
-        showToast('Para usar Google Maps ingresa una clave de API válida', 'error');
-        return;
-      }
-
-      localStorage.setItem('preferred_map_engine', choice);
-      if (keyVal) {
-        window.__VITE_GOOGLE_MAPS_API_KEY__ = keyVal;
-      }
-
-      const btn = document.getElementById('btnSaveMapEngine');
-      if (btn) btn.disabled = true;
-
-      try {
-        await fetch('/api/maps/config', {
-          method: 'POST',
-          headers: authHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ api_key: keyVal, engine: choice })
-        });
-      } catch (e) {
-        console.warn('Error al guardar configuración de mapa en backend:', e);
-      } finally {
-        if (btn) btn.disabled = false;
-      }
-
-      closeMapEngineModal();
-      showToast(`Motor de mapa cambiado a ${choice === 'google' ? 'Google Maps' : 'OpenStreetMap'}`, 'success');
-      NetworkConnectionsMapEngine.destroy();
-      if (latestMetrics) {
-        NetworkConnectionsMapEngine.renderFromMetrics(latestMetrics, true);
-      }
-    }
-
-    function switchToLeafletEngine() {
-      localStorage.setItem('preferred_map_engine', 'leaflet');
-      NetworkConnectionsMapEngine.destroy();
-      showToast('Cambiado a OpenStreetMap (Gratis)', 'info');
-      if (latestMetrics) {
-        NetworkConnectionsMapEngine.renderFromMetrics(latestMetrics, true);
-      }
-    }
-
     const NetworkConnectionsMapEngine = {
-      _engine: 'leaflet',
-      _map: null,
       _leafletMap: null,
-      _infoWindow: null,
-      _MapClass: null,
-      _InfoWindowClass: null,
-      _PolylineClass: null,
-      _LatLngBoundsClass: null,
-      _AdvancedMarkerClass: null,
       _isBootstrapping: false,
       _isReady: false,
-      _hasError: false,
       _lastSignature: '',
       _markersMap: new Map(),
       _serverMarker: null,
@@ -9729,18 +9563,7 @@
       _hasInitialFit: false,
       _lastConnData: null,
 
-      getApiKey() {
-        return (window.__VITE_GOOGLE_MAPS_API_KEY__ || '').trim();
-      },
-
-      getEngine() {
-        const pref = localStorage.getItem('preferred_map_engine');
-        if (pref === 'google' && this.getApiKey()) return 'google';
-        if (pref === 'leaflet') return 'leaflet';
-        return this.getApiKey() ? 'google' : 'leaflet';
-      },
-
-      setStatusOverlay(visible, title, desc, showActionBtn = false) {
+      setStatusOverlay(visible, title, desc) {
         const overlay = document.getElementById('networkConnectionsMapStatus');
         if (!overlay) return;
         overlay.style.display = visible ? 'flex' : 'none';
@@ -9752,10 +9575,6 @@
           const dEl = document.getElementById('networkConnectionsMapStatusDesc');
           if (dEl) dEl.textContent = desc;
         }
-        const actWrap = document.getElementById('mapStatusActionWrap');
-        if (actWrap) {
-          actWrap.style.display = showActionBtn ? 'block' : 'none';
-        }
       },
 
       destroy() {
@@ -9764,69 +9583,17 @@
           try { this._leafletMap.remove(); } catch (e) {}
           this._leafletMap = null;
         }
-        this._map = null;
         this._isReady = false;
         this._isBootstrapping = false;
-        this._hasError = false;
         this._hasInitialFit = false;
         this._lastSignature = '';
         const container = document.getElementById('networkConnectionsMapCanvas');
         if (container) container.innerHTML = '';
       },
 
-      loadBootstrap(apiKey) {
-        if (window.google && window.google.maps && typeof window.google.maps.importLibrary === 'function') {
-          return Promise.resolve();
-        }
-        return new Promise((resolve, reject) => {
-          try {
-            window.gm_authFailure = () => {
-              console.error('Google Maps authentication or configuration error.');
-              this._hasError = true;
-              this.setStatusOverlay(
-                true,
-                'No se pudo autenticar Google Maps Platform',
-                'Verifica que la clave VITE_GOOGLE_MAPS_API_KEY tenga habilitada Maps JavaScript API y permisos de referente HTTP.',
-                true
-              );
-            };
-            (g => {
-              var h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__", m = document, b = window;
-              b = b[c] || (b[c] = {});
-              var d = b.maps || (b.maps = {}), r = new Set, e = new URLSearchParams,
-                u = () => h || (h = new Promise(async (f, n) => {
-                  await (a = m.createElement("script"));
-                  e.set("libraries", [...r] + "");
-                  for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]);
-                  e.set("callback", c + ".maps." + q);
-                  a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
-                  d[q] = f;
-                  a.onerror = () => h = n(Error(p + " could not load."));
-                  a.nonce = m.querySelector("script[nonce]")?.nonce || "";
-                  m.head.append(a);
-                }));
-              d[l] ? console.warn(p + " only loads once.") : d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n));
-            })({
-              key: apiKey,
-              v: "weekly"
-            });
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      },
-
       async ensureInitialized(srvNode) {
-        this._engine = this.getEngine();
-        const lblEngine = document.getElementById('lblActiveMapEngine');
-        const lblAttr = document.getElementById('lblMapProviderAttribution');
-        if (lblEngine) {
-          lblEngine.textContent = this._engine === 'google' ? 'Google Maps' : 'OpenStreetMap (Gratis)';
-        }
-        if (lblAttr) {
-          lblAttr.textContent = this._engine === 'google' ? 'Google Maps Platform' : 'OpenStreetMap · CartoDB';
-        }
+        if (this._isReady && this._leafletMap) return true;
+        if (this._isBootstrapping) return false;
 
         const container = document.getElementById('networkConnectionsMapCanvas');
         if (!container) return false;
@@ -9834,159 +9601,68 @@
         const initLat = (srvNode && typeof srvNode.lat === 'number') ? srvNode.lat : 40.4168;
         const initLng = (srvNode && typeof srvNode.lng === 'number') ? srvNode.lng : -3.7038;
 
-        // ------------------------------------------
-        // MOTOR 1: OPENSTREETMAP (LEAFLET - DEFAULT)
-        // ------------------------------------------
-        if (this._engine === 'leaflet') {
-          if (this._isReady && this._leafletMap) return true;
-          if (this._isBootstrapping) return false;
-
-          if (typeof L === 'undefined') {
-            this.setStatusOverlay(
-              true,
-              'Cargando librería de mapa...',
-              'Obteniendo recursos de visualización cartográfica Leaflet.'
-            );
-            return false;
-          }
-
-          try {
-            this._isBootstrapping = true;
-            container.innerHTML = '';
-            this._leafletMap = L.map(container, {
-              center: [initLat, initLng],
-              zoom: 3,
-              zoomControl: true,
-              attributionControl: false
-            });
-
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-              maxZoom: 19,
-              subdomains: 'abcd',
-              attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-            }).addTo(this._leafletMap);
-
-            this._isReady = true;
-            this._isBootstrapping = false;
-            this.setStatusOverlay(false);
-            setTimeout(() => {
-              if (this._leafletMap) this._leafletMap.invalidateSize();
-            }, 120);
-            return true;
-          } catch (err) {
-            console.error('Error inicializando Leaflet:', err);
-            this._isBootstrapping = false;
-            this._hasError = true;
-            this.setStatusOverlay(
-              true,
-              'Error al inicializar OpenStreetMap',
-              'Comprueba la conexión de red local.'
-            );
-            return false;
-          }
-        }
-
-        // ------------------------------------------
-        // MOTOR 2: GOOGLE MAPS PLATFORM (OPCIONAL)
-        // ------------------------------------------
-        if (this._isReady && this._map) return true;
-        if (this._isBootstrapping || this._hasError) return false;
-
-        const apiKey = this.getApiKey();
-        if (!apiKey) {
+        if (typeof L === 'undefined') {
           this.setStatusOverlay(
             true,
-            'Esperando configuración de Google Maps...',
-            'No hay una clave VITE_GOOGLE_MAPS_API_KEY configurada. Puedes usar OpenStreetMap gratis de inmediato.',
-            true
+            'Cargando librería de mapa...',
+            'Obteniendo recursos de visualización cartográfica Leaflet.'
           );
           return false;
         }
 
-        this._isBootstrapping = true;
         try {
-          await this.loadBootstrap(apiKey);
-          const [mapsLib, markerLib] = await Promise.all([
-            google.maps.importLibrary('maps'),
-            google.maps.importLibrary('marker')
-          ]);
-
-          this._MapClass = mapsLib.Map;
-          this._InfoWindowClass = mapsLib.InfoWindow;
-          this._PolylineClass = mapsLib.Polyline;
-          this._LatLngBoundsClass = mapsLib.LatLngBounds;
-          this._AdvancedMarkerClass = markerLib.AdvancedMarkerElement;
-
+          this._isBootstrapping = true;
           container.innerHTML = '';
-          this._map = new this._MapClass(container, {
-            center: { lat: initLat, lng: initLng },
+          this._leafletMap = L.map(container, {
+            center: [initLat, initLng],
             zoom: 3,
-            mapId: 'DEMO_MAP_ID',
-            renderingType: 'VECTOR',
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: true,
             zoomControl: true,
-            internalUsageAttributionIds: ['gmp_mcp_codeassist_v1_aistudio']
+            attributionControl: false
           });
 
-          this._infoWindow = new this._InfoWindowClass({
-            maxWidth: 360
-          });
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            subdomains: 'abcd',
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+          }).addTo(this._leafletMap);
 
           this._isReady = true;
           this._isBootstrapping = false;
           this.setStatusOverlay(false);
+          setTimeout(() => {
+            if (this._leafletMap) this._leafletMap.invalidateSize();
+          }, 120);
           return true;
         } catch (err) {
-          console.error('Error initializing Google Maps JavaScript API:', err);
+          console.error('Error inicializando Leaflet:', err);
           this._isBootstrapping = false;
-          this._hasError = true;
           this.setStatusOverlay(
             true,
-            'Error al cargar Google Maps Platform',
-            'No se pudo inicializar Google Maps. Puedes pulsar el botón abajo para cambiar a OpenStreetMap.',
-            true
+            'Error al inicializar OpenStreetMap',
+            'Comprueba la conexión de red local.'
           );
           return false;
         }
       },
 
       clearMapOverlays() {
-        if (this._engine === 'leaflet') {
-          if (this._serverMarker && this._leafletMap) {
-            this._serverMarker.remove();
-            this._serverMarker = null;
-          }
-          for (const m of this._markersMap.values()) {
-            if (m.marker) m.marker.remove();
-          }
-          this._markersMap.clear();
-          for (const line of this._polylines) {
-            if (line) line.remove();
-          }
-          this._polylines = [];
-        } else {
-          if (this._serverMarker) {
-            this._serverMarker.map = null;
-            this._serverMarker = null;
-          }
-          for (const m of this._markersMap.values()) {
-            m.marker.map = null;
-          }
-          this._markersMap.clear();
-          for (const line of this._polylines) {
-            line.setMap(null);
-          }
-          this._polylines = [];
+        if (this._serverMarker && this._leafletMap) {
+          this._serverMarker.remove();
+          this._serverMarker = null;
         }
+        for (const m of this._markersMap.values()) {
+          if (m.marker) m.marker.remove();
+        }
+        this._markersMap.clear();
+        for (const line of this._polylines) {
+          if (line) line.remove();
+        }
+        this._polylines = [];
       },
 
       buildInfoWindowNode(item, isServerHost = false) {
         const wrap = document.createElement('div');
         wrap.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #0f172a; padding: 4px 6px; min-width: 220px; line-height: 1.45;';
-
-        const providerLabel = this._engine === 'google' ? 'Google Maps' : 'OpenStreetMap · CartoDB';
 
         if (isServerHost) {
           wrap.innerHTML = `
@@ -10004,7 +9680,7 @@
               📍 ${escapeHtml(item.city || 'Servidor')}${item.country ? ', ' + escapeHtml(item.country) : ''}
             </div>
             <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">
-              ${providerLabel} · GeoIP (ip-api.com)
+              OpenStreetMap · CartoDB · GeoIP (ip-api.com)
             </div>
           `;
           return wrap;
@@ -10037,7 +9713,7 @@
           </div>
           <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b; display: flex; justify-content: space-between; gap: 8px;">
             <span>${geoSourceBadge}</span>
-            <span>${providerLabel}</span>
+            <span>OpenStreetMap · CartoDB</span>
           </div>
         `;
         return wrap;
@@ -10130,9 +9806,9 @@
         if (activeView !== 'network') return;
 
         const ready = await this.ensureInitialized(srv);
-        if (!ready) return;
+        if (!ready || !this._leafletMap) return;
 
-        const sig = `${this._engine}|${connectionsMapFilter}|${srv.lat},${srv.lng}|` + filteredConns.map(c => `${c.id}:${c.lat},${c.lng}:${c.state}:${c.geo_status || ''}`).join(';');
+        const sig = `${connectionsMapFilter}|${srv.lat},${srv.lng}|` + filteredConns.map(c => `${c.id}:${c.lat},${c.lng}:${c.state}:${c.geo_status || ''}`).join(';');
         if (!forceRedraw && sig === this._lastSignature) return;
         this._lastSignature = sig;
 
@@ -10143,153 +9819,59 @@
           lng: typeof srv.lng === 'number' ? srv.lng : -3.7038
         };
 
-        // ==========================================
-        // RENDER EN LEAFLET (OPENSTREETMAP)
-        // ==========================================
-        if (this._engine === 'leaflet') {
-          if (!this._leafletMap) return;
-
-          // 1. Host Central Marker
-          const srvIcon = L.divIcon({
-            className: 'gmp-conn-marker-wrap',
-            html: `<div class="gmp-conn-marker server-host"><span>🖥️</span><span>Host (${escapeHtml(srv.city || 'Servidor')})</span></div>`,
-            iconSize: null
-          });
-          const srvMarker = L.marker([srvPos.lat, srvPos.lng], {
-            icon: srvIcon,
-            title: `Nodo Servidor (${srv.public_ip || srv.ip || 'Host'})`
-          }).addTo(this._leafletMap);
-
-          srvMarker.bindPopup(this.buildInfoWindowNode(srv, true), {
-            maxWidth: 360,
-            className: 'leaflet-custom-popup'
-          });
-          this._serverMarker = srvMarker;
-
-          // 2. Conexiones Remotas y Polilíneas
-          for (const conn of filteredConns) {
-            if (typeof conn.lat !== 'number' || typeof conn.lng !== 'number') continue;
-            const remPos = { lat: conn.lat, lng: conn.lng };
-            const arrowChar = conn.direction === 'incoming' ? '↓' : (conn.direction === 'blocked' ? '🛡️' : '↑');
-
-            const badgeHtml = `<div class="gmp-conn-marker ${conn.direction}"><span>${arrowChar}</span><span>${escapeHtml(conn.remote_ip)}</span></div>`;
-            const icon = L.divIcon({
-              className: 'gmp-conn-marker-wrap',
-              html: badgeHtml,
-              iconSize: null
-            });
-
-            const marker = L.marker([conn.lat, conn.lng], {
-              icon: icon,
-              title: `${conn.service} (${conn.remote_ip})`
-            }).addTo(this._leafletMap);
-
-            marker.bindPopup(this.buildInfoWindowNode(conn, false), {
-              maxWidth: 360,
-              className: 'leaflet-custom-popup'
-            });
-
-            this._markersMap.set(conn.id, { marker, conn });
-
-            const strokeHex = conn.direction === 'incoming'
-              ? '#10B981'
-              : (conn.direction === 'blocked' ? '#F43F5E' : '#06B6D4');
-
-            const poly = L.polyline([[srvPos.lat, srvPos.lng], [conn.lat, conn.lng]], {
-              color: strokeHex,
-              weight: 2.2,
-              opacity: 0.82,
-              dashArray: conn.direction === 'incoming' ? '4, 4' : null
-            }).addTo(this._leafletMap);
-
-            this._polylines.push(poly);
-          }
-
-          if (!this._hasInitialFit && filteredConns.length > 0) {
-            this._hasInitialFit = true;
-            this.fitAllBounds();
-          }
-          return;
-        }
-
-        // ==========================================
-        // RENDER EN GOOGLE MAPS PLATFORM
-        // ==========================================
-        if (!this._map) return;
-
-        // 1. Central Server Host AdvancedMarkerElement
-        const srvBadge = document.createElement('div');
-        srvBadge.className = 'gmp-conn-marker server-host';
-        srvBadge.innerHTML = `<span>🖥️</span><span>Host (${escapeHtml(srv.city || 'Servidor')})</span>`;
-
-        const srvMarker = new this._AdvancedMarkerClass({
-          map: this._map,
-          position: srvPos,
-          title: `Nodo Servidor (${srv.public_ip || srv.ip || 'Host'})`
+        // 1. Host Central Marker
+        const srvIcon = L.divIcon({
+          className: 'gmp-conn-marker-wrap',
+          html: `<div class="gmp-conn-marker server-host"><span>🖥️</span><span>Host (${escapeHtml(srv.city || 'Servidor')})</span></div>`,
+          iconSize: null
         });
-        srvMarker.append(srvBadge);
-        srvBadge.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this._infoWindow.setContent(this.buildInfoWindowNode(srv, true));
-          this._infoWindow.open({ anchor: srvMarker, map: this._map });
+        const srvMarker = L.marker([srvPos.lat, srvPos.lng], {
+          icon: srvIcon,
+          title: `Nodo Servidor (${srv.public_ip || srv.ip || 'Host'})`
+        }).addTo(this._leafletMap);
+
+        srvMarker.bindPopup(this.buildInfoWindowNode(srv, true), {
+          maxWidth: 360,
+          className: 'leaflet-custom-popup'
         });
         this._serverMarker = srvMarker;
 
-        // 2. Remote Connection AdvancedMarkers & Geodesic Polylines
+        // 2. Remote Connection Markers & Polylines
         for (const conn of filteredConns) {
           if (typeof conn.lat !== 'number' || typeof conn.lng !== 'number') continue;
-          const remPos = { lat: conn.lat, lng: conn.lng };
 
-          const badge = document.createElement('div');
-          badge.className = `gmp-conn-marker ${conn.direction}`;
           const arrowChar = conn.direction === 'incoming' ? '↓' : (conn.direction === 'blocked' ? '🛡️' : '↑');
-          badge.innerHTML = `<span>${arrowChar}</span><span>${escapeHtml(conn.remote_ip)}</span>`;
+          const badgeHtml = `<div class="gmp-conn-marker ${conn.direction}"><span>${arrowChar}</span><span>${escapeHtml(conn.remote_ip)}</span></div>`;
+          const icon = L.divIcon({
+            className: 'gmp-conn-marker-wrap',
+            html: badgeHtml,
+            iconSize: null
+          });
 
-          const marker = new this._AdvancedMarkerClass({
-            map: this._map,
-            position: remPos,
+          const marker = L.marker([conn.lat, conn.lng], {
+            icon: icon,
             title: `${conn.service} (${conn.remote_ip})`
-          });
-          marker.append(badge);
+          }).addTo(this._leafletMap);
 
-          const openConnPopup = () => {
-            this._infoWindow.setContent(this.buildInfoWindowNode(conn, false));
-            this._infoWindow.open({ anchor: marker, map: this._map });
-          };
-          badge.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openConnPopup();
+          marker.bindPopup(this.buildInfoWindowNode(conn, false), {
+            maxWidth: 360,
+            className: 'leaflet-custom-popup'
           });
 
-          this._markersMap.set(conn.id, { marker, conn, openConnPopup });
+          this._markersMap.set(conn.id, { marker, conn });
 
           const strokeHex = conn.direction === 'incoming'
             ? '#10B981'
             : (conn.direction === 'blocked' ? '#F43F5E' : '#06B6D4');
 
-          const linePath = conn.direction === 'incoming' ? [remPos, srvPos] : [srvPos, remPos];
+          const poly = L.polyline([[srvPos.lat, srvPos.lng], [conn.lat, conn.lng]], {
+            color: strokeHex,
+            weight: 2.2,
+            opacity: 0.82,
+            dashArray: conn.direction === 'incoming' ? '4, 4' : null
+          }).addTo(this._leafletMap);
 
-          const geodesicLine = new this._PolylineClass({
-            path: linePath,
-            geodesic: true,
-            strokeColor: strokeHex,
-            strokeOpacity: 0.82,
-            strokeWeight: 2.4,
-            icons: window.google?.maps?.SymbolPath ? [
-              {
-                icon: {
-                  path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                  scale: 2.6,
-                  strokeColor: strokeHex,
-                  fillColor: strokeHex,
-                  fillOpacity: 1
-                },
-                offset: '55%'
-              }
-            ] : []
-          });
-          geodesicLine.setMap(this._map);
-          this._polylines.push(geodesicLine);
+          this._polylines.push(poly);
         }
 
         if (!this._hasInitialFit && filteredConns.length > 0) {
@@ -10299,98 +9881,40 @@
       },
 
       fitAllBounds() {
-        if (this._engine === 'leaflet') {
-          if (!this._leafletMap) return;
-          const srv = this._lastConnData ? this._lastConnData.server_node : null;
-          const pts = [];
-          if (srv && typeof srv.lat === 'number' && typeof srv.lng === 'number') {
-            pts.push([srv.lat, srv.lng]);
-          }
-          for (const entry of this._markersMap.values()) {
-            if (entry.conn && typeof entry.conn.lat === 'number') {
-              pts.push([entry.conn.lat, entry.conn.lng]);
-            }
-          }
-          if (pts.length > 1) {
-            this._leafletMap.fitBounds(L.latLngBounds(pts).pad(0.12));
-          } else if (pts.length === 1) {
-            this._leafletMap.setView(pts[0], 6);
-          }
-          return;
-        }
-
-        // Google Maps
-        if (!this._map || !this._LatLngBoundsClass || !this._lastConnData) return;
-        const bounds = new this._LatLngBoundsClass();
-        const srv = this._lastConnData.server_node;
-        let count = 0;
+        if (!this._leafletMap) return;
+        const srv = this._lastConnData ? this._lastConnData.server_node : null;
+        const pts = [];
         if (srv && typeof srv.lat === 'number' && typeof srv.lng === 'number') {
-          bounds.extend({ lat: srv.lat, lng: srv.lng });
-          count++;
+          pts.push([srv.lat, srv.lng]);
         }
         for (const entry of this._markersMap.values()) {
-          bounds.extend({ lat: entry.conn.lat, lng: entry.conn.lng });
-          count++;
+          if (entry.conn && typeof entry.conn.lat === 'number') {
+            pts.push([entry.conn.lat, entry.conn.lng]);
+          }
         }
-        if (count > 1) {
-          this._map.fitBounds(bounds, 52);
-        } else if (count === 1 && srv) {
-          this._map.panTo({ lat: srv.lat, lng: srv.lng });
-          this._map.setZoom(6);
+        if (pts.length > 1) {
+          this._leafletMap.fitBounds(L.latLngBounds(pts).pad(0.12));
+        } else if (pts.length === 1) {
+          this._leafletMap.setView(pts[0], 6);
         }
       },
 
       focusServerNode() {
-        if (!this._lastConnData || !this._lastConnData.server_node) return;
+        if (!this._lastConnData || !this._lastConnData.server_node || !this._leafletMap) return;
         const srv = this._lastConnData.server_node;
         if (typeof srv.lat !== 'number' || typeof srv.lng !== 'number') return;
-
-        if (this._engine === 'leaflet') {
-          if (!this._leafletMap) return;
-          this._leafletMap.setView([srv.lat, srv.lng], 9);
-          if (this._serverMarker) this._serverMarker.openPopup();
-          return;
-        }
-
-        // Google Maps
-        if (!this._map) return;
-        this._map.panTo({ lat: srv.lat, lng: srv.lng });
-        this._map.setZoom(9);
-        if (this._serverMarker && this._infoWindow) {
-          this._infoWindow.setContent(this.buildInfoWindowNode(srv, true));
-          this._infoWindow.open({ anchor: this._serverMarker, map: this._map });
-        }
+        this._leafletMap.setView([srv.lat, srv.lng], 9);
+        if (this._serverMarker) this._serverMarker.openPopup();
       },
 
       focusConnectionById(connId) {
+        if (!this._leafletMap) return;
         const entry = this._markersMap.get(connId);
         if (!entry) return;
-
-        if (this._engine === 'leaflet') {
-          if (!this._leafletMap) return;
-          this._leafletMap.setView([entry.conn.lat, entry.conn.lng], 9);
-          if (entry.marker) entry.marker.openPopup();
-          return;
-        }
-
-        // Google Maps
-        if (!this._map) return;
-        this._map.panTo({ lat: entry.conn.lat, lng: entry.conn.lng });
-        if ((this._map.getZoom() || 3) < 5) {
-          this._map.setZoom(6);
-        }
-        if (typeof entry.openConnPopup === 'function') {
-          entry.openConnPopup();
-        }
+        this._leafletMap.setView([entry.conn.lat, entry.conn.lng], 9);
+        if (entry.marker) entry.marker.openPopup();
       }
     };
-  </script>
-  <script type="module">
-    try {
-      if (import.meta && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
-        window.__VITE_GOOGLE_MAPS_API_KEY__ = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      }
-    } catch (e) {}
   </script>
 </body>
 </html>
