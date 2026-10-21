@@ -271,6 +271,178 @@ def clear_geoip_worker_errors():
         GEOIP_WORKER_STATS["errors_total"] = 0
         return cleared
 
+# ==============================================================================
+# RECOLECTOR UNIFICADO DE FALLOS Y ERRORES DEL SISTEMA (APPS, SERVICIOS, KERNEL)
+# ==============================================================================
+SYSTEM_LOGS_CACHE = {
+    "err": {"ts": 0.0, "data": None},
+    "warn": {"ts": 0.0, "data": None}
+}
+SYSTEM_LOGS_LOCK = threading.Lock()
+
+def fetch_system_logs(priority_max=3, limit=80, force=False):
+    """
+    Recopila de forma unificada y ultraligera todos los fallos, errores y eventos críticos
+    procedentes de todas las aplicaciones (Docker, apps nativas), servicios systemd y kernel
+    mediante systemd-journald y systemctl. 100% Zero-Hardcoding.
+    """
+    cache_key = "warn" if priority_max >= 4 else "err"
+    now = time.time()
+    with SYSTEM_LOGS_LOCK:
+        cached = SYSTEM_LOGS_CACHE.get(cache_key, {})
+        if not force and cached.get("data") and (now - cached.get("ts", 0) < 4.0):
+            return cached["data"]
+
+    # 1. Comprobar unidades en estado fallido (systemctl list-units --failed)
+    failed_units = []
+    try:
+        p_fail = subprocess.run(
+            ['systemctl', 'list-units', '--failed', '--no-pager', '--plain'],
+            capture_output=True, text=True, timeout=2.5
+        )
+        for line in p_fail.stdout.strip().split('\n'):
+            line = line.strip()
+            if not line or line.startswith(('UNIT', '0 loaded', 'LOAD', '●')):
+                continue
+            parts = line.split(None, 4)
+            if parts and parts[0].endswith(('.service', '.mount', '.socket', '.timer', '.target')):
+                failed_units.append({
+                    "unit": parts[0],
+                    "load": parts[1] if len(parts) > 1 else "loaded",
+                    "active": parts[2] if len(parts) > 2 else "failed",
+                    "sub": parts[3] if len(parts) > 3 else "failed",
+                    "description": parts[4] if len(parts) > 4 else parts[0]
+                })
+    except Exception:
+        pass
+
+    # 2. Consultar journalctl con prioridad especificada en formato JSON
+    logs = []
+    category_counts = {"docker": 0, "service": 0, "kernel": 0, "system": 0}
+    try:
+        cmd = ['journalctl', '-p', str(priority_max), '-n', str(min(200, max(20, limit))), '--no-pager', '-o', 'json']
+        p_j = subprocess.run(cmd, capture_output=True, text=True, timeout=3.5)
+        raw_lines = p_j.stdout.strip().split('\n')
+        for raw_line in raw_lines:
+            if not raw_line:
+                continue
+            try:
+                item = json.loads(raw_line)
+                msg = item.get("MESSAGE", "")
+                if isinstance(msg, list):
+                    try:
+                        msg = bytes(msg).decode('utf-8', errors='replace')
+                    except Exception:
+                        msg = str(msg)
+                msg_str = str(msg).strip()
+                if not msg_str:
+                    continue
+
+                # Deducción dinámica de origen (Zero-Hardcoding)
+                c_name = item.get("CONTAINER_NAME")
+                sysd_unit = item.get("_SYSTEMD_UNIT") or ""
+                syslog_id = item.get("SYSLOG_IDENTIFIER") or ""
+                comm = item.get("_COMM") or ""
+                transport = item.get("_TRANSPORT") or ""
+
+                category = "system"
+                if c_name:
+                    unit_name = str(c_name)
+                    category = "docker"
+                elif "docker" in sysd_unit.lower() or "containerd" in sysd_unit.lower():
+                    unit_name = syslog_id or comm or sysd_unit or "docker"
+                    category = "docker"
+                elif transport == "kernel" or syslog_id == "kernel" or comm == "kernel":
+                    unit_name = "kernel"
+                    category = "kernel"
+                elif sysd_unit and sysd_unit.endswith(('.service', '.mount', '.socket', '.timer', '.slice')):
+                    unit_name = sysd_unit
+                    category = "service"
+                elif syslog_id:
+                    unit_name = syslog_id
+                    category = "service" if syslog_id.endswith('.service') else "system"
+                else:
+                    unit_name = comm or "sistema"
+
+                prio_num = 3
+                try:
+                    prio_num = int(item.get("PRIORITY", 3))
+                except Exception:
+                    pass
+
+                prio_label = {
+                    0: "EMERG",
+                    1: "ALERT",
+                    2: "CRIT",
+                    3: "ERR",
+                    4: "WARN"
+                }.get(prio_num, "ERR")
+
+                ts_us = int(item.get("__REALTIME_TIMESTAMP", 0))
+                ts_ms = ts_us // 1000 if ts_us else int(time.time() * 1000)
+                ts_sec = ts_ms / 1000.0
+                time_str = datetime.fromtimestamp(ts_sec).strftime("%H:%M:%S")
+                time_iso = datetime.fromtimestamp(ts_sec).strftime("%Y-%m-%d %H:%M:%S")
+
+                seq = item.get("__SEQNUM") or len(logs)
+                entry_id = f"syslog_{ts_ms}_{seq}"
+
+                category_counts[category] = category_counts.get(category, 0) + 1
+
+                logs.append({
+                    "id": entry_id,
+                    "ts": ts_ms,
+                    "time_str": time_str,
+                    "time_iso": time_iso,
+                    "unit": unit_name,
+                    "category": category,
+                    "level": prio_label,
+                    "priority": prio_num,
+                    "message": msg_str
+                })
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    # Invertir para mostrar primero los más recientes
+    logs.reverse()
+
+    result = {
+        "success": True,
+        "total_errors": len(logs),
+        "failed_units_count": len(failed_units),
+        "failed_units": failed_units,
+        "counts_by_category": category_counts,
+        "logs": logs,
+        "fetched_at": datetime.now().strftime("%H:%M:%S")
+    }
+
+    with SYSTEM_LOGS_LOCK:
+        SYSTEM_LOGS_CACHE[cache_key] = {
+            "ts": now,
+            "data": result
+        }
+
+    return result
+
+def get_system_errors_summary():
+    """Devuelve un resumen ultraligero de fallos para incluirlo en /api/metrics."""
+    data = fetch_system_logs(priority_max=3, limit=50)
+    counts = data.get("counts_by_category", {})
+    total = data.get("total_errors", 0)
+    failed_u = data.get("failed_units_count", 0)
+    return {
+        "total": total,
+        "failed_units_count": failed_u,
+        "docker_errors": counts.get("docker", 0),
+        "service_errors": counts.get("service", 0),
+        "kernel_errors": counts.get("kernel", 0),
+        "system_errors": counts.get("system", 0),
+        "healthy": (total == 0 and failed_u == 0),
+        "last_sync": data.get("fetched_at", "--")
+    }
+
 PORT_SERVICE_LABELS = {
     20: "FTP Datos",
     21: "FTP Servidor de Archivos",
@@ -4613,6 +4785,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             base_payload["maps_engine"] = "leaflet"
             base_payload["version_info"] = get_version_info(force_refresh=False)
             base_payload["version_info"]["public_domain"] = req_domain
+            base_payload["system_errors_summary"] = get_system_errors_summary()
             with CUSTOM_LOGOS_LOCK:
                 base_payload["custom_logos"] = load_custom_logos()
             data = json.dumps(base_payload).encode('utf-8')
@@ -4641,6 +4814,41 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             ver_data["public_domain"] = req_domain
             ver_data["local_ip"] = SERVER_LOCAL_IP
             resp = json.dumps(ver_data).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 1c. REGISTRO UNIFICADO DE FALLOS Y ERRORES DEL SISTEMA (APPS, SERVICIOS, KERNEL)
+        elif clean_path == "/api/system/logs":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            query_str = self.path.split('?', 1)[1] if '?' in self.path else ''
+            params = urllib.parse.parse_qs(query_str)
+            prio = 4 if params.get('level', ['err'])[0].lower() in ('warn', 'warning', '4') else 3
+            cat = params.get('category', ['all'])[0].lower()
+            try:
+                limit = int(params.get('limit', [80])[0])
+            except Exception:
+                limit = 80
+            force = (params.get('refresh', ['0'])[0] in ('1', 'true'))
+
+            logs_payload = fetch_system_logs(priority_max=prio, limit=limit, force=force)
+            if cat != 'all':
+                filtered_logs = [entry for entry in logs_payload.get('logs', []) if entry.get('category') == cat]
+                logs_payload = dict(logs_payload)
+                logs_payload['logs'] = filtered_logs
+
+            resp = json.dumps(logs_payload).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')

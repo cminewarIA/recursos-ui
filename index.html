@@ -2193,21 +2193,21 @@
     }
 
     /* ==========================================================================
-       MAIN NODE REAL-TIME ERROR TERMINAL (GEOIP WORKER & NETWORK REQUESTS)
+       CENTRO UNIFICADO DE REGISTRO DE FALLOS DEL SISTEMA (APPS, SERVICIOS, KERNEL)
        ========================================================================== */
-    .node-error-terminal-card {
+    .system-logs-center-card {
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
       overflow: hidden;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+      transition: all 0.25s ease;
     }
-    .node-error-terminal-card.has-active-errors {
+    .system-logs-center-card.has-active-errors {
       border-color: rgba(244, 63, 94, 0.45);
-      box-shadow: 0 0 20px rgba(244, 63, 94, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      box-shadow: 0 0 24px rgba(244, 63, 94, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
-    .node-error-terminal-bar {
+    .system-logs-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -2217,107 +2217,72 @@
       background: rgba(15, 23, 42, 0.55);
       border-bottom: 1px solid var(--border-subtle);
     }
-    [data-theme="light"] .node-error-terminal-bar {
+    [data-theme="light"] .system-logs-bar {
       background: rgba(241, 245, 249, 0.9);
     }
-    .node-error-terminal-title-group {
+    .system-logs-title-group {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
       min-width: 0;
     }
-    .node-terminal-lights {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      flex-shrink: 0;
-    }
-    .node-terminal-lights span {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    .node-terminal-lights .tl-red { background: #f43f5e; }
-    .node-terminal-lights .tl-amber { background: #f59e0b; }
-    .node-terminal-lights .tl-green { background: #10b981; }
-    .node-error-terminal-title {
+    .system-logs-title {
       font-family: var(--font-mono);
       font-size: 11.5px;
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: 0.02em;
     }
-    .node-error-terminal-actions {
+    .system-logs-actions {
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
     }
-    .node-error-clear-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      height: 28px;
-      padding: 0 11px;
-      border-radius: 8px;
-      font-family: var(--font-sans);
-      font-size: 11px;
-      font-weight: 700;
-      background: rgba(244, 63, 94, 0.14);
-      border: 1px solid rgba(244, 63, 94, 0.38);
-      color: var(--accent-rose-bright);
-      cursor: pointer;
-      transition: all 0.18s ease;
-    }
-    .node-error-clear-btn:hover {
-      background: rgba(244, 63, 94, 0.25);
-      border-color: rgba(244, 63, 94, 0.65);
-      transform: translateY(-1px);
-    }
-    .node-error-clear-btn:active {
-      transform: translateY(0);
-    }
-    .node-error-terminal-viewport {
-      max-height: 210px;
+    .system-logs-viewport {
+      max-height: 280px;
       overflow-y: auto;
       padding: 10px 14px;
       font-family: var(--font-mono);
-      font-size: 11.5px;
+      font-size: 11px;
       line-height: 1.5;
       display: flex;
       flex-direction: column;
       gap: 6px;
-      background: rgba(2, 6, 23, 0.42);
+      background: rgba(2, 6, 23, 0.45);
     }
-    [data-theme="light"] .node-error-terminal-viewport {
+    [data-theme="light"] .system-logs-viewport {
       background: rgba(15, 23, 42, 0.04);
     }
-    .node-err-log-entry {
+    .system-log-row {
       display: flex;
       align-items: flex-start;
-      justify-content: space-between;
       gap: 10px;
-      padding: 6px 10px;
+      padding: 7px 10px;
       border-radius: 7px;
-      background: rgba(15, 23, 42, 0.55);
+      background: rgba(15, 23, 42, 0.5);
       border-left: 3px solid #f43f5e;
       color: var(--text-primary);
       word-break: break-word;
+      transition: background 0.15s ease;
     }
-    [data-theme="light"] .node-err-log-entry {
+    [data-theme="light"] .system-log-row {
       background: rgba(255, 255, 255, 0.85);
       border: 1px solid rgba(226, 232, 240, 0.9);
       border-left: 3px solid #e11d48;
     }
-    .node-err-log-entry.source-geoip {
-      border-left-color: #f59e0b;
+    .system-log-row:hover {
+      background: rgba(255, 255, 255, 0.05);
     }
-    .node-err-log-entry.source-net {
-      border-left-color: #f43f5e;
+    [data-theme="light"] .system-log-row:hover {
+      background: rgba(255, 255, 255, 1);
     }
-    .node-err-tag {
+    .system-log-row.cat-docker { border-left-color: #38bdf8; }
+    .system-log-row.cat-service { border-left-color: #c084fc; }
+    .system-log-row.cat-kernel { border-left-color: #f59e0b; }
+    .system-log-row.cat-system { border-left-color: #94a3b8; }
+    .sys-cat-pill {
       display: inline-flex;
       align-items: center;
       padding: 1px 6px;
@@ -2327,40 +2292,30 @@
       letter-spacing: 0.03em;
       flex-shrink: 0;
     }
-    .node-err-tag.geoip {
-      background: rgba(245, 158, 11, 0.18);
-      color: #fbbf24;
-      border: 1px solid rgba(245, 158, 11, 0.38);
-    }
-    [data-theme="light"] .node-err-tag.geoip {
-      color: #b45309;
-    }
-    .node-err-tag.net {
-      background: rgba(244, 63, 94, 0.18);
-      color: #fb7185;
-      border: 1px solid rgba(244, 63, 94, 0.38);
-    }
-    [data-theme="light"] .node-err-tag.net {
-      color: #be123c;
-    }
-    .node-err-code-pill {
+    .sys-cat-pill.docker { background: rgba(14, 165, 233, 0.2); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); }
+    .sys-cat-pill.service { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
+    .sys-cat-pill.kernel { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .sys-cat-pill.system { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4); }
+    .sys-prio-pill {
       display: inline-flex;
       align-items: center;
       padding: 1px 5px;
       border-radius: 4px;
       font-size: 10px;
       font-weight: 700;
-      background: rgba(148, 163, 184, 0.16);
-      color: var(--text-secondary);
       flex-shrink: 0;
     }
-    .node-err-empty-state {
+    .sys-prio-pill.prio-emerg,
+    .sys-prio-pill.prio-crit { background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.45); }
+    .sys-prio-pill.prio-err { background: rgba(244, 63, 94, 0.2); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.4); }
+    .sys-prio-pill.prio-warn { background: rgba(245, 158, 11, 0.2); color: #fde047; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .system-logs-empty-state {
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 8px;
-      padding: 8px 6px;
+      padding: 12px 10px;
       color: var(--accent-emerald-bright);
       font-size: 11.5px;
     }
@@ -2934,11 +2889,61 @@
             </div>
 
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1;">
+              <button class="action-btn" style="min-height: 30px; height: 30px; padding: 0 12px; font-size: 11.5px;" onclick="SystemLogsCenter.toggleCenter()" id="ovSystemLogsToggleBtn" title="Abrir/ocultar Centro Unificado de Registro de Fallos (Apps, Servicios y Kernel)">
+                📋 <span id="ovSystemLogsBadgeText" class="mono">Logs: verificando...</span>
+              </button>
               <button class="action-btn" style="min-height: 30px; height: 30px; padding: 0 12px; font-size: 11.5px;" onclick="openPerfAuditDialog()" title="Ver auditoría de rendimiento y optimización en tiempo real">
                 ⚡ <span id="ovPerfBadgeText">Auditoría 60fps</span>
               </button>
               <span class="adw-badge badge-green" id="ovBadgeStatus">Telemetría Activa</span>
               <span class="adw-badge badge-blue" id="ovBadgeTrust" onclick="openTrustDialog()" style="cursor: pointer;">Verificando red...</span>
+            </div>
+          </div>
+
+          <!-- Centro Unificado de Registro y Monitor de Fallos del Sistema (Todas las Apps y Servicios) -->
+          <div class="system-logs-center-card" id="systemLogsCenterCard" style="display: none; margin-bottom: 16px;">
+            <div class="system-logs-bar">
+              <div class="system-logs-title-group">
+                <span class="node-terminal-lights" aria-hidden="true">
+                  <span class="tl-red"></span>
+                  <span class="tl-amber"></span>
+                  <span class="tl-green"></span>
+                </span>
+                <span class="system-logs-title">📋 CENTRO UNIFICADO DE FALLOS DEL SISTEMA · APPS, SERVICIOS &amp; KERNEL</span>
+                <span class="adw-badge badge-green mono" id="sysLogsStatusBadge">0 fallos detectados</span>
+                <span class="adw-badge badge-red mono" id="sysLogsFailedUnitsBadge" style="display: none;">0 servicios caídos</span>
+              </div>
+              <div class="system-logs-actions">
+                <div class="segmented-control">
+                  <button type="button" class="seg-btn active" id="btnSysCatAll" onclick="SystemLogsCenter.setCategory('all')">Todos (<span id="cntSysErrAll">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSysCatDocker" onclick="SystemLogsCenter.setCategory('docker')">🐳 Apps &amp; Docker (<span id="cntSysErrDocker">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSysCatService" onclick="SystemLogsCenter.setCategory('service')">⚙️ Servicios (<span id="cntSysErrService">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSysCatKernel" onclick="SystemLogsCenter.setCategory('kernel')">🐧 Kernel (<span id="cntSysErrKernel">0</span>)</button>
+                </div>
+                <div class="segmented-control">
+                  <button type="button" class="seg-btn active" id="btnSysLevelErr" onclick="SystemLogsCenter.setLevel('err')">Solo Errores</button>
+                  <button type="button" class="seg-btn" id="btnSysLevelWarn" onclick="SystemLogsCenter.setLevel('warn')">+ Advertencias</button>
+                </div>
+                <button type="button" class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.refreshLive()" title="Recargar eventos del sistema en vivo">
+                  🔄 Actualizar
+                </button>
+                <button type="button" class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.openModal()" title="Abrir visor completo de fallos en pantalla completa">
+                  ⛶ Pantalla completa
+                </button>
+              </div>
+            </div>
+            
+            <div style="padding: 8px 14px; border-bottom: 1px solid var(--border-subtle); display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 200px; position: relative;">
+                <input type="text" id="sysLogsSearchInput" placeholder="🔍 Filtrar por nombre de app, servicio o texto del error..." style="width: 100%; height: 28px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0 10px; font-size: 11px; color: var(--text-primary); outline: none;" oninput="SystemLogsCenter.setFilterQuery(this.value)">
+              </div>
+              <span id="sysLogsMetaCount" class="mono" style="font-size: 11px; color: var(--text-muted);">Cargando eventos...</span>
+            </div>
+
+            <div class="system-logs-viewport" id="systemLogsViewport" role="log" aria-live="polite">
+              <div class="system-logs-empty-state">
+                <span>✔ [OK] Consultando eventos de fallos y errores del sistema en tiempo real...</span>
+              </div>
             </div>
           </div>
 
@@ -4269,6 +4274,38 @@
             <div class="row-sublabel">Animación acelerada por GPU al navegar entre módulos o deslizar en pantalla táctil</div>
           </div>
           <span class="adw-badge badge-purple" id="auditViewTransitionBadge">Soportado</span>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ======================================================================
+       NATIVE HTML5 <dialog>: CENTRO UNIFICADO DE FALLOS DEL SISTEMA (MODAL)
+       ====================================================================== -->
+  <dialog class="bento-dialog" id="systemLogsModal" onclick="if(event.target===this) SystemLogsCenter.closeModal()" style="max-width: 920px; width: 95vw;">
+    <div class="bento-dialog-header">
+      <div>
+        <div class="instrument-kicker">Diagnóstico Integral del Sistema</div>
+        <h3 style="font-family: var(--font-display); font-size: 19px; font-weight: 800; color: var(--text-primary);">📋 Registro Unificado de Fallos &amp; Excepciones</h3>
+        <div id="modalSystemLogsMeta" style="font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">Cargando eventos...</div>
+      </div>
+      <button class="action-btn" style="min-height: 36px; height: 36px; padding: 0 12px;" onclick="SystemLogsCenter.closeModal()">✕</button>
+    </div>
+    <div class="bento-dialog-body">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+        <div class="segmented-control">
+          <button type="button" class="seg-btn active" id="btnModalSysCatAll" onclick="SystemLogsCenter.setCategory('all')">Todos</button>
+          <button type="button" class="seg-btn" id="btnModalSysCatDocker" onclick="SystemLogsCenter.setCategory('docker')">🐳 Apps &amp; Docker</button>
+          <button type="button" class="seg-btn" id="btnModalSysCatService" onclick="SystemLogsCenter.setCategory('service')">⚙️ Servicios</button>
+          <button type="button" class="seg-btn" id="btnModalSysCatKernel" onclick="SystemLogsCenter.setCategory('kernel')">🐧 Kernel</button>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button type="button" class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.refreshLive()">🔄 Actualizar</button>
+        </div>
+      </div>
+      <div class="system-logs-viewport" id="modalSystemLogsViewport" role="log" style="max-height: 60vh; min-height: 250px;">
+        <div class="system-logs-empty-state">
+          <span>✔ [OK] Consultando eventos de fallos y errores del sistema...</span>
         </div>
       </div>
     </div>
@@ -7516,6 +7553,11 @@
           MainNodeErrorTerminal.renderAll();
         }
 
+        // Sync system failure logs summary into Unified System Logs Center
+        if (typeof SystemLogsCenter !== 'undefined' && data.system_errors_summary) {
+          SystemLogsCenter.updateFromMetrics(data.system_errors_summary);
+        }
+
         // 1. Sidebar Counters & Host Info
         const cpuPct = Number(cpu.usage_percent || 0);
         const ramPct = Number(ram.percent || 0);
@@ -10117,6 +10159,314 @@
     };
     window.MainNodeErrorTerminal = MainNodeErrorTerminal;
     MainNodeErrorTerminal.init();
+
+    // =========================================================================
+    // CENTRO UNIFICADO DE REGISTRO DE FALLOS DEL SISTEMA (APPS, SERVICIOS & KERNEL)
+    // =========================================================================
+    const SystemLogsCenter = {
+      _logs: [],
+      _summary: null,
+      _failedUnits: [],
+      _category: 'all', // 'all' | 'docker' | 'service' | 'kernel'
+      _level: 'err',    // 'err' | 'warn'
+      _searchQuery: '',
+      _isVisible: false,
+      _isLoading: false,
+      _initialized: false,
+
+      init() {
+        if (this._initialized) return;
+        this._initialized = true;
+      },
+
+      toggleCenter() {
+        const card = document.getElementById('systemLogsCenterCard');
+        if (!card) return;
+        const isHidden = card.style.display === 'none' || getComputedStyle(card).display === 'none';
+        if (isHidden) {
+          card.style.display = 'block';
+          this._isVisible = true;
+          if (!this._logs || this._logs.length === 0) {
+            this.fetchLogs(false);
+          }
+          try {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } catch (e) {}
+        } else {
+          card.style.display = 'none';
+          this._isVisible = false;
+        }
+      },
+
+      openModal() {
+        const modal = document.getElementById('systemLogsModal');
+        if (!modal) return;
+        if (typeof modal.showModal === 'function') {
+          modal.showModal();
+        } else {
+          modal.style.display = 'block';
+        }
+        if (!this._logs || this._logs.length === 0) {
+          this.fetchLogs(false);
+        } else {
+          this.render();
+        }
+      },
+
+      closeModal() {
+        const modal = document.getElementById('systemLogsModal');
+        if (!modal) return;
+        if (typeof modal.close === 'function') {
+          modal.close();
+        } else {
+          modal.style.display = 'none';
+        }
+      },
+
+      setCategory(cat) {
+        this._category = cat;
+        const cardBtns = {
+          all: 'btnSysCatAll',
+          docker: 'btnSysCatDocker',
+          service: 'btnSysCatService',
+          kernel: 'btnSysCatKernel'
+        };
+        for (const [k, id] of Object.entries(cardBtns)) {
+          const b = document.getElementById(id);
+          if (b) b.classList.toggle('active', k === cat);
+        }
+        const modalBtns = {
+          all: 'btnModalSysCatAll',
+          docker: 'btnModalSysCatDocker',
+          service: 'btnModalSysCatService',
+          kernel: 'btnModalSysCatKernel'
+        };
+        for (const [k, id] of Object.entries(modalBtns)) {
+          const b = document.getElementById(id);
+          if (b) b.classList.toggle('active', k === cat);
+        }
+        this.render();
+      },
+
+      setLevel(level) {
+        if (this._level === level) return;
+        this._level = level;
+        const bErr = document.getElementById('btnSysLevelErr');
+        const bWarn = document.getElementById('btnSysLevelWarn');
+        if (bErr) bErr.classList.toggle('active', level === 'err');
+        if (bWarn) bWarn.classList.toggle('active', level === 'warn');
+        this.fetchLogs(true);
+      },
+
+      setFilterQuery(query) {
+        this._searchQuery = String(query || '').trim().toLowerCase();
+        this.render();
+      },
+
+      updateFromMetrics(summary) {
+        if (!summary) return;
+        this._summary = summary;
+        const total = Number(summary.total_errors || 0);
+        const failedUnits = Number(summary.failed_units_count || 0);
+        const counts = summary.counts_by_category || {};
+
+        const ovBadgeText = document.getElementById('ovSystemLogsBadgeText');
+        const ovBtn = document.getElementById('ovSystemLogsToggleBtn');
+        if (ovBadgeText) {
+          if (failedUnits > 0) {
+            ovBadgeText.textContent = `Fallos: ${failedUnits} unidad(es) caídas!`;
+          } else if (total > 0) {
+            ovBadgeText.textContent = `Fallos: ${total} detectados`;
+          } else {
+            ovBadgeText.textContent = `Fallos: 0 detectados`;
+          }
+        }
+        if (ovBtn) {
+          if (failedUnits > 0) {
+            ovBtn.style.borderColor = 'rgba(239, 68, 68, 0.7)';
+            ovBtn.style.color = 'var(--accent-rose-bright)';
+          } else if (total > 0) {
+            ovBtn.style.borderColor = 'rgba(244, 63, 94, 0.45)';
+            ovBtn.style.color = 'var(--accent-rose-bright)';
+          } else {
+            ovBtn.style.borderColor = '';
+            ovBtn.style.color = '';
+          }
+        }
+
+        const statusBadge = document.getElementById('sysLogsStatusBadge');
+        if (statusBadge) {
+          statusBadge.textContent = `${total} fallos detectados`;
+          statusBadge.className = `adw-badge ${total > 0 ? 'badge-amber' : 'badge-green'} mono`;
+        }
+        const failedBadge = document.getElementById('sysLogsFailedUnitsBadge');
+        if (failedBadge) {
+          if (failedUnits > 0) {
+            failedBadge.style.display = 'inline-flex';
+            const names = (summary.failed_units_names || []).join(', ');
+            failedBadge.textContent = `${failedUnits} servicios caídos: ${names}`;
+          } else {
+            failedBadge.style.display = 'none';
+          }
+        }
+
+        const cAll = document.getElementById('cntSysErrAll');
+        if (cAll) cAll.textContent = total;
+        const cDocker = document.getElementById('cntSysErrDocker');
+        if (cDocker) cDocker.textContent = counts.docker || 0;
+        const cService = document.getElementById('cntSysErrService');
+        if (cService) cService.textContent = counts.service || 0;
+        const cKernel = document.getElementById('cntSysErrKernel');
+        if (cKernel) cKernel.textContent = counts.kernel || 0;
+
+        const modalEl = document.getElementById('systemLogsModal');
+        const isModalOpen = modalEl && (modalEl.open || modalEl.style.display === 'block');
+        if ((this._isVisible || isModalOpen) && (!this._logs || this._logs.length === 0) && !this._isLoading) {
+          this.fetchLogs(false);
+        }
+      },
+
+      async fetchLogs(force = false) {
+        if (this._isLoading) return;
+        this._isLoading = true;
+        const vp = document.getElementById('systemLogsViewport');
+        const mvp = document.getElementById('modalSystemLogsViewport');
+        const loadingHtml = `
+          <div class="system-logs-empty-state">
+            <span>⏳ Consultando eventos de fallos del sistema en tiempo real...</span>
+          </div>`;
+        if (!this._logs || this._logs.length === 0) {
+          if (vp) vp.innerHTML = loadingHtml;
+          if (mvp) mvp.innerHTML = loadingHtml;
+        }
+
+        try {
+          const url = `/api/system/logs?level=${encodeURIComponent(this._level)}&category=all&limit=80${force ? '&refresh=1' : ''}`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          this._logs = data.entries || [];
+          this._failedUnits = data.failed_units || [];
+          if (data.counts_by_category) {
+            const counts = data.counts_by_category;
+            const cAll = document.getElementById('cntSysErrAll');
+            if (cAll) cAll.textContent = counts.total || this._logs.length;
+            const cDocker = document.getElementById('cntSysErrDocker');
+            if (cDocker) cDocker.textContent = counts.docker || 0;
+            const cService = document.getElementById('cntSysErrService');
+            if (cService) cService.textContent = counts.service || 0;
+            const cKernel = document.getElementById('cntSysErrKernel');
+            if (cKernel) cKernel.textContent = counts.kernel || 0;
+          }
+          this.render();
+        } catch (err) {
+          console.error('Error fetching system logs:', err);
+          const errHtml = `
+            <div class="system-logs-empty-state" style="color: var(--accent-rose-bright);">
+              <span>⚠️ Error al obtener logs del sistema: ${escapeHtml(err.message || 'Fallo de conexión')}</span>
+            </div>`;
+          if (vp) vp.innerHTML = errHtml;
+          if (mvp) mvp.innerHTML = errHtml;
+        } finally {
+          this._isLoading = false;
+        }
+      },
+
+      async refreshLive() {
+        await this.fetchLogs(true);
+        if (typeof showToast === 'function') {
+          showToast('🔄 Registro de fallos del sistema actualizado', 'info');
+        }
+      },
+
+      render() {
+        const vp = document.getElementById('systemLogsViewport');
+        const mvp = document.getElementById('modalSystemLogsViewport');
+        if (!vp && !mvp) return;
+
+        const logs = this._logs || [];
+        const cat = this._category;
+        const q = this._searchQuery;
+
+        const filtered = logs.filter(entry => {
+          if (cat !== 'all' && entry.category !== cat) {
+            return false;
+          }
+          if (q) {
+            const matchSource = String(entry.source || '').toLowerCase().includes(q);
+            const matchMsg = String(entry.message || '').toLowerCase().includes(q);
+            const matchUnit = String(entry.unit || '').toLowerCase().includes(q);
+            const matchCont = String(entry.container || '').toLowerCase().includes(q);
+            if (!matchSource && !matchMsg && !matchUnit && !matchCont) return false;
+          }
+          return true;
+        });
+
+        const totalFiltered = filtered.length;
+        const metaText = `Mostrando ${totalFiltered} de ${logs.length} eventos (Nivel: ${this._level === 'warn' ? 'Errores y Advertencias' : 'Solo Errores'})`;
+        const metaEl = document.getElementById('sysLogsMetaCount');
+        if (metaEl) metaEl.textContent = metaText;
+        const modalMetaEl = document.getElementById('modalSystemLogsMeta');
+        if (modalMetaEl) modalMetaEl.textContent = metaText;
+
+        let failedUnitsBanner = '';
+        if (this._failedUnits && this._failedUnits.length > 0) {
+          failedUnitsBanner = `
+            <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <span style="color: #f87171; font-weight: 700; font-size: 11.5px;">⚠️ ${this._failedUnits.length} unidad(es) de systemd en estado fallido:</span>
+              <span class="mono" style="color: #fca5a5; font-size: 11px;">${this._failedUnits.map(u => escapeHtml(u.unit || u.description || '')).join(', ')}</span>
+            </div>`;
+        }
+
+        if (filtered.length === 0) {
+          const emptyHtml = failedUnitsBanner + `
+            <div class="system-logs-empty-state">
+              <span>✔ [OK] No se encontraron fallos ni errores con los filtros aplicados.</span>
+              <span class="mono" style="opacity: 0.75;">0 eventos</span>
+            </div>`;
+          if (vp) vp.innerHTML = emptyHtml;
+          if (mvp) mvp.innerHTML = emptyHtml;
+          return;
+        }
+
+        const rowsHtml = filtered.map(entry => {
+          const prio = Number(entry.priority);
+          let prioClass = 'prio-err';
+          let prioLabel = 'ERR';
+          if (prio <= 1) { prioClass = 'prio-emerg'; prioLabel = 'EMERG'; }
+          else if (prio === 2) { prioClass = 'prio-crit'; prioLabel = 'CRIT'; }
+          else if (prio === 3) { prioClass = 'prio-err'; prioLabel = 'ERR'; }
+          else if (prio >= 4) { prioClass = 'prio-warn'; prioLabel = 'WARN'; }
+
+          const entryCat = entry.category || 'system';
+          let catIcon = '💻';
+          let catClass = 'system';
+          let catTitle = 'Sistema';
+          if (entryCat === 'docker') { catIcon = '🐳'; catClass = 'docker'; catTitle = 'Docker'; }
+          else if (entryCat === 'service') { catIcon = '⚙️'; catClass = 'service'; catTitle = 'Servicio'; }
+          else if (entryCat === 'kernel') { catIcon = '🐧'; catClass = 'kernel'; catTitle = 'Kernel'; }
+
+          const srcName = entry.container || entry.unit || entry.source || 'sistema';
+          const dateStr = entry.date_str ? entry.date_str.split(' ')[1] || entry.date_str : '';
+
+          return `
+            <div class="system-log-row cat-${catClass}">
+              <span class="sys-prio-pill ${prioClass}">${prioLabel}</span>
+              <span class="sys-cat-pill ${catClass}" title="${catTitle}">${catIcon} ${catTitle}</span>
+              <span class="mono" style="font-size: 11px; opacity: 0.65; flex-shrink: 0;">${escapeHtml(dateStr)}</span>
+              <span class="mono" style="font-size: 11.5px; font-weight: 700; color: var(--accent-cyan-bright); flex-shrink: 0; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(srcName)}">${escapeHtml(srcName)}</span>
+              <span style="font-family: var(--font-mono); font-size: 11px; line-height: 1.4; word-break: break-word; flex: 1; color: var(--text-primary);">${escapeHtml(entry.message || '')}</span>
+            </div>
+          `;
+        }).join('');
+
+        const fullHtml = failedUnitsBanner + rowsHtml;
+        if (vp) vp.innerHTML = fullHtml;
+        if (mvp) mvp.innerHTML = fullHtml;
+      }
+    };
+    window.SystemLogsCenter = SystemLogsCenter;
+    SystemLogsCenter.init();
 
     // =========================================================================
     // GEOSPATIAL CONNECTIONS ENGINE (DUAL ENGINE: OPENSTREETMAP LEAFLET + GOOGLE MAPS)

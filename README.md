@@ -3,7 +3,7 @@
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
 ### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v4.15.0-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v4.16.0-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
 [![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white)](#-filosof%C3%ADa-de-dise%C3%B1o)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
 [![Rendimiento](https://img.shields.io/badge/Rendimiento-60_FPS_HiDPI_Retina-FF9F0A?style=for-the-badge&logo=speedtest&logoColor=white)](#-rendimiento-y-motor-desacoplado)
@@ -20,7 +20,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v4.15.0 ║
+║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v4.16.0 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                              ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
@@ -52,6 +52,7 @@
    - [Ciberdefensa Activa IPS y Seguridad Zero-Trust](#4-ciberdefensa-activa-ips-y-seguridad-zero-trust)
    - [Analítica de Ancho de Banda con D3.js](#5-analítica-de-ancho-de-banda-con-d3js)
    - [Ecosistema Multimedia y Docker](#6-ecosistema-multimedia-y-docker)
+   - [Centro Unificado de Registro de Fallos del Sistema (Apps, Servicios & Kernel)](#7-centro-unificado-de-registro-de-fallos-del-sistema-apps-servicios--kernel)
 4. [Principio Estricto 100% Zero-Hardcoding](#-principio-estricto-100-zero-hardcoding)
 5. [Mapa de Vistas SPA (12 Pantallas)](#-mapa-de-vistas-spa-12-pantallas)
 6. [Referencia de la API REST](#-referencia-de-la-api-rest)
@@ -154,6 +155,17 @@ System Cockpit rompe con la estética tradicional de paneles de administración 
 * **Descargas qBittorrent & Emby**: Seguimiento de torrents activos, velocidades de descarga/subida, ratios de compartición y sesiones activas en el servidor multimedia.
 * **DuckDNS & Proxy Inverso Caddy**: Integración con DNS dinámico DuckDNS y proxy inverso Caddy con certificados SSL TLS automáticos.
 
+### 7. Centro Unificado de Registro de Fallos del Sistema (Apps, Servicios & Kernel)
+* **Agregador Global de Diagnóstico**: Recolecta en tiempo real todos los eventos con nivel de severidad `emerg`, `alert`, `crit`, `err` (y opcionalmente `warning`) generados por:
+  - **Contenedores de Aplicaciones**: Registros de salida estándar y error de Docker (`Immich`, `Postgres`, `Nextcloud`, `Collabora`, `HomeAssistant`, etc.) capturados por el journal de Docker.
+  - **Servicios del Sistema Systemd**: Fallos y excepciones de daemons como `pxe-dnsmasq`, `fail2ban`, `caddy`, `smbd`, `systemd-resolved`, etc., junto con la detección en tiempo real de unidades en estado `failed`.
+  - **Núcleo del Sistema Operativo (Kernel)**: Eventos de I/O de almacenamiento, errores de módulos, `dmesg`, eventos térmicos y del subsistema de red.
+* **Decodificación Binaria Segura**: Resiliente ante buffers de salida de aplicaciones (como Postgres o Collabora) que emiten secuencias de bytes binarios en JSON.
+* **Diseño Plegable y Modal Panorámico**:
+  - Indicador rápido en la cabecera de la Vista General (`📋 Fallos: X detectados`) con resaltado de color dinámico ante incidencias.
+  - Tarjeta Bento colapsable (`#systemLogsCenterCard`) con filtros por categoría (`🐳 Apps & Docker`, `⚙️ Servicios`, `🐧 Kernel`), búsqueda en vivo y cambio de severidad.
+  - Visor nativo HTML5 `<dialog>` a pantalla completa para auditorías exhaustivas.
+
 ---
 
 ## 🧭 Principio Estricto 100% Zero-Hardcoding
@@ -195,6 +207,7 @@ El servidor expone una API REST ligera en formato JSON:
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/metrics` | Telemetría consolidada del sistema (CPU, RAM, GPU, Red, Discos). | Público (LAN / Token WAN) |
 | `GET` | `/api/version` | Versión canónica activa (`VERSION`), hash Git y estado del repo. | Público |
+| `GET` | `/api/system/logs` | Registro unificado de fallos y errores (filtros: `level`, `category`, `limit`, `refresh`). | Público (LAN / Token WAN) |
 | `POST` | `/api/net/geoip/resolve` | Resolución en lote de coordenadas geográficas para el mapa. | Abierto para clientes del mapa |
 | `POST` | `/api/net/geoip/clear-errors`| Limpia el historial de eventos del Worker GeoIP en el servidor. | Requiere sesión de confianza |
 | `POST` | `/api/fail2ban/ban` | Bloquea una dirección IP maliciosa en una cárcel de Fail2ban. | Requiere sesión de confianza |
@@ -280,6 +293,7 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v4.16.0`** | `MINOR` | **Centro Unificado de Registro de Fallos (Apps, Servicios & Kernel)**: Agregador de diagnósticos en tiempo real que recolecta fallos de contenedores Docker (Immich, Postgres, Nextcloud, Collabora), servicios Systemd y eventos críticos del kernel en una sola vista unificada; decodificación resiliente de buffers binarios en streams de contenedores; categorización 100% dinámica sin nombres fijos; nuevo endpoint REST `/api/system/logs` con filtrado por categoría y nivel de severidad; visor Bento colapsable en Vista General y modal a pantalla completa. |
 | **`v4.15.0`** | `MINOR` | **Corrección de Deadlock GeoIP & Limpieza de Interfaz**: Se reemplazó `GEOIP_LOCK` por un cerrojo reentrante (`threading.RLock()`) resolviendo el bloqueo que congelaba el servidor; se retiraron los volcados invasivos de logs y tarjetas de terminal de la Vista General y Red; se desactivó el interceptor global de fetch; se eliminó el fallback inseguro a ip-api.com desde el navegador; rediseño integral del README a nivel de ingeniería de producción. |
 | **`v4.14.0`** | `MINOR` | Adición del terminal de errores en tiempo real del nodo principal y endpoints de diagnóstico del worker. |
 | **`v4.13.1`** | `PATCH` | Ajustes de documentación y sincronización de planes en el repositorio. |
