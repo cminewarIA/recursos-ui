@@ -1,60 +1,46 @@
-# Plan de Implementación: Agrupación de Conexiones en Mapa, Selector de IPs y Popups Persistentes (`v4.11.0`)
+# Plan de Implementación: Agrupamiento Dinámico por Zoom y Exclusión de Conexiones Locales
 
-## Descripción del Problema y Objetivos
-1. **Superposición de Marcadores**: Cuando múltiples conexiones coinciden en las mismas coordenadas (por ejemplo, múltiples sockets hacia Google, Cloudflare, Azure o dispositivos en red local con varios servicios), los pines se dibujaban uno encima del otro, ocultando las demás conexiones y haciendo imposible verlas todas.
-2. **Visualización de Conexiones Múltiples ("ver como varios")**: El usuario solicita que si hay varias conexiones en un punto, el marcador se distinga visualmente como un grupo con su contador (ej. `🔀 4 Mountain View` o `🔀 2 192.168.50.242`), y que al pulsar sobre él se despliegue una **lista interactiva de las IPs**.
-3. **Cierre Prematuro del Popup ("se me cierra enseguida")**: Leaflet cerraba el popup por dos motivos:
-   - Cada 2 segundos el polling de `/api/metrics` redibuja las capas del mapa (`clearMapOverlays()`), destruyendo el marcador que tenía el popup abierto.
-   - La opción por defecto de Leaflet `closeOnClick: true` / `closePopupOnClick: true` cerraba el popup al hacer clic o arrastrar mínimamente el mapa.
-   El objetivo es que **el popup permanezca abierto de forma fija y estable** hasta que el usuario decida cerrarlo con el botón `×`.
-
----
-
-## Cambios Propuestos
-
-### 1. `static/index.html` e `index.html` (Frontend)
-- **Agrupación de Conexiones por Coordenadas**:
-  - Agrupar `filteredConns` mediante una clave geográfica (`lat_lng` redondeada a 3 decimales o identidad IP).
-  - Si un grupo tiene 1 conexión: se renderiza el marcador individual habitual (`↓ IP` / `↑ IP`).
-  - Si un grupo tiene 2 o más conexiones: se renderiza con estilo `.gmp-conn-marker.grouped` mostrando `🔀 [N] [Ciudad o IP]`.
-- **Nuevo Generador de Popups para Grupos (`buildGroupInfoWindowNode`)**:
-  - **Vista Lista (por defecto)**:
-    - Encabezado con el número total de conexiones y ubicación geográfica.
-    - Lista interactiva y desplazable con cada IP, puertos, servicio (`Emby`, `Google Cast`, etc.), estado del socket y flecha de dirección (`↓ / ↑`).
-    - Al hacer clic sobre cualquier IP de la lista, el popup conmuta a la vista detallada de esa IP específica.
-  - **Vista Detallada**:
-    - Muestra todos los detalles técnicos (proceso local, puertos, ISP, ASN, telemetría).
-    - Menú y botón de control de firewall Fail2ban (`🚫 Bloquear IP` / `🔓 Desbloquear`).
-    - Botón `◀ Ver todas las conexiones (N)` para regresar a la lista de IPs sin cerrar el popup.
-- **Persistencia de Popups y Prevención de Cierres Prematuros**:
-  - Configurar Leaflet con `closePopupOnClick: false`, `closeOnClick: false`, `autoClose: false`.
-  - Guardar el estado activo del popup (`_activePopupState = { type, groupKey, selectedConnId }`).
-  - Durante el refresco cíclico de métricas (`renderFromMetrics`):
-    - Activar bandera `_isRedrawing = true`.
-    - Si había un popup abierto, restaurarlo automáticamente tras el refresco sin parpadeos ni pérdidas de foco.
-    - El popup solo se cerrará cuando el usuario pulse explícitamente el botón de cierre `×` o seleccione otro nodo.
-- **Integración con la Tabla de Conexiones**:
-  - `focusConnectionById(connId)` localizará el grupo correspondiente, centrará el mapa y abrirá el popup directamente en la vista de detalle de esa conexión.
+## 1. Contexto y Objetivos del Usuario
+1. **Cero Texto Hardcodeado / Fijo**: Ningún nombre de ciudad, proveedor o texto estático en la lógica de agrupación o renderizado del mapa. Todas las etiquetas y títulos deben calcularse de forma 100% dinámica a partir de los datos recibidos (`remote_ip`, `city`, `country`, `isp`).
+2. **Agrupamiento Dinámico según el Zoom (Clustering por Distancia de Píxeles en Pantalla)**:
+   - Al hacer zoom hacia afuera (alejarse), los marcadores próximos en pantalla (< 48px) se combinan dinámicamente en una insignia de grupo (`🔀 N`) para no solaparse.
+   - Al hacer zoom hacia adentro (acercarse), a medida que los puntos se separan visualmente en la pantalla, se desempaquetan dinámicamente en pines individuales o subgrupos independientes.
+   - Escuchar el evento `'zoomend'` de Leaflet para recalcular instantáneamente los clusters.
+3. **Excluir Conexiones Locales (LAN) del Mapa**:
+   - No mostrar IPs privadas locales (`192.168.x.x`, `10.x.x.x`, `172.x.x.x`, `127.x.x.x`, etc.) como pines en el mapa.
+   - Únicamente el nodo anfitrión central del servidor se ubica en Gran Canaria.
+4. **Mostrar las IPs Públicas a las que se conectan los dispositivos de la casa**:
+   - Integrar la lectura de kernel conntrack (`sudo -n conntrack -L`) en `server.py` para capturar todos los flujos activos y recientes de red entre los dispositivos de la casa (`192.168.50.x`) y las IPs públicas externas de Internet a las que acceden.
+5. **Persistencia del Popup Abierto**:
+   - Mantener abierto el popup de la IP seleccionada durante los refrescos periódicos de métricas y los eventos de zoom del mapa hasta que el usuario decida cerrarlo con el botón `[X]`.
+6. **Incremento de Versión Semántica**:
+   - Siguiendo la regla de control de versión (`0.0.X` para ajustes de detalle / corrección sin cambio mayor de diseño): pasar de `v4.11.0` a `v4.11.1`.
 
 ---
 
-## Cambios en Control de Versiones y Documentación
-- `VERSION` → `4.11.0` (según Regla 5: `0.X.0` al añadir nueva funcionalidad de agrupación interactiva y persistencia).
-- `package.json` → `4.11.0`.
-- `README.md` → Actualizar título y añadir sección `## ✨ Novedades en v4.11.0`.
-- `planes/2026-10-21_agrupacion_conexiones_y_popup_persistente.md` y `planes/walkthrough.md`.
+## 2. Cambios Propuestos
 
----
+### Backend (`server.py`)
+- En `fetch_connections_geo_worker()`:
+  - Mantener la exclusión de IPs privadas para que no se generen pines LAN falsos ni órbitas.
+  - Añadir lectura de kernel conntrack con `sudo -n conntrack -L`:
+    - Identificar flujos donde el origen sea una IP privada de la casa (`192.168.50.x`) y el destino sea una IP pública externa (o viceversa).
+    - Registrar el socket con su servicio y `source_hint` dinámico ("Servidor" o "Dispositivo 192.168.50.x").
+    - Añadir estas IPs públicas a la cola de resolución GeoIP (`ip-api.com`).
 
-## Plan de Verificación
-1. **Prueba de Agrupación Visual**:
-   - Abrir vista de Red en el dashboard y comprobar que puntos con conexiones concurrentes (ej. Mountain View, Frankfurt o dispositivos LAN con varios sockets) muestran la insignia `🔀 N`.
-2. **Prueba de Lista de IPs y Selección**:
-   - Hacer clic en un marcador múltiple: verificar que se despliega la lista con las IPs.
-   - Pulsar sobre una IP: verificar que se abren sus detalles y controles de firewall.
-   - Pulsar `◀ Volver a la lista`: verificar que regresa al listado de conexiones.
-3. **Prueba de Persistencia ante Refrescos**:
-   - Dejar el popup abierto durante más de 10-15 segundos mientras el dashboard recibe actualizaciones cada 2 segundos.
-   - Comprobar que el popup **no se cierra**, permitiendo leer los datos y pulsar los botones tranquilamente.
-4. **Verificación de Versión**:
-   - Probar `curl http://127.0.0.1:8085/api/version` y comprobar `4.11.0`.
+### Frontend (`static/index.html` e `index.html`)
+- En `NetworkConnectionsMapEngine`:
+  - Almacenar `_currentConns` y `_currentSrv`.
+  - Escuchar `this._leafletMap.on('zoomend', () => this.renderDynamicClusters())`.
+  - Crear función `clusterConnections(conns)` que proyecte cada coordenada a píxeles de pantalla con `this._leafletMap.latLngToLayerPoint([lat, lng])` y agrupe aquellos con distancia `< 48px`.
+  - Crear función `renderDynamicClusters()`:
+    - Etiquetado 100% dinámico con `getDynamicClusterLabel(items)`.
+    - Generación de marcadores y polilíneas hacia el nodo servidor.
+    - Retención inteligente del popup activo mediante `activeConnId` y `activeIp`.
+  - En `renderFromMetrics`: filtrar `conns.filter(c => !c.is_lan && typeof c.lat === 'number' && typeof c.lng === 'number')` y delegar a `renderDynamicClusters()`.
+
+### Versión y Documentación
+- `VERSION` -> `4.11.1`
+- `package.json` -> `"version": "4.11.1"`
+- `README.md` actualizado con las novedades de la versión `4.11.1`.
+- `planes/2026-10-21_cluster_dinamico_zoom_y_excluir_lan.md` y `planes/walkthrough.md`.

@@ -1,22 +1,35 @@
-# Recorrido de Verificación: Agrupación de Conexiones en Mapa, Selector de IPs y Popups Persistentes (`v4.11.0`)
+# Recorrido de Verificación: Agrupamiento Dinámico por Zoom y Exclusión de Conexiones Locales (`v4.11.1`)
 
-## Resumen del Cambio
-- **Objetivo**: Resolver la superposición de marcadores concurrentes en el mapa de red, permitiendo ver marcadores agrupados con contador (`🔀 N`), una lista interactiva de IPs al pulsar sobre ellos con selector de detalle y acciones Fail2ban, y eliminar el cierre involuntario de los popups debido al polling de telemetría cada 2s o a clics en el mapa.
-- **Versión**: Incrementada a `4.11.0` (según Regla 5: `0.X.0` al añadir nueva funcionalidad).
+## 1. Resumen de Cambios Realizados
+- **Agrupamiento Dinámico según el Nivel de Zoom (`clusterConnections`)**:
+  - Implementado algoritmo de clustering dinámico en base a distancia euclídea en píxeles de pantalla (`latLngToLayerPoint`, umbral 48px).
+  - Al alejar el zoom, los nodos se agrupan en una insignia `🔀 N` evitando saturar la vista.
+  - Al acercar el zoom, los nodos se disocian de inmediato en pines individuales conforme se separan en pantalla.
+  - Evento `zoomend` de Leaflet conectado para recalcular clusters al vuelo sin recargar la página.
+- **Cero Texto Hardcodeado / Fijo**:
+  - Eliminado cualquier nombre de ciudad o proveedor estático en el código fuente.
+  - El etiquetado se resuelve dinámicamente mediante `getDynamicClusterLabel` usando `remote_ip`, `city`, `country` e `isp`.
+- **Exclusión de Conexiones Locales (LAN)**:
+  - Se eliminaron las órbitas alrededor de Gran Canaria y la representación de IPs privadas locales en el mapa geográfico.
+  - Únicamente el nodo anfitrión del servidor se sitúa en Gran Canaria (`27.9600° N, -15.5800° W`).
+- **Captura de Flujos de Dispositivos del Hogar hacia IPs Públicas vía Kernel Conntrack**:
+  - `server.py` ejecuta `sudo -n conntrack -L` en segundo plano cada ciclo.
+  - Detecta todos los flujos salientes desde dispositivos del hogar (`192.168.50.x`) hacia IPs públicas externas (y viceversa).
+  - Cada conexión indica en sus detalles qué dispositivo local originó el tráfico (ej. `Dispositivo 192.168.50.16`).
+  - Todas las IPs públicas descubiertas entran en el worker GeoIP de `ip-api.com`.
+- **Retención Absoluta del Popup Seleccionado**:
+  - Se implementó un estado de popup persistente con `activeConnId` y `activeRemoteIp` que restaura la ventana informativa tras refrescos de métricas (cada 2s) y tras eventos de zoom.
+- **Incremento de Versión Semántica**:
+  - `VERSION` -> `4.11.1`
+  - `package.json` -> `4.11.1`
+  - `README.md` actualizado con la sección de novedades.
 
-## Componentes Modificados
-1. **`server.py`**:
-   - `lan_coords_map` y `pending_coords_map`: Los sockets de una misma IP local o en espera comparten exactamente las mismas coordenadas en la órbita de Gran Canaria para agruparse coherentemente en un único pin de dispositivo físico.
-2. **`static/index.html` e `index.html`**:
-   - **CSS**: Clases `.gmp-conn-marker.grouped` y `.group-count-pill` para diferenciar marcadores agrupados con contadores estilizados según el flujo (`incoming`, `outgoing`, `blocked`).
-   - **Leaflet Map Config**: `closePopupOnClick: false` en `L.map` y `autoClose: false`, `closeOnClick: false` en los popups.
-   - **Gestión de Estado de Popup (`_activePopupState`)**: Registra el popup abierto (`server` o `group` con `groupKey` y `selectedConnId`).
-   - **Preservación en Redibujado (`renderFromMetrics`)**: Durante las actualizaciones periódicas de 2 segundos, `savedPopupState` reabre de forma inmediata el popup sin parpadeos ni pérdidas de datos.
-   - **`buildGroupInfoWindowNode`**:
-     - Vista listado con todas las IPs, servicios y flechas de dirección.
-     - Vista detalle al pulsar cualquier IP de la lista con botón `◀ Ver lista de IPs (N)`.
-   - **Integración con Tabla**: `focusConnectionById(connId)` localiza el grupo y abre la vista detallada de esa conexión de forma directa.
-3. **`VERSION` y `package.json`**:
-   - Establecidos a `4.11.0`.
-4. **`README.md`**:
-   - Documentada la versión `4.11.0` y sus características.
+---
+
+## 2. Pruebas y Validación Realizadas
+1. **Compilación de Sintaxis Python**:
+   - `python3 -m py_compile server.py` -> Exitoso sin errores (código 0).
+2. **Inspección de Flujos de Conntrack**:
+   - Más de 110 flujos públicos detectados con origen en IPs del hogar hacia la WAN.
+3. **Sincronización de Archivos**:
+   - `static/index.html` sincronizado con `index.html`.

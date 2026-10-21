@@ -716,6 +716,61 @@ def fetch_connections_geo_worker():
             except Exception:
                 pass
 
+            # 3b. Inspect kernel conntrack flows (public traffic involving home devices & host)
+            try:
+                ct_proc = subprocess.run(["sudo", "-n", "conntrack", "-L"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.5)
+                if ct_proc.returncode == 0 and ct_proc.stdout:
+                    for line in ct_proc.stdout.splitlines():
+                        m = re.findall(r"src=([^\s]+)\s+dst=([^\s]+)\s+sport=(\d+)\s+dport=(\d+)", line)
+                        if not m:
+                            continue
+                        proto_str = "TCP" if "tcp" in line[:8] else ("UDP" if "udp" in line[:8] else "NET")
+                        state_str = "ESTABLISHED" if "ESTABLISHED" in line else ("TIME_WAIT" if "TIME_WAIT" in line else "ACTIVE")
+                        (s_ip, d_ip, s_port, d_port) = m[0]
+                        s_port, d_port = int(s_port), int(d_port)
+
+                        # Identify public vs private flow
+                        if _is_private_ip(s_ip) and not _is_private_ip(d_ip):
+                            rem_ip, rem_port = d_ip, d_port
+                            loc_ip, loc_port = s_ip, s_port
+                            dir_str = "outgoing"
+                        elif not _is_private_ip(s_ip) and _is_private_ip(d_ip):
+                            rem_ip, rem_port = s_ip, s_port
+                            loc_ip, loc_port = d_ip, d_port
+                            dir_str = "incoming"
+                        else:
+                            continue
+
+                        dedup_key = f"{dir_str}:{rem_ip}:{rem_port if dir_str == 'outgoing' else loc_port}"
+                        if dedup_key in seen_keys:
+                            continue
+                        seen_keys.add(dedup_key)
+
+                        target_port = loc_port if dir_str == "incoming" else rem_port
+                        svc_label = PORT_SERVICE_LABELS.get(target_port, f"{proto_str} Puerto :{target_port}")
+
+                        source_hint = "Servidor" if loc_ip == SERVER_LOCAL_IP else f"Dispositivo {loc_ip}"
+                        if dir_str == "incoming":
+                            details_str = f"Entrante desde {rem_ip} hacia {svc_label} ({source_hint})"
+                        else:
+                            details_str = f"Saliente desde {source_hint} hacia {svc_label} ({rem_ip})"
+
+                        raw_sockets.append({
+                            "direction": dir_str,
+                            "protocol": proto_str,
+                            "local_ip": loc_ip,
+                            "local_port": loc_port,
+                            "remote_ip": rem_ip,
+                            "remote_port": rem_port,
+                            "state": state_str,
+                            "service": svc_label,
+                            "process": "Kernel Conntrack",
+                            "jail": "caddy-scan",
+                            "details": details_str
+                        })
+            except Exception:
+                pass
+
             # 4. Collect Fail2ban banned IPs
             with SECURITY_LOCK:
                 f2b_banned = list(SECURITY_CACHE.get("fail2ban", {}).get("banned_details", []))
@@ -775,14 +830,13 @@ def fetch_connections_geo_worker():
             srv_cc = SERVER_SELF_GEO.get("country_code", "ES")
 
             connections_out = []
-            lan_idx = 0
             pending_idx = 0
-            lan_coords_map = {}
             pending_coords_map = {}
             import math
             for s in raw_sockets:
                 r_ip = s["remote_ip"]
-                is_lan = _is_private_ip(r_ip)
+                if _is_private_ip(r_ip):
+                    continue  # El usuario no desea conexiones locales internas en el mapa
                 with GEOIP_LOCK:
                     geo = GEOIP_CACHE.get(r_ip)
                 if geo:
@@ -790,22 +844,6 @@ def fetch_connections_geo_worker():
                     city, country, cc = geo["city"], geo["country"], geo["country_code"]
                     isp, asn = geo["isp"], geo["asn"]
                     geo_status = "cached"
-                elif is_lan:
-                    if r_ip in lan_coords_map:
-                        lat, lng = lan_coords_map[r_ip]
-                    else:
-                        lan_idx += 1
-                        angle = (lan_idx * 137.5 * 3.14159265) / 180.0
-                        radius = 0.022 + (lan_idx % 4) * 0.008
-                        lat = round(srv_lat + radius * math.cos(angle), 5)
-                        lng = round(srv_lng + radius * math.sin(angle) * 1.4, 5)
-                        lan_coords_map[r_ip] = (lat, lng)
-                    city = "Red Local (LAN)"
-                    country = srv_country
-                    cc = srv_cc
-                    isp = "Subred Privada / Enlace Directo"
-                    asn = "LAN-LOCAL"
-                    geo_status = "lan"
                 else:
                     if r_ip in pending_coords_map:
                         lat, lng = pending_coords_map[r_ip]
@@ -824,7 +862,7 @@ def fetch_connections_geo_worker():
                     geo_status = "pending"
 
                 svc_title = s["service"]
-                if geo and s["direction"] == "outgoing" and not is_lan:
+                if geo and s["direction"] == "outgoing":
                     isp_str = (geo.get("isp", "") + " " + geo.get("asn", "")).lower()
                     if "telegram" in isp_str:
                         svc_title = f"Telegram API / Bot (:{s['remote_port']})"
@@ -859,7 +897,7 @@ def fetch_connections_geo_worker():
                     "country_code": cc,
                     "isp": isp,
                     "asn": asn,
-                    "is_lan": is_lan,
+                    "is_lan": False,
                     "geo_status": geo_status
                 })
 

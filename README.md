@@ -1,8 +1,25 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.11.0`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.11.1`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.11.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Agrupación Inteligente de Conexiones Concurrentes en el Mapa (`🔀 N`) con Selector Interactivo de IPs y Popups 100% Persistentes**, **Motor de Mapa Geoespacial Libre (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.11.1`)**, telemetría de hardware en tiempo real, auditoría de red con **Agrupamiento Dinámico según Nivel de Zoom en Pantalla (Pixel Distance Clustering)**, **Exclusión Estricta de LAN en Mapa y Geolocalización Mundial de Destinos de Dispositivos del Hogar (Kernel Conntrack)**, **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Popups 100% Persistentes sin Cierres Involuntarios**, **Motor de Mapa Geoespacial Libre (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.11.1`
+- **Agrupamiento Dinámico según el Nivel de Zoom (Pixel Distance Clustering en Tiempo Real)**:
+  - **Separación y Fusión Visual Inteligente**:
+    - Al hacer zoom hacia afuera (alejarse), las conexiones cuya distancia en pantalla sea inferior a 48 píxeles se agrupan automáticamente en una insignia interactiva (`🔀 N`) con contador dinámico para evitar cualquier solapamiento.
+    - Al hacer zoom hacia adentro (acercarse), a medida que los puntos se distancian en la pantalla, se desempaquetan dinámicamente en pines individuales o subgrupos independientes.
+    - El evento nativo `zoomend` de Leaflet recalcula los clusters al instante de forma fluida.
+- **Cero Texto Hardcodeado / Fijo en Código**:
+  - Eliminado cualquier nombre estático o preconcebido en la lógica del mapa; todos los nombres de ciudad, país, proveedor de red e IP se generan de manera 100% dinámica a partir de la telemetría recibida (`remote_ip`, `city`, `country`, `isp`).
+- **Exclusión Estricta de Conexiones Locales (LAN) en el Mapa**:
+  - Los sockets internos privados (`192.168.x.x`, `172.x.x.x`, `10.x.x.x`, `127.x.x.x`) quedan excluidos de los pines del mapa para no saturar la vista con órbitas ficticias.
+  - El nodo central del servidor permanece anclado con precisión en Gran Canaria.
+- **Mapeo de IPs Públicas de Dispositivos de la Casa mediante Kernel Conntrack**:
+  - El backend `server.py` integra la lectura de la tabla de seguimiento de conexiones del kernel (`sudo -n conntrack -L`).
+  - Cualquier flujo originado por un dispositivo del hogar (`192.168.50.x`) hacia una IP pública de Internet (o tráfico entrante hacia ellos) se registra e incorpora automáticamente a la cola del worker GeoIP, mostrando en el mapa las ubicaciones de todos los destinos a los que se conectan los equipos de la casa con detalle de su IP local de origen.
+- **Persistencia Robusta del Popup Abierto**:
+  - El diálogo popup de inspección de una IP o grupo se conserva abierto frente a cambios de zoom y al refresco recurrente de telemetría cada 2 segundos, cerrándose únicamente cuando el usuario pulsa de forma deliberada el botón `×`.
 
 ## ✨ Novedades en `v4.11.0`
 - **Agrupación Inteligente de Conexiones Concurrentes en el Mapa de Red (Clustering de Sockets)**:

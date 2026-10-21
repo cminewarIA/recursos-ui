@@ -9670,6 +9670,8 @@
       _lastConnData: null,
       _activePopupState: null,
       _isRedrawing: false,
+      _currentConns: [],
+      _currentSrv: null,
 
       setStatusOverlay(visible, title, desc) {
         const overlay = document.getElementById('networkConnectionsMapStatus');
@@ -9697,6 +9699,8 @@
         this._lastSignature = '';
         this._activePopupState = null;
         this._isRedrawing = false;
+        this._currentConns = [];
+        this._currentSrv = null;
         const container = document.getElementById('networkConnectionsMapCanvas');
         if (container) container.innerHTML = '';
       },
@@ -9753,13 +9757,21 @@
               this._activePopupState = {
                 type: 'group',
                 groupKey: popup._groupKey,
-                selectedConnId: popup._selectedConnId || null
+                selectedConnId: popup._selectedConnId || null,
+                activeConnId: popup._selectedConnId || null
               };
             }
           });
           this._leafletMap.on('popupclose', (e) => {
             if (!this._isRedrawing) {
               this._activePopupState = null;
+            }
+          });
+
+          // Recalcular dinámicamente agrupamiento según el nivel de zoom (distancia de píxeles en pantalla)
+          this._leafletMap.on('zoomend', () => {
+            if (this._isReady && Array.isArray(this._currentConns) && this._currentConns.length > 0) {
+              this.renderDynamicClusters();
             }
           });
 
@@ -9782,11 +9794,7 @@
         }
       },
 
-      clearMapOverlays() {
-        if (this._serverMarker && this._leafletMap) {
-          this._serverMarker.remove();
-          this._serverMarker = null;
-        }
+      clearConnectionOverlays() {
         for (const m of this._markersMap.values()) {
           if (m && m.marker) m.marker.remove();
         }
@@ -9799,6 +9807,68 @@
           if (line) line.remove();
         }
         this._polylines = [];
+      },
+
+      clearMapOverlays() {
+        this.clearConnectionOverlays();
+        if (this._serverMarker && this._leafletMap) {
+          this._serverMarker.remove();
+          this._serverMarker = null;
+        }
+      },
+
+      clusterConnections(conns) {
+        if (!this._leafletMap || !Array.isArray(conns)) return [];
+        const CLUSTER_PX = 48; // Umbral dinámico en píxeles de pantalla
+        const clusters = [];
+        for (const c of conns) {
+          if (typeof c.lat !== 'number' || typeof c.lng !== 'number') continue;
+          const pt = this._leafletMap.latLngToLayerPoint([c.lat, c.lng]);
+          let targetCluster = null;
+          for (const cl of clusters) {
+            const dist = Math.hypot(pt.x - cl.pixelPoint.x, pt.y - cl.pixelPoint.y);
+            if (dist < CLUSTER_PX) {
+              targetCluster = cl;
+              break;
+            }
+          }
+          if (targetCluster) {
+            targetCluster.items.push(c);
+          } else {
+            clusters.push({
+              pixelPoint: pt,
+              lat: c.lat,
+              lng: c.lng,
+              items: [c]
+            });
+          }
+        }
+        return clusters;
+      },
+
+      getDynamicClusterLabel(items) {
+        if (!Array.isArray(items) || items.length === 0) return 'Remoto';
+        const first = items[0];
+        if (items.length === 1) {
+          return first.remote_ip || 'Remoto';
+        }
+        const allSameIp = items.every(c => c.remote_ip === first.remote_ip);
+        if (allSameIp) {
+          return first.remote_ip;
+        }
+        const firstCity = (first.city || '').trim();
+        if (firstCity && !firstCity.includes('Resolviendo') && items.every(c => (c.city || '').trim() === firstCity)) {
+          return firstCity;
+        }
+        const firstCountry = (first.country || '').trim();
+        if (firstCountry && items.every(c => (c.country || '').trim() === firstCountry)) {
+          return firstCountry;
+        }
+        const firstIsp = (first.isp || '').trim();
+        if (firstIsp && !firstIsp.includes('En cola') && items.every(c => (c.isp || '').trim() === firstIsp)) {
+          return firstIsp;
+        }
+        return `${first.remote_ip} (+${items.length - 1})`;
       },
 
       buildInfoWindowNode(item, isServerHost = false, groupKey = null, groupLength = 1) {
@@ -9934,21 +10004,32 @@
         const wrap = document.createElement('div');
         wrap.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #0f172a; padding: 6px 8px; min-width: 280px; max-width: 360px; line-height: 1.45;';
 
-        const city = group[0].city || 'Zona Remota';
-        const country = group[0].country ? `, ${group[0].country}` : '';
-        const isp = group[0].isp || 'Red';
-        const isLan = group.some(c => c.geo_status === 'lan');
+        const uniqueCities = [...new Set(group.map(c => c.city).filter(Boolean))];
+        const uniqueCountries = [...new Set(group.map(c => c.country).filter(Boolean))];
+        let locHeader = '';
+        if (uniqueCities.length === 1) {
+          locHeader = uniqueCities[0] + (uniqueCountries.length === 1 ? `, ${uniqueCountries[0]}` : '');
+        } else if (uniqueCountries.length === 1) {
+          locHeader = `${uniqueCities.length} ciudades en ${uniqueCountries[0]}`;
+        } else if (uniqueCountries.length > 1) {
+          locHeader = `${group.length} destinos (${uniqueCountries.length} países)`;
+        } else {
+          locHeader = group[0].city || 'Zona Remota';
+        }
+
+        const uniqueIsps = [...new Set(group.map(c => c.isp).filter(Boolean))];
+        const ispHeader = uniqueIsps.length === 1 ? uniqueIsps[0] : (uniqueIsps.length > 1 ? `${uniqueIsps.length} redes / proveedores` : 'Red');
 
         wrap.innerHTML = `
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #a855f7; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-            <span>🔀 ${group.length} CONEXIONES CONCURRENTES</span>
+            <span>🔀 ${group.length} CONEXIONES AGRUPADAS</span>
             <span style="background: rgba(168, 85, 247, 0.15); color: #7e22ce; padding: 2px 7px; border-radius: 999px; font-weight: 700;">${group.length} sockets</span>
           </div>
           <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
-            📍 ${escapeHtml(city)}${escapeHtml(country)}
+            📍 ${escapeHtml(locHeader)}
           </div>
           <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">
-            🏢 ${escapeHtml(isp)} ${group[0].asn ? '· ' + escapeHtml(group[0].asn) : ''}
+            🏢 ${escapeHtml(ispHeader)} ${uniqueIsps.length === 1 && group[0].asn ? '· ' + escapeHtml(group[0].asn) : ''}
           </div>
           <div style="font-size: 11px; font-weight: 600; color: #334155; margin-bottom: 6px;">
             Selecciona una conexión para ver detalles o bloquear:
@@ -9980,7 +10061,7 @@
             }).join('')}
           </div>
           <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 9.5px; color: #64748b; display: flex; justify-content: space-between; align-items: center;">
-            <span>${isLan ? '🏠 Red Local (LAN)' : '⚡ OpenStreetMap · GeoIP'}</span>
+            <span>⚡ OpenStreetMap · GeoIP</span>
             <span>OpenStreetMap (Libre)</span>
           </div>
         `;
@@ -9990,7 +10071,14 @@
       selectConnInGroup(groupKey, connId) {
         const entry = this._groupsMap.get(groupKey);
         if (!entry || !entry.marker) return;
-        this._activePopupState = { type: 'group', groupKey: groupKey, selectedConnId: connId };
+        const targetItem = entry.group.find(c => c.id === connId);
+        this._activePopupState = {
+          type: 'group',
+          groupKey: groupKey,
+          selectedConnId: connId,
+          activeConnId: connId,
+          activeRemoteIp: targetItem ? targetItem.remote_ip : null
+        };
         const node = this.buildGroupInfoWindowNode(entry.group, connId, groupKey);
         entry.marker.setPopupContent(node);
         const popup = entry.marker.getPopup();
@@ -10004,7 +10092,13 @@
       showGroupList(groupKey) {
         const entry = this._groupsMap.get(groupKey);
         if (!entry || !entry.marker) return;
-        this._activePopupState = { type: 'group', groupKey: groupKey, selectedConnId: null };
+        this._activePopupState = {
+          type: 'group',
+          groupKey: groupKey,
+          selectedConnId: null,
+          activeConnId: null,
+          activeRemoteIp: null
+        };
         const node = this.buildGroupInfoWindowNode(entry.group, null, groupKey);
         entry.marker.setPopupContent(node);
         const popup = entry.marker.getPopup();
@@ -10013,6 +10107,188 @@
           popup._groupKey = groupKey;
           popup._selectedConnId = null;
         }
+      },
+
+      renderDynamicClusters() {
+        if (!this._leafletMap || !this._isReady) return;
+        const conns = Array.isArray(this._currentConns) ? this._currentConns : [];
+        const srv = this._currentSrv || (this._lastConnData && this._lastConnData.server_node) || {};
+        const srvPos = {
+          lat: typeof srv.lat === 'number' ? srv.lat : 27.9600,
+          lng: typeof srv.lng === 'number' ? srv.lng : -15.5800
+        };
+
+        const savedPopupState = this._activePopupState ? { ...this._activePopupState } : null;
+        this._isRedrawing = true;
+
+        this.clearConnectionOverlays();
+
+        // Asegurar la presencia del nodo central del servidor en Gran Canaria
+        if (!this._serverMarker) {
+          const srvIcon = L.divIcon({
+            className: 'gmp-conn-marker-wrap',
+            html: `<div class="gmp-conn-marker server-host"><span>🖥️</span><span>Host (${escapeHtml(srv.city || 'Servidor')})</span></div>`,
+            iconSize: null
+          });
+          const srvMarker = L.marker([srvPos.lat, srvPos.lng], {
+            icon: srvIcon,
+            title: `Nodo Servidor (${srv.public_ip || srv.ip || 'Host'})`
+          }).addTo(this._leafletMap);
+
+          const srvPopup = L.popup({
+            maxWidth: 360,
+            className: 'leaflet-custom-popup',
+            autoClose: false,
+            closeOnClick: false
+          });
+          srvPopup.setContent(this.buildInfoWindowNode(srv, true));
+          srvPopup._ownerType = 'server';
+          srvMarker.bindPopup(srvPopup);
+          srvMarker.on('click', () => {
+            this._activePopupState = { type: 'server' };
+          });
+          this._serverMarker = srvMarker;
+        }
+
+        // Agrupar dinámicamente según la distancia en pantalla (píxeles al zoom actual)
+        const clusters = this.clusterConnections(conns);
+
+        for (const cl of clusters) {
+          const items = cl.items;
+          const first = items[0];
+          const isGroup = items.length > 1;
+          const isBlocked = items.some(c => c.direction === 'blocked');
+          const hasIncoming = items.some(c => c.direction === 'incoming');
+          const dirClass = isBlocked ? 'blocked' : (hasIncoming ? 'incoming' : 'outgoing');
+
+          const groupKey = isGroup
+            ? `grp_${cl.lat.toFixed(3)}_${cl.lng.toFixed(3)}_${items.length}`
+            : (first.id || `conn_${first.remote_ip}`);
+
+          let badgeHtml = '';
+          if (isGroup) {
+            const dynamicLabel = this.getDynamicClusterLabel(items);
+            badgeHtml = `<div class="gmp-conn-marker ${dirClass} grouped"><span class="group-count-pill">🔀 ${items.length}</span><span>${escapeHtml(dynamicLabel)}</span></div>`;
+          } else {
+            const arrowChar = first.direction === 'incoming' ? '↓' : (first.direction === 'blocked' ? '🛡️' : '↑');
+            badgeHtml = `<div class="gmp-conn-marker ${dirClass}"><span>${arrowChar}</span><span>${escapeHtml(first.remote_ip)}</span></div>`;
+          }
+
+          const icon = L.divIcon({
+            className: 'gmp-conn-marker-wrap',
+            html: badgeHtml,
+            iconSize: null
+          });
+
+          const markerTitle = isGroup
+            ? `${items.length} conexiones (${this.getDynamicClusterLabel(items)})`
+            : `${first.service || first.remote_ip} (${first.remote_ip})`;
+
+          const marker = L.marker([cl.lat, cl.lng], {
+            icon: icon,
+            title: markerTitle
+          }).addTo(this._leafletMap);
+
+          const popup = L.popup({
+            maxWidth: 380,
+            minWidth: 280,
+            className: 'leaflet-custom-popup',
+            autoClose: false,
+            closeOnClick: false
+          });
+          popup._ownerType = 'group';
+          popup._groupKey = groupKey;
+          popup._selectedConnId = null;
+
+          const initialContent = this.buildGroupInfoWindowNode(items, null, groupKey);
+          popup.setContent(initialContent);
+          marker.bindPopup(popup);
+
+          marker.on('click', () => {
+            const currentSelected = (this._activePopupState && this._activePopupState.groupKey === groupKey)
+              ? this._activePopupState.selectedConnId
+              : (items.length === 1 ? items[0].id : null);
+            this._activePopupState = {
+              type: 'group',
+              groupKey: groupKey,
+              selectedConnId: currentSelected,
+              activeConnId: currentSelected,
+              activeRemoteIp: (items.length === 1 ? items[0].remote_ip : (items.find(c => c.id === currentSelected)?.remote_ip || null))
+            };
+            popup._selectedConnId = currentSelected;
+            const content = this.buildGroupInfoWindowNode(items, currentSelected, groupKey);
+            marker.setPopupContent(content);
+          });
+
+          this._groupsMap.set(groupKey, { marker, group: items, lat: cl.lat, lng: cl.lng });
+          for (const c of items) {
+            this._markersMap.set(c.id, { marker, conn: c, groupKey });
+          }
+
+          const strokeHex = isBlocked
+            ? '#F43F5E'
+            : (hasIncoming ? '#10B981' : '#06B6D4');
+
+          const poly = L.polyline([[srvPos.lat, srvPos.lng], [cl.lat, cl.lng]], {
+            color: strokeHex,
+            weight: isGroup ? 2.8 : 2.2,
+            opacity: 0.85,
+            dashArray: hasIncoming ? '4, 4' : null
+          }).addTo(this._leafletMap);
+
+          this._polylines.push(poly);
+        }
+
+        // Restaurar popup activo manteniendo la selección sin cerrarlo por zoom ni métricas
+        if (savedPopupState) {
+          if (savedPopupState.type === 'server' && this._serverMarker) {
+            this._serverMarker.openPopup();
+          } else if (savedPopupState.type === 'group') {
+            let targetGroupEntry = null;
+            let targetGroupKey = null;
+            let targetConnId = savedPopupState.selectedConnId || savedPopupState.activeConnId;
+
+            if (targetConnId && this._markersMap.has(targetConnId)) {
+              const m = this._markersMap.get(targetConnId);
+              targetGroupKey = m.groupKey;
+              targetGroupEntry = this._groupsMap.get(targetGroupKey);
+            } else if (savedPopupState.activeRemoteIp) {
+              for (const [gKey, gEntry] of this._groupsMap.entries()) {
+                if (gEntry.group.some(c => c.remote_ip === savedPopupState.activeRemoteIp)) {
+                  targetGroupKey = gKey;
+                  targetGroupEntry = gEntry;
+                  const matchConn = gEntry.group.find(c => c.remote_ip === savedPopupState.activeRemoteIp);
+                  if (matchConn) targetConnId = matchConn.id;
+                  break;
+                }
+              }
+            } else if (savedPopupState.groupKey && this._groupsMap.has(savedPopupState.groupKey)) {
+              targetGroupKey = savedPopupState.groupKey;
+              targetGroupEntry = this._groupsMap.get(targetGroupKey);
+            }
+
+            if (targetGroupEntry && targetGroupEntry.marker) {
+              this._activePopupState = {
+                type: 'group',
+                groupKey: targetGroupKey,
+                selectedConnId: targetConnId || null,
+                activeConnId: targetConnId || null,
+                activeRemoteIp: savedPopupState.activeRemoteIp || null
+              };
+              const node = this.buildGroupInfoWindowNode(targetGroupEntry.group, targetConnId || null, targetGroupKey);
+              targetGroupEntry.marker.setPopupContent(node);
+              const p = targetGroupEntry.marker.getPopup();
+              if (p) {
+                p._ownerType = 'group';
+                p._groupKey = targetGroupKey;
+                p._selectedConnId = targetConnId || null;
+              }
+              targetGroupEntry.marker.openPopup();
+            }
+          }
+        }
+
+        this._isRedrawing = false;
       },
 
       async renderFromMetrics(metricsData, forceRedraw = false) {
@@ -10057,6 +10333,11 @@
           if (connectionsMapFilter === 'all') return true;
           return c.direction === connectionsMapFilter;
         });
+
+        // Filtrar exclusivamente conexiones públicas con coordenadas reales para el mapa
+        const mapConns = filteredConns.filter(c => !c.is_lan && typeof c.lat === 'number' && typeof c.lng === 'number');
+        this._currentConns = mapConns;
+        this._currentSrv = srv;
 
         setText('mapConnTableMeta', `Mostrando ${filteredConns.length} de ${allConns.length} conexiones geolocalizadas`);
 
@@ -10119,159 +10400,14 @@
         const ready = await this.ensureInitialized(srv);
         if (!ready || !this._leafletMap) return;
 
-        const sig = `${connectionsMapFilter}|${srv.lat},${srv.lng}|` + filteredConns.map(c => `${c.id}:${c.lat},${c.lng}:${c.state}:${c.geo_status || ''}`).join(';');
+        const zoomLevel = this._leafletMap.getZoom();
+        const sig = `${connectionsMapFilter}|z${zoomLevel}|${srv.lat},${srv.lng}|` + mapConns.map(c => `${c.id}:${c.lat},${c.lng}:${c.state}:${c.geo_status || ''}`).join(';');
         if (!forceRedraw && sig === this._lastSignature) return;
         this._lastSignature = sig;
 
-        const savedPopupState = this._activePopupState ? { ...this._activePopupState } : null;
-        this._isRedrawing = true;
+        this.renderDynamicClusters();
 
-        this.clearMapOverlays();
-
-        const srvPos = {
-          lat: typeof srv.lat === 'number' ? srv.lat : 27.9600,
-          lng: typeof srv.lng === 'number' ? srv.lng : -15.5800
-        };
-
-        // 1. Host Central Marker
-        const srvIcon = L.divIcon({
-          className: 'gmp-conn-marker-wrap',
-          html: `<div class="gmp-conn-marker server-host"><span>🖥️</span><span>Host (${escapeHtml(srv.city || 'Servidor')})</span></div>`,
-          iconSize: null
-        });
-        const srvMarker = L.marker([srvPos.lat, srvPos.lng], {
-          icon: srvIcon,
-          title: `Nodo Servidor (${srv.public_ip || srv.ip || 'Host'})`
-        }).addTo(this._leafletMap);
-
-        const srvPopup = L.popup({
-          maxWidth: 360,
-          className: 'leaflet-custom-popup',
-          autoClose: false,
-          closeOnClick: false
-        });
-        srvPopup.setContent(this.buildInfoWindowNode(srv, true));
-        srvPopup._ownerType = 'server';
-        srvMarker.bindPopup(srvPopup);
-        srvMarker.on('click', () => {
-          this._activePopupState = { type: 'server' };
-        });
-        this._serverMarker = srvMarker;
-
-        // 2. Agrupar conexiones por coordenadas (~110m de proximidad o misma IP)
-        const groups = new Map();
-        for (const conn of filteredConns) {
-          if (typeof conn.lat !== 'number' || typeof conn.lng !== 'number') continue;
-          const groupKey = `${conn.lat.toFixed(3)}_${conn.lng.toFixed(3)}`;
-          if (!groups.has(groupKey)) {
-            groups.set(groupKey, []);
-          }
-          groups.get(groupKey).push(conn);
-        }
-
-        // 3. Crear marcadores (individuales o agrupados con contador) y polilíneas
-        for (const [groupKey, conns] of groups.entries()) {
-          const first = conns[0];
-          const isGroup = conns.length > 1;
-          const isBlocked = conns.some(c => c.direction === 'blocked');
-          const hasIncoming = conns.some(c => c.direction === 'incoming');
-          const dirClass = isBlocked ? 'blocked' : (hasIncoming ? 'incoming' : 'outgoing');
-
-          let badgeHtml = '';
-          if (isGroup) {
-            const allSameIp = conns.every(c => c.remote_ip === first.remote_ip);
-            const label = allSameIp ? first.remote_ip : (first.city || first.remote_ip);
-            badgeHtml = `<div class="gmp-conn-marker ${dirClass} grouped"><span class="group-count-pill">🔀 ${conns.length}</span><span>${escapeHtml(label)}</span></div>`;
-          } else {
-            const arrowChar = first.direction === 'incoming' ? '↓' : (first.direction === 'blocked' ? '🛡️' : '↑');
-            badgeHtml = `<div class="gmp-conn-marker ${dirClass}"><span>${arrowChar}</span><span>${escapeHtml(first.remote_ip)}</span></div>`;
-          }
-
-          const icon = L.divIcon({
-            className: 'gmp-conn-marker-wrap',
-            html: badgeHtml,
-            iconSize: null
-          });
-
-          const markerTitle = isGroup
-            ? `${conns.length} conexiones (${first.city || first.remote_ip})`
-            : `${first.service} (${first.remote_ip})`;
-
-          const marker = L.marker([first.lat, first.lng], {
-            icon: icon,
-            title: markerTitle
-          }).addTo(this._leafletMap);
-
-          const popup = L.popup({
-            maxWidth: 380,
-            minWidth: 280,
-            className: 'leaflet-custom-popup',
-            autoClose: false,
-            closeOnClick: false
-          });
-          popup._ownerType = 'group';
-          popup._groupKey = groupKey;
-          popup._selectedConnId = null;
-
-          const initialContent = this.buildGroupInfoWindowNode(conns, null, groupKey);
-          popup.setContent(initialContent);
-          marker.bindPopup(popup);
-
-          marker.on('click', () => {
-            const currentSelected = (this._activePopupState && this._activePopupState.groupKey === groupKey)
-              ? this._activePopupState.selectedConnId
-              : (conns.length === 1 ? conns[0].id : null);
-            this._activePopupState = {
-              type: 'group',
-              groupKey: groupKey,
-              selectedConnId: currentSelected
-            };
-            popup._selectedConnId = currentSelected;
-            const content = this.buildGroupInfoWindowNode(conns, currentSelected, groupKey);
-            marker.setPopupContent(content);
-          });
-
-          this._groupsMap.set(groupKey, { marker, group: conns, lat: first.lat, lng: first.lng });
-          for (const c of conns) {
-            this._markersMap.set(c.id, { marker, conn: c, groupKey });
-          }
-
-          const strokeHex = isBlocked
-            ? '#F43F5E'
-            : (hasIncoming ? '#10B981' : '#06B6D4');
-
-          const poly = L.polyline([[srvPos.lat, srvPos.lng], [first.lat, first.lng]], {
-            color: strokeHex,
-            weight: isGroup ? 2.8 : 2.2,
-            opacity: 0.85,
-            dashArray: hasIncoming ? '4, 4' : null
-          }).addTo(this._leafletMap);
-
-          this._polylines.push(poly);
-        }
-
-        // 4. Restaurar popup si estaba abierto previamente (previene cierre involuntario)
-        if (savedPopupState) {
-          if (savedPopupState.type === 'server' && this._serverMarker) {
-            this._serverMarker.openPopup();
-          } else if (savedPopupState.type === 'group' && savedPopupState.groupKey) {
-            const groupEntry = this._groupsMap.get(savedPopupState.groupKey);
-            if (groupEntry && groupEntry.marker) {
-              const node = this.buildGroupInfoWindowNode(groupEntry.group, savedPopupState.selectedConnId, savedPopupState.groupKey);
-              groupEntry.marker.setPopupContent(node);
-              const p = groupEntry.marker.getPopup();
-              if (p) {
-                p._ownerType = 'group';
-                p._groupKey = savedPopupState.groupKey;
-                p._selectedConnId = savedPopupState.selectedConnId;
-              }
-              groupEntry.marker.openPopup();
-            }
-          }
-        }
-        this._isRedrawing = false;
-
-        if (!this._hasInitialFit && filteredConns.length > 0) {
+        if (!this._hasInitialFit && mapConns.length > 0) {
           this._hasInitialFit = true;
           this.fitAllBounds();
         }
@@ -10312,7 +10448,13 @@
         if (!groupEntry) return;
 
         this._leafletMap.setView([entry.conn.lat, entry.conn.lng], 9);
-        this._activePopupState = { type: 'group', groupKey: entry.groupKey, selectedConnId: connId };
+        this._activePopupState = {
+          type: 'group',
+          groupKey: entry.groupKey,
+          selectedConnId: connId,
+          activeConnId: connId,
+          activeRemoteIp: entry.conn.remote_ip
+        };
         const node = this.buildGroupInfoWindowNode(groupEntry.group, connId, entry.groupKey);
         groupEntry.marker.setPopupContent(node);
         const popup = groupEntry.marker.getPopup();
