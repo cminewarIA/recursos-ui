@@ -3880,7 +3880,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://maps.googleapis.com https://*.googleapis.com; "
             f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
             f"img-src 'self' data: blob: https: http:; "
-            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://maps.googleapis.com https://*.googleapis.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com http://ip-api.com https://ip-api.com ws: wss: https://*.cminewar.duckdns.org https://*.duckdns.org; "
+            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://maps.googleapis.com https://*.googleapis.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de http://ip-api.com https://ip-api.com ws: wss: https://*.cminewar.duckdns.org https://*.duckdns.org; "
             f"frame-src 'self' https://cminewar.duckdns.org https://*.cminewar.duckdns.org https://*.duckdns.org https://*.{dom}; "
             f"frame-ancestors {csp_ancestors};"
         )

@@ -1,8 +1,17 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.9.1`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.9.2`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.9.1`)**, telemetría de hardware en tiempo real, auditoría de red con **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap / CartoDB Dark Matter)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.9.2`)**, telemetría de hardware en tiempo real, auditoría de red con **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.9.2`
+- **Corrección de Marca de Agua 'API KEY REQUIRED' (OpenStreetMap Puro + Filtro Dark CSS)**:
+  - **Eliminación Total del Servidor de Teselas de CARTO**:
+    - Se identificó que la marca de agua con el texto *"API KEY REQUIRED"* procedía de `basemaps.cartocdn.com`, que comenzó a estampar dicho texto en sus imágenes PNG al no recibir clave de pago.
+    - Se sustituyó por el servidor oficial de **OpenStreetMap** (`tile.openstreetmap.org`) con respaldo automático en vuelo hacia el espejo comunitario `tile.openstreetmap.de`.
+  - **Modo Oscuro Mediante Filtro Gráfico CSS Específico (`.leaflet-tile-pane`)**:
+    - Las teselas libres se oscurecen elegantemente sin alterar en absoluto los marcadores de colores (verde, cian, rojo, azul) ni los popups informativos de conexiones.
+    - 100% libre, sin marcas de agua, sin claves API ni dependencias comerciales.
 
 ## ✨ Novedades en `v4.9.1`
 - **Estandarización del Criterio Estricto de Versionado Semántico (`GEMINI.md`)**:

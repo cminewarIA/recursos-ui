@@ -1722,8 +1722,12 @@
       background: #ffffff !important;
     }
     .leaflet-container {
-      background: #0f172a !important;
+      background: #0b1120 !important;
       font-family: inherit !important;
+    }
+    /* Filtro de alto contraste modo oscuro para teselas 100% libres de OpenStreetMap */
+    #networkConnectionsMapCanvas .leaflet-tile-pane {
+      filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(92%);
     }
     .conn-table-wrap {
       max-height: 290px;
@@ -3290,7 +3294,7 @@
                     <span id="mapLegendBandwidthAlertIcon">⚡</span>
                     <span id="mapLegendBandwidthAlertText">Umbral NIC: Normal (&lt; 5.0 MB/s)</span>
                   </span>
-                  <span id="lblMapProviderAttribution" style="font-family: var(--font-mono); font-size: 10px; opacity: 0.8;">OpenStreetMap · CartoDB</span>
+                  <span id="lblMapProviderAttribution" style="font-family: var(--font-mono); font-size: 10px; opacity: 0.8;">OpenStreetMap (100% Libre)</span>
                 </div>
               </div>
 
@@ -9620,11 +9624,18 @@
             attributionControl: false
           });
 
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          const mainTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            subdomains: 'abcd',
-            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-          }).addTo(this._leafletMap);
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+          });
+          mainTileLayer.on('tileerror', function(error, tile) {
+            if (!tile._hasFallback) {
+              tile._hasFallback = true;
+              const coords = error.coords;
+              tile.src = `https://tile.openstreetmap.de/${coords.z}/${coords.x}/${coords.y}.png`;
+            }
+          });
+          mainTileLayer.addTo(this._leafletMap);
 
           this._isReady = true;
           this._isBootstrapping = false;
@@ -9680,7 +9691,7 @@
               📍 ${escapeHtml(item.city || 'Servidor')}${item.country ? ', ' + escapeHtml(item.country) : ''}
             </div>
             <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">
-              OpenStreetMap · CartoDB · GeoIP (ip-api.com)
+              OpenStreetMap (100% Libre) · GeoIP
             </div>
           `;
           return wrap;
@@ -9713,7 +9724,7 @@
           </div>
           <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b; display: flex; justify-content: space-between; gap: 8px;">
             <span>${geoSourceBadge}</span>
-            <span>OpenStreetMap · CartoDB</span>
+            <span>OpenStreetMap (100% Libre)</span>
           </div>
         `;
         return wrap;
