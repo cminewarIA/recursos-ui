@@ -1431,38 +1431,97 @@
     /* ==========================================================================
        FLOATING APPLE/TESLA TOUCH DOCK (THUMB-ZONE ERGONOMICS)
        ========================================================================== */
+    .floating-dock-shell,
     .floating-touch-dock-wrap {
       position: fixed;
       left: 50%;
-      bottom: 14px;
+      bottom: calc(14px + env(safe-area-inset-bottom, 0px));
       transform: translateX(-50%);
-      z-index: 60;
+      z-index: 85;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
       max-width: calc(100vw - 20px);
       pointer-events: none;
     }
 
+    .swipe-pagination-dots {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      background: var(--bg-surface-elevated);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      pointer-events: auto;
+    }
+
+    @media (max-width: 960px) {
+      .swipe-pagination-dots {
+        display: inline-flex;
+      }
+    }
+
+    .swipe-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      cursor: pointer;
+      transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease, transform 0.2s ease;
+    }
+
+    .swipe-dot:hover {
+      background: var(--text-primary);
+    }
+
+    .swipe-dot.active {
+      width: 15px;
+      border-radius: 999px;
+      background: var(--accent-cyan-bright);
+      box-shadow: 0 0 8px var(--accent-cyan-bright);
+    }
+
+    .floating-dock,
     .floating-touch-dock {
       pointer-events: auto;
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 7px 10px;
+      gap: 5px;
+      padding: 6px 10px;
       background: var(--bg-dock);
-      backdrop-filter: blur(30px) saturate(200%);
-      -webkit-backdrop-filter: blur(30px) saturate(200%);
+      backdrop-filter: blur(32px) saturate(210%);
+      -webkit-backdrop-filter: blur(32px) saturate(210%);
       border: 1px solid var(--border-strong);
-      box-shadow: 0 22px 50px rgba(0, 0, 0, 0.55), var(--specular-inset);
-      border-radius: 24px;
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.48), 0 2px 10px rgba(0, 0, 0, 0.25), var(--specular-inset);
+      border-radius: 22px;
+      max-width: 100%;
       overflow-x: auto;
+      overscroll-behavior-x: contain;
       scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x;
     }
+    .floating-dock::-webkit-scrollbar,
     .floating-touch-dock::-webkit-scrollbar { display: none; }
 
+    .dock-divider {
+      width: 1px;
+      height: 22px;
+      background: var(--border-strong);
+      margin: 0 3px;
+      flex-shrink: 0;
+    }
+
     .dock-item {
-      min-width: 56px;
-      height: 52px;
-      padding: 0 10px;
-      border-radius: 16px;
+      min-width: 52px;
+      height: 48px;
+      padding: 3px 8px;
+      border-radius: 14px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--text-muted);
@@ -1471,17 +1530,19 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 3px;
+      gap: 2px;
       cursor: pointer;
       flex-shrink: 0;
       position: relative;
-      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
 
     .dock-item:hover {
       color: var(--text-primary);
-      background: rgba(148, 163, 184, 0.1);
-      transform: translateY(-3px);
+      background: rgba(148, 163, 184, 0.12);
+      transform: translateY(-2px);
     }
 
     .dock-item:active {
@@ -1492,31 +1553,36 @@
       background: var(--accent-cyan-soft);
       color: var(--accent-cyan-bright);
       border-color: var(--border-highlight);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
     }
 
     .dock-item.active::after {
       content: "";
       position: absolute;
-      bottom: 3px;
-      width: 5px;
-      height: 5px;
+      bottom: 2px;
+      width: 4px;
+      height: 4px;
       border-radius: 50%;
       background: var(--accent-cyan-bright);
-      box-shadow: 0 0 8px var(--accent-cyan-bright);
+      box-shadow: 0 0 6px var(--accent-cyan-bright);
     }
 
     .dock-item svg {
-      width: 19px;
-      height: 19px;
+      width: 18px;
+      height: 18px;
       flex-shrink: 0;
     }
 
     .dock-label {
-      font-size: 10px;
+      font-size: 9.5px;
       font-weight: 700;
       letter-spacing: -0.01em;
       white-space: nowrap;
+      line-height: 1;
+    }
+
+    .dock-dot {
+      display: none;
     }
 
     /* Modals & Native Liquid Glass Inspector Dialog */
@@ -2852,24 +2918,24 @@
   <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
 
   <!-- ======================================================================
-       MOBILE SWIPE PAGINATION DOTS + FLOATING TOUCH DOCK (iPAD / TESLA COCKPIT)
+       FLOATING TOUCH DOCK & MOBILE SWIPE PAGINATION (iPAD / TESLA COCKPIT)
        ====================================================================== -->
-  <div class="swipe-pagination-dots" id="swipePaginationDots" title="Desliza horizontalmente en pantalla táctil para cambiar de vista">
-    <span class="swipe-dot active" data-view="overview" onclick="navigateTo(event, 'overview')"></span>
-    <span class="swipe-dot" data-view="processor" onclick="navigateTo(event, 'processor')"></span>
-    <span class="swipe-dot" data-view="memory" onclick="navigateTo(event, 'memory')"></span>
-    <span class="swipe-dot" data-view="gpu" onclick="navigateTo(event, 'gpu')"></span>
-    <span class="swipe-dot" data-view="drives" onclick="navigateTo(event, 'drives')"></span>
-    <span class="swipe-dot" data-view="network" onclick="navigateTo(event, 'network')"></span>
-    <span class="swipe-dot" data-view="apps" onclick="navigateTo(event, 'apps')"></span>
-    <span class="swipe-dot" data-view="security" onclick="navigateTo(event, 'security')"></span>
-    <span class="swipe-dot" data-view="torrents" onclick="navigateTo(event, 'torrents')"></span>
-    <span class="swipe-dot" data-view="processes" onclick="navigateTo(event, 'processes')"></span>
-    <span class="swipe-dot" data-view="dns" onclick="navigateTo(event, 'dns')"></span>
-    <span class="swipe-dot" data-view="version" onclick="navigateTo(event, 'version')"></span>
-  </div>
+  <div class="floating-dock-shell" id="floatingDockShell">
+    <div class="swipe-pagination-dots" id="swipePaginationDots" title="Desliza horizontalmente en pantalla táctil para cambiar de vista">
+      <span class="swipe-dot active" data-view="overview" onclick="navigateTo(event, 'overview')"></span>
+      <span class="swipe-dot" data-view="processor" onclick="navigateTo(event, 'processor')"></span>
+      <span class="swipe-dot" data-view="memory" onclick="navigateTo(event, 'memory')"></span>
+      <span class="swipe-dot" data-view="gpu" onclick="navigateTo(event, 'gpu')"></span>
+      <span class="swipe-dot" data-view="drives" onclick="navigateTo(event, 'drives')"></span>
+      <span class="swipe-dot" data-view="network" onclick="navigateTo(event, 'network')"></span>
+      <span class="swipe-dot" data-view="apps" onclick="navigateTo(event, 'apps')"></span>
+      <span class="swipe-dot" data-view="security" onclick="navigateTo(event, 'security')"></span>
+      <span class="swipe-dot" data-view="torrents" onclick="navigateTo(event, 'torrents')"></span>
+      <span class="swipe-dot" data-view="processes" onclick="navigateTo(event, 'processes')"></span>
+      <span class="swipe-dot" data-view="dns" onclick="navigateTo(event, 'dns')"></span>
+      <span class="swipe-dot" data-view="version" onclick="navigateTo(event, 'version')"></span>
+    </div>
 
-  <div class="floating-dock-shell">
     <nav class="floating-dock" id="floatingTouchDock" aria-label="Dock táctil principal">
       <a href="/" class="dock-item active" id="dockOverview" data-view="overview" onclick="return navigateTo(event, 'overview')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
@@ -3405,8 +3471,14 @@
         if (navEl) navEl.classList.toggle('active', v === viewName);
         if (dockEl) {
           dockEl.classList.toggle('active', v === viewName);
-          if (v === viewName && typeof dockEl.scrollIntoView === 'function') {
-            try { dockEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); } catch (e) {}
+          if (v === viewName) {
+            try {
+              const dockContainer = document.getElementById('floatingTouchDock');
+              if (dockContainer) {
+                const targetLeft = dockEl.offsetLeft - (dockContainer.clientWidth / 2) + (dockEl.clientWidth / 2);
+                dockContainer.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+              }
+            } catch (e) {}
           }
         }
         if (viewEl) viewEl.style.display = (v === viewName) ? 'flex' : 'none';

@@ -1,8 +1,15 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.0.0`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.0.1`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.0.0`)**, telemetría de hardware en tiempo real, auditoría de red y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.0.1`)**, telemetría de hardware en tiempo real, auditoría de red y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades y Correcciones en `v4.0.1`
+- **Corrección Integral de la Barra Inferior (Floating Touch Dock)**:
+  - Sincronización de selectores CSS (`.floating-dock-shell`, `.floating-dock`) asegurando posicionamiento flotante permanente (`position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 85;`).
+  - Integración de los puntos de paginación táctil (`.swipe-pagination-dots` / `.swipe-dot`) directamente dentro de la cápsula flotante, evitando interferencias con el flujo principal del DOM.
+  - Corrección del auto-centrado de pestañas: reemplazo de `scrollIntoView()` por `dockContainer.scrollTo({ left, behavior: 'smooth' })`, eliminando saltos bruscos o indeseados en el scroll vertical de la ventana.
+  - Soporte completo de área segura para dispositivos móviles y acabados translúcidos en modo Titanio Oscuro y Titanio Claro.
 
 ## ✨ Novedades Principales en `v4.0.0` (Apple Liquid Glass & Tesla Touch Cockpit)
 
