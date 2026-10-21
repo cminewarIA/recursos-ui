@@ -231,24 +231,99 @@ GEOIP_WORKER_STATS = {
 }
 
 PORT_SERVICE_LABELS = {
+    20: "FTP Datos",
+    21: "FTP Servidor de Archivos",
     22: "SSH Daemon (OpenSSH)",
+    25: "SMTP Correo Saliente",
     53: "DNS Resolver (Pi-hole / Unbound)",
-    80: "HTTP Web Server",
-    123: "NTP Time Sync",
-    443: "HTTPS / TLS Stream",
+    67: "DHCP Servidor de Red",
+    68: "DHCP Cliente de Red",
+    80: "HTTP Web (Caddy / Servidor Web)",
+    110: "POP3 Servidor de Correo",
+    123: "NTP Sincronización Horaria",
+    143: "IMAP Servidor de Correo",
+    443: "HTTPS / TLS (Caddy Proxy / Web)",
+    445: "Samba / SMB (Archivos de Red)",
+    465: "SMTPS Correo Seguro",
+    587: "SMTP Envío Autenticado",
+    993: "IMAPS Correo Seguro",
+    995: "POP3S Correo Seguro",
+    1883: "MQTT Broker IoT",
+    1900: "UPnP / SSDP Descubrimiento",
+    1926: "Tuya IoT Device",
+    2019: "Caddy Admin API",
     2283: "Immich Photo Server",
     3000: "Panel Recursos Web UI",
+    3306: "MySQL / MariaDB Database",
+    4011: "PXE Boot Proxy",
+    4200: "Shell In A Box",
+    5000: "Flask API / Docker Registry",
+    5037: "Android Debug Bridge (ADB)",
+    5353: "mDNS / Avahi ZeroConf",
+    5432: "PostgreSQL Database",
+    5555: "Android ADB Remoto",
+    6379: "Redis / Valkey Cache",
     7878: "Radarr Media Service",
     8000: "Backend API Service",
+    8009: "Google Cast / Chromecast",
     8080: "HTTP Proxy / Web Socket",
+    8081: "Torrent / Web Alternate",
     8082: "qBittorrent Web UI",
     8085: "Panel Recursos Backend",
+    8088: "Pi-hole Web Admin",
+    8089: "Nextcloud Web App",
     8096: "Emby Media Server",
+    8123: "Home Assistant",
+    8443: "HTTPS Alternativo",
     8550: "Panel Recursos (HTTPS)",
+    8884: "Tesseract OCR Service",
     8989: "Sonarr Media Service",
+    8998: "Python Script Server",
+    8999: "Nginx Web Proxy",
     9000: "Portainer Docker Engine",
+    9050: "Tor SOCKS Proxy",
+    9090: "Cockpit Management Console",
+    9091: "Transmission Torrent",
+    9443: "Portainer HTTPS",
+    9980: "Collabora Online (Nextcloud)",
+    11434: "Ollama LLM Engine",
+    18554: "go2rtc WebRTC Gateway",
+    18555: "go2rtc RTSP Stream",
+    32034: "Plex Companion / Cast",
+    32400: "Plex Media Server",
+    36367: "Tailscale Mesh VPN",
+    36907: "Tailscale Mesh VPN",
+    41641: "Tailscale WireGuard",
     51820: "WireGuard VPN Tunnel"
 }
+
+LISTENING_PORTS_MAP = {}
+LAST_LISTENING_SCAN = 0.0
+
+def update_listening_ports_map(force=False):
+    global LISTENING_PORTS_MAP, LAST_LISTENING_SCAN
+    now = time.time()
+    if not force and (now - LAST_LISTENING_SCAN < 20.0) and LISTENING_PORTS_MAP:
+        return LISTENING_PORTS_MAP
+    LAST_LISTENING_SCAN = now
+    new_map = {}
+    try:
+        p = subprocess.run(['sudo', 'ss', '-tulpn', '-H'], capture_output=True, text=True, timeout=2.0)
+        if p.returncode == 0:
+            for line in p.stdout.splitlines():
+                m_port = re.search(r':(\d+)\s+', line)
+                m_proc = re.search(r'users:\(\(\"([^\"]+)\",pid=(\d+)', line)
+                if m_port and m_proc:
+                    port = int(m_port.group(1))
+                    proc = m_proc.group(1)
+                    pid = int(m_proc.group(2))
+                    new_map[port] = {"proc": proc, "pid": pid}
+    except Exception:
+        pass
+    if new_map:
+        LISTENING_PORTS_MAP = new_map
+    return LISTENING_PORTS_MAP
+
 
 def _is_private_ip(ip_str):
     try:
@@ -523,7 +598,8 @@ def fetch_connections_geo_worker():
                         pass
 
             # 3. Inspect active kernel sockets via psutil.net_connections
-            listening_ports = {22, 53, 80, 443, 3000, 8080, 8082, 8085, 8096, 8550, 9000, 51820}
+            listening_map = update_listening_ports_map()
+            listening_ports = set(listening_map.keys()) | {22, 53, 80, 443, 2283, 3000, 8080, 8082, 8085, 8088, 8089, 8096, 8123, 8550, 8884, 9000, 9980, 11434, 18554, 18555, 32400, 51820}
             raw_sockets = []
             try:
                 conns = psutil.net_connections(kind="inet")
@@ -547,7 +623,75 @@ def fetch_connections_geo_worker():
                     if dedup_key in seen_keys:
                         continue
                     seen_keys.add(dedup_key)
-                    svc_port = loc_port if is_in else rem_port
+
+                    proc_name = ""
+                    if c.pid:
+                        try:
+                            proc_name = psutil.Process(c.pid).name()
+                        except Exception:
+                            proc_name = ""
+                    if not proc_name:
+                        if is_in and loc_port in listening_map:
+                            proc_name = listening_map[loc_port].get("proc", "")
+                        elif not is_in and rem_port in listening_map:
+                            proc_name = listening_map[rem_port].get("proc", "")
+
+                    container_hint = ""
+                    if "docker" in proc_name.lower():
+                        if loc_port == 8089 or rem_port == 8089:
+                            container_hint = "Nextcloud Hub"
+                        elif loc_port == 2283 or rem_port == 2283:
+                            container_hint = "Immich Photo Server"
+                        elif loc_port == 8884 or rem_port == 8884:
+                            container_hint = "Tesseract OCR"
+                        elif loc_port == 3000 or rem_port == 3000:
+                            container_hint = "Panel Recursos Web / NodeODM"
+                        elif loc_port == 9980 or rem_port == 9980:
+                            container_hint = "Collabora Online"
+
+                    if is_in:
+                        svc_port = loc_port
+                        base_svc = PORT_SERVICE_LABELS.get(svc_port)
+                        if container_hint:
+                            svc_label = f"{container_hint} (:{svc_port})"
+                        elif base_svc:
+                            svc_label = base_svc
+                        elif proc_name:
+                            svc_label = f"{proc_name.capitalize()} (:{svc_port})"
+                        else:
+                            svc_label = f"{proto_str} Puerto :{svc_port}"
+                        if svc_port == 22:
+                            suggested_jail = "sshd"
+                        elif svc_port in (80, 443):
+                            suggested_jail = "caddy-scan"
+                        else:
+                            suggested_jail = "nextcloud"
+                        details_str = f"Entrante desde {rem_ip} hacia {svc_label}"
+                    else:
+                        svc_port = rem_port
+                        suggested_jail = "caddy-scan"
+                        if _is_private_ip(rem_ip):
+                            if svc_port == 8009:
+                                svc_label = "Google Cast / Chromecast (:8009)"
+                            elif svc_port == 5555:
+                                svc_label = "Android ADB Remoto (:5555)"
+                            elif svc_port == 445:
+                                svc_label = "Samba / SMB Red Compartida (:445)"
+                            elif svc_port == 1926:
+                                svc_label = "Tuya IoT Device (:1926)"
+                            elif svc_port == 32034:
+                                svc_label = "Plex Companion / Cast (:32034)"
+                            elif svc_port == 8096:
+                                svc_label = "Emby Media Server (:8096)"
+                            elif svc_port == 53:
+                                svc_label = "DNS Consulta Interna (:53)"
+                            else:
+                                svc_label = PORT_SERVICE_LABELS.get(svc_port, f"LAN Servicio :{svc_port}")
+                        else:
+                            svc_label = PORT_SERVICE_LABELS.get(svc_port, f"{proto_str} Puerto :{svc_port}")
+                        p_info = f" desde {proc_name}" if proc_name else ""
+                        details_str = f"Saliente{p_info} hacia {svc_label} ({rem_ip})"
+
                     raw_sockets.append({
                         "direction": direction,
                         "protocol": proto_str,
@@ -556,7 +700,10 @@ def fetch_connections_geo_worker():
                         "remote_ip": rem_ip,
                         "remote_port": rem_port,
                         "state": c.status or "ACTIVE",
-                        "service": PORT_SERVICE_LABELS.get(svc_port, f"{proto_str} Puerto :{svc_port}")
+                        "service": svc_label,
+                        "process": proc_name,
+                        "jail": suggested_jail,
+                        "details": details_str
                     })
             except Exception:
                 pass
@@ -658,6 +805,22 @@ def fetch_connections_geo_worker():
                     asn = ""
                     geo_status = "pending"
 
+                svc_title = s["service"]
+                if geo and s["direction"] == "outgoing" and not is_lan:
+                    isp_str = (geo.get("isp", "") + " " + geo.get("asn", "")).lower()
+                    if "telegram" in isp_str:
+                        svc_title = f"Telegram API / Bot (:{s['remote_port']})"
+                    elif "google" in isp_str:
+                        svc_title = f"Google Cloud / APIs (:{s['remote_port']})"
+                    elif "fastly" in isp_str or "github" in isp_str:
+                        svc_title = f"GitHub / CDN Fastly (:{s['remote_port']})"
+                    elif "cloudflare" in isp_str:
+                        svc_title = f"Cloudflare CDN / DNS (:{s['remote_port']})"
+                    elif "amazon" in isp_str or "aws" in isp_str:
+                        svc_title = f"AWS Cloud (:{s['remote_port']})"
+                    elif "microsoft" in isp_str or "azure" in isp_str:
+                        svc_title = f"Microsoft Azure (:{s['remote_port']})"
+
                 connections_out.append({
                     "id": f"sock_{s['direction']}_{r_ip}_{s['local_port']}_{s['remote_port']}",
                     "direction": s["direction"],
@@ -666,7 +829,10 @@ def fetch_connections_geo_worker():
                     "local_port": s["local_port"],
                     "remote_ip": r_ip,
                     "remote_port": s["remote_port"],
-                    "service": s["service"],
+                    "service": svc_title,
+                    "process": s.get("process", ""),
+                    "jail": s.get("jail", "caddy-scan"),
+                    "details": s.get("details", ""),
                     "state": s["state"],
                     "lat": lat,
                     "lng": lng,
@@ -694,6 +860,9 @@ def fetch_connections_geo_worker():
                         "remote_ip": ep["ip"],
                         "remote_port": ep["port"],
                         "service": ep["service"],
+                        "process": "python3 (dashboard)",
+                        "jail": "caddy-scan",
+                        "details": f"Sincronización externa hacia {ep['service']}",
                         "state": "ESTABLISHED",
                         "lat": geo["lat"],
                         "lng": geo["lng"],
@@ -715,15 +884,19 @@ def fetch_connections_geo_worker():
                 if not geo:
                     continue
                 if not any(c["remote_ip"] == b_ip and c["direction"] == "blocked" for c in connections_out):
+                    b_jail = b_item.get("jail", "sshd")
                     connections_out.append({
                         "id": f"blk_{b_ip}",
                         "direction": "blocked",
                         "protocol": "TCP",
                         "local_ip": SERVER_LOCAL_IP,
-                        "local_port": 22,
+                        "local_port": 22 if b_jail == "sshd" else 443,
                         "remote_ip": b_ip,
                         "remote_port": 0,
-                        "service": f"Fail2ban IPS ({b_item.get('jail', 'sshd')})",
+                        "service": f"Fail2ban IPS ({b_jail})",
+                        "process": "fail2ban",
+                        "jail": b_jail,
+                        "details": f"IP bloqueada en firewall por Fail2ban (jail {b_jail})",
                         "state": "BANNED",
                         "lat": geo["lat"],
                         "lng": geo["lng"],
@@ -4537,7 +4710,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 3. Fail2ban: Desbloqueo de IP
-        elif self.path == "/api/fail2ban/unban":
+        elif self.path.split('?')[0] == "/api/fail2ban/unban":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -4573,14 +4746,21 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(resp)
                 return
 
-            if jail:
+            if jail and jail != 'all':
                 cmd = ["sudo", "fail2ban-client", "set", jail, "unbanip", target_ip]
             else:
                 cmd = ["sudo", "fail2ban-client", "unban", target_ip]
 
             p = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             if p.returncode == 0:
-                resp = json.dumps({"success": True, "message": f"IP {target_ip} desbloqueada exitosamente", "output": p.stdout.strip()}).encode('utf-8')
+                # Actualizar inmediatamente SECURITY_CACHE para reflejar el desbloqueo
+                with SECURITY_LOCK:
+                    f2b_d = SECURITY_CACHE.get("fail2ban", {})
+                    if "banned_details" in f2b_d:
+                        f2b_d["banned_details"] = [b for b in f2b_d["banned_details"] if b.get("ip") != target_ip]
+                    if "banned_ips" in f2b_d:
+                        f2b_d["banned_ips"] = [ip for ip in f2b_d["banned_ips"] if ip != target_ip]
+                resp = json.dumps({"success": True, "message": f"IP {target_ip} desbloqueada exitosamente", "ip": target_ip, "output": p.stdout.strip()}).encode('utf-8')
             else:
                 resp = json.dumps({"success": False, "error": p.stderr.strip() or p.stdout.strip() or "Error al desbloquear IP"}).encode('utf-8')
 
@@ -4593,7 +4773,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 4. Fail2ban: Baneo manual de IP
-        elif self.path == "/api/fail2ban/ban":
+        elif self.path.split('?')[0] == "/api/fail2ban/ban":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -4612,10 +4792,10 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             try:
                 body = json.loads(post_data)
                 target_ip = body.get('ip', '').strip()
-                jail = body.get('jail', 'nextcloud').strip()
+                jail = body.get('jail', 'caddy-scan').strip()
             except Exception:
                 target_ip = ''
-                jail = 'nextcloud'
+                jail = 'caddy-scan'
 
             try:
                 ipaddress.ip_address(target_ip)
@@ -4639,12 +4819,39 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(resp)
                 return
 
-            cmd = ["sudo", "fail2ban-client", "set", jail, "banip", target_ip]
-            p = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            if p.returncode == 0:
-                resp = json.dumps({"success": True, "message": f"IP {target_ip} bloqueada en {jail}", "output": p.stdout.strip()}).encode('utf-8')
+            if not jail or jail == 'auto':
+                jail = 'caddy-scan'
+
+            success = False
+            last_err = ""
+            if jail == 'all':
+                active_jails = ['caddy-scan', 'sshd', 'nextcloud', 'recidive']
+                for j in active_jails:
+                    cmd = ["sudo", "fail2ban-client", "set", j, "banip", target_ip]
+                    p = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                    if p.returncode == 0:
+                        success = True
+                    else:
+                        last_err = p.stderr.strip() or p.stdout.strip()
             else:
-                resp = json.dumps({"success": False, "error": p.stderr.strip() or p.stdout.strip() or "Error al bloquear IP"}).encode('utf-8')
+                cmd = ["sudo", "fail2ban-client", "set", jail, "banip", target_ip]
+                p = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                success = (p.returncode == 0)
+                last_err = p.stderr.strip() or p.stdout.strip()
+
+            if success:
+                # Actualizar inmediatamente SECURITY_CACHE para reflejar el bloqueo
+                with SECURITY_LOCK:
+                    f2b_d = SECURITY_CACHE.get("fail2ban", {})
+                    if "banned_details" in f2b_d:
+                        if not any(b.get("ip") == target_ip for b in f2b_d["banned_details"]):
+                            f2b_d["banned_details"].append({"ip": target_ip, "jail": jail, "banned_at": int(time.time()), "is_active": True})
+                    if "banned_ips" in f2b_d:
+                        if target_ip not in f2b_d["banned_ips"]:
+                            f2b_d["banned_ips"].append(target_ip)
+                resp = json.dumps({"success": True, "message": f"IP {target_ip} bloqueada en firewall (jail: {jail})", "ip": target_ip, "jail": jail}).encode('utf-8')
+            else:
+                resp = json.dumps({"success": False, "error": last_err or "Error al bloquear IP en Fail2ban"}).encode('utf-8')
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')

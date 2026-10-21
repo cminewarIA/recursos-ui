@@ -1,10 +1,24 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.9.3`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.10.0`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.9.3`)**, telemetría de hardware en tiempo real, auditoría de red con **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.10.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
 
-## ✨ Novedades en `v4.9.3`
+## ✨ Novedades en `v4.10.0`
+- **Identificación Precisa del Servicio por IP (Conexiones Entrantes y Salientes)**:
+  - **Mapeo Profundo de Sockets, Procesos y Contenedores**:
+    - Detección dinámica y en tiempo real de los servicios locales en escucha mediante inspección de puertos (`sudo ss -tulpn`), procesos del sistema (`psutil`) y contenedores Docker activos (`DOCKER_CACHE`).
+    - **Conexiones Entrantes (↓ RX)**: Muestra explícitamente a qué servicio local se conecta cada IP remota (*Emby Media Server*, *Caddy Reverse Proxy / HTTPS*, *SSH Daemon*, *Nextcloud Hub*, *Immich Photo Server*, *Home Assistant*, *qBittorrent*, *Pi-hole DNS*, etc.) y el proceso local ejecutor (*EmbyServer*, *caddy*, *sshd*, *docker-proxy*, etc.).
+    - **Conexiones Salientes (↑ TX)**: Identifica el proceso local de origen (*chrome*, *tailscaled*, *python3*, *adb*, *agy*, etc.) y el servicio o destino remoto (*Google Cast / Chromecast en LAN*, *Telegram API / Messenger*, *GitHub / CDN Fastly*, *Cloudflare*, *Samba / SMB*, *DNS Upstream*, etc.).
+- **Bloqueo y Desbloqueo Directo de IPs en el Firewall (Fail2ban IPS) desde el Mapa y la Tabla**:
+  - **Menú Interactivo en el Popup del Mapa**:
+    - Al pulsar sobre cualquier conexión en el mapa geoespacial (OpenStreetMap), el diálogo desplegable presenta los detalles del servicio y controles integrados para bloquear la IP directamente en Fail2ban con selector inteligente de jail (`caddy-scan`, `sshd`, `nextcloud`, `all`).
+    - Si la IP ya está bloqueada, el botón conmuta automáticamente a `🔓 Desbloquear IP en Firewall`.
+  - **Acción Rápida en la Tabla de Conexiones**:
+    - Cada fila de la tabla de sockets geolocalizados incluye ahora el distintivo claro del servicio al que se conecta y un botón directo `🚫 Bloquear` / `🔓 Desbloquear` para gestión inmediata sin cambiar de vista.
+  - **Protección de Seguridad**:
+    - Bloqueo preventivo en interfaz y backend para impedir el baneo accidental de las IPs locales del servidor (`127.0.0.1`, `SERVER_LOCAL_IP`).
+
 - **Compatibilidad Universal de Rutas para Simulador de Google AI Studio y GitHub (`GEMINI.md` y `server.py`)**:
   - **Resolución Dinámica de Rutas y Candidatos Relativos**:
     - Se dotó al backend (`server.py`) de listas de candidatos para todos los recursos del sistema (DuckDNS, base de datos de Emby, scripts de sincronización, configuración de dominios e IP caché), comprobando primero rutas relativas al repositorio (`BASE_DIR` / `./`) antes de cualquier fallback local (`/home/servidor/...`).

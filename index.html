@@ -7061,6 +7061,65 @@
       .catch(e => showToast('Error de red al contactar con Fail2ban', 'error'));
     }
 
+    window.blockIpDirectly = function(ip, jail, serviceName) {
+      if (!ip) return;
+      const srv = (latestMetrics && latestMetrics.net && latestMetrics.net.connections_map && latestMetrics.net.connections_map.server_node) || {};
+      const hostIps = [srv.ip, srv.public_ip, '127.0.0.1', '::1', '192.168.50.2'].filter(Boolean);
+      if (hostIps.includes(ip)) {
+        showToast('No se puede bloquear la IP local o del servidor', 'error');
+        return;
+      }
+      const targetJail = jail || 'caddy-scan';
+      const svcMsg = serviceName ? ` (Servicio: ${serviceName})` : '';
+      if (!confirm(`¿Bloquear en el firewall (Fail2ban IPS) la dirección IP ${ip}${svcMsg}?\n\nJail seleccionada: ${targetJail}`)) {
+        return;
+      }
+      showToast(`Bloqueando IP ${ip} en jail ${targetJail}...`, 'info');
+      fetch('/api/fail2ban/ban', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ ip, jail: targetJail })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          showToast(res.message || `IP ${ip} bloqueada en ${targetJail}`, 'success');
+          setTimeout(() => {
+            if (typeof updateMetrics === 'function') updateMetrics();
+          }, 600);
+        } else {
+          showToast(res.error || 'Error al bloquear IP en Fail2ban', 'error');
+        }
+      })
+      .catch(e => showToast('Error de red al bloquear IP en Fail2ban', 'error'));
+    };
+
+    window.unblockIpDirectly = function(ip, jail) {
+      if (!ip) return;
+      if (!confirm(`¿Desbloquear la dirección IP ${ip} del firewall Fail2ban?`)) {
+        return;
+      }
+      showToast(`Desbloqueando IP ${ip}...`, 'info');
+      fetch('/api/fail2ban/unban', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ ip, jail: jail || '' })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          showToast(res.message || `IP ${ip} desbloqueada`, 'success');
+          setTimeout(() => {
+            if (typeof updateMetrics === 'function') updateMetrics();
+          }, 600);
+        } else {
+          showToast(res.error || 'Error al desbloquear IP', 'error');
+        }
+      })
+      .catch(e => showToast('Error de red al desbloquear IP', 'error'));
+    };
+
+
     // =========================================================================
     // REAL-TIME PERFORMANCE AUDITOR, ABORTCONTROLLER LOCK & RAF RENDER PIPELINE
     // =========================================================================
@@ -9673,7 +9732,7 @@
 
       buildInfoWindowNode(item, isServerHost = false) {
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #0f172a; padding: 4px 6px; min-width: 220px; line-height: 1.45;';
+        wrap.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #0f172a; padding: 6px 8px; min-width: 260px; max-width: 320px; line-height: 1.45;';
 
         if (isServerHost) {
           wrap.innerHTML = `
@@ -9707,24 +9766,78 @@
           ? '🏠 Red Interna (LAN)'
           : (item.geo_status === 'pending' ? '⏳ Worker GeoIP resolviendo...' : '⚡ Caché GeoIP (ip-api.com)');
 
+        const procHtml = item.process
+          ? `<div style="font-size: 11px; color: #475569; margin-top: 2px;">⚙️ Proceso local: <strong style="color: #0f172a;">${escapeHtml(item.process)}</strong></div>`
+          : '';
+        const detailsHtml = item.details
+          ? `<div style="font-size: 10.5px; color: #64748b; margin-top: 3px; font-style: italic;">${escapeHtml(item.details)}</div>`
+          : '';
+
+        const srv = (this._lastConnData && this._lastConnData.server_node) || {};
+        const hostIps = [srv.ip, srv.public_ip, '127.0.0.1', '::1', '192.168.50.2'].filter(Boolean);
+        const isHostSelf = hostIps.includes(item.remote_ip);
+
+        let actionBlockHtml = '';
+        if (item.direction === 'blocked') {
+          actionBlockHtml = `
+            <div style="margin-top: 8px; padding: 8px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px;">
+              <div style="font-size: 10.5px; font-weight: 700; color: #e11d48; margin-bottom: 5px; display: flex; align-items: center; gap: 4px;">
+                <span>🛡️</span> <span>IP Bloqueada en Fail2ban (${escapeHtml(item.jail || 'sshd')})</span>
+              </div>
+              <button type="button" class="action-btn" style="width: 100%; height: 28px; background: #10B981; color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: opacity 0.2s;" onclick="window.unblockIpDirectly('${escapeHtml(item.remote_ip)}', '${escapeHtml(item.jail || '')}')">
+                <span>🔓</span> <span>Desbloquear IP en Firewall</span>
+              </button>
+            </div>
+          `;
+        } else if (isHostSelf) {
+          actionBlockHtml = `
+            <div style="margin-top: 8px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 10.5px; color: #64748b; text-align: center;">
+              🔒 IP del Servidor / Local (Protegida)
+            </div>
+          `;
+        } else {
+          const safeId = escapeHtml(item.remote_ip).replace(/[^a-zA-Z0-9]/g, '_');
+          const isSsh = item.local_port === 22 || (item.service && item.service.toLowerCase().includes('ssh'));
+          const isWeb = item.local_port === 80 || item.local_port === 443 || (item.service && item.service.toLowerCase().includes('caddy'));
+          actionBlockHtml = `
+            <div style="margin-top: 8px; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 6px;">
+                <span style="font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase;">🛡️ Control Firewall IPS</span>
+                <select id="mapJailSelect_${safeId}" style="font-size: 10px; padding: 2px 4px; border-radius: 5px; border: 1px solid #cbd5e1; background: white; color: #1e293b; max-width: 130px;">
+                  <option value="caddy-scan" ${isWeb ? 'selected' : ''}>Jail: caddy-scan</option>
+                  <option value="sshd" ${isSsh ? 'selected' : ''}>Jail: sshd</option>
+                  <option value="nextcloud" ${!isWeb && !isSsh ? 'selected' : ''}>Jail: nextcloud</option>
+                  <option value="all">Todas las Jails</option>
+                </select>
+              </div>
+              <button type="button" class="action-btn" style="width: 100%; height: 28px; background: #e11d48; color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: opacity 0.2s;" onclick="window.blockIpDirectly('${escapeHtml(item.remote_ip)}', document.getElementById('mapJailSelect_${safeId}')?.value || '${escapeHtml(item.jail || 'caddy-scan')}', '${escapeHtml(item.service)}')">
+                <span>🚫</span> <span>Bloquear IP en Fail2ban</span>
+              </button>
+            </div>
+          `;
+        }
+
         wrap.innerHTML = `
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${dirColor}; margin-bottom: 4px;">
             ${dirLabel} · ${escapeHtml(item.protocol || 'TCP')}
           </div>
-          <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+          <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px; line-height: 1.3;">
             ${escapeHtml(item.service || 'Socket Activo')}
           </div>
-          <div style="font-size: 11.5px; color: #1e293b; font-family: monospace; background: #f1f5f9; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px;">
+          ${procHtml}
+          ${detailsHtml}
+          <div style="font-size: 11px; color: #1e293b; font-family: monospace; background: #f1f5f9; padding: 6px 8px; border-radius: 6px; margin: 6px 0;">
             Remoto: <strong>${escapeHtml(item.remote_ip)}${item.remote_port ? ':' + item.remote_port : ''}</strong><br>
             Local: <strong>${escapeHtml(item.local_ip)}:${item.local_port}</strong> (${escapeHtml(item.state || 'ACTIVE')})
           </div>
-          <div style="font-size: 11.5px; color: #334155;">
+          <div style="font-size: 11px; color: #334155;">
             📍 <strong>${escapeHtml(item.city || 'Nodo Remoto')}${item.country ? ', ' + escapeHtml(item.country) : ''}</strong><br>
             🏢 ${escapeHtml(item.isp || 'Proveedor de Red')}${item.asn ? ' · ' + escapeHtml(item.asn) : ''}
           </div>
-          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b; display: flex; justify-content: space-between; gap: 8px;">
+          ${actionBlockHtml}
+          <div style="margin-top: 8px; padding-top: 5px; border-top: 1px solid #e2e8f0; font-size: 9.5px; color: #64748b; display: flex; justify-content: space-between; gap: 8px;">
             <span>${geoSourceBadge}</span>
-            <span>OpenStreetMap (100% Libre)</span>
+            <span>OpenStreetMap</span>
           </div>
         `;
         return wrap;
@@ -9786,26 +9899,41 @@
               const locText = `${c.city || 'Red'}${c.country ? ', ' + c.country : ''}`;
               const geoSt = c.geo_status || (c.is_lan ? 'lan' : 'cached');
               const geoTagLabel = geoSt === 'lan' ? '🏠 LAN' : (geoSt === 'pending' ? '⏳ Cola GeoIP' : '⚡ GeoIP Caché');
+              const isBlocked = c.direction === 'blocked';
+              const blockBtnLabel = isBlocked ? '🔓 Desbloquear' : '🚫 Bloquear';
+              const blockBtnStyle = isBlocked
+                ? 'background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10B981;'
+                : 'background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); color: #f43f5e;';
+              const blockOnClick = isBlocked
+                ? `event.stopPropagation(); window.unblockIpDirectly('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.jail || '')}')`
+                : `event.stopPropagation(); window.blockIpDirectly('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.jail || 'caddy-scan')}', '${escapeHtml(c.service)}')`;
+              const procInfo = c.process ? `<span style="opacity: 0.75; font-weight: 500;">· proc: <strong>${escapeHtml(c.process)}</strong></span>` : '';
               return `
                 <div class="conn-row-item" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
-                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
                     <span class="conn-dir-pill ${escapeHtml(c.direction)}">${dirIcon}</span>
-                    <div style="min-width: 0;">
+                    <div style="min-width: 0; flex: 1;">
                       <div style="font-weight: 700; font-size: 12.5px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                         <span class="mono">${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
                         <span style="color: var(--text-muted); font-weight: 400;">→</span>
                         <span class="mono" style="color: var(--accent-cyan-bright);">:${c.local_port}</span>
-                        <span class="adw-badge" style="font-size: 10px; padding: 1px 6px;">${escapeHtml(c.service)}</span>
+                        <span class="adw-badge badge-blue" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700;" title="Servicio al que se conecta">${escapeHtml(c.service)}</span>
+                        ${procInfo}
                         <span class="conn-geo-tag ${escapeHtml(geoSt)}">${geoTagLabel}</span>
                       </div>
-                      <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        📍 ${escapeHtml(locText)} · ${escapeHtml(c.isp || 'Red Externa')} ${c.asn ? '(' + escapeHtml(c.asn) + ')' : ''}
+                      <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                        📍 ${escapeHtml(locText)} · ${escapeHtml(c.isp || 'Red')} ${c.asn ? '(' + escapeHtml(c.asn) + ')' : ''} ${c.details ? '· ' + escapeHtml(c.details) : ''}
                       </div>
                     </div>
                   </div>
-                  <div style="text-align: right; flex-shrink: 0;">
-                    <div class="mono" style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">${escapeHtml(c.protocol)} · ${escapeHtml(c.state)}</div>
-                    <div class="mono" style="font-size: 10px; color: var(--text-muted);">${Number(c.lat).toFixed(2)}°, ${Number(c.lng).toFixed(2)}°</div>
+                  <div style="text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 10px;">
+                    <div>
+                      <div class="mono" style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">${escapeHtml(c.protocol)} · ${escapeHtml(c.state)}</div>
+                      <div class="mono" style="font-size: 10px; color: var(--text-muted);">${Number(c.lat).toFixed(2)}°, ${Number(c.lng).toFixed(2)}°</div>
+                    </div>
+                    <button class="action-btn" style="height: 26px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 6px; cursor: pointer; ${blockBtnStyle}" onclick="${blockOnClick}">
+                      ${blockBtnLabel}
+                    </button>
                   </div>
                 </div>
               `;
