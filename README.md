@@ -1,8 +1,24 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.11.1`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.11.2`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.11.1`)**, telemetría de hardware en tiempo real, auditoría de red con **Agrupamiento Dinámico según Nivel de Zoom en Pantalla (Pixel Distance Clustering)**, **Exclusión Estricta de LAN en Mapa y Geolocalización Mundial de Destinos de Dispositivos del Hogar (Kernel Conntrack)**, **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Popups 100% Persistentes sin Cierres Involuntarios**, **Motor de Mapa Geoespacial Libre (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.11.2`)**, telemetría de hardware en tiempo real, auditoría de red con **Persistencia Absoluta de Popups en Mapa (Multi-tier Matching Antidesaparición)**, **Regla Estricta de Cero Hardcoding (`GEMINI.md`)**, **Agrupamiento Dinámico según Nivel de Zoom en Pantalla (Pixel Distance Clustering)**, **Exclusión Estricta de LAN en Mapa y Geolocalización Mundial de Destinos de Dispositivos del Hogar (Kernel Conntrack)**, **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Motor de Mapa Geoespacial Libre (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.11.2`
+- **Corrección Definitiva de Persistencia de Popups en el Mapa (Cero Desapariciones)**:
+  - **Eliminación del Cierre Falso por Eventos del DOM**:
+    - Se eliminó el borrado reactivo de estado en `popupclose`. Los popups ahora solo se cierran cuando el usuario pulsa deliberadamente el botón de cierre `[×]` o presiona la tecla `Escape`.
+  - **Algoritmo de Restauración Multicriterio (`Multi-tier Matching`)**:
+    - Al renovar la capa de conexiones cada 2 segundos o tras cambios continuos de zoom, el motor busca la mejor correspondencia para mantener el diálogo abierto mediante 5 niveles sucesivos de fallback:
+      1. ID de socket activo persistente.
+      2. IP pública remota seleccionada por el usuario.
+      3. IP representativa del grupo o cluster.
+      4. Pertenencia de cualquiera de las IPs históricas del cluster.
+      5. Coordenadas geográficas espaciales (`lat, lng`) por proximidad física (< 5°).
+    - Garantiza que aunque se cierren puertos efímeros de TCP (`TIME_WAIT`) en conntrack, el diálogo informativo permanezca anclado de forma inmutable.
+- **Incorporación de la Regla 7 en `GEMINI.md` (Principio Estricto de Cero Hardcoding)**:
+  - Prohibición estricta de nombres estáticos, ciudades ("Mountain View", "Madrid"), marcas o proveedores en código o lógica de agrupación.
+  - Toda la telemetría, hardware e interfaces se resuelven de forma 100% dinámica en tiempo de ejecución.
 
 ## ✨ Novedades en `v4.11.1`
 - **Agrupamiento Dinámico según el Nivel de Zoom (Pixel Distance Clustering en Tiempo Real)**:

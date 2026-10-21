@@ -9748,22 +9748,16 @@
           });
           mainTileLayer.addTo(this._leafletMap);
 
-          // Escuchar eventos de popup para recordar qué popup está abierto y evitar que los refrescos de métricas lo cierren
-          this._leafletMap.on('popupopen', (e) => {
-            const popup = e.popup;
-            if (popup && popup._ownerType === 'server') {
-              this._activePopupState = { type: 'server' };
-            } else if (popup && popup._ownerType === 'group') {
-              this._activePopupState = {
-                type: 'group',
-                groupKey: popup._groupKey,
-                selectedConnId: popup._selectedConnId || null,
-                activeConnId: popup._selectedConnId || null
-              };
+          // Escuchar clics en el botón de cierre [X] del popup para detectar cierre explícito del usuario
+          container.addEventListener('click', (e) => {
+            if (e.target && (e.target.classList.contains('leaflet-popup-close-button') || e.target.closest('.leaflet-popup-close-button'))) {
+              this._activePopupState = null;
             }
-          });
-          this._leafletMap.on('popupclose', (e) => {
-            if (!this._isRedrawing) {
+          }, true);
+
+          // Cierre deliberado mediante tecla Escape
+          window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this._activePopupState) {
               this._activePopupState = null;
             }
           });
@@ -10075,9 +10069,13 @@
         this._activePopupState = {
           type: 'group',
           groupKey: groupKey,
+          lat: entry.lat,
+          lng: entry.lng,
           selectedConnId: connId,
           activeConnId: connId,
-          activeRemoteIp: targetItem ? targetItem.remote_ip : null
+          activeRemoteIp: targetItem ? targetItem.remote_ip : null,
+          clusterIps: entry.group.map(c => c.remote_ip),
+          representativeIp: entry.group[0].remote_ip
         };
         const node = this.buildGroupInfoWindowNode(entry.group, connId, groupKey);
         entry.marker.setPopupContent(node);
@@ -10095,9 +10093,13 @@
         this._activePopupState = {
           type: 'group',
           groupKey: groupKey,
+          lat: entry.lat,
+          lng: entry.lng,
           selectedConnId: null,
           activeConnId: null,
-          activeRemoteIp: null
+          activeRemoteIp: null,
+          clusterIps: entry.group.map(c => c.remote_ip),
+          representativeIp: entry.group[0].remote_ip
         };
         const node = this.buildGroupInfoWindowNode(entry.group, null, groupKey);
         entry.marker.setPopupContent(node);
@@ -10145,7 +10147,11 @@
           srvPopup._ownerType = 'server';
           srvMarker.bindPopup(srvPopup);
           srvMarker.on('click', () => {
-            this._activePopupState = { type: 'server' };
+            this._activePopupState = {
+              type: 'server',
+              lat: srvPos.lat,
+              lng: srvPos.lng
+            };
           });
           this._serverMarker = srvMarker;
         }
@@ -10205,15 +10211,19 @@
           marker.bindPopup(popup);
 
           marker.on('click', () => {
-            const currentSelected = (this._activePopupState && this._activePopupState.groupKey === groupKey)
-              ? this._activePopupState.selectedConnId
+            const currentSelected = (this._activePopupState && this._activePopupState.activeRemoteIp)
+              ? (items.find(c => c.remote_ip === this._activePopupState.activeRemoteIp)?.id || null)
               : (items.length === 1 ? items[0].id : null);
             this._activePopupState = {
               type: 'group',
               groupKey: groupKey,
+              lat: cl.lat,
+              lng: cl.lng,
               selectedConnId: currentSelected,
               activeConnId: currentSelected,
-              activeRemoteIp: (items.length === 1 ? items[0].remote_ip : (items.find(c => c.id === currentSelected)?.remote_ip || null))
+              activeRemoteIp: (items.length === 1 ? items[0].remote_ip : (items.find(c => c.id === currentSelected)?.remote_ip || null)),
+              clusterIps: items.map(c => c.remote_ip),
+              representativeIp: items[0].remote_ip
             };
             popup._selectedConnId = currentSelected;
             const content = this.buildGroupInfoWindowNode(items, currentSelected, groupKey);
@@ -10248,11 +10258,15 @@
             let targetGroupKey = null;
             let targetConnId = savedPopupState.selectedConnId || savedPopupState.activeConnId;
 
+            // 1. Coincidencia por ID de socket si aún existe
             if (targetConnId && this._markersMap.has(targetConnId)) {
               const m = this._markersMap.get(targetConnId);
               targetGroupKey = m.groupKey;
               targetGroupEntry = this._groupsMap.get(targetGroupKey);
-            } else if (savedPopupState.activeRemoteIp) {
+            }
+
+            // 2. Coincidencia por la IP remota seleccionada
+            if (!targetGroupEntry && savedPopupState.activeRemoteIp) {
               for (const [gKey, gEntry] of this._groupsMap.entries()) {
                 if (gEntry.group.some(c => c.remote_ip === savedPopupState.activeRemoteIp)) {
                   targetGroupKey = gKey;
@@ -10262,26 +10276,72 @@
                   break;
                 }
               }
-            } else if (savedPopupState.groupKey && this._groupsMap.has(savedPopupState.groupKey)) {
+            }
+
+            // 3. Coincidencia por la IP representativa del grupo
+            if (!targetGroupEntry && savedPopupState.representativeIp) {
+              for (const [gKey, gEntry] of this._groupsMap.entries()) {
+                if (gEntry.group.some(c => c.remote_ip === savedPopupState.representativeIp)) {
+                  targetGroupKey = gKey;
+                  targetGroupEntry = gEntry;
+                  break;
+                }
+              }
+            }
+
+            // 4. Coincidencia por cualquiera de las IPs que componían el grupo
+            if (!targetGroupEntry && Array.isArray(savedPopupState.clusterIps) && savedPopupState.clusterIps.length > 0) {
+              for (const [gKey, gEntry] of this._groupsMap.entries()) {
+                if (gEntry.group.some(c => savedPopupState.clusterIps.includes(c.remote_ip))) {
+                  targetGroupKey = gKey;
+                  targetGroupEntry = gEntry;
+                  break;
+                }
+              }
+            }
+
+            // 5. Coincidencia por clave de grupo directa si aún existe
+            if (!targetGroupEntry && savedPopupState.groupKey && this._groupsMap.has(savedPopupState.groupKey)) {
               targetGroupKey = savedPopupState.groupKey;
               targetGroupEntry = this._groupsMap.get(targetGroupKey);
             }
 
+            // 6. Coincidencia geográfica espacial por proximidad a (lat, lng)
+            if (!targetGroupEntry && typeof savedPopupState.lat === 'number' && typeof savedPopupState.lng === 'number') {
+              let minDist = Infinity;
+              for (const [gKey, gEntry] of this._groupsMap.entries()) {
+                const d = Math.hypot(gEntry.lat - savedPopupState.lat, gEntry.lng - savedPopupState.lng);
+                if (d < 5.0 && d < minDist) {
+                  minDist = d;
+                  targetGroupKey = gKey;
+                  targetGroupEntry = gEntry;
+                }
+              }
+            }
+
             if (targetGroupEntry && targetGroupEntry.marker) {
+              const restoredTargetId = (targetConnId && targetGroupEntry.group.some(c => c.id === targetConnId))
+                ? targetConnId
+                : (savedPopupState.activeRemoteIp ? (targetGroupEntry.group.find(c => c.remote_ip === savedPopupState.activeRemoteIp)?.id || null) : null);
+
               this._activePopupState = {
                 type: 'group',
                 groupKey: targetGroupKey,
-                selectedConnId: targetConnId || null,
-                activeConnId: targetConnId || null,
-                activeRemoteIp: savedPopupState.activeRemoteIp || null
+                lat: targetGroupEntry.lat,
+                lng: targetGroupEntry.lng,
+                selectedConnId: restoredTargetId,
+                activeConnId: restoredTargetId,
+                activeRemoteIp: savedPopupState.activeRemoteIp || (restoredTargetId ? targetGroupEntry.group.find(c => c.id === restoredTargetId)?.remote_ip : null),
+                clusterIps: targetGroupEntry.group.map(c => c.remote_ip),
+                representativeIp: targetGroupEntry.group[0].remote_ip
               };
-              const node = this.buildGroupInfoWindowNode(targetGroupEntry.group, targetConnId || null, targetGroupKey);
+              const node = this.buildGroupInfoWindowNode(targetGroupEntry.group, restoredTargetId, targetGroupKey);
               targetGroupEntry.marker.setPopupContent(node);
               const p = targetGroupEntry.marker.getPopup();
               if (p) {
                 p._ownerType = 'group';
                 p._groupKey = targetGroupKey;
-                p._selectedConnId = targetConnId || null;
+                p._selectedConnId = restoredTargetId;
               }
               targetGroupEntry.marker.openPopup();
             }
@@ -10436,6 +10496,11 @@
         if (!this._lastConnData || !this._lastConnData.server_node || !this._leafletMap) return;
         const srv = this._lastConnData.server_node;
         if (typeof srv.lat !== 'number' || typeof srv.lng !== 'number') return;
+        this._activePopupState = {
+          type: 'server',
+          lat: srv.lat,
+          lng: srv.lng
+        };
         this._leafletMap.setView([srv.lat, srv.lng], 10);
         if (this._serverMarker) this._serverMarker.openPopup();
       },
@@ -10451,9 +10516,13 @@
         this._activePopupState = {
           type: 'group',
           groupKey: entry.groupKey,
+          lat: groupEntry.lat,
+          lng: groupEntry.lng,
           selectedConnId: connId,
           activeConnId: connId,
-          activeRemoteIp: entry.conn.remote_ip
+          activeRemoteIp: entry.conn.remote_ip,
+          clusterIps: groupEntry.group.map(c => c.remote_ip),
+          representativeIp: groupEntry.group[0].remote_ip
         };
         const node = this.buildGroupInfoWindowNode(groupEntry.group, connId, entry.groupKey);
         groupEntry.marker.setPopupContent(node);
