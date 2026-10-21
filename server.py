@@ -160,6 +160,11 @@ HISTORY = {
 }
 MAX_HISTORY = 60
 
+# Rolling 2-Hour per-NIC Bandwidth History Buffer (100% OS-driven from /proc/net/dev)
+NIC_BANDWIDTH_HISTORY_2H = {}  # { nic_name: [ {"t": ms_epoch, "rx": float_bytes_sec, "tx": float_bytes_sec}, ... ] }
+NIC_BANDWIDTH_LOCK = threading.Lock()
+MAX_NIC_HISTORY_SECONDS = 7200  # 2 hours
+
 # Dynamic Hardware & OS Information (Queried directly from OS kernel at startup)
 def _detect_cpu_static_specs():
     model = ""
@@ -3035,6 +3040,31 @@ def background_collector():
             rx_bytes_sec = max(0, (curr_rx - last_rx) / dt)
             tx_bytes_sec = max(0, (curr_tx - last_tx) / dt)
             last_rx, last_tx = curr_rx, curr_tx
+
+            # Accumulate rolling 2-hour bandwidth history per NIC (at least every 10-15s, pruned to 7200s)
+            with NIC_BANDWIDTH_LOCK:
+                cutoff_ms = int((now - MAX_NIC_HISTORY_SECONDS) * 1000)
+                now_ms = int(now * 1000)
+                for nic_item in interfaces_list:
+                    n_name = nic_item["name"]
+                    n_hist = NIC_BANDWIDTH_HISTORY_2H.setdefault(n_name, [])
+                    if not n_hist or (now_ms - n_hist[-1]["t"] >= 10000):
+                        n_hist.append({
+                            "t": now_ms,
+                            "rx": nic_item["rx_bytes_sec"],
+                            "tx": nic_item["tx_bytes_sec"]
+                        })
+                    else:
+                        n_hist[-1]["rx"] = max(n_hist[-1]["rx"], nic_item["rx_bytes_sec"])
+                        n_hist[-1]["tx"] = max(n_hist[-1]["tx"], nic_item["tx_bytes_sec"])
+                        n_hist[-1]["t"] = now_ms
+                    
+                    while n_hist and n_hist[0]["t"] < cutoff_ms:
+                        n_hist.pop(0)
+                    
+                    nic_item["history_2h"] = list(n_hist)
+                    if n_name in interfaces:
+                        interfaces[n_name]["history_2h"] = list(n_hist)
             
             curr_r, curr_w = get_real_disk()
             read_bytes_sec = max(0, (curr_r - last_r) / dt)
@@ -3091,7 +3121,8 @@ def background_collector():
                 "tx_total_bytes": curr_tx,
                 "local_ip": SERVER_LOCAL_IP,
                 "interfaces": interfaces,
-                "interfaces_list": interfaces_list
+                "interfaces_list": interfaces_list,
+                "interfaces_history_2h": {k: list(v) for k, v in NIC_BANDWIDTH_HISTORY_2H.items()}
             }
             
             disk_io_info = {

@@ -224,19 +224,21 @@
       position: fixed;
       top: 68px;
       left: 16px;
-      bottom: 94px;
-      width: 284px;
+      bottom: 24px;
+      max-height: calc(100vh - 92px);
+      width: 288px;
+      max-width: calc(100vw - 32px);
       background: var(--bg-sidebar);
-      backdrop-filter: blur(28px) saturate(190%);
-      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      backdrop-filter: blur(30px) saturate(190%);
+      -webkit-backdrop-filter: blur(30px) saturate(190%);
       border: 1px solid var(--border-strong);
-      box-shadow: var(--card-shadow), var(--specular-inset);
+      box-shadow: var(--card-shadow), var(--specular-inset), 0 24px 60px rgba(0, 0, 0, 0.55);
       border-radius: var(--radius-lg);
       display: flex;
       flex-direction: column;
       user-select: none;
-      z-index: 65;
-      transform: translateX(-320px);
+      z-index: 100; /* Top-most layer at 100 */
+      transform: translateX(-340px);
       opacity: 0;
       pointer-events: none;
       transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
@@ -244,6 +246,24 @@
 
     .sidebar.open {
       transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Dimmed spatial backdrop overlay for drawer */
+    .sidebar-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 6, 12, 0.62);
+      backdrop-filter: blur(10px) saturate(160%);
+      -webkit-backdrop-filter: blur(10px) saturate(160%);
+      z-index: 90;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.24s ease;
+    }
+
+    .sidebar-backdrop.open {
       opacity: 1;
       pointer-events: auto;
     }
@@ -1255,6 +1275,123 @@
       gap: 12px;
     }
 
+    /* NIC 2-Hour Bandwidth Sparkline & Temporal Telemetry */
+    .nic-sparkline-box {
+      margin-top: 4px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .nic-sparkline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .nic-sparkline-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: 0.01em;
+    }
+    .nic-sparkline-meta {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .nic-sparkline-legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+    .spark-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .legend-pip {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .legend-pip.rx { background: #34D399; box-shadow: 0 0 6px rgba(52, 211, 153, 0.5); }
+    .legend-pip.tx { background: #38BDF8; box-shadow: 0 0 6px rgba(56, 189, 248, 0.5); }
+    .spark-peak-badge {
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+    .nic-sparkline-stage {
+      position: relative;
+      width: 100%;
+      height: 64px;
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      touch-action: none;
+    }
+    .nic-sparkline-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+    .nic-sparkline-scrub-tooltip {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      background: rgba(15, 23, 42, 0.90);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #f8fafc;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-family: var(--font-mono);
+      pointer-events: none;
+      display: none;
+      white-space: nowrap;
+      z-index: 5;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+    [data-theme="light"] .nic-sparkline-scrub-tooltip {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      color: #0f172a;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    }
+    .nic-sparkline-axis {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9.5px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      padding: 0 2px;
+      margin-top: 1px;
+    }
+
     /* Interactive Segmented Filter Controls (Apple iOS Style) */
     .segmented-control {
       display: inline-flex;
@@ -1437,13 +1574,16 @@
       left: 50%;
       bottom: calc(14px + env(safe-area-inset-bottom, 0px));
       transform: translateX(-50%);
-      z-index: 85;
+      z-index: 99;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 6px;
+      width: fit-content;
       max-width: calc(100vw - 20px);
+      min-width: 0;
       pointer-events: none;
+      transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1), transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     .swipe-pagination-dots {
@@ -1488,36 +1628,67 @@
 
     .floating-dock,
     .floating-touch-dock {
+      z-index: 99;
+      position: relative;
       pointer-events: auto;
       display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
       align-items: center;
+      justify-content: flex-start;
       gap: 5px;
-      padding: 6px 10px;
+      padding: 0 12px;
+      height: 60px;
+      min-height: 60px;
+      max-height: 60px;
+      box-sizing: border-box;
       background: var(--bg-dock);
       backdrop-filter: blur(32px) saturate(210%);
       -webkit-backdrop-filter: blur(32px) saturate(210%);
       border: 1px solid var(--border-strong);
       box-shadow: 0 20px 48px rgba(0, 0, 0, 0.48), 0 2px 10px rgba(0, 0, 0, 0.25), var(--specular-inset);
-      border-radius: 22px;
+      border-radius: 9999px; /* Iconic continuous pill shape */
+      width: fit-content;
       max-width: 100%;
+      min-width: 0; /* CRITICAL: Enables overflow-x in flexbox without shape expansion */
       overflow-x: auto;
+      overflow-y: hidden;
       overscroll-behavior-x: contain;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
       touch-action: pan-x;
+      scroll-behavior: smooth;
+      scroll-padding: 0 14px;
+      scroll-snap-type: x proximity;
     }
     .floating-dock::-webkit-scrollbar,
     .floating-touch-dock::-webkit-scrollbar { display: none; }
+
+    /* Pill edge spacers to prevent first/last items from clipping against circular ends */
+    .floating-dock::before,
+    .floating-dock::after,
+    .floating-touch-dock::before,
+    .floating-touch-dock::after {
+      content: "";
+      width: 4px;
+      height: 100%;
+      flex: 0 0 4px;
+      flex-shrink: 0;
+      pointer-events: none;
+    }
 
     .dock-divider {
       width: 1px;
       height: 22px;
       background: var(--border-strong);
       margin: 0 3px;
+      flex: 0 0 1px;
       flex-shrink: 0;
     }
 
     .dock-item {
+      flex: 0 0 auto;
+      flex-shrink: 0;
       min-width: 52px;
       height: 48px;
       padding: 3px 8px;
@@ -1532,10 +1703,12 @@
       justify-content: center;
       gap: 2px;
       cursor: pointer;
-      flex-shrink: 0;
       position: relative;
       user-select: none;
       -webkit-user-select: none;
+      white-space: nowrap;
+      scroll-snap-align: center;
+      scroll-margin: 0 8px;
       transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
 
@@ -1585,6 +1758,60 @@
       display: none;
     }
 
+    /* Small Screen Graceful Overflow & Shape Preservation */
+    @media (max-width: 768px) {
+      .floating-dock,
+      .floating-touch-dock {
+        mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+        -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+      }
+    }
+
+    @media (max-width: 680px) {
+      .floating-dock-shell,
+      .floating-touch-dock-wrap {
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        max-width: calc(100vw - 16px);
+      }
+      .floating-dock,
+      .floating-touch-dock {
+        height: 52px;
+        min-height: 52px;
+        max-height: 52px;
+        padding: 0 8px;
+        gap: 3px;
+        border-radius: 9999px;
+      }
+      .dock-item {
+        min-width: 46px;
+        height: 42px;
+        padding: 2px 6px;
+        border-radius: 12px;
+      }
+      .dock-item svg {
+        width: 16px;
+        height: 16px;
+      }
+      .dock-label {
+        font-size: 8.5px;
+      }
+      .dock-divider {
+        height: 18px;
+        margin: 0 2px;
+      }
+      .swipe-pagination-dots {
+        gap: 4px;
+        padding: 3px 8px;
+      }
+      .swipe-dot {
+        width: 4px;
+        height: 4px;
+      }
+      .swipe-dot.active {
+        width: 12px;
+      }
+    }
+
     /* Modals & Native Liquid Glass Inspector Dialog */
     .modal-overlay {
       position: fixed;
@@ -1595,7 +1822,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 100;
+      z-index: 90; /* Below floating dock at 99 */
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.2s ease;
@@ -3522,6 +3749,7 @@
       const backdrop = document.getElementById('sidebarBackdrop');
       if (sidebar) sidebar.classList.remove('open');
       if (backdrop) backdrop.classList.remove('open');
+      document.body.classList.remove('sidebar-open');
 
       if (viewName === 'version') {
         checkSystemVersion(false);
@@ -3589,6 +3817,7 @@
       if (sb) {
         const isOpen = sb.classList.toggle('open');
         if (bd) bd.classList.toggle('open', isOpen);
+        document.body.classList.toggle('sidebar-open', isOpen);
       }
     }
 
@@ -3885,6 +4114,355 @@
           ctx.fillText(valText, bx + 7, by + 13.5);
         }
         ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // NIC BANDWIDTH 2-HOUR TEMPORAL STORAGE & TELEMETRY ENGINE
+    // =========================================================================
+    const NicBandwidthStorageManager = {
+      STORAGE_KEY: 'recursos_nic_bandwidth_history_2h',
+      MAX_WINDOW_MS: 2 * 60 * 60 * 1000, // 2 hours in ms
+      SAMPLE_INTERVAL_MS: 15 * 1000,     // 15 seconds bucket threshold
+      _cache: {},                        // { [nicName]: [ { t, rx, tx } ] }
+      _dirty: false,
+      _saveTimer: null,
+
+      init() {
+        try {
+          const raw = localStorage.getItem(this.STORAGE_KEY) || sessionStorage.getItem(this.STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed.nics === 'object') {
+              const now = Date.now();
+              const cutoff = now - this.MAX_WINDOW_MS;
+              for (const [nicName, series] of Object.entries(parsed.nics)) {
+                if (Array.isArray(series)) {
+                  this._cache[nicName] = series.filter(pt => pt && pt.t >= cutoff && !isNaN(pt.rx) && !isNaN(pt.tx));
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[NIC Storage] Inicializando almacenamiento temporal en memoria:', e);
+        }
+
+        window.addEventListener('beforeunload', () => this.flush());
+        window.addEventListener('pagehide', () => this.flush());
+      },
+
+      recordLiveSample(nicName, rxBytesSec, txBytesSec) {
+        if (!nicName) return;
+        const now = Date.now();
+        const cutoff = now - this.MAX_WINDOW_MS;
+        const series = this._cache[nicName] || (this._cache[nicName] = []);
+
+        const rx = Math.max(0, Number(rxBytesSec) || 0);
+        const tx = Math.max(0, Number(txBytesSec) || 0);
+
+        if (series.length === 0) {
+          series.push({ t: now, rx, tx });
+          this._scheduleSave();
+          return;
+        }
+
+        const last = series[series.length - 1];
+        if (now - last.t < this.SAMPLE_INTERVAL_MS) {
+          last.rx = Math.max(last.rx, rx);
+          last.tx = Math.max(last.tx, tx);
+          last.t = now;
+        } else {
+          series.push({ t: now, rx, tx });
+          while (series.length > 0 && series[0].t < cutoff) {
+            series.shift();
+          }
+        }
+        this._scheduleSave();
+      },
+
+      mergeServerHistory(nicName, serverHistory) {
+        if (!nicName || !Array.isArray(serverHistory) || serverHistory.length === 0) return;
+        const now = Date.now();
+        const cutoff = now - this.MAX_WINDOW_MS;
+        const localSeries = this._cache[nicName] || (this._cache[nicName] = []);
+
+        const mergedMap = new Map();
+        for (const pt of localSeries) {
+          if (pt && pt.t >= cutoff) {
+            const key = Math.round(pt.t / 10000);
+            mergedMap.set(key, pt);
+          }
+        }
+
+        for (const pt of serverHistory) {
+          if (pt && pt.t >= cutoff && !isNaN(pt.rx) && !isNaN(pt.tx)) {
+            const key = Math.round(pt.t / 10000);
+            if (!mergedMap.has(key)) {
+              mergedMap.set(key, { t: pt.t, rx: Math.max(0, Number(pt.rx) || 0), tx: Math.max(0, Number(pt.tx) || 0) });
+            }
+          }
+        }
+
+        const combined = Array.from(mergedMap.values()).sort((a, b) => a.t - b.t);
+        this._cache[nicName] = combined;
+        this._scheduleSave();
+      },
+
+      getHistory(nicName) {
+        const series = this._cache[nicName] || [];
+        const cutoff = Date.now() - this.MAX_WINDOW_MS;
+        return series.filter(pt => pt.t >= cutoff);
+      },
+
+      getPeak(nicName) {
+        const series = this.getHistory(nicName);
+        let maxRx = 0;
+        let maxTx = 0;
+        for (const pt of series) {
+          if (pt.rx > maxRx) maxRx = pt.rx;
+          if (pt.tx > maxTx) maxTx = pt.tx;
+        }
+        return { maxRx, maxTx, count: series.length };
+      },
+
+      _scheduleSave() {
+        this._dirty = true;
+        if (!this._saveTimer) {
+          this._saveTimer = setTimeout(() => this.flush(), 4000);
+        }
+      },
+
+      flush() {
+        if (!this._dirty) return;
+        if (this._saveTimer) {
+          clearTimeout(this._saveTimer);
+          this._saveTimer = null;
+        }
+        this._dirty = false;
+        try {
+          const payload = JSON.stringify({
+            version: 1,
+            saved_at: Date.now(),
+            nics: this._cache
+          });
+          localStorage.setItem(this.STORAGE_KEY, payload);
+        } catch (e) {
+          try {
+            sessionStorage.setItem(this.STORAGE_KEY, payload);
+          } catch (e2) {}
+        }
+      }
+    };
+
+    const nicSparkScrubState = {};
+
+    function bindNicSparklineScrubbing(canvas, nicName, tip) {
+      if (canvas.dataset.scrubBound === 'true') return;
+      canvas.dataset.scrubBound = 'true';
+
+      function updateScrub(clientX) {
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width === 0) return;
+        const relX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+        nicSparkScrubState[nicName] = { active: true, ratio: relX / rect.width };
+        drawNicSparkline(nicName);
+      }
+
+      function clearScrub() {
+        if (nicSparkScrubState[nicName]) {
+          nicSparkScrubState[nicName].active = false;
+        }
+        if (tip) tip.style.display = 'none';
+        drawNicSparkline(nicName);
+      }
+
+      canvas.addEventListener('pointerdown', (e) => {
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+        updateScrub(e.clientX);
+      }, { passive: true });
+
+      canvas.addEventListener('pointermove', (e) => {
+        if (nicSparkScrubState[nicName] && nicSparkScrubState[nicName].active) {
+          updateScrub(e.clientX);
+        } else if (e.buttons === 0) {
+          updateScrub(e.clientX);
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('pointerup', (e) => {
+        try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+        clearScrub();
+      }, { passive: true });
+
+      canvas.addEventListener('pointerleave', clearScrub, { passive: true });
+      canvas.addEventListener('pointercancel', clearScrub, { passive: true });
+    }
+
+    function drawNicSparkline(nicName) {
+      const canvas = document.getElementById('nicSpark_' + nicName);
+      if (!canvas) return;
+      const tip = document.getElementById('nicSparkTip_' + nicName);
+
+      bindNicSparklineScrubbing(canvas, nicName, tip);
+
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      const expectedW = Math.round(rect.width * dpr);
+      const expectedH = Math.round(rect.height * dpr);
+      if (canvas.width !== expectedW || canvas.height !== expectedH) {
+        canvas.width = expectedW;
+        canvas.height = expectedH;
+      }
+
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+
+      // Horizontal subtle horizon gridlines
+      ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.06)' : 'rgba(148, 163, 184, 0.07)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 3; i++) {
+        const y = Math.round((h / 4) * i);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      const history = NicBandwidthStorageManager.getHistory(nicName);
+      const now = Date.now();
+      const twoHoursAgo = now - (2 * 60 * 60 * 1000);
+
+      const peak = NicBandwidthStorageManager.getPeak(nicName);
+      const peakEl = document.getElementById('nicSparkPeak_' + nicName);
+      if (peakEl) {
+        peakEl.innerText = `Pico: ↓ ${formatSpeed(peak.maxRx)} · ↑ ${formatSpeed(peak.maxTx)}`;
+      }
+      const metaEl = document.getElementById('nicSparkMeta_' + nicName);
+      if (metaEl) {
+        metaEl.innerText = `${history.length} pts`;
+      }
+
+      if (!history || history.length < 2) {
+        ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.15)' : 'rgba(148, 163, 184, 0.20)';
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(0, h - 8);
+        ctx.lineTo(w, h - 8);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        return;
+      }
+
+      const maxVal = Math.max(peak.maxRx, peak.maxTx, 1024 * 50) * 1.15;
+
+      const rxPoints = [];
+      const txPoints = [];
+      for (let i = 0; i < history.length; i++) {
+        const pt = history[i];
+        const timeRatio = Math.max(0, Math.min(1, (pt.t - twoHoursAgo) / (2 * 60 * 60 * 1000)));
+        const x = timeRatio * w;
+        const yRx = h - (Math.min(pt.rx, maxVal) / maxVal) * (h - 10) - 5;
+        const yTx = h - (Math.min(pt.tx, maxVal) / maxVal) * (h - 10) - 5;
+        rxPoints.push({ x, y: yRx, val: pt.rx, t: pt.t });
+        txPoints.push({ x, y: yTx, val: pt.tx, t: pt.t });
+      }
+
+      function renderSpline(pts, strokeColor, fillColor) {
+        if (pts.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const xc = (pts[i].x + pts[i + 1].x) / 2;
+          const yc = (pts[i].y + pts[i + 1].y) / 2;
+          ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+        }
+        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        if (fillColor) {
+          ctx.lineTo(pts[pts.length - 1].x, h);
+          ctx.lineTo(pts[0].x, h);
+          ctx.closePath();
+          const grad = ctx.createLinearGradient(0, 0, 0, h);
+          grad.addColorStop(0, fillColor);
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
+      }
+
+      // TX (Upload - Cyan) line
+      renderSpline(txPoints, '#38BDF8', null);
+
+      // RX (Download - Emerald) line with gradient fill
+      const rxFill = isLight ? 'rgba(52, 211, 153, 0.20)' : 'rgba(52, 211, 153, 0.28)';
+      renderSpline(rxPoints, '#34D399', rxFill);
+
+      // Scrub indicator
+      const scrub = nicSparkScrubState[nicName];
+      if (scrub && scrub.active && rxPoints.length > 1) {
+        const targetX = scrub.ratio * w;
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        for (let i = 0; i < rxPoints.length; i++) {
+          const diff = Math.abs(rxPoints[i].x - targetX);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestIdx = i;
+          }
+        }
+        const ptRx = rxPoints[closestIdx];
+        const ptTx = txPoints[closestIdx];
+
+        ctx.beginPath();
+        ctx.moveTo(ptRx.x, 0);
+        ctx.lineTo(ptRx.x, h);
+        ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.35)' : 'rgba(248, 250, 252, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.beginPath();
+        ctx.arc(ptRx.x, ptRx.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#34D399';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(ptTx.x, ptTx.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#38BDF8';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        if (tip) {
+          const minAgo = Math.max(0, Math.round((now - ptRx.t) / 60000));
+          const timeStr = minAgo === 0 ? 'Ahora' : `-${minAgo} min`;
+          tip.style.display = 'block';
+          tip.innerHTML = `<strong>${timeStr}</strong>: <span style="color:#34D399;">↓ ${formatSpeed(ptRx.val)}</span> · <span style="color:#38BDF8;">↑ ${formatSpeed(ptTx.val)}</span>`;
+        }
+      } else {
+        if (tip) tip.style.display = 'none';
       }
 
       ctx.restore();
@@ -5196,6 +5774,7 @@
               const nicLogo = resolveNicLogo(nic);
               const isDataCover = nicLogo.isCustom && nicLogo.url.startsWith('data:image/');
               const nicTitle = `Interfaz ${nic.name} (${nic.ip || 'Activa'})`;
+              const nicPeak = NicBandwidthStorageManager.getPeak(nic.name);
               return `
                 <div class="nic-card">
                   <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
@@ -5235,9 +5814,40 @@
                       <div class="mono" style="color: var(--text-secondary);">↓ ${formatBytes(nic.bytes_recv)} · ↑ ${formatBytes(nic.bytes_sent)}</div>
                     </div>
                   </div>
+
+                  <!-- 2-Hour Bandwidth History Sparkline -->
+                  <div class="nic-sparkline-box">
+                    <div class="nic-sparkline-header">
+                      <div class="nic-sparkline-title">
+                        <span style="font-size: 13px;">📈</span>
+                        <span>Historial de Banda Ancha (Últimas 2 Horas)</span>
+                        <span class="nic-sparkline-meta" id="nicSparkMeta_${escapeHtml(nic.name)}">${nicPeak.count} pts</span>
+                      </div>
+                      <div class="nic-sparkline-legend">
+                        <span class="spark-legend-item"><span class="legend-pip rx"></span> ↓ Descarga</span>
+                        <span class="spark-legend-item"><span class="legend-pip tx"></span> ↑ Subida</span>
+                        <span class="spark-peak-badge" id="nicSparkPeak_${escapeHtml(nic.name)}">Pico: ↓ ${formatSpeed(nicPeak.maxRx)} · ↑ ${formatSpeed(nicPeak.maxTx)}</span>
+                      </div>
+                    </div>
+                    <div class="nic-sparkline-stage" id="nicSparkStage_${escapeHtml(nic.name)}">
+                      <canvas id="nicSpark_${escapeHtml(nic.name)}" class="nic-sparkline-canvas"></canvas>
+                      <div class="nic-sparkline-scrub-tooltip" id="nicSparkTip_${escapeHtml(nic.name)}"></div>
+                    </div>
+                    <div class="nic-sparkline-axis">
+                      <span>-2 horas</span>
+                      <span>-1 hora</span>
+                      <span>-30 min</span>
+                      <span>Ahora</span>
+                    </div>
+                  </div>
                 </div>
               `;
             }).join('');
+
+            // Draw sparklines for all active system network interfaces
+            nicsList.forEach(nic => {
+              drawNicSparkline(nic.name);
+            });
           }
         }
 
@@ -5851,6 +6461,19 @@
           renderVersionInfo(data.version_info);
         }
 
+        // Ingest per-NIC bandwidth samples continuously into 2-Hour Temporal Storage
+        const netInterfaces = (net && Array.isArray(net.interfaces_list))
+          ? net.interfaces_list
+          : (net && typeof net.interfaces === 'object' ? Object.values(net.interfaces) : []);
+        for (const nic of netInterfaces) {
+          if (nic && nic.name) {
+            if (Array.isArray(nic.history_2h) && nic.history_2h.length) {
+              NicBandwidthStorageManager.mergeServerHistory(nic.name, nic.history_2h);
+            }
+            NicBandwidthStorageManager.recordLiveSample(nic.name, nic.rx_bytes_sec, nic.tx_bytes_sec);
+          }
+        }
+
         // 1. Sidebar Counters & Host Info
         const cpuPct = Number(cpu.usage_percent || 0);
         const ramPct = Number(ram.percent || 0);
@@ -6269,8 +6892,19 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      NicBandwidthStorageManager.init();
       applyTitaniumTheme(currentTitaniumTheme);
       initTouchSwipeNavigation();
+
+      const dockNav = document.getElementById('floatingTouchDock');
+      if (dockNav) {
+        dockNav.addEventListener('wheel', (e) => {
+          if (e.deltaY !== 0 && dockNav.scrollWidth > dockNav.clientWidth) {
+            e.preventDefault();
+            dockNav.scrollLeft += e.deltaY;
+          }
+        }, { passive: false });
+      }
 
       const initialView = resolveViewFromLocation();
       navStack = [initialView];
