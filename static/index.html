@@ -14,6 +14,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- D3.js v7 for Fluid Animated Data Visualizations & Arc Transitions -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 
   <style>
     /* ==========================================================================
@@ -1781,7 +1783,20 @@
       width: 240px;
       height: 240px;
       cursor: pointer;
+      display: none;
+    }
+    #svgNetBandwidthPie {
+      width: 240px;
+      height: 240px;
+      overflow: visible;
       display: block;
+      cursor: pointer;
+      filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.28));
+    }
+    .bw-pie-arc-path {
+      cursor: pointer;
+      stroke-linejoin: round;
+      transition: opacity 0.22s ease, filter 0.22s ease, stroke 0.22s ease, stroke-width 0.22s ease;
     }
     .bw-pie-center-readout {
       position: absolute;
@@ -1924,7 +1939,7 @@
     .bw-pie-legend-bar-fill {
       height: 100%;
       border-radius: 999px;
-      transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.35s ease;
     }
     .bw-pie-legend-sub {
       display: flex;
@@ -3283,7 +3298,8 @@
               <div class="bw-pie-layout">
                 <div class="bw-pie-stage-box">
                   <div class="bw-pie-canvas-wrap">
-                    <canvas id="canvasNetBandwidthPie" width="240" height="240"></canvas>
+                    <svg id="svgNetBandwidthPie" viewBox="-120 -120 240 240" width="240" height="240" role="img" aria-label="Gráfico de pastel animado con D3 de distribución de ancho de banda"></svg>
+                    <canvas id="canvasNetBandwidthPie" width="240" height="240" aria-hidden="true"></canvas>
                     <div class="bw-pie-center-readout" id="bwPieCenterReadout">
                       <span class="bw-pie-center-kicker" id="bwPieCenterKicker">TOTAL RED</span>
                       <span class="bw-pie-center-val mono" id="bwPieCenterVal">0 B</span>
@@ -7870,8 +7886,15 @@
       pinnedIndex: -1,
       slices: [],
       totalValue: 0,
+       prevTotalValue: 0,
       effectiveMetric: 'total_bytes',
       _eventsBound: false,
+      _svgInitialized: false,
+      _prevArcStateByKey: new Map(),
+      _prevArcStateByIndex: [],
+      _lastDataSignature: '',
+      _pendingModeTransition: true,
+      _activeCenterTweenTimer: null,
       PALETTE: [
         '#38BDF8', // Cyan
         '#10B981', // Emerald
@@ -7883,87 +7906,70 @@
         '#EC4899'  // Pink
       ],
 
+      hasD3() {
+        return typeof window.d3 !== 'undefined' && typeof window.d3.pie === 'function' && typeof window.d3.arc === 'function';
+      },
+
       initEvents() {
+        const svgEl = document.getElementById('svgNetBandwidthPie');
+        if (svgEl && this.hasD3() && !this._svgInitialized) {
+          this._svgInitialized = true;
+          const d3 = window.d3;
+          const svg = d3.select(svgEl);
+          svg.selectAll('*').remove();
+
+          // Subtle background track ring
+          svg.append('circle')
+            .attr('class', 'bw-pie-track-ring')
+            .attr('cx', 0)
+            .attr('cy', 0)
+            .attr('r', 78)
+            .attr('fill', 'none')
+            .attr('stroke', 'rgba(148, 163, 184, 0.08)')
+            .attr('stroke-width', 40);
+
+          svg.append('g').attr('class', 'bw-pie-slices-group');
+
+          svg.on('click', (ev) => {
+            if (ev.target === svgEl) {
+              this.pinnedIndex = -1;
+              this.animateHoverState(220);
+              this.syncHighlightDOM(true);
+            }
+          });
+        }
+
         if (this._eventsBound) return;
         const canvas = document.getElementById('canvasNetBandwidthPie');
         if (!canvas) return;
         this._eventsBound = true;
-
-        const getSliceAtEvent = (ev) => {
-          if (!this.slices || this.slices.length === 0) return -1;
-          const rect = canvas.getBoundingClientRect();
-          const clientX = ev.touches && ev.touches[0] ? ev.touches[0].clientX : ev.clientX;
-          const clientY = ev.touches && ev.touches[0] ? ev.touches[0].clientY : ev.clientY;
-          const x = clientX - rect.left - rect.width / 2;
-          const y = clientY - rect.top - rect.height / 2;
-          const dist = Math.sqrt(x * x + y * y);
-          const outerR = Math.min(rect.width, rect.height) * 0.45;
-          const innerR = outerR * 0.56;
-          if (dist < innerR * 0.85 || dist > outerR + 10) return -1;
-
-          let angle = Math.atan2(y, x);
-          // Normalize relative to -PI/2 start angle
-          let norm = angle - (-Math.PI / 2);
-          while (norm < 0) norm += Math.PI * 2;
-          while (norm >= Math.PI * 2) norm -= Math.PI * 2;
-
-          for (let i = 0; i < this.slices.length; i++) {
-            const s = this.slices[i];
-            if (norm >= s.startAngle && norm <= s.endAngle) {
-              return i;
-            }
-          }
-          return -1;
-        };
-
-        canvas.addEventListener('mousemove', (ev) => {
-          const idx = getSliceAtEvent(ev);
-          if (idx !== this.hoveredIndex) {
-            this.hoveredIndex = idx;
-            this.drawCanvas();
-            this.syncHighlightDOM();
-          }
-        });
-
-        canvas.addEventListener('mouseleave', () => {
-          if (this.hoveredIndex !== -1) {
-            this.hoveredIndex = -1;
-            this.drawCanvas();
-            this.syncHighlightDOM();
-          }
-        });
-
-        canvas.addEventListener('click', (ev) => {
-          const idx = getSliceAtEvent(ev);
-          if (idx === -1) {
-            this.pinnedIndex = -1;
-          } else {
-            this.pinnedIndex = (this.pinnedIndex === idx) ? -1 : idx;
-          }
-          this.drawCanvas();
-          this.syncHighlightDOM();
-        });
       },
 
       setGroupMode(mode) {
+        if (this.groupMode === mode) return;
         this.groupMode = mode;
         this.pinnedIndex = -1;
         this.hoveredIndex = -1;
+        this._pendingModeTransition = true;
+        this._lastDataSignature = '';
         ['Subnets', 'Groups', 'Categories'].forEach(k => {
           const btn = document.getElementById('btnPieGroup' + k);
           if (btn) btn.classList.toggle('active', k.toLowerCase() === mode);
         });
-        if (latestMetrics) this.renderFromMetrics(latestMetrics);
+        if (latestMetrics) this.renderFromMetrics(latestMetrics, { forceModeAnimation: true });
       },
 
       setMetricMode(mode) {
+        if (this.metricMode === mode) return;
         this.metricMode = mode;
+        this._pendingModeTransition = true;
+        this._lastDataSignature = '';
         ['Total', 'Live'].forEach(k => {
           const btn = document.getElementById('btnPieMetric' + k);
           const target = k === 'Total' ? 'total_bytes' : 'live_speed';
           if (btn) btn.classList.toggle('active', target === mode);
         });
-        if (latestMetrics) this.renderFromMetrics(latestMetrics);
+        if (latestMetrics) this.renderFromMetrics(latestMetrics, { forceModeAnimation: true });
       },
 
       parseSubnetInfo(ipStr) {
@@ -8241,39 +8247,75 @@
         return list;
       },
 
-      renderFromMetrics(metrics) {
-        const canvas = document.getElementById('canvasNetBandwidthPie');
+      renderFromMetrics(metrics, opts = {}) {
+        const svgEl = document.getElementById('svgNetBandwidthPie');
         const legendList = document.getElementById('bwPieLegendList');
-        if (!canvas || !legendList) return;
+        if (!svgEl || !legendList) return;
 
         this.initEvents();
         const buckets = this.buildBuckets(metrics);
         const totalVal = Math.max(1, buckets.reduce((acc, b) => acc + b.value, 0));
+        this.prevTotalValue = this.totalValue || totalVal;
         this.totalValue = totalVal;
 
-        let curAngle = 0;
-        this.slices = buckets.map((b, idx) => {
-          const fraction = Math.max(0, b.value / totalVal);
-          const sweep = fraction * Math.PI * 2;
-          const slice = {
-            ...b,
-            index: idx,
-            color: this.PALETTE[idx % this.PALETTE.length],
-            fraction,
-            percent: (fraction * 100),
-            startAngle: curAngle,
-            endAngle: curAngle + sweep
-          };
-          curAngle += sweep;
-          return slice;
-        });
+        const d3 = this.hasD3() ? window.d3 : null;
+        const padAngle = buckets.length > 1 ? 0.022 : 0;
+
+        if (d3) {
+          const pieGen = d3.pie()
+            .sort(null)
+            .value(d => Math.max(0, d.value))
+            .padAngle(padAngle);
+          const pieArcs = pieGen(buckets);
+
+          this.slices = pieArcs.map((arcDatum, idx) => {
+            const b = arcDatum.data;
+            const fraction = Math.max(0, b.value / totalVal);
+            return {
+              ...b,
+              index: idx,
+              color: this.PALETTE[idx % this.PALETTE.length],
+              fraction,
+              percent: fraction * 100,
+              startAngle: arcDatum.startAngle,
+              endAngle: arcDatum.endAngle,
+              padAngle: arcDatum.padAngle
+            };
+          });
+        } else {
+          let curAngle = 0;
+          this.slices = buckets.map((b, idx) => {
+            const fraction = Math.max(0, b.value / totalVal);
+            const sweep = fraction * Math.PI * 2;
+            const slice = {
+              ...b,
+              index: idx,
+              color: this.PALETTE[idx % this.PALETTE.length],
+              fraction,
+              percent: fraction * 100,
+              startAngle: curAngle,
+              endAngle: curAngle + sweep,
+              padAngle
+            };
+            curAngle += sweep;
+            return slice;
+          });
+        }
 
         if (this.pinnedIndex >= this.slices.length) this.pinnedIndex = -1;
         if (this.hoveredIndex >= this.slices.length) this.hoveredIndex = -1;
 
-        this.drawCanvas();
+        const newSig = `${this.groupMode}|${this.effectiveMetric}|` +
+          this.slices.map(s => `${s.key}:${s.percent.toFixed(2)}:${Math.round(s.value)}`).join(';');
+        const isModeSwitch = Boolean(opts.forceModeAnimation || this._pendingModeTransition);
+        const hasTrafficShift = (newSig !== this._lastDataSignature);
+        this._pendingModeTransition = false;
+        this._lastDataSignature = newSig;
+
+        const durationMs = isModeSwitch ? 680 : (hasTrafficShift ? 460 : 0);
+        this.renderD3Pie(durationMs, isModeSwitch);
         this.renderLegendDOM();
-        this.syncHighlightDOM();
+        this.syncHighlightDOM(isModeSwitch || hasTrafficShift);
       },
 
       formatMetricValue(val) {
@@ -8281,6 +8323,247 @@
           return formatSpeed(val);
         }
         return formatBytes(val);
+      },
+
+      renderD3Pie(durationMs = 520, isModeSwitch = false) {
+        if (!this.hasD3()) {
+          this.drawCanvas();
+          return;
+        }
+        const d3 = window.d3;
+        const svgEl = document.getElementById('svgNetBandwidthPie');
+        if (!svgEl) return;
+
+        const svg = d3.select(svgEl);
+        let slicesGroup = svg.select('g.bw-pie-slices-group');
+        if (slicesGroup.empty()) {
+          slicesGroup = svg.append('g').attr('class', 'bw-pie-slices-group');
+        }
+
+        const baseOuterR = 98;
+        const baseInnerR = 58;
+        const activeIdx = this.hoveredIndex !== -1 ? this.hoveredIndex : this.pinnedIndex;
+        const arcGenerator = d3.arc().cornerRadius(4);
+
+        const targetData = this.slices.map((s, i) => {
+          const isHighlighted = (i === activeIdx);
+          return {
+            ...s,
+            innerRadius: isHighlighted ? baseInnerR - 2 : baseInnerR,
+            outerRadius: isHighlighted ? baseOuterR + 7 : baseOuterR
+          };
+        });
+
+        // Bind by slice index so mode switches morph existing SVG arc paths seamlessly around the 2π ring
+        const paths = slicesGroup.selectAll('path.bw-pie-arc-path')
+          .data(targetData, d => d.index);
+
+        const easeFn = d3.easeCubicOut || (t => 1 - Math.pow(1 - t, 3));
+        const hasPriorRender = this._prevArcStateByIndex.length > 0;
+
+        // EXIT slices: smoothly collapse angle sweep to 2π before removing
+        paths.exit()
+          .transition()
+          .duration(Math.max(240, Math.round(durationMs * 0.8)))
+          .ease(easeFn)
+          .attrTween('d', function(d) {
+            const current = this._current || {
+              startAngle: d ? d.startAngle : Math.PI * 2,
+              endAngle: d ? d.endAngle : Math.PI * 2,
+              innerRadius: baseInnerR,
+              outerRadius: baseOuterR,
+              padAngle: 0
+            };
+            const interp = d3.interpolate(current, {
+              startAngle: Math.PI * 2,
+              endAngle: Math.PI * 2,
+              innerRadius: baseInnerR,
+              outerRadius: baseOuterR,
+              padAngle: 0
+            });
+            return function(t) {
+              return arcGenerator(interp(t));
+            };
+          })
+          .style('opacity', 0)
+          .remove();
+
+        // ENTER slices: fan out from 0 on first render, or expand from 2π when new segments appear
+        const enterPaths = paths.enter()
+          .append('path')
+          .attr('class', 'bw-pie-arc-path')
+          .attr('fill', d => d.color)
+          .style('opacity', 0.2)
+          .each((d, i, nodes) => {
+            const prevByKey = !isModeSwitch ? this._prevArcStateByKey.get(d.key) : null;
+            const prevByIdx = this._prevArcStateByIndex[d.index];
+            let initialArc;
+            if (prevByKey) {
+              initialArc = { ...prevByKey };
+            } else if (prevByIdx) {
+              initialArc = { ...prevByIdx };
+            } else if (hasPriorRender) {
+              initialArc = {
+                startAngle: Math.PI * 2,
+                endAngle: Math.PI * 2,
+                innerRadius: baseInnerR,
+                outerRadius: baseOuterR,
+                padAngle: d.padAngle || 0
+              };
+            } else {
+              initialArc = {
+                startAngle: 0,
+                endAngle: 0.001,
+                innerRadius: baseInnerR,
+                outerRadius: baseOuterR,
+                padAngle: d.padAngle || 0
+              };
+            }
+            nodes[i]._current = initialArc;
+          });
+
+        // MERGE enter + update and run D3 arcTween transition
+        const merged = enterPaths.merge(paths);
+
+        merged
+          .on('mouseenter', (ev, d) => {
+            if (this.hoveredIndex !== d.index) {
+              this.hoveredIndex = d.index;
+              this.animateHoverState(210);
+              this.syncHighlightDOM(false);
+            }
+          })
+          .on('mouseleave', () => {
+            if (this.hoveredIndex !== -1) {
+              this.hoveredIndex = -1;
+              this.animateHoverState(210);
+              this.syncHighlightDOM(false);
+            }
+          })
+          .on('click', (ev, d) => {
+            ev.stopPropagation();
+            this.pinnedIndex = (this.pinnedIndex === d.index) ? -1 : d.index;
+            this.animateHoverState(240);
+            this.syncHighlightDOM(false);
+          });
+
+        const self = this;
+        if (durationMs > 0) {
+          merged.transition()
+            .duration(durationMs)
+            .ease(easeFn)
+            .attr('fill', d => d.color)
+            .style('opacity', d => (activeIdx !== -1 && d.index !== activeIdx) ? 0.42 : 0.94)
+            .attr('stroke', d => (d.index === activeIdx) ? '#ffffff' : 'rgba(15, 23, 42, 0.65)')
+            .attr('stroke-width', d => (d.index === activeIdx) ? 2 : 1)
+            .attr('transform', d => {
+              if (d.index !== activeIdx) return 'translate(0,0)';
+              const mid = (d.startAngle + d.endAngle) / 2 - Math.PI / 2;
+              return `translate(${(Math.cos(mid) * 4.5).toFixed(2)}, ${(Math.sin(mid) * 4.5).toFixed(2)})`;
+            })
+            .attrTween('d', function(d) {
+              const startState = this._current || {
+                startAngle: d.startAngle,
+                endAngle: d.endAngle,
+                innerRadius: d.innerRadius,
+                outerRadius: d.outerRadius,
+                padAngle: d.padAngle || 0
+              };
+              const targetState = {
+                startAngle: d.startAngle,
+                endAngle: d.endAngle,
+                innerRadius: d.innerRadius,
+                outerRadius: d.outerRadius,
+                padAngle: d.padAngle || 0
+              };
+              const interpolator = d3.interpolate(startState, targetState);
+              return function(t) {
+                const step = interpolator(t);
+                this._current = step;
+                self._prevArcStateByKey.set(d.key, step);
+                self._prevArcStateByIndex[d.index] = step;
+                return arcGenerator(step);
+              }.bind(this);
+            });
+        } else {
+          merged
+            .attr('fill', d => d.color)
+            .style('opacity', d => (activeIdx !== -1 && d.index !== activeIdx) ? 0.42 : 0.94)
+            .attr('stroke', d => (d.index === activeIdx) ? '#ffffff' : 'rgba(15, 23, 42, 0.65)')
+            .attr('stroke-width', d => (d.index === activeIdx) ? 2 : 1)
+            .attr('transform', d => {
+              if (d.index !== activeIdx) return 'translate(0,0)';
+              const mid = (d.startAngle + d.endAngle) / 2 - Math.PI / 2;
+              return `translate(${(Math.cos(mid) * 4.5).toFixed(2)}, ${(Math.sin(mid) * 4.5).toFixed(2)})`;
+            })
+            .attr('d', function(d) {
+              const state = {
+                startAngle: d.startAngle,
+                endAngle: d.endAngle,
+                innerRadius: d.innerRadius,
+                outerRadius: d.outerRadius,
+                padAngle: d.padAngle || 0
+              };
+              this._current = state;
+              self._prevArcStateByKey.set(d.key, state);
+              self._prevArcStateByIndex[d.index] = state;
+              return arcGenerator(state);
+            });
+        }
+      },
+
+      animateHoverState(durationMs = 210) {
+        if (!this.hasD3()) {
+          this.drawCanvas();
+          return;
+        }
+        const d3 = window.d3;
+        const svgEl = document.getElementById('svgNetBandwidthPie');
+        if (!svgEl) return;
+
+        const baseOuterR = 98;
+        const baseInnerR = 58;
+        const activeIdx = this.hoveredIndex !== -1 ? this.hoveredIndex : this.pinnedIndex;
+        const arcGenerator = d3.arc().cornerRadius(4);
+        const easeFn = d3.easeCubicOut || (t => 1 - Math.pow(1 - t, 3));
+
+        const slicesGroup = d3.select(svgEl).select('g.bw-pie-slices-group');
+        slicesGroup.selectAll('path.bw-pie-arc-path')
+          .transition()
+          .duration(durationMs)
+          .ease(easeFn)
+          .style('opacity', d => (activeIdx !== -1 && d.index !== activeIdx) ? 0.42 : 0.94)
+          .attr('stroke', d => (d.index === activeIdx) ? '#ffffff' : 'rgba(15, 23, 42, 0.65)')
+          .attr('stroke-width', d => (d.index === activeIdx) ? 2 : 1)
+          .style('filter', d => (d.index === activeIdx) ? `drop-shadow(0 0 10px ${d.color})` : 'none')
+          .attr('transform', d => {
+            if (d.index !== activeIdx) return 'translate(0,0)';
+            const mid = (d.startAngle + d.endAngle) / 2 - Math.PI / 2;
+            return `translate(${(Math.cos(mid) * 4.5).toFixed(2)}, ${(Math.sin(mid) * 4.5).toFixed(2)})`;
+          })
+          .attrTween('d', function(d) {
+            const isHighlighted = (d.index === activeIdx);
+            const startState = this._current || {
+              startAngle: d.startAngle,
+              endAngle: d.endAngle,
+              innerRadius: baseInnerR,
+              outerRadius: baseOuterR,
+              padAngle: d.padAngle || 0
+            };
+            const targetState = {
+              startAngle: d.startAngle,
+              endAngle: d.endAngle,
+              innerRadius: isHighlighted ? baseInnerR - 2 : baseInnerR,
+              outerRadius: isHighlighted ? baseOuterR + 7 : baseOuterR,
+              padAngle: d.padAngle || 0
+            };
+            const interp = d3.interpolate(startState, targetState);
+            return function(t) {
+              const step = interp(t);
+              this._current = step;
+              return arcGenerator(step);
+            }.bind(this);
+          });
       },
 
       drawCanvas() {
@@ -8387,6 +8670,43 @@
         }
 
         const isLive = (this.effectiveMetric === 'live_speed');
+        const existingKeys = Array.from(legendList.querySelectorAll('.bw-pie-legend-item'))
+          .map(el => el.getAttribute('data-slice-key'));
+        const nextKeys = this.slices.map(s => s.key);
+        const canUpdateInPlace = existingKeys.length === nextKeys.length &&
+          existingKeys.every((k, idx) => k === nextKeys[idx]);
+
+        if (canUpdateInPlace) {
+          // Smooth in-place DOM update so CSS bar transitions and hover states are preserved
+          this.slices.forEach((s, idx) => {
+            const itemEl = document.getElementById(`bwPieLegendItem_${idx}`);
+            if (!itemEl) return;
+            const dlStr = isLive ? formatSpeed(s.dlSpeed) : formatBytes(s.dlBytes);
+            const ulStr = isLive ? formatSpeed(s.ulSpeed) : formatBytes(s.ulBytes);
+            const totStr = this.formatMetricValue(s.value);
+            const sampleStr = s.sampleNames && s.sampleNames.length > 0
+              ? `Ej: ${s.sampleNames.join(', ')}`
+              : s.subtitle;
+
+            const swatchEl = itemEl.querySelector('.bw-pie-color-swatch');
+            if (swatchEl) swatchEl.style.background = s.color;
+            const totEl = itemEl.querySelector('.bw-pie-legend-tot-val');
+            if (totEl) totEl.textContent = totStr;
+            const pctEl = itemEl.querySelector('.bw-pie-legend-pct');
+            if (pctEl) pctEl.textContent = `${s.percent.toFixed(1)}%`;
+            const barEl = itemEl.querySelector('.bw-pie-legend-bar-fill');
+            if (barEl) {
+              barEl.style.width = `${Math.max(2, s.percent).toFixed(1)}%`;
+              barEl.style.background = s.color;
+            }
+            const subNodesEl = itemEl.querySelector('.bw-pie-legend-sub-nodes');
+            if (subNodesEl) subNodesEl.textContent = `${s.devicesCount} ${s.devicesCount === 1 ? 'nodo' : 'nodos'} · ${sampleStr}`;
+            const subIoEl = itemEl.querySelector('.bw-pie-legend-sub-io');
+            if (subIoEl) subIoEl.textContent = `↓ ${dlStr} · ↑ ${ulStr}`;
+          });
+          return;
+        }
+
         legendList.innerHTML = this.slices.map((s, idx) => {
           const dlStr = isLive ? formatSpeed(s.dlSpeed) : formatBytes(s.dlBytes);
           const ulStr = isLive ? formatSpeed(s.ulSpeed) : formatBytes(s.ulBytes);
@@ -8396,7 +8716,7 @@
             : s.subtitle;
 
           return `
-            <div class="bw-pie-legend-item" id="bwPieLegendItem_${idx}"
+            <div class="bw-pie-legend-item" id="bwPieLegendItem_${idx}" data-slice-key="${escapeHtml(s.key)}"
                  onmouseenter="NetworkBandwidthPieChart.onLegendHover(${idx})"
                  onmouseleave="NetworkBandwidthPieChart.onLegendHover(-1)"
                  onclick="NetworkBandwidthPieChart.onLegendClick(${idx})">
@@ -8406,7 +8726,7 @@
                   <span class="bw-pie-legend-name" title="${escapeHtml(s.label)}">${escapeHtml(s.label)}</span>
                 </div>
                 <div class="bw-pie-legend-metrics">
-                  <strong style="color: var(--text-primary);">${totStr}</strong>
+                  <strong class="bw-pie-legend-tot-val" style="color: var(--text-primary);">${totStr}</strong>
                   <span class="bw-pie-legend-pct">${s.percent.toFixed(1)}%</span>
                 </div>
               </div>
@@ -8414,15 +8734,15 @@
                 <div class="bw-pie-legend-bar-fill" style="width: ${Math.max(2, s.percent).toFixed(1)}%; background: ${s.color};"></div>
               </div>
               <div class="bw-pie-legend-sub">
-                <span>${s.devicesCount} ${s.devicesCount === 1 ? 'nodo' : 'nodos'} · ${escapeHtml(sampleStr)}</span>
-                <span class="mono">↓ ${dlStr} · ↑ ${ulStr}</span>
+                <span class="bw-pie-legend-sub-nodes">${s.devicesCount} ${s.devicesCount === 1 ? 'nodo' : 'nodos'} · ${escapeHtml(sampleStr)}</span>
+                <span class="bw-pie-legend-sub-io mono">↓ ${dlStr} · ↑ ${ulStr}</span>
               </div>
             </div>
           `;
         }).join('');
       },
 
-      syncHighlightDOM() {
+      syncHighlightDOM(animateReadout = false) {
         const activeIdx = this.hoveredIndex !== -1 ? this.hoveredIndex : this.pinnedIndex;
         const kickerEl = document.getElementById('bwPieCenterKicker');
         const valEl = document.getElementById('bwPieCenterVal');
@@ -8437,30 +8757,51 @@
 
         if (!kickerEl || !valEl || !subEl) return;
 
+        let targetVal = this.totalValue;
         if (activeIdx !== -1 && this.slices[activeIdx]) {
           const s = this.slices[activeIdx];
+          targetVal = s.value;
           kickerEl.textContent = s.label.replace(/^[^\w\d]+/, '').trim();
-          valEl.textContent = this.formatMetricValue(s.value);
           valEl.style.color = s.color;
           subEl.textContent = `${s.percent.toFixed(1)}% del total · ${s.devicesCount} ${s.devicesCount === 1 ? 'nodo' : 'nodos'}`;
         } else {
           kickerEl.textContent = this.effectiveMetric === 'live_speed' ? 'CAUDAL RED' : 'TRÁFICO TOTAL';
-          valEl.textContent = this.formatMetricValue(this.totalValue);
           valEl.style.color = 'var(--text-primary)';
           subEl.textContent = `${this.slices.length} ${this.slices.length === 1 ? 'segmento' : 'segmentos'}`;
+        }
+
+        if (animateReadout && this.hasD3()) {
+          const d3 = window.d3;
+          const startNum = Number(valEl.getAttribute('data-raw-val') || 0);
+          valEl.setAttribute('data-raw-val', String(targetVal));
+          const self = this;
+          d3.select(valEl)
+            .transition()
+            .duration(460)
+            .ease(d3.easeCubicOut)
+            .tween('text', function() {
+              const interp = d3.interpolateNumber(startNum, targetVal);
+              return function(t) {
+                this.textContent = self.formatMetricValue(interp(t));
+              };
+            });
+        } else {
+          valEl.setAttribute('data-raw-val', String(targetVal));
+          valEl.textContent = this.formatMetricValue(targetVal);
         }
       },
 
       onLegendHover(idx) {
+        if (this.hoveredIndex === idx) return;
         this.hoveredIndex = idx;
-        this.drawCanvas();
-        this.syncHighlightDOM();
+        this.animateHoverState(210);
+        this.syncHighlightDOM(false);
       },
 
       onLegendClick(idx) {
         this.pinnedIndex = (this.pinnedIndex === idx) ? -1 : idx;
-        this.drawCanvas();
-        this.syncHighlightDOM();
+        this.animateHoverState(240);
+        this.syncHighlightDOM(false);
       }
     };
 
