@@ -1392,6 +1392,308 @@
       margin-top: 1px;
     }
 
+    /* =========================================================================
+       GOOGLE MAPS GEOSPATIAL CONNECTIONS MONITOR (INCOMING / OUTGOING)
+       ========================================================================= */
+    .connections-map-card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(22px);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--specular-inset);
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .connections-map-kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+      gap: 10px;
+    }
+    .connections-map-kpi-cell {
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 10px 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .connections-map-kpi-label {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+    .connections-map-kpi-val {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .connections-map-kpi-sub {
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .connections-map-stage-wrap {
+      position: relative;
+      width: 100%;
+      height: 440px;
+      min-height: 440px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      background: rgba(10, 15, 28, 0.72);
+    }
+    /* Explicit height on #networkConnectionsMapCanvas to satisfy CF2 (never collapse to 0x0) */
+    #networkConnectionsMapCanvas {
+      width: 100%;
+      height: 440px;
+      min-height: 440px;
+    }
+    .connections-map-overlay-legend {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      right: 58px;
+      width: fit-content;
+      max-width: calc(100% - 72px);
+      z-index: 4;
+      background: rgba(15, 23, 42, 0.90);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 10px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: #f8fafc;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      pointer-events: auto;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+    }
+    [data-theme="light"] .connections-map-overlay-legend {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      color: #0f172a;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    }
+    .connections-map-overlay-legend.legend-bandwidth-alert-active {
+      border-color: rgba(244, 63, 94, 0.88);
+      box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.30), 0 8px 26px rgba(244, 63, 94, 0.38);
+    }
+    .bw-threshold-control-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+    .bw-threshold-input {
+      width: 64px;
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 3px 6px;
+      text-align: right;
+      outline: none;
+    }
+    [data-theme="light"] .bw-threshold-input {
+      background: rgba(255, 255, 255, 0.85);
+    }
+    .bw-threshold-input:focus {
+      border-color: var(--accent-cyan-bright);
+    }
+    .bw-threshold-select {
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 5px;
+      outline: none;
+      cursor: pointer;
+    }
+    [data-theme="light"] .bw-threshold-select {
+      background: rgba(255, 255, 255, 0.85);
+    }
+    .legend-bw-alert-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .legend-bw-alert-badge.normal {
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+    [data-theme="light"] .legend-bw-alert-badge.normal {
+      background: rgba(16, 185, 129, 0.12);
+      color: #059669;
+    }
+    .legend-bw-alert-badge.exceeded {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.95), rgba(217, 119, 6, 0.95));
+      border: 1px solid #fda4af;
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(244, 63, 94, 0.55);
+      animation: pulseLegendBwAlert 1.35s infinite ease-in-out;
+    }
+    .legend-dir-exceeded {
+      background: rgba(244, 63, 94, 0.20);
+      border: 1px solid rgba(244, 63, 94, 0.55);
+      border-radius: 6px;
+      padding: 2px 6px;
+      color: #fda4af;
+      font-weight: 700;
+    }
+    [data-theme="light"] .legend-dir-exceeded {
+      color: #be123c;
+    }
+    @keyframes pulseLegendBwAlert {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 10px rgba(244, 63, 94, 0.45);
+      }
+      50% {
+        transform: scale(1.03);
+        box-shadow: 0 0 18px rgba(244, 63, 94, 0.85);
+      }
+    }
+    .connections-map-status-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 24px;
+      text-align: center;
+      background: rgba(10, 15, 28, 0.84);
+      backdrop-filter: blur(10px);
+      color: var(--text-secondary);
+      z-index: 6;
+    }
+    [data-theme="light"] .connections-map-status-overlay {
+      background: rgba(248, 250, 252, 0.88);
+    }
+    .gmp-conn-marker {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #ffffff;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1.5px solid #38bdf8;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease;
+      white-space: nowrap;
+    }
+    .gmp-conn-marker:hover {
+      transform: scale(1.08);
+      z-index: 20;
+    }
+    .gmp-conn-marker.server-host {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(37, 99, 235, 0.95));
+      border-color: #bae6fd;
+      padding: 5px 10px;
+      font-size: 11px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.28), 0 6px 16px rgba(0, 0, 0, 0.5);
+    }
+    .gmp-conn-marker.incoming {
+      border-color: #10B981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22), 0 4px 12px rgba(0, 0, 0, 0.45);
+    }
+    .gmp-conn-marker.outgoing {
+      border-color: #06B6D4;
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.22), 0 4px 12px rgba(0, 0, 0, 0.45);
+    }
+    .gmp-conn-marker.blocked {
+      border-color: #F43F5E;
+      box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.24), 0 4px 12px rgba(0, 0, 0, 0.45);
+    }
+    .conn-table-wrap {
+      max-height: 290px;
+      overflow-y: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      background: var(--bg-surface-inset);
+    }
+    .conn-row-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .conn-row-item:last-child {
+      border-bottom: none;
+    }
+    .conn-row-item:hover {
+      background: rgba(56, 189, 248, 0.08);
+    }
+    .conn-dir-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .conn-dir-pill.incoming {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .conn-dir-pill.outgoing {
+      background: rgba(6, 182, 212, 0.15);
+      color: #06B6D4;
+      border: 1px solid rgba(6, 182, 212, 0.35);
+    }
+    .conn-dir-pill.blocked {
+      background: rgba(244, 63, 94, 0.15);
+      color: #F43F5E;
+      border: 1px solid rgba(244, 63, 94, 0.35);
+    }
+
     /* Interactive Segmented Filter Controls (Apple iOS Style) */
     .segmented-control {
       display: inline-flex;
@@ -2622,6 +2924,91 @@
             </div>
             <div class="nic-grid" id="activeNicsGrid">
               <div class="nic-card hw-detecting">Detectando interfaces de red del sistema...</div>
+            </div>
+          </div>
+
+          <!-- Geospatial Map of Incoming & Outgoing Network Connections (Google Maps Platform) -->
+          <div class="section-block">
+            <div class="section-header-bar" style="flex-wrap: wrap; gap: 10px;">
+              <div>
+                <div class="section-title">Mapa Geoespacial de Conexiones Entrantes y Salientes</div>
+                <div class="section-subtitle">Inspección en vivo de sockets (<code class="mono">/proc/net/tcp</code>, <code class="mono">/proc/net/udp</code>) y rutas geodésicas con Google Maps</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <div class="bw-threshold-control-pill" title="Configura el límite de caudal entrante (RX) o saliente (TX) por tarjeta de red (NIC) para activar la alerta visual en la leyenda del mapa">
+                  <span style="font-weight: 700;">⚡ Umbral NIC:</span>
+                  <input type="number" id="nicBwThresholdInput" class="bw-threshold-input" min="0.01" step="0.5" value="5" onchange="updateNicBandwidthThresholdFromUI()" oninput="updateNicBandwidthThresholdFromUI()">
+                  <select id="nicBwThresholdUnit" class="bw-threshold-select" onchange="updateNicBandwidthThresholdFromUI()">
+                    <option value="KB">KB/s</option>
+                    <option value="MB" selected>MB/s</option>
+                  </select>
+                </div>
+                <div class="segmented-control">
+                  <button class="seg-btn active" id="fMapConnAll" onclick="setConnectionsMapFilter('all')">Todas (<span id="cntMapAll">0</span>)</button>
+                  <button class="seg-btn" id="fMapConnIn" onclick="setConnectionsMapFilter('incoming')">↓ Entrantes (<span id="cntMapIn">0</span>)</button>
+                  <button class="seg-btn" id="fMapConnOut" onclick="setConnectionsMapFilter('outgoing')">↑ Salientes (<span id="cntMapOut">0</span>)</button>
+                  <button class="seg-btn" id="fMapConnBlk" onclick="setConnectionsMapFilter('blocked')">🛡️ Bloqueadas (<span id="cntMapBlk">0</span>)</button>
+                </div>
+                <button class="seg-btn" style="background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 6px 11px;" onclick="fitConnectionsMapBounds()" title="Ajustar zoom a todas las conexiones">🌍 Encuadrar Todo</button>
+                <button class="seg-btn" style="background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 6px 11px;" onclick="focusServerNodeOnMap()" title="Centrar en el nodo del servidor">🖥️ Nodo Host</button>
+              </div>
+            </div>
+
+            <div class="connections-map-card">
+              <div class="connections-map-kpi-strip">
+                <div class="connections-map-kpi-cell">
+                  <span class="connections-map-kpi-label">Nodo Central (Servidor)</span>
+                  <span class="connections-map-kpi-val" id="mapSrvNodeIp">Detectando IP...</span>
+                  <span class="connections-map-kpi-sub" id="mapSrvNodeLoc">Resolviendo ubicación del host...</span>
+                </div>
+                <div class="connections-map-kpi-cell">
+                  <span class="connections-map-kpi-label">Conexiones Entrantes (↓ RX)</span>
+                  <span class="connections-map-kpi-val" style="color: #10B981;" id="mapKpiIncoming">0 activas</span>
+                  <span class="connections-map-kpi-sub" id="mapKpiIncomingSub">Clientes remotos y servicios</span>
+                </div>
+                <div class="connections-map-kpi-cell">
+                  <span class="connections-map-kpi-label">Conexiones Salientes (↑ TX)</span>
+                  <span class="connections-map-kpi-val" style="color: #06B6D4;" id="mapKpiOutgoing">0 activas</span>
+                  <span class="connections-map-kpi-sub" id="mapKpiOutgoingSub">Endpoints externos y DNS</span>
+                </div>
+                <div class="connections-map-kpi-cell">
+                  <span class="connections-map-kpi-label">Defensa IPS / GeoIP</span>
+                  <span class="connections-map-kpi-val" style="color: #F43F5E;" id="mapKpiBlocked">0 bloqueadas</span>
+                  <span class="connections-map-kpi-sub" id="mapKpiCountries">0 países detectados</span>
+                </div>
+              </div>
+
+              <div class="connections-map-stage-wrap">
+                <div id="networkConnectionsMapCanvas"></div>
+                <div class="connections-map-status-overlay" id="networkConnectionsMapStatus">
+                  <div style="font-size: 24px;">🗺️</div>
+                  <div style="font-weight: 700; color: var(--text-primary); font-size: 14px;" id="networkConnectionsMapStatusTitle">Inicializando Mapa Geoespacial de Red...</div>
+                  <div style="font-size: 12px; max-width: 440px;" id="networkConnectionsMapStatusDesc">Cargando Google Maps Platform y trazando conexiones entrantes y salientes en tiempo real.</div>
+                </div>
+                <div class="connections-map-overlay-legend" id="networkConnectionsMapLegend">
+                  <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: #38bdf8; display: inline-block; box-shadow: 0 0 6px #38bdf8;"></span> Nodo Host</span>
+                  <span id="mapLegendItemIncoming" style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: #10B981; display: inline-block;"></span> ↓ Conexión Entrante</span>
+                  <span id="mapLegendItemOutgoing" style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: #06B6D4; display: inline-block;"></span> ↑ Conexión Saliente</span>
+                  <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: #F43F5E; display: inline-block;"></span> 🛡️ IP Bloqueada (IPS)</span>
+                  <span class="legend-bw-alert-badge normal" id="mapLegendBandwidthAlert" onclick="const inp=document.getElementById('nicBwThresholdInput'); if(inp){inp.focus(); inp.select();}" title="Pulsa para ajustar el umbral de alerta de caudal de red">
+                    <span id="mapLegendBandwidthAlertIcon">⚡</span>
+                    <span id="mapLegendBandwidthAlertText">Umbral NIC: Normal (&lt; 5.0 MB/s)</span>
+                  </span>
+                  <span style="font-family: var(--font-mono); font-size: 10px; opacity: 0.8;">Google Maps</span>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap;">
+                  <span style="font-size: 12px; font-weight: 700; color: var(--text-secondary);">Detalle de Flujos y Sockets Geolocalizados (Pulsa una fila para enfocar en el mapa)</span>
+                  <span class="mono" style="font-size: 11px; color: var(--text-muted);" id="mapConnTableMeta">Sincronizando sockets...</span>
+                </div>
+                <div class="conn-table-wrap" id="networkConnectionsTableList">
+                  <div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 20px;">
+                    Sondeando conexiones entrantes y salientes del kernel...
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -5775,8 +6162,9 @@
               const isDataCover = nicLogo.isCustom && nicLogo.url.startsWith('data:image/');
               const nicTitle = `Interfaz ${nic.name} (${nic.ip || 'Activa'})`;
               const nicPeak = NicBandwidthStorageManager.getPeak(nic.name);
+              const nicExceed = BandwidthThresholdMonitor.checkNic(nic);
               return `
-                <div class="nic-card">
+                <div class="nic-card" style="${nicExceed.exceeded ? 'border-color: rgba(244, 63, 94, 0.72); box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.25);' : ''}">
                   <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                     <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
                       <div class="nic-logo-box interactive-logo" onclick="openLogoPickerModal('${escapeHtml(nicLogo.key)}', '${escapeHtml(nicTitle)}', '${escapeHtml(nicLogo.query)}', '${escapeHtml(nicLogo.url)}')" title="Haz clic para cambiar el logo de la interfaz ${escapeHtml(nic.name)}">
@@ -5791,7 +6179,8 @@
                         <div style="font-size: 11px; color: var(--text-muted);">Adaptador de Red del Sistema</div>
                       </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                      ${nicExceed.exceeded ? `<span class="adw-badge mono" style="background: rgba(244, 63, 94, 0.18); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.45);">⚠️ Supera umbral (${nicExceed.dirLabel})</span>` : ''}
                       <span class="adw-badge badge-blue mono">${nic.speed_mbps ? nic.speed_mbps + ' Mbps' : 'Activa'}</span>
                       <button class="action-btn" style="height: 26px; padding: 0 8px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(nicLogo.key)}', '${escapeHtml(nicTitle)}', '${escapeHtml(nicLogo.query)}', '${escapeHtml(nicLogo.url)}')" title="Cambiar logo de interfaz">🖼️</button>
                     </div>
@@ -5850,6 +6239,9 @@
             });
           }
         }
+
+        // Render Google Maps Geospatial Incoming & Outgoing Connections
+        NetworkConnectionsMapEngine.renderFromMetrics(latestMetrics);
 
         // Render Connected Network Clients with Automatic Brand/Device Logo & Local File Override
         const clients = latestMetrics.wifi_clients || [];
@@ -6456,6 +6848,10 @@
         const sec = data.security || {};
         const auth = data.auth_status || {};
 
+        if (data.maps_api_key && !window.__VITE_GOOGLE_MAPS_API_KEY__) {
+          window.__VITE_GOOGLE_MAPS_API_KEY__ = data.maps_api_key;
+        }
+
         if (data.version_info) {
           latestVersionInfo = data.version_info;
           renderVersionInfo(data.version_info);
@@ -6473,6 +6869,9 @@
             NicBandwidthStorageManager.recordLiveSample(nic.name, nic.rx_bytes_sec, nic.tx_bytes_sec);
           }
         }
+
+        // Evaluate per-NIC incoming/outgoing bandwidth against configurable threshold and update map legend alert
+        BandwidthThresholdMonitor.evaluateAndRender(netInterfaces);
 
         // 1. Sidebar Counters & Host Info
         const cpuPct = Number(cpu.usage_percent || 0);
@@ -6893,6 +7292,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       NicBandwidthStorageManager.init();
+      BandwidthThresholdMonitor.init();
       applyTitaniumTheme(currentTitaniumTheme);
       initTouchSwipeNavigation();
 
@@ -6948,6 +7348,626 @@
         });
       }
     });
+
+    // =========================================================================
+    // CONFIGURABLE NIC BANDWIDTH THRESHOLD MONITOR & MAP LEGEND ALERT ENGINE
+    // =========================================================================
+    const BandwidthThresholdMonitor = {
+      STORAGE_KEY: 'recursos_nic_bw_threshold_cfg',
+      _value: 5,
+      _unit: 'MB', // 'KB' or 'MB'
+      _lastState: { exceeded: false, rxExceeded: false, txExceeded: false, details: [] },
+
+      init() {
+        try {
+          const raw = localStorage.getItem(this.STORAGE_KEY) || sessionStorage.getItem(this.STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed.value === 'number' && parsed.value > 0) {
+              this._value = parsed.value;
+            }
+            if (parsed && (parsed.unit === 'KB' || parsed.unit === 'MB')) {
+              this._unit = parsed.unit;
+            }
+          }
+        } catch (e) {}
+        this.syncInputs();
+      },
+
+      syncInputs() {
+        const inp = document.getElementById('nicBwThresholdInput');
+        const sel = document.getElementById('nicBwThresholdUnit');
+        if (inp && document.activeElement !== inp) inp.value = String(this._value);
+        if (sel && document.activeElement !== sel) sel.value = this._unit;
+      },
+
+      saveConfig(val, unit) {
+        const num = parseFloat(val);
+        if (!isNaN(num) && num > 0) {
+          this._value = num;
+        }
+        if (unit === 'KB' || unit === 'MB') {
+          this._unit = unit;
+        }
+        const payload = JSON.stringify({ value: this._value, unit: this._unit });
+        try {
+          localStorage.setItem(this.STORAGE_KEY, payload);
+        } catch (e) {
+          try { sessionStorage.setItem(this.STORAGE_KEY, payload); } catch (err) {}
+        }
+      },
+
+      getLimitBytesSec() {
+        const mult = this._unit === 'MB' ? 1024 * 1024 : 1024;
+        return this._value * mult;
+      },
+
+      getFormattedLimit() {
+        return `${this._value} ${this._unit}/s`;
+      },
+
+      checkNic(nic) {
+        if (!nic) return { exceeded: false, rxExceeded: false, txExceeded: false, dirLabel: '' };
+        const limit = this.getLimitBytesSec();
+        const rx = Number(nic.rx_bytes_sec || 0);
+        const tx = Number(nic.tx_bytes_sec || 0);
+        const rxExceeded = rx > limit;
+        const txExceeded = tx > limit;
+        const parts = [];
+        if (rxExceeded) parts.push(`↓ ${formatSpeed(rx)}`);
+        if (txExceeded) parts.push(`↑ ${formatSpeed(tx)}`);
+        return {
+          exceeded: rxExceeded || txExceeded,
+          rxExceeded,
+          txExceeded,
+          dirLabel: parts.join(' · ')
+        };
+      },
+
+      evaluateAndRender(netInterfaces) {
+        const list = Array.isArray(netInterfaces) ? netInterfaces : [];
+        let anyRxExceeded = false;
+        let anyTxExceeded = false;
+        const details = [];
+
+        for (const nic of list) {
+          if (!nic || !nic.name) continue;
+          const res = this.checkNic(nic);
+          if (res.exceeded) {
+            if (res.rxExceeded) anyRxExceeded = true;
+            if (res.txExceeded) anyTxExceeded = true;
+            details.push(`${nic.name} (${res.dirLabel})`);
+          }
+        }
+
+        const exceeded = details.length > 0;
+        this._lastState = { exceeded, rxExceeded: anyRxExceeded, txExceeded: anyTxExceeded, details };
+
+        const legendBox = document.getElementById('networkConnectionsMapLegend');
+        const badgeEl = document.getElementById('mapLegendBandwidthAlert');
+        const iconEl = document.getElementById('mapLegendBandwidthAlertIcon');
+        const textEl = document.getElementById('mapLegendBandwidthAlertText');
+        const inItem = document.getElementById('mapLegendItemIncoming');
+        const outItem = document.getElementById('mapLegendItemOutgoing');
+
+        if (legendBox) {
+          legendBox.classList.toggle('legend-bandwidth-alert-active', exceeded);
+        }
+        if (inItem) {
+          inItem.classList.toggle('legend-dir-exceeded', anyRxExceeded);
+        }
+        if (outItem) {
+          outItem.classList.toggle('legend-dir-exceeded', anyTxExceeded);
+        }
+        if (badgeEl && iconEl && textEl) {
+          badgeEl.classList.toggle('exceeded', exceeded);
+          badgeEl.classList.toggle('normal', !exceeded);
+          if (exceeded) {
+            iconEl.textContent = '⚠️';
+            textEl.textContent = `ALERTA CAUDAL NIC: ${details.join(' | ')} > ${this.getFormattedLimit()}`;
+          } else {
+            iconEl.textContent = '⚡';
+            textEl.textContent = `Umbral NIC: Normal (< ${this.getFormattedLimit()})`;
+          }
+        }
+      }
+    };
+
+    function updateNicBandwidthThresholdFromUI() {
+      const inp = document.getElementById('nicBwThresholdInput');
+      const sel = document.getElementById('nicBwThresholdUnit');
+      if (!inp || !sel) return;
+      BandwidthThresholdMonitor.saveConfig(inp.value, sel.value);
+      if (latestMetrics && latestMetrics.net) {
+        const netInterfaces = Array.isArray(latestMetrics.net.interfaces_list)
+          ? latestMetrics.net.interfaces_list
+          : (latestMetrics.net.interfaces ? Object.values(latestMetrics.net.interfaces) : []);
+        BandwidthThresholdMonitor.evaluateAndRender(netInterfaces);
+        if (activeView === 'network') {
+          renderActiveView();
+        }
+      }
+    }
+
+    // =========================================================================
+    // GOOGLE MAPS PLATFORM GEOSPATIAL CONNECTIONS ENGINE (INCOMING & OUTGOING)
+    // =========================================================================
+    let connectionsMapFilter = 'all';
+
+    function setConnectionsMapFilter(filter) {
+      connectionsMapFilter = filter;
+      const mapBtns = {
+        all: 'fMapConnAll',
+        incoming: 'fMapConnIn',
+        outgoing: 'fMapConnOut',
+        blocked: 'fMapConnBlk'
+      };
+      Object.entries(mapBtns).forEach(([k, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', k === filter);
+      });
+      if (latestMetrics) {
+        NetworkConnectionsMapEngine.renderFromMetrics(latestMetrics, true);
+      }
+    }
+
+    function fitConnectionsMapBounds() {
+      NetworkConnectionsMapEngine.fitAllBounds();
+    }
+
+    function focusServerNodeOnMap() {
+      NetworkConnectionsMapEngine.focusServerNode();
+    }
+
+    function focusConnectionOnMap(connId) {
+      NetworkConnectionsMapEngine.focusConnectionById(connId);
+    }
+
+    const NetworkConnectionsMapEngine = {
+      _map: null,
+      _infoWindow: null,
+      _MapClass: null,
+      _InfoWindowClass: null,
+      _PolylineClass: null,
+      _LatLngBoundsClass: null,
+      _AdvancedMarkerClass: null,
+      _isBootstrapping: false,
+      _isReady: false,
+      _hasError: false,
+      _lastSignature: '',
+      _markersMap: new Map(),
+      _serverMarker: null,
+      _polylines: [],
+      _hasInitialFit: false,
+      _lastConnData: null,
+
+      getApiKey() {
+        return (window.__VITE_GOOGLE_MAPS_API_KEY__ || '').trim();
+      },
+
+      setStatusOverlay(visible, title, desc) {
+        const overlay = document.getElementById('networkConnectionsMapStatus');
+        if (!overlay) return;
+        overlay.style.display = visible ? 'flex' : 'none';
+        if (title) {
+          const tEl = document.getElementById('networkConnectionsMapStatusTitle');
+          if (tEl) tEl.textContent = title;
+        }
+        if (desc) {
+          const dEl = document.getElementById('networkConnectionsMapStatusDesc');
+          if (dEl) dEl.textContent = desc;
+        }
+      },
+
+      loadBootstrap(apiKey) {
+        if (window.google && window.google.maps && typeof window.google.maps.importLibrary === 'function') {
+          return Promise.resolve();
+        }
+        return new Promise((resolve, reject) => {
+          try {
+            window.gm_authFailure = () => {
+              console.error('Google Maps authentication or configuration error.');
+              this._hasError = true;
+              this.setStatusOverlay(
+                true,
+                'No se pudo autenticar Google Maps Platform',
+                'Verifica que la clave VITE_GOOGLE_MAPS_API_KEY tenga habilitada Maps JavaScript API y permisos de referente HTTP.'
+              );
+            };
+            // Official Google Maps JavaScript API Dynamic Library Import Bootstrap
+            (g => {
+              var h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__", m = document, b = window;
+              b = b[c] || (b[c] = {});
+              var d = b.maps || (b.maps = {}), r = new Set, e = new URLSearchParams,
+                u = () => h || (h = new Promise(async (f, n) => {
+                  await (a = m.createElement("script"));
+                  e.set("libraries", [...r] + "");
+                  for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]);
+                  e.set("callback", c + ".maps." + q);
+                  a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
+                  d[q] = f;
+                  a.onerror = () => h = n(Error(p + " could not load."));
+                  a.nonce = m.querySelector("script[nonce]")?.nonce || "";
+                  m.head.append(a);
+                }));
+              d[l] ? console.warn(p + " only loads once.") : d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n));
+            })({
+              key: apiKey,
+              v: "weekly"
+            });
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        });
+      },
+
+      async ensureInitialized(srvNode) {
+        if (this._isReady && this._map) return true;
+        if (this._isBootstrapping || this._hasError) return false;
+
+        const apiKey = this.getApiKey();
+        if (!apiKey) {
+          this.setStatusOverlay(
+            true,
+            'Esperando configuración de VITE_GOOGLE_MAPS_API_KEY...',
+            'Configura la variable de entorno VITE_GOOGLE_MAPS_API_KEY para activar el mapa interactivo de conexiones.'
+          );
+          return false;
+        }
+
+        const container = document.getElementById('networkConnectionsMapCanvas');
+        if (!container) return false;
+
+        this._isBootstrapping = true;
+        try {
+          await this.loadBootstrap(apiKey);
+          const [mapsLib, markerLib] = await Promise.all([
+            google.maps.importLibrary('maps'),
+            google.maps.importLibrary('marker')
+          ]);
+
+          this._MapClass = mapsLib.Map;
+          this._InfoWindowClass = mapsLib.InfoWindow;
+          this._PolylineClass = mapsLib.Polyline;
+          this._LatLngBoundsClass = mapsLib.LatLngBounds;
+          this._AdvancedMarkerClass = markerLib.AdvancedMarkerElement;
+
+          const initLat = (srvNode && typeof srvNode.lat === 'number') ? srvNode.lat : 40.4168;
+          const initLng = (srvNode && typeof srvNode.lng === 'number') ? srvNode.lng : -3.7038;
+
+          this._map = new this._MapClass(container, {
+            center: { lat: initLat, lng: initLng },
+            zoom: 3,
+            mapId: 'DEMO_MAP_ID', // Mandatory for AdvancedMarkerElement (CF9)
+            renderingType: 'VECTOR',
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+            zoomControl: true,
+            internalUsageAttributionIds: ['gmp_mcp_codeassist_v1_aistudio']
+          });
+
+          this._infoWindow = new this._InfoWindowClass({
+            maxWidth: 360
+          });
+
+          this._isReady = true;
+          this._isBootstrapping = false;
+          this.setStatusOverlay(false);
+          return true;
+        } catch (err) {
+          console.error('Error initializing Google Maps JavaScript API:', err);
+          this._isBootstrapping = false;
+          this._hasError = true;
+          this.setStatusOverlay(
+            true,
+            'Error al cargar Google Maps Platform',
+            'No se pudo inicializar el mapa de conexiones. Comprueba tu conexión de red o los permisos de la clave de API.'
+          );
+          return false;
+        }
+      },
+
+      clearMapOverlays() {
+        if (this._serverMarker) {
+          this._serverMarker.map = null;
+          this._serverMarker = null;
+        }
+        for (const m of this._markersMap.values()) {
+          m.marker.map = null;
+        }
+        this._markersMap.clear();
+        for (const line of this._polylines) {
+          line.setMap(null);
+        }
+        this._polylines = [];
+      },
+
+      buildInfoWindowNode(item, isServerHost = false) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #0f172a; padding: 4px 6px; min-width: 220px; line-height: 1.45;';
+
+        if (isServerHost) {
+          wrap.innerHTML = `
+            <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin-bottom: 4px;">
+              🖥️ NODO CENTRAL DEL SERVIDOR
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+              ${escapeHtml(item.org || 'Servidor Local')}
+            </div>
+            <div style="font-size: 12px; color: #334155; font-family: monospace; margin-bottom: 6px;">
+              IP LAN: <strong>${escapeHtml(item.ip || '--')}</strong><br>
+              IP WAN: <strong>${escapeHtml(item.public_ip || '--')}</strong>
+            </div>
+            <div style="font-size: 12px; color: #475569;">
+              📍 ${escapeHtml(item.city || 'Servidor')}${item.country ? ', ' + escapeHtml(item.country) : ''}
+            </div>
+            <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">
+              Google Maps
+            </div>
+          `;
+          return wrap;
+        }
+
+        const dirLabel = item.direction === 'incoming'
+          ? '↓ CONEXIÓN ENTRANTE (RX)'
+          : (item.direction === 'blocked' ? '🛡️ IP BLOQUEADA (IPS)' : '↑ CONEXIÓN SALIENTE (TX)');
+        const dirColor = item.direction === 'incoming'
+          ? '#059669'
+          : (item.direction === 'blocked' ? '#e11d48' : '#0891b2');
+
+        wrap.innerHTML = `
+          <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${dirColor}; margin-bottom: 4px;">
+            ${dirLabel} · ${escapeHtml(item.protocol || 'TCP')}
+          </div>
+          <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+            ${escapeHtml(item.service || 'Socket Activo')}
+          </div>
+          <div style="font-size: 11.5px; color: #1e293b; font-family: monospace; background: #f1f5f9; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px;">
+            Remoto: <strong>${escapeHtml(item.remote_ip)}${item.remote_port ? ':' + item.remote_port : ''}</strong><br>
+            Local: <strong>${escapeHtml(item.local_ip)}:${item.local_port}</strong> (${escapeHtml(item.state || 'ACTIVE')})
+          </div>
+          <div style="font-size: 11.5px; color: #334155;">
+            📍 <strong>${escapeHtml(item.city || 'Nodo Remoto')}${item.country ? ', ' + escapeHtml(item.country) : ''}</strong><br>
+            🏢 ${escapeHtml(item.isp || 'Proveedor de Red')}${item.asn ? ' · ' + escapeHtml(item.asn) : ''}
+          </div>
+          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">
+            Google Maps
+          </div>
+        `;
+        return wrap;
+      },
+
+      async renderFromMetrics(metricsData, forceRedraw = false) {
+        if (!metricsData || !metricsData.net) return;
+        const connMap = metricsData.net.connections_map;
+        if (!connMap) return;
+
+        this._lastConnData = connMap;
+        const srv = connMap.server_node || {};
+        const allConns = Array.isArray(connMap.connections) ? connMap.connections : [];
+        const summary = connMap.summary || {
+          total: allConns.length,
+          incoming: allConns.filter(c => c.direction === 'incoming').length,
+          outgoing: allConns.filter(c => c.direction === 'outgoing').length,
+          blocked: allConns.filter(c => c.direction === 'blocked').length
+        };
+
+        // Update filter badges & KPI strip
+        setText('cntMapAll', summary.total || 0);
+        setText('cntMapIn', summary.incoming || 0);
+        setText('cntMapOut', summary.outgoing || 0);
+        setText('cntMapBlk', summary.blocked || 0);
+
+        setText('mapSrvNodeIp', `${srv.public_ip || srv.ip || '127.0.0.1'}`);
+        setText('mapSrvNodeLoc', `${srv.city || 'Host Local'}${srv.country ? ', ' + srv.country : ''} · ${srv.org || ''}`);
+        setText('mapKpiIncoming', `${summary.incoming || 0} flujos entrantes`);
+        const inSvcs = [...new Set(allConns.filter(c => c.direction === 'incoming').map(c => c.service))].slice(0, 2).join(', ');
+        setText('mapKpiIncomingSub', inSvcs || 'Escuchando en puertos del host');
+
+        setText('mapKpiOutgoing', `${summary.outgoing || 0} flujos salientes`);
+        const outSvcs = [...new Set(allConns.filter(c => c.direction === 'outgoing').map(c => c.service))].slice(0, 2).join(', ');
+        setText('mapKpiOutgoingSub', outSvcs || 'Sincronización externa y DNS');
+
+        setText('mapKpiBlocked', `${summary.blocked || 0} IPs bloqueadas`);
+        const uniqueCountries = new Set(allConns.map(c => c.country).filter(Boolean)).size;
+        setText('mapKpiCountries', `${uniqueCountries || 1} países / regiones en mapa`);
+
+        const filteredConns = allConns.filter(c => {
+          if (connectionsMapFilter === 'all') return true;
+          return c.direction === connectionsMapFilter;
+        });
+
+        setText('mapConnTableMeta', `Mostrando ${filteredConns.length} de ${allConns.length} conexiones geolocalizadas`);
+
+        // Render Interactive Connections Table
+        const tableEl = document.getElementById('networkConnectionsTableList');
+        if (tableEl) {
+          if (filteredConns.length === 0) {
+            tableEl.innerHTML = `<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 22px;">No hay conexiones ${connectionsMapFilter === 'all' ? 'activas' : 'en este filtro'} en este instante.</div>`;
+          } else {
+            tableEl.innerHTML = filteredConns.map(c => {
+              const dirIcon = c.direction === 'incoming' ? '↓ Entrante' : (c.direction === 'blocked' ? '🛡️ Bloqueada' : '↑ Saliente');
+              const locText = `${c.city || 'Red'}${c.country ? ', ' + c.country : ''}`;
+              return `
+                <div class="conn-row-item" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
+                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                    <span class="conn-dir-pill ${escapeHtml(c.direction)}">${dirIcon}</span>
+                    <div style="min-width: 0;">
+                      <div style="font-weight: 700; font-size: 12.5px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <span class="mono">${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
+                        <span style="color: var(--text-muted); font-weight: 400;">→</span>
+                        <span class="mono" style="color: var(--accent-cyan-bright);">:${c.local_port}</span>
+                        <span class="adw-badge" style="font-size: 10px; padding: 1px 6px;">${escapeHtml(c.service)}</span>
+                      </div>
+                      <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        📍 ${escapeHtml(locText)} · ${escapeHtml(c.isp || 'Red Externa')} ${c.asn ? '(' + escapeHtml(c.asn) + ')' : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div style="text-align: right; flex-shrink: 0;">
+                    <div class="mono" style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">${escapeHtml(c.protocol)} · ${escapeHtml(c.state)}</div>
+                    <div class="mono" style="font-size: 10px; color: var(--text-muted);">${Number(c.lat).toFixed(2)}°, ${Number(c.lng).toFixed(2)}°</div>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+        }
+
+        // Only initialize/update Google Map canvas when the Network view is active
+        if (activeView !== 'network') return;
+
+        const ready = await this.ensureInitialized(srv);
+        if (!ready || !this._map) return;
+
+        const sig = `${connectionsMapFilter}|${srv.lat},${srv.lng}|` + filteredConns.map(c => `${c.id}:${c.lat},${c.lng}:${c.state}`).join(';');
+        if (!forceRedraw && sig === this._lastSignature) return;
+        this._lastSignature = sig;
+
+        this.clearMapOverlays();
+
+        const srvPos = {
+          lat: typeof srv.lat === 'number' ? srv.lat : 40.4168,
+          lng: typeof srv.lng === 'number' ? srv.lng : -3.7038
+        };
+
+        // 1. Create Central Server Host AdvancedMarkerElement (CF7: append custom HTML element)
+        const srvBadge = document.createElement('div');
+        srvBadge.className = 'gmp-conn-marker server-host';
+        srvBadge.innerHTML = `<span>🖥️</span><span>Host (${escapeHtml(srv.city || 'Servidor')})</span>`;
+
+        const srvMarker = new this._AdvancedMarkerClass({
+          map: this._map,
+          position: srvPos,
+          title: `Nodo Servidor (${srv.public_ip || srv.ip || 'Host'})`
+        });
+        srvMarker.append(srvBadge);
+        srvBadge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this._infoWindow.setContent(this.buildInfoWindowNode(srv, true));
+          this._infoWindow.open({ anchor: srvMarker, map: this._map });
+        });
+        this._serverMarker = srvMarker;
+
+        // 2. Create Remote Connection AdvancedMarkers & Geodesic Polylines
+        for (const conn of filteredConns) {
+          if (typeof conn.lat !== 'number' || typeof conn.lng !== 'number') continue;
+          const remPos = { lat: conn.lat, lng: conn.lng };
+
+          const badge = document.createElement('div');
+          badge.className = `gmp-conn-marker ${conn.direction}`;
+          const arrowChar = conn.direction === 'incoming' ? '↓' : (conn.direction === 'blocked' ? '🛡️' : '↑');
+          badge.innerHTML = `<span>${arrowChar}</span><span>${escapeHtml(conn.remote_ip)}</span>`;
+
+          const marker = new this._AdvancedMarkerClass({
+            map: this._map,
+            position: remPos,
+            title: `${conn.service} (${conn.remote_ip})`
+          });
+          marker.append(badge);
+
+          const openConnPopup = () => {
+            this._infoWindow.setContent(this.buildInfoWindowNode(conn, false));
+            this._infoWindow.open({ anchor: marker, map: this._map });
+          };
+          badge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openConnPopup();
+          });
+
+          this._markersMap.set(conn.id, { marker, conn, openConnPopup });
+
+          // Geodesic Polyline with hexadecimal HTML color (strictly adhering to add-shape-line-map.md)
+          const strokeHex = conn.direction === 'incoming'
+            ? '#10B981'
+            : (conn.direction === 'blocked' ? '#F43F5E' : '#06B6D4');
+
+          // Path oriented in the direction of traffic flow (Remote -> Server for incoming, Server -> Remote for outgoing)
+          const linePath = conn.direction === 'incoming' ? [remPos, srvPos] : [srvPos, remPos];
+
+          const geodesicLine = new this._PolylineClass({
+            path: linePath,
+            geodesic: true,
+            strokeColor: strokeHex,
+            strokeOpacity: 0.82,
+            strokeWeight: 2.4,
+            icons: window.google?.maps?.SymbolPath ? [
+              {
+                icon: {
+                  path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                  scale: 2.6,
+                  strokeColor: strokeHex,
+                  fillColor: strokeHex,
+                  fillOpacity: 1
+                },
+                offset: '55%'
+              }
+            ] : []
+          });
+          geodesicLine.setMap(this._map);
+          this._polylines.push(geodesicLine);
+        }
+
+        if (!this._hasInitialFit && filteredConns.length > 0) {
+          this._hasInitialFit = true;
+          this.fitAllBounds();
+        }
+      },
+
+      fitAllBounds() {
+        if (!this._map || !this._LatLngBoundsClass || !this._lastConnData) return;
+        const bounds = new this._LatLngBoundsClass();
+        const srv = this._lastConnData.server_node;
+        let count = 0;
+        if (srv && typeof srv.lat === 'number' && typeof srv.lng === 'number') {
+          bounds.extend({ lat: srv.lat, lng: srv.lng });
+          count++;
+        }
+        for (const entry of this._markersMap.values()) {
+          bounds.extend({ lat: entry.conn.lat, lng: entry.conn.lng });
+          count++;
+        }
+        if (count > 1) {
+          this._map.fitBounds(bounds, 52);
+        } else if (count === 1 && srv) {
+          this._map.panTo({ lat: srv.lat, lng: srv.lng });
+          this._map.setZoom(6);
+        }
+      },
+
+      focusServerNode() {
+        if (!this._map || !this._lastConnData || !this._lastConnData.server_node) return;
+        const srv = this._lastConnData.server_node;
+        if (typeof srv.lat === 'number' && typeof srv.lng === 'number') {
+          this._map.panTo({ lat: srv.lat, lng: srv.lng });
+          this._map.setZoom(9);
+          if (this._serverMarker && this._infoWindow) {
+            this._infoWindow.setContent(this.buildInfoWindowNode(srv, true));
+            this._infoWindow.open({ anchor: this._serverMarker, map: this._map });
+          }
+        }
+      },
+
+      focusConnectionById(connId) {
+        if (!this._map) return;
+        const item = this._markersMap.get(connId);
+        if (!item) return;
+        this._map.panTo({ lat: item.conn.lat, lng: item.conn.lng });
+        if ((this._map.getZoom() || 3) < 5) {
+          this._map.setZoom(6);
+        }
+        item.openConnPopup();
+      }
+    };
+  </script>
+  <script type="module">
+    try {
+      if (import.meta && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+        window.__VITE_GOOGLE_MAPS_API_KEY__ = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      }
+    } catch (e) {}
   </script>
 </body>
 </html>

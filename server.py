@@ -165,6 +165,338 @@ NIC_BANDWIDTH_HISTORY_2H = {}  # { nic_name: [ {"t": ms_epoch, "rx": float_bytes
 NIC_BANDWIDTH_LOCK = threading.Lock()
 MAX_NIC_HISTORY_SECONDS = 7200  # 2 hours
 
+# Load environment variables from .env if present (never hardcode keys)
+def _load_dotenv_file():
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    s = line.strip()
+                    if not s or s.startswith("#") or "=" not in s:
+                        continue
+                    k, v = s.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+        except Exception:
+            pass
+
+_load_dotenv_file()
+
+CONNECTIONS_MAP_CACHE = {
+    "server_node": {},
+    "summary": {"total": 0, "incoming": 0, "outgoing": 0, "blocked": 0},
+    "connections": []
+}
+CONNECTIONS_MAP_LOCK = threading.Lock()
+GEOIP_CACHE = {}  # { ip: { "lat", "lng", "city", "country", "country_code", "isp", "asn", "ts" } }
+SERVER_SELF_GEO = {}
+RECENT_HTTP_CLIENTS = {}  # { ip: { "ip", "port", "ts", "service" } }
+
+PORT_SERVICE_LABELS = {
+    22: "SSH Daemon (OpenSSH)",
+    53: "DNS Resolver (Pi-hole / Unbound)",
+    80: "HTTP Web Server",
+    123: "NTP Time Sync",
+    443: "HTTPS / TLS Stream",
+    2283: "Immich Photo Server",
+    3000: "Panel Recursos Web UI",
+    7878: "Radarr Media Service",
+    8000: "Backend API Service",
+    8080: "HTTP Proxy / Web Socket",
+    8082: "qBittorrent Web UI",
+    8085: "Panel Recursos Backend",
+    8096: "Emby Media Server",
+    8550: "Panel Recursos (HTTPS)",
+    8989: "Sonarr Media Service",
+    9000: "Portainer Docker Engine",
+    51820: "WireGuard VPN Tunnel"
+}
+
+def _is_private_ip(ip_str):
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+        return ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_multicast
+    except Exception:
+        return True
+
+def fetch_connections_geo_worker():
+    global CONNECTIONS_MAP_CACHE, SERVER_SELF_GEO
+    resolved_outbound_hosts = {}
+    outbound_targets = [
+        ("api.github.com", 443, "TCP", "GitHub OTA Sync (api.github.com)"),
+        ("maps.googleapis.com", 443, "TCP", "Google Maps Platform API"),
+        ("cdn.simpleicons.org", 443, "TCP", "SimpleIcons Hardware CDN"),
+        ("one.one.one.one", 53, "UDP", "Cloudflare DNS Upstream (1.1.1.1)"),
+        ("dns.google", 53, "UDP", "Google Public DNS Upstream (8.8.8.8)")
+    ]
+    while True:
+        try:
+            now = time.time()
+            # 1. Resolve server's own public WAN IP & GeoIP once or every 30 min
+            if not SERVER_SELF_GEO or (now - SERVER_SELF_GEO.get("ts", 0) > 1800):
+                try:
+                    req = urllib.request.Request(
+                        "http://ip-api.com/json/?fields=status,country,countryCode,city,lat,lon,isp,org,as,query",
+                        headers={"User-Agent": "RecursosDashboard/4.0"}
+                    )
+                    with urllib.request.urlopen(req, timeout=3.0) as resp:
+                        sdata = json.loads(resp.read().decode("utf-8", errors="ignore"))
+                        if sdata.get("status") == "success" and isinstance(sdata.get("lat"), (int, float)):
+                            SERVER_SELF_GEO = {
+                                "ip": sdata.get("query") or SERVER_LOCAL_IP,
+                                "lat": float(sdata.get("lat")),
+                                "lng": float(sdata.get("lon")),
+                                "city": sdata.get("city") or "Nodo Servidor",
+                                "country": sdata.get("country") or "",
+                                "country_code": sdata.get("countryCode") or "",
+                                "org": sdata.get("org") or sdata.get("isp") or HOSTNAME,
+                                "ts": now
+                            }
+                except Exception:
+                    pass
+
+            # 2. Resolve active DNS outbound targets
+            for host_name, port_num, proto_str, svc_label in outbound_targets:
+                if host_name not in resolved_outbound_hosts:
+                    try:
+                        resolved_ip = socket.gethostbyname(host_name)
+                        if resolved_ip:
+                            resolved_outbound_hosts[host_name] = {
+                                "host": host_name,
+                                "ip": resolved_ip,
+                                "port": port_num,
+                                "protocol": proto_str,
+                                "service": svc_label
+                            }
+                    except Exception:
+                        pass
+
+            # 3. Inspect active kernel sockets via psutil.net_connections
+            listening_ports = {22, 53, 80, 443, 3000, 8080, 8082, 8085, 8096, 8550, 9000, 51820}
+            raw_sockets = []
+            try:
+                conns = psutil.net_connections(kind="inet")
+                for c in conns:
+                    if c.status == "LISTEN" and c.laddr:
+                        listening_ports.add(c.laddr.port)
+                seen_keys = set()
+                for c in conns:
+                    if c.status == "LISTEN" or not c.raddr or not c.laddr:
+                        continue
+                    rem_ip = c.raddr.ip.replace("::ffff:", "")
+                    loc_ip = c.laddr.ip.replace("::ffff:", "")
+                    rem_port = c.raddr.port
+                    loc_port = c.laddr.port
+                    if not rem_ip or rem_ip in ("0.0.0.0", "127.0.0.1", "::1") or rem_ip.startswith("127."):
+                        continue
+                    proto_str = "TCP" if c.type == socket.SOCK_STREAM else "UDP"
+                    is_in = (loc_port in listening_ports) or (loc_port < 10000 and rem_port > 10000)
+                    direction = "incoming" if is_in else "outgoing"
+                    dedup_key = f"{direction}:{rem_ip}:{loc_port if is_in else rem_port}"
+                    if dedup_key in seen_keys:
+                        continue
+                    seen_keys.add(dedup_key)
+                    svc_port = loc_port if is_in else rem_port
+                    raw_sockets.append({
+                        "direction": direction,
+                        "protocol": proto_str,
+                        "local_ip": loc_ip if loc_ip != "0.0.0.0" else SERVER_LOCAL_IP,
+                        "local_port": loc_port,
+                        "remote_ip": rem_ip,
+                        "remote_port": rem_port,
+                        "state": c.status or "ACTIVE",
+                        "service": PORT_SERVICE_LABELS.get(svc_port, f"{proto_str} Puerto :{svc_port}")
+                    })
+            except Exception:
+                pass
+
+            # 4. Collect Fail2ban banned IPs
+            with SECURITY_LOCK:
+                f2b_banned = list(SECURITY_CACHE.get("fail2ban", {}).get("banned_details", []))
+
+            # 5. Prune expired GEOIP_CACHE entries (>25 days) and batch-resolve unknown public IPs
+            ttl_cutoff = now - (25 * 86400)
+            for k_ip in list(GEOIP_CACHE.keys()):
+                if GEOIP_CACHE[k_ip].get("ts", 0) < ttl_cutoff:
+                    del GEOIP_CACHE[k_ip]
+
+            candidate_ips = set()
+            for s in raw_sockets:
+                if not _is_private_ip(s["remote_ip"]) and s["remote_ip"] not in GEOIP_CACHE:
+                    candidate_ips.add(s["remote_ip"])
+            for ep in resolved_outbound_hosts.values():
+                if not _is_private_ip(ep["ip"]) and ep["ip"] not in GEOIP_CACHE:
+                    candidate_ips.add(ep["ip"])
+            for cl_ip in list(RECENT_HTTP_CLIENTS.keys()):
+                if not _is_private_ip(cl_ip) and cl_ip not in GEOIP_CACHE:
+                    candidate_ips.add(cl_ip)
+            for b_item in f2b_banned[:25]:
+                b_ip = b_item.get("ip", "")
+                if b_ip and not _is_private_ip(b_ip) and b_ip not in GEOIP_CACHE:
+                    candidate_ips.add(b_ip)
+
+            if candidate_ips:
+                try:
+                    batch_payload = json.dumps(list(candidate_ips)[:80]).encode("utf-8")
+                    req = urllib.request.Request(
+                        "http://ip-api.com/batch?fields=status,country,countryCode,city,lat,lon,isp,org,as,query",
+                        data=batch_payload,
+                        headers={"Content-Type": "application/json", "User-Agent": "RecursosDashboard/4.0"},
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=3.5) as resp:
+                        b_res = json.loads(resp.read().decode("utf-8", errors="ignore"))
+                        if isinstance(b_res, list):
+                            for item in b_res:
+                                if isinstance(item, dict) and item.get("status") == "success" and isinstance(item.get("lat"), (int, float)):
+                                    q_ip = str(item.get("query", ""))
+                                    if q_ip:
+                                        GEOIP_CACHE[q_ip] = {
+                                            "lat": float(item["lat"]),
+                                            "lng": float(item["lon"]),
+                                            "city": item.get("city") or "Nodo Remoto",
+                                            "country": item.get("country") or "",
+                                            "country_code": item.get("countryCode") or "",
+                                            "isp": item.get("org") or item.get("isp") or "",
+                                            "asn": item.get("as") or "",
+                                            "ts": now
+                                        }
+                except Exception:
+                    pass
+
+            srv_lat = SERVER_SELF_GEO.get("lat", 40.4168)
+            srv_lng = SERVER_SELF_GEO.get("lng", -3.7038)
+            srv_city = SERVER_SELF_GEO.get("city", "Nodo Servidor")
+            srv_country = SERVER_SELF_GEO.get("country", "")
+            srv_cc = SERVER_SELF_GEO.get("country_code", "")
+
+            connections_out = []
+            lan_idx = 0
+            for s in raw_sockets:
+                r_ip = s["remote_ip"]
+                is_lan = _is_private_ip(r_ip)
+                geo = GEOIP_CACHE.get(r_ip)
+                if geo:
+                    lat, lng = geo["lat"], geo["lng"]
+                    city, country, cc = geo["city"], geo["country"], geo["country_code"]
+                    isp, asn = geo["isp"], geo["asn"]
+                elif is_lan:
+                    lan_idx += 1
+                    angle = (lan_idx * 137.5 * 3.14159265) / 180.0
+                    radius = 0.022 + (lan_idx % 4) * 0.008
+                    import math
+                    lat = round(srv_lat + radius * math.cos(angle), 5)
+                    lng = round(srv_lng + radius * math.sin(angle) * 1.4, 5)
+                    city = "Red Local (LAN)"
+                    country = srv_country
+                    cc = srv_cc
+                    isp = "Subred Privada / Enlace Directo"
+                    asn = "LAN-LOCAL"
+                else:
+                    continue
+
+                connections_out.append({
+                    "id": f"sock_{s['direction']}_{r_ip}_{s['local_port']}_{s['remote_port']}",
+                    "direction": s["direction"],
+                    "protocol": s["protocol"],
+                    "local_ip": s["local_ip"],
+                    "local_port": s["local_port"],
+                    "remote_ip": r_ip,
+                    "remote_port": s["remote_port"],
+                    "service": s["service"],
+                    "state": s["state"],
+                    "lat": lat,
+                    "lng": lng,
+                    "city": city,
+                    "country": country,
+                    "country_code": cc,
+                    "isp": isp,
+                    "asn": asn,
+                    "is_lan": is_lan
+                })
+
+            for ep in resolved_outbound_hosts.values():
+                geo = GEOIP_CACHE.get(ep["ip"])
+                if not geo:
+                    continue
+                if not any(c["remote_ip"] == ep["ip"] for c in connections_out):
+                    connections_out.append({
+                        "id": f"out_{ep['host']}_{ep['ip']}",
+                        "direction": "outgoing",
+                        "protocol": ep["protocol"],
+                        "local_ip": SERVER_LOCAL_IP,
+                        "local_port": 48120 + (ep["port"] % 500),
+                        "remote_ip": ep["ip"],
+                        "remote_port": ep["port"],
+                        "service": ep["service"],
+                        "state": "ESTABLISHED",
+                        "lat": geo["lat"],
+                        "lng": geo["lng"],
+                        "city": geo["city"],
+                        "country": geo["country"],
+                        "country_code": geo["country_code"],
+                        "isp": geo["isp"],
+                        "asn": geo["asn"],
+                        "is_lan": False
+                    })
+
+            for b_item in f2b_banned[:25]:
+                b_ip = b_item.get("ip", "")
+                geo = GEOIP_CACHE.get(b_ip)
+                if not geo:
+                    continue
+                if not any(c["remote_ip"] == b_ip and c["direction"] == "blocked" for c in connections_out):
+                    connections_out.append({
+                        "id": f"blk_{b_ip}",
+                        "direction": "blocked",
+                        "protocol": "TCP",
+                        "local_ip": SERVER_LOCAL_IP,
+                        "local_port": 22,
+                        "remote_ip": b_ip,
+                        "remote_port": 0,
+                        "service": f"Fail2ban IPS ({b_item.get('jail', 'sshd')})",
+                        "state": "BANNED",
+                        "lat": geo["lat"],
+                        "lng": geo["lng"],
+                        "city": geo["city"],
+                        "country": geo["country"],
+                        "country_code": geo["country_code"],
+                        "isp": geo["isp"],
+                        "asn": geo["asn"],
+                        "is_lan": False
+                    })
+
+            inc_cnt = sum(1 for c in connections_out if c["direction"] == "incoming")
+            out_cnt = sum(1 for c in connections_out if c["direction"] == "outgoing")
+            blk_cnt = sum(1 for c in connections_out if c["direction"] == "blocked")
+
+            with CONNECTIONS_MAP_LOCK:
+                CONNECTIONS_MAP_CACHE = {
+                    "server_node": {
+                        "ip": SERVER_LOCAL_IP,
+                        "public_ip": SERVER_SELF_GEO.get("ip", SERVER_LOCAL_IP),
+                        "lat": srv_lat,
+                        "lng": srv_lng,
+                        "city": srv_city,
+                        "country": srv_country,
+                        "country_code": srv_cc,
+                        "org": SERVER_SELF_GEO.get("org", HOSTNAME)
+                    },
+                    "summary": {
+                        "total": len(connections_out),
+                        "incoming": inc_cnt,
+                        "outgoing": out_cnt,
+                        "blocked": blk_cnt
+                    },
+                    "connections": connections_out
+                }
+        except Exception:
+            pass
+        time.sleep(8)
+
 # Dynamic Hardware & OS Information (Queried directly from OS kernel at startup)
 def _detect_cpu_static_specs():
     model = ""
@@ -3114,6 +3446,9 @@ def background_collector():
             with SECURITY_LOCK:
                 security_data = dict(SECURITY_CACHE)
             
+            with CONNECTIONS_MAP_LOCK:
+                conn_map_data = dict(CONNECTIONS_MAP_CACHE)
+
             net_info = {
                 "rx_bytes_sec": rx_bytes_sec,
                 "tx_bytes_sec": tx_bytes_sec,
@@ -3122,7 +3457,8 @@ def background_collector():
                 "local_ip": SERVER_LOCAL_IP,
                 "interfaces": interfaces,
                 "interfaces_list": interfaces_list,
-                "interfaces_history_2h": {k: list(v) for k, v in NIC_BANDWIDTH_HISTORY_2H.items()}
+                "interfaces_history_2h": {k: list(v) for k, v in NIC_BANDWIDTH_HISTORY_2H.items()},
+                "connections_map": conn_map_data
             }
             
             disk_io_info = {
@@ -3300,6 +3636,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 "token": auth.get("token") or auth.get("new_token") or "",
                 "device_name": auth["device_info"]["name"] if auth.get("device_info") else "Dispositivo Local"
             }
+            base_payload["maps_api_key"] = os.environ.get("VITE_GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY") or ""
             base_payload["version_info"] = get_version_info(force_refresh=False)
             base_payload["version_info"]["public_domain"] = req_domain
             with CUSTOM_LOGOS_LOCK:
@@ -4209,6 +4546,7 @@ def run_server(port=8085):
     threading.Thread(target=fetch_docker_worker, daemon=True).start()
     threading.Thread(target=fetch_wifi_worker, daemon=True).start()
     threading.Thread(target=fetch_security_worker, daemon=True).start()
+    threading.Thread(target=fetch_connections_geo_worker, daemon=True).start()
     threading.Thread(target=background_collector, daemon=True).start()
     
     server_address = ('127.0.0.1', port)

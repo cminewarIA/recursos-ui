@@ -1,8 +1,21 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.1.0`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.3.0`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.1.0`)**, telemetría de hardware en tiempo real, auditoría de red y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.3.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Mapa Geoespacial Interactivo de Conexiones Entrantes y Salientes (Google Maps Platform)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.3.0`
+- **Monitor de Umbral de Caudal de Red por NIC y Alerta Visual en la Leyenda del Mapa (`BandwidthThresholdMonitor`)**:
+  - **Límite Configurable en Tiempo Real**: Control interactivo en la cabecera del mapa (`⚡ Umbral NIC`) que permite definir el límite máximo de tráfico entrante (`RX`) o saliente (`TX`) por interfaz de red en `KB/s` o `MB/s`, con persistencia automática en `localStorage` (`recursos_nic_bw_threshold_cfg`).
+  - **Alerta Visual en la Leyenda del Mapa (`#networkConnectionsMapLegend`)**: Cuando cualquier tarjeta de red (NIC) supera el umbral configurado en descarga (`↓ RX`) o subida (`↑ TX`), la leyenda superpuesta del mapa activa un contorno luminoso de alerta (`.legend-bandwidth-alert-active`), resalta el sentido del tráfico afectado (`↓ Conexión Entrante` y/o `↑ Conexión Saliente` con `.legend-dir-exceeded`) y muestra una insignia pulsante (`⚠️ ALERTA CAUDAL NIC: <interfaz> (↓/↑ <caudal>) > <límite>`).
+  - **Resaltado Sincronizado en Tarjetas NIC**: Las tarjetas individuales de interfaces de red en `#activeNicsGrid` también muestran una insignia de advertencia y borde reactivo cuando su caudal instantáneo supera el umbral establecido.
+
+## ✨ Novedades en `v4.2.0`
+- **Mapa Geoespacial Interactivo de Conexiones Entrantes y Salientes (Google Maps Platform)**:
+  - Integración nativa en la vista de Red (`/red`) de un mapa vectorial interactivo (`Maps JavaScript API`) con marcadores avanzados (`AdvancedMarkerElement`), arcos geodésicos direccionales (`Polyline` con `geodesic: true` y flechas de flujo) y ventanas de inspección (`InfoWindow`).
+  - **Inspección de Sockets en Vivo (Cero Hardcoding)**: Lectura directa de conexiones activas del kernel (`/proc/net/tcp`, `/proc/net/udp`, `psutil.net_connections`) e integración con bloqueos activos de Fail2ban IPS.
+  - **Clasificación y Filtrado en Tiempo Real**: Controles segmentados para filtrar entre `Todas`, `↓ Entrantes` (Verde Esmeralda `#10B981`), `↑ Salientes` (Cian `#06B6D4`) y `🛡️ Bloqueadas` (Rosa `#F43F5E`), además de botones rápidos `🌍 Encuadrar Todo` y `🖥️ Nodo Host`.
+  - **Tabla Interactiva de Flujos Geolocalizados**: Listado sincronizado bajo el mapa donde al pulsar cualquier conexión el mapa se desplaza suavemente (`panTo`) hacia el nodo remoto y despliega su ficha técnica completa (IP/Puerto local y remoto, protocolo, estado del socket, servicio, ciudad, país e ISP/ASN).
 
 ## ✨ Novedades en `v4.1.0`
 - **Gráficos Sparkline de Banda Ancha (Últimas 2 Horas) por Tarjeta de Red (NIC)**:

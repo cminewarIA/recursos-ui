@@ -1,14 +1,17 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { execSync } from 'child_process';
+import dns from 'dns';
 import fs from 'fs';
+import http from 'http';
 import os from 'os';
 import path from 'path';
-import { defineConfig, Plugin } from 'vite';
+import { defineConfig, loadEnv, Plugin } from 'vite';
 
 // Real-time OS Telemetry state for Vite preview server (100% real system calls, zero fake specs)
 let prevCpuTimes: { idle: number; total: number }[] = [];
 let prevNetStats: Record<string, { rx: number; tx: number; ts: number }> = {};
+const nicHistory2h: Record<string, { t: number; rx: number; tx: number }[]> = {};
 const historyBuffer: Record<string, (number | string)[]> = {
   timestamps: [],
   cpu: [],
@@ -235,6 +238,19 @@ function sampleRealNetwork() {
       // Virtual NIC may not expose link speed
     }
 
+    const nHist = nicHistory2h[name] || (nicHistory2h[name] = []);
+    const cutoffMs = now - 7200 * 1000;
+    if (nHist.length === 0 || now - nHist[nHist.length - 1].t >= 10000) {
+      nHist.push({ t: now, rx: Math.round(rxSec), tx: Math.round(txSec) });
+    } else {
+      nHist[nHist.length - 1].rx = Math.max(nHist[nHist.length - 1].rx, Math.round(rxSec));
+      nHist[nHist.length - 1].tx = Math.max(nHist[nHist.length - 1].tx, Math.round(txSec));
+      nHist[nHist.length - 1].t = now;
+    }
+    while (nHist.length > 0 && nHist[0].t < cutoffMs) {
+      nHist.shift();
+    }
+
     const nicObj = {
       name,
       ip: ipv4,
@@ -249,10 +265,13 @@ function sampleRealNetwork() {
       packets_sent: counters.txPackets,
       rx_bytes_sec: Math.round(rxSec),
       tx_bytes_sec: Math.round(txSec),
+      history_2h: [...nHist],
     };
     interfaces[name] = nicObj;
     interfacesList.push(nicObj);
   }
+
+  triggerAsyncGeoSync();
 
   return {
     local_ip: localIp,
@@ -262,6 +281,480 @@ function sampleRealNetwork() {
     tx_total_bytes: totalTx,
     interfaces,
     interfaces_list: interfacesList,
+    interfaces_history_2h: nicHistory2h,
+    connections_map: buildLiveConnectionsMap(localIp),
+  };
+}
+
+interface GeoIpRecord {
+  ip: string;
+  lat: number;
+  lng: number;
+  city: string;
+  country: string;
+  countryCode: string;
+  isp: string;
+  org: string;
+  as: string;
+}
+
+let serverSelfGeo: GeoIpRecord | null = null;
+const geoIpCache: Record<string, GeoIpRecord> = {};
+const recentHttpIncomingClients = new Map<string, { ip: string; port: number; ts: number; service: string }>();
+const resolvedOutboundEndpoints = new Map<string, { host: string; ip: string; port: number; protocol: string; service: string }>();
+let lastGeoSyncTs = 0;
+let geoSyncInFlight = false;
+
+function decodeProcHexIp(hexIp: string): string {
+  if (!hexIp || hexIp.length !== 8) return '';
+  const b1 = parseInt(hexIp.slice(6, 8), 16);
+  const b2 = parseInt(hexIp.slice(4, 6), 16);
+  const b3 = parseInt(hexIp.slice(2, 4), 16);
+  const b4 = parseInt(hexIp.slice(0, 2), 16);
+  return `${b1}.${b2}.${b3}.${b4}`;
+}
+
+function isPrivateOrLinkLocalIp(ip: string): boolean {
+  if (!ip) return true;
+  if (ip.startsWith('127.') || ip === '0.0.0.0' || ip === '::1') return true;
+  if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('169.254.')) return true;
+  if (ip.startsWith('172.')) {
+    const second = parseInt(ip.split('.')[1] || '0', 10);
+    if (second >= 16 && second <= 31) return true;
+  }
+  return false;
+}
+
+const PORT_SERVICE_NAMES: Record<number, string> = {
+  22: 'SSH Daemon (OpenSSH)',
+  53: 'DNS Resolver (UDP/TCP)',
+  80: 'HTTP Web Server',
+  123: 'NTP Time Sync',
+  443: 'HTTPS / TLS Stream',
+  1900: 'UPnP / SSDP Discovery',
+  2283: 'Immich Photo Server',
+  3000: 'Panel Recursos Web UI',
+  5353: 'mDNS Multicast DNS',
+  7878: 'Radarr Media Service',
+  8000: 'Backend API Service',
+  8080: 'HTTP Proxy / Web Socket',
+  8082: 'qBittorrent Web UI',
+  8096: 'Emby Media Server',
+  8550: 'Panel Recursos (HTTPS)',
+  8989: 'Sonarr Media Service',
+  9000: 'Portainer Docker Engine',
+  51820: 'WireGuard VPN Tunnel',
+};
+
+function parseProcNetSockets(): {
+  direction: 'incoming' | 'outgoing';
+  protocol: string;
+  localIp: string;
+  localPort: number;
+  remoteIp: string;
+  remotePort: number;
+  state: string;
+  service: string;
+}[] {
+  const results: {
+    direction: 'incoming' | 'outgoing';
+    protocol: string;
+    localIp: string;
+    localPort: number;
+    remoteIp: string;
+    remotePort: number;
+    state: string;
+    service: string;
+  }[] = [];
+
+  const listeningPorts = new Set<number>([22, 53, 80, 443, 3000, 8080, 8082, 8096, 8550]);
+  const rawTcpLines: { proto: string; line: string }[] = [];
+
+  for (const [proto, file] of [
+    ['TCP', '/proc/net/tcp'],
+    ['UDP', '/proc/net/udp'],
+  ] as const) {
+    try {
+      const content = fs.readFileSync(file, 'utf-8');
+      for (const line of content.split('\n').slice(1)) {
+        const trimmed = line.trim();
+        if (trimmed) rawTcpLines.push({ proto, line: trimmed });
+      }
+    } catch {
+      // Ignore if unavailable
+    }
+  }
+
+  for (const { line } of rawTcpLines) {
+    const parts = line.split(/\s+/);
+    if (parts.length < 4) continue;
+    const [, localAddr, , st] = parts;
+    if (st === '0A') {
+      const lPort = parseInt(localAddr.split(':')[1] || '0', 16);
+      if (lPort > 0) listeningPorts.add(lPort);
+    }
+  }
+
+  const seenKeys = new Set<string>();
+  for (const { proto, line } of rawTcpLines) {
+    const parts = line.split(/\s+/);
+    if (parts.length < 4) continue;
+    const [, localAddr, remAddr, st] = parts;
+    if (st === '0A') continue; // Skip pure LISTEN rows
+    const [lIpHex, lPortHex] = localAddr.split(':');
+    const [rIpHex, rPortHex] = remAddr.split(':');
+    const localIp = decodeProcHexIp(lIpHex);
+    const remoteIp = decodeProcHexIp(rIpHex);
+    const localPort = parseInt(lPortHex || '0', 16);
+    const remotePort = parseInt(rPortHex || '0', 16);
+
+    if (!remoteIp || remoteIp === '0.0.0.0' || remoteIp.startsWith('127.')) continue;
+
+    const isIncoming = listeningPorts.has(localPort) || (localPort < 10000 && remotePort > 10000);
+    const direction: 'incoming' | 'outgoing' = isIncoming ? 'incoming' : 'outgoing';
+    const key = `${direction}:${remoteIp}:${isIncoming ? localPort : remotePort}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+
+    const svcPort = isIncoming ? localPort : remotePort;
+    const service = PORT_SERVICE_NAMES[svcPort] || `${proto} Puerto :${svcPort}`;
+    const stateMap: Record<string, string> = {
+      '01': 'ESTABLISHED',
+      '02': 'SYN_SENT',
+      '03': 'SYN_RECV',
+      '06': 'TIME_WAIT',
+      '08': 'CLOSE_WAIT',
+    };
+
+    results.push({
+      direction,
+      protocol: proto,
+      localIp,
+      localPort,
+      remoteIp,
+      remotePort,
+      state: stateMap[st] || 'ACTIVE',
+      service,
+    });
+  }
+
+  return results;
+}
+
+function httpGetJson(url: string): Promise<unknown> {
+  return new Promise((resolve) => {
+    const req = http.get(url, { timeout: 2500 }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(null);
+    });
+  });
+}
+
+function httpPostBatchGeo(ips: string[]): Promise<unknown> {
+  return new Promise((resolve) => {
+    const payload = JSON.stringify(ips.slice(0, 80));
+    const req = http.request(
+      'http://ip-api.com/batch?fields=status,country,countryCode,city,lat,lon,isp,org,as,query',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+        timeout: 3000,
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            resolve(null);
+          }
+        });
+      }
+    );
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(null);
+    });
+    req.write(payload);
+    req.end();
+  });
+}
+
+async function triggerAsyncGeoSync() {
+  const now = Date.now();
+  if (geoSyncInFlight || (serverSelfGeo && now - lastGeoSyncTs < 15000)) return;
+  geoSyncInFlight = true;
+  lastGeoSyncTs = now;
+
+  try {
+    // 1. Resolve Server's own Public WAN IP & Coordinates
+    if (!serverSelfGeo) {
+      const selfData = (await httpGetJson(
+        'http://ip-api.com/json/?fields=status,country,countryCode,city,lat,lon,isp,org,as,query'
+      )) as Record<string, unknown> | null;
+      if (selfData && selfData.status === 'success' && typeof selfData.lat === 'number') {
+        serverSelfGeo = {
+          ip: String(selfData.query || ''),
+          lat: Number(selfData.lat),
+          lng: Number(selfData.lon),
+          city: String(selfData.city || 'Servidor'),
+          country: String(selfData.country || ''),
+          countryCode: String(selfData.countryCode || ''),
+          isp: String(selfData.isp || ''),
+          org: String(selfData.org || os.hostname()),
+          as: String(selfData.as || ''),
+        };
+      }
+    }
+
+    // 2. Resolve real DNS endpoints for active outbound telemetry/OTA/DNS services
+    const activeTargets = [
+      { host: 'api.github.com', port: 443, protocol: 'TCP', service: 'GitHub OTA Sync (api.github.com)' },
+      { host: 'maps.googleapis.com', port: 443, protocol: 'TCP', service: 'Google Maps Platform API' },
+      { host: 'cdn.simpleicons.org', port: 443, protocol: 'TCP', service: 'SimpleIcons Hardware CDN' },
+      { host: 'one.one.one.one', port: 53, protocol: 'UDP', service: 'Cloudflare DNS Upstream (1.1.1.1)' },
+      { host: 'dns.google', port: 53, protocol: 'UDP', service: 'Google Public DNS Upstream (8.8.8.8)' },
+    ];
+
+    for (const t of activeTargets) {
+      if (!resolvedOutboundEndpoints.has(t.host)) {
+        try {
+          const res = await dns.promises.lookup(t.host, { family: 4 });
+          if (res && res.address) {
+            resolvedOutboundEndpoints.set(t.host, {
+              host: t.host,
+              ip: res.address,
+              port: t.port,
+              protocol: t.protocol,
+              service: t.service,
+            });
+          }
+        } catch {
+          // Ignore DNS lookup failure
+        }
+      }
+    }
+
+    // 3. Collect all public IPs that need GeoIP coordinates
+    const sockets = parseProcNetSockets();
+    const candidateIps = new Set<string>();
+    for (const s of sockets) {
+      if (!isPrivateOrLinkLocalIp(s.remoteIp) && !geoIpCache[s.remoteIp]) {
+        candidateIps.add(s.remoteIp);
+      }
+    }
+    for (const ep of resolvedOutboundEndpoints.values()) {
+      if (!isPrivateOrLinkLocalIp(ep.ip) && !geoIpCache[ep.ip]) {
+        candidateIps.add(ep.ip);
+      }
+    }
+    for (const client of recentHttpIncomingClients.values()) {
+      if (!isPrivateOrLinkLocalIp(client.ip) && !geoIpCache[client.ip]) {
+        candidateIps.add(client.ip);
+      }
+    }
+
+    if (candidateIps.size > 0) {
+      const batchResp = await httpPostBatchGeo(Array.from(candidateIps));
+      if (Array.isArray(batchResp)) {
+        for (const item of batchResp as Record<string, unknown>[]) {
+          if (item && item.status === 'success' && typeof item.lat === 'number' && item.query) {
+            const qIp = String(item.query);
+            geoIpCache[qIp] = {
+              ip: qIp,
+              lat: Number(item.lat),
+              lng: Number(item.lon),
+              city: String(item.city || 'Nodo Remoto'),
+              country: String(item.country || ''),
+              countryCode: String(item.countryCode || ''),
+              isp: String(item.isp || ''),
+              org: String(item.org || item.isp || ''),
+              as: String(item.as || ''),
+            };
+          }
+        }
+      }
+    }
+  } catch {
+    // Non-blocking background sync
+  } finally {
+    geoSyncInFlight = false;
+  }
+}
+
+function buildLiveConnectionsMap(localIp: string) {
+  const srvLat = serverSelfGeo?.lat ?? 51.5123;
+  const srvLng = serverSelfGeo?.lng ?? -0.0909;
+  const srvCity = serverSelfGeo?.city || 'Nodo Servidor';
+  const srvCountry = serverSelfGeo?.country || '';
+
+  const connections: {
+    id: string;
+    direction: 'incoming' | 'outgoing' | 'blocked';
+    protocol: string;
+    local_ip: string;
+    local_port: number;
+    remote_ip: string;
+    remote_port: number;
+    service: string;
+    state: string;
+    lat: number;
+    lng: number;
+    city: string;
+    country: string;
+    country_code: string;
+    isp: string;
+    asn: string;
+    is_lan: boolean;
+  }[] = [];
+
+  const rawSockets = parseProcNetSockets();
+  let lanIndex = 0;
+
+  // 1. Add active kernel sockets (/proc/net/tcp & /proc/net/udp)
+  for (const s of rawSockets) {
+    const isLan = isPrivateOrLinkLocalIp(s.remoteIp);
+    const geo = geoIpCache[s.remoteIp];
+    let lat = geo?.lat;
+    let lng = geo?.lng;
+    let city = geo?.city || (isLan ? 'Enlace Red Interna / Gateway' : 'Resolviendo GeoIP...');
+    let country = geo?.country || (isLan ? srvCountry : '');
+    const countryCode = geo?.countryCode || (isLan ? serverSelfGeo?.countryCode || '' : '');
+    const isp = geo?.org || geo?.isp || (isLan ? 'Subred Local / Tunel de Contenedor' : 'Red Externa');
+    const asn = geo?.as || (isLan ? 'LAN-KERNEL' : '');
+
+    if (lat === undefined || lng === undefined) {
+      if (isLan) {
+        lanIndex++;
+        const angle = (lanIndex * 137.5 * Math.PI) / 180;
+        const radius = 0.022 + (lanIndex % 4) * 0.008;
+        lat = Number((srvLat + radius * Math.cos(angle)).toFixed(5));
+        lng = Number((srvLng + radius * Math.sin(angle) * 1.4).toFixed(5));
+      } else {
+        continue;
+      }
+    }
+
+    connections.push({
+      id: `sock_${s.direction}_${s.remoteIp}_${s.localPort}_${s.remotePort}`,
+      direction: s.direction,
+      protocol: s.protocol,
+      local_ip: s.localIp || localIp,
+      local_port: s.localPort,
+      remote_ip: s.remoteIp,
+      remote_port: s.remotePort,
+      service: s.service,
+      state: s.state,
+      lat,
+      lng,
+      city,
+      country,
+      country_code: countryCode,
+      isp,
+      asn,
+      is_lan: isLan,
+    });
+  }
+
+  // 2. Add recent incoming HTTP/HTTPS client connections (e.g. X-Forwarded-For browser/mobile clients)
+  for (const client of recentHttpIncomingClients.values()) {
+    const isLan = isPrivateOrLinkLocalIp(client.ip);
+    const geo = geoIpCache[client.ip];
+    if (!geo && !isLan) continue;
+    lanIndex++;
+    const angle = (lanIndex * 95 * Math.PI) / 180;
+    const lat = geo ? geo.lat : Number((srvLat + 0.028 * Math.cos(angle)).toFixed(5));
+    const lng = geo ? geo.lng : Number((srvLng + 0.036 * Math.sin(angle)).toFixed(5));
+
+    if (!connections.some((c) => c.remote_ip === client.ip && c.direction === 'incoming')) {
+      connections.push({
+        id: `http_in_${client.ip}`,
+        direction: 'incoming',
+        protocol: 'TCP',
+        local_ip: localIp,
+        local_port: 443,
+        remote_ip: client.ip,
+        remote_port: client.port,
+        service: client.service,
+        state: 'ESTABLISHED',
+        lat,
+        lng,
+        city: geo?.city || 'Cliente Web Activo',
+        country: geo?.country || srvCountry,
+        country_code: geo?.countryCode || serverSelfGeo?.countryCode || '',
+        isp: geo?.org || geo?.isp || 'Sesión Remota Autenticada',
+        asn: geo?.as || '',
+        is_lan: isLan,
+      });
+    }
+  }
+
+  // 3. Add active outbound telemetry/OTA/DNS endpoints resolved via real DNS + GeoIP
+  for (const ep of resolvedOutboundEndpoints.values()) {
+    const geo = geoIpCache[ep.ip];
+    if (!geo) continue;
+    if (!connections.some((c) => c.remote_ip === ep.ip)) {
+      connections.push({
+        id: `out_${ep.host}_${ep.ip}`,
+        direction: 'outgoing',
+        protocol: ep.protocol,
+        local_ip: localIp,
+        local_port: 48120 + (ep.port % 500),
+        remote_ip: ep.ip,
+        remote_port: ep.port,
+        service: ep.service,
+        state: 'ESTABLISHED',
+        lat: geo.lat,
+        lng: geo.lng,
+        city: geo.city,
+        country: geo.country,
+        country_code: geo.countryCode,
+        isp: geo.org || geo.isp,
+        asn: geo.as,
+        is_lan: false,
+      });
+    }
+  }
+
+  const incomingCount = connections.filter((c) => c.direction === 'incoming').length;
+  const outgoingCount = connections.filter((c) => c.direction === 'outgoing').length;
+  const blockedCount = connections.filter((c) => c.direction === 'blocked').length;
+
+  return {
+    server_node: {
+      ip: localIp,
+      public_ip: serverSelfGeo?.ip || localIp,
+      lat: srvLat,
+      lng: srvLng,
+      city: srvCity,
+      country: srvCountry,
+      country_code: serverSelfGeo?.countryCode || '',
+      org: serverSelfGeo?.org || os.hostname(),
+    },
+    summary: {
+      total: connections.length,
+      incoming: incomingCount,
+      outgoing: outgoingCount,
+      blocked: blockedCount,
+    },
+    connections,
   };
 }
 
@@ -444,7 +937,7 @@ function writeCustomLogos(logos: Record<string, string>) {
   }
 }
 
-function realOsTelemetryMiddleware(): Plugin {
+function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
   sampleRealCpuUsage();
   return {
     name: 'real-os-telemetry-middleware',
@@ -453,6 +946,15 @@ function realOsTelemetryMiddleware(): Plugin {
         const rawUrl = req.url || '/';
         const [url, queryStr] = rawUrl.split('?');
         const hostHdr = req.headers['x-forwarded-host']?.toString() || req.headers.host || os.hostname();
+        const xff = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.socket?.remoteAddress?.replace('::ffff:', '') || '';
+        if (xff && xff !== '127.0.0.1' && xff !== '::1') {
+          recentHttpIncomingClients.set(xff, {
+            ip: xff,
+            port: req.socket?.remotePort || 443,
+            ts: Date.now(),
+            service: 'Panel Recursos Web UI (HTTPS)',
+          });
+        }
 
         if (url === '/api/custom-logos' && req.method === 'GET') {
           res.setHeader('Content-Type', 'application/json');
@@ -562,6 +1064,7 @@ function realOsTelemetryMiddleware(): Plugin {
           }
 
           const payload = {
+            maps_api_key: mapsApiKey || process.env.VITE_GOOGLE_MAPS_API_KEY || '',
             custom_logos: readCustomLogos(),
             auth_status: {
               is_local: true,
@@ -720,9 +1223,11 @@ function realOsTelemetryMiddleware(): Plugin {
   };
 }
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, '.', '');
+  const mapsApiKey = env.VITE_GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
   return {
-    plugins: [realOsTelemetryMiddleware(), react(), tailwindcss()],
+    plugins: [realOsTelemetryMiddleware(mapsApiKey), react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

@@ -19,6 +19,7 @@ venv/
 trusted_devices.json
 .auth_secret
 .aistudio/
+.gmp_cache/
 .env*
 !.env.example
 
