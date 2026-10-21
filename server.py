@@ -3876,9 +3876,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         )
         self.send_header(
             'Content-Security-Policy',
-            f"default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com data: blob:; "
+            f"default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://maps.googleapis.com https://*.googleapis.com data: blob:; "
+            f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://maps.googleapis.com https://*.googleapis.com; "
+            f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
             f"img-src 'self' data: blob: https: http:; "
-            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com ws: wss: https://*.cminewar.duckdns.org https://*.duckdns.org; "
+            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://maps.googleapis.com https://*.googleapis.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com http://ip-api.com https://ip-api.com ws: wss: https://*.cminewar.duckdns.org https://*.duckdns.org; "
             f"frame-src 'self' https://cminewar.duckdns.org https://*.cminewar.duckdns.org https://*.duckdns.org https://*.{dom}; "
             f"frame-ancestors {csp_ancestors};"
         )
@@ -3989,6 +3991,24 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.send_security_headers()
             if auth.get("new_token"):
                 self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 1.1 CONFIGURACIÓN Y ESTADO DE MOTOR DE MAPAS (OpenStreetMap / Google Maps)
+        elif clean_path == "/api/maps/config":
+            k = os.environ.get("VITE_GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY") or ""
+            masked = f"{k[:4]}****{k[-4:]}" if len(k) > 8 else ("****" if k else "")
+            resp = json.dumps({
+                "has_key": bool(k),
+                "masked_key": masked,
+                "engine": "google" if k else "leaflet"
+            }).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
             self.send_header('Content-Length', str(len(resp)))
             self.end_headers()
             self.wfile.write(resp)
@@ -4939,6 +4959,55 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 "results": resolved_map,
                 "worker": get_geoip_worker_summary()
             }).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 10. Configuración del Motor de Mapas y Clave de API
+        elif clean_path == "/api/maps/config":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                body = json.loads(post_data) if post_data else {}
+                api_key = str(body.get("api_key", "")).strip()
+
+                env_path = os.path.join(BASE_DIR, ".env")
+                lines = []
+                found = False
+                if os.path.exists(env_path):
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        for l in f:
+                            if l.strip().startswith("VITE_GOOGLE_MAPS_API_KEY="):
+                                lines.append(f'VITE_GOOGLE_MAPS_API_KEY="{api_key}"\n')
+                                found = True
+                            else:
+                                lines.append(l)
+                if not found:
+                    lines.append(f'VITE_GOOGLE_MAPS_API_KEY="{api_key}"\n')
+
+                with open(env_path, "w", encoding="utf-8") as f:
+                    f.writelines(lines)
+
+                os.environ["VITE_GOOGLE_MAPS_API_KEY"] = api_key
+                resp = json.dumps({
+                    "success": True,
+                    "has_key": bool(api_key),
+                    "engine": "google" if api_key else "leaflet"
+                }).encode('utf-8')
+            except Exception as e:
+                resp = json.dumps({"success": False, "error": str(e)}).encode('utf-8')
+
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()

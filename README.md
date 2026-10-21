@@ -1,8 +1,20 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.7.0`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.8.0`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.7.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Mapa Geoespacial Interactivo de Conexiones Entrantes y Salientes (Google Maps Platform)**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.8.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Motor Dual de Mapa Geoespacial (OpenStreetMap / CartoDB Dark Matter 100% Gratuito y sin Clave + Google Maps Platform Opcional)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.8.0`
+- **Motor Dual de Mapa Geoespacial de Red (OpenStreetMap / Leaflet Gratuito + Google Maps Platform Opcional)**:
+  - **OpenStreetMap / CartoDB Dark Matter como Motor Predeterminado (Cero Claves, Cero Coste)**:
+    - Resuelve de forma definitiva el aviso bloqueante *"Esperando configuración de VITE_GOOGLE_MAPS_API_KEY..."* activando automáticamente el motor **Leaflet.js + CartoDB Dark Matter**.
+    - Renderiza instantáneamente todas las conexiones entrantes (verde `#10B981`), salientes (cian `#06B6D4`), IPs bloqueadas por el IPS Fail2ban (rojo `#F43F5E`) y el nodo host central sin requerir ninguna clave de API, tarjeta de crédito ni cuenta en Google Cloud.
+    - Soporte completo para líneas geodésicas direccionales, popups interactivos enriquecidos con datos de GeoIP y ajuste dinámico de encuadre (`fitBounds`).
+  - **Soporte Completo de Google Maps Platform Opcional**:
+    - Si el usuario cuenta con una clave `VITE_GOOGLE_MAPS_API_KEY`, el dashboard permite utilizar Google Maps Platform con renderizado vectorial y marcadores avanzados.
+  - **Selector y Configurador Visual en la Barra de Herramientas (`#mapEngineModal`)**:
+    - Botón interactivo `🗺️ Motor: OpenStreetMap (Gratis)` en los controles del mapa que abre un diálogo para alternar fácilmente entre proveedores de mapas e introducir la clave de API con persistencia automática en `.env` y `localStorage`.
+    - Botón de recuperación rápida en el overlay de estado para cambiar a OpenStreetMap con un solo clic si Google Maps no está autenticado.
 
 ## ✨ Novedades en `v4.7.0`
 - **Transiciones Animadas Fluidas con D3.js v7 en el Gráfico de Pastel de la Pestaña `Red` (`NetworkBandwidthPieChart`)**:
