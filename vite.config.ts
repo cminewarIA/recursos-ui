@@ -341,14 +341,139 @@ function getRealVersionPayload(hostHeader: string) {
   };
 }
 
+const CUSTOM_LOGOS_PATH = path.resolve(__dirname, 'custom_logos.json');
+
+const BRAND_CATALOG: Record<string, { label: string; domain: string; logo: string }> = {
+  ubuntu: { label: 'Ubuntu Linux', domain: 'ubuntu.com', logo: 'https://cdn.simpleicons.org/ubuntu/E95420' },
+  debian: { label: 'Debian GNU/Linux', domain: 'debian.org', logo: 'https://cdn.simpleicons.org/debian/A81D33' },
+  arch: { label: 'Arch Linux', domain: 'archlinux.org', logo: 'https://cdn.simpleicons.org/archlinux/1793D1' },
+  fedora: { label: 'Fedora Linux', domain: 'fedoraproject.org', logo: 'https://cdn.simpleicons.org/fedora/51A2DA' },
+  alpine: { label: 'Alpine Linux', domain: 'alpinelinux.org', logo: 'https://cdn.simpleicons.org/alpinelinux/0D597F' },
+  kali: { label: 'Kali Linux', domain: 'kali.org', logo: 'https://cdn.simpleicons.org/kalilinux/557C94' },
+  linuxmint: { label: 'Linux Mint', domain: 'linuxmint.com', logo: 'https://cdn.simpleicons.org/linuxmint/87CF3E' },
+  manjaro: { label: 'Manjaro', domain: 'manjaro.org', logo: 'https://cdn.simpleicons.org/manjaro/35BF5C' },
+  opensuse: { label: 'openSUSE', domain: 'opensuse.org', logo: 'https://cdn.simpleicons.org/opensuse/73BA25' },
+  redhat: { label: 'Red Hat Linux', domain: 'redhat.com', logo: 'https://cdn.simpleicons.org/redhat/EE0000' },
+  proxmox: { label: 'Proxmox VE', domain: 'proxmox.com', logo: 'https://cdn.simpleicons.org/proxmox/E57000' },
+  raspbian: { label: 'Raspberry Pi OS', domain: 'raspberrypi.com', logo: 'https://cdn.simpleicons.org/raspberrypi/A22846' },
+  linux: { label: 'Linux Kernel', domain: 'kernel.org', logo: 'https://cdn.simpleicons.org/linux/FCC624' },
+  nintendo: { label: 'Nintendo', domain: 'nintendo.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=nintendo.com' },
+  xbox: { label: 'Microsoft Xbox', domain: 'xbox.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=xbox.com' },
+  playstation: { label: 'Sony PlayStation', domain: 'playstation.com', logo: 'https://cdn.simpleicons.org/playstation/0070D1' },
+  sony: { label: 'Sony', domain: 'sony.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=sony.com' },
+  samsung: { label: 'Samsung', domain: 'samsung.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=samsung.com' },
+  xiaomi: { label: 'Xiaomi', domain: 'mi.com', logo: 'https://cdn.simpleicons.org/xiaomi/FF6900' },
+  google: { label: 'Google', domain: 'google.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=google.com' },
+  asus: { label: 'ASUS', domain: 'asus.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=asus.com' },
+  vodafone: { label: 'Vodafone', domain: 'vodafone.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=vodafone.com' },
+  synology: { label: 'Synology', domain: 'synology.com', logo: 'https://cdn.simpleicons.org/synology/B5B5B6' },
+  tplink: { label: 'TP-Link Tapo', domain: 'tp-link.com', logo: 'https://cdn.simpleicons.org/tplink/4ACBD6' },
+  espressif: { label: 'Espressif IoT', domain: 'espressif.com', logo: 'https://cdn.simpleicons.org/espressif/E7352C' },
+  tuya: { label: 'Tuya Smart', domain: 'tuya.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=tuya.com' },
+  apple: { label: 'Apple', domain: 'apple.com', logo: 'https://cdn.simpleicons.org/apple/F8FAFC' },
+  intel: { label: 'Intel', domain: 'intel.com', logo: 'https://cdn.simpleicons.org/intel/0071C5' },
+  amd: { label: 'AMD', domain: 'amd.com', logo: 'https://cdn.simpleicons.org/amd/ED1C24' },
+  nvidia: { label: 'NVIDIA', domain: 'nvidia.com', logo: 'https://cdn.simpleicons.org/nvidia/76B900' },
+  realtek: { label: 'Realtek', domain: 'realtek.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=realtek.com' },
+  microsoft: { label: 'Microsoft Windows', domain: 'microsoft.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=microsoft.com' },
+  docker: { label: 'Docker', domain: 'docker.com', logo: 'https://cdn.simpleicons.org/docker/2496ED' },
+};
+
+function readCustomLogos(): Record<string, string> {
+  try {
+    if (fs.existsSync(CUSTOM_LOGOS_PATH)) {
+      const parsed = JSON.parse(fs.readFileSync(CUSTOM_LOGOS_PATH, 'utf-8'));
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch {
+    // Ignore read errors
+  }
+  return {};
+}
+
+function writeCustomLogos(logos: Record<string, string>) {
+  try {
+    fs.writeFileSync(CUSTOM_LOGOS_PATH, JSON.stringify(logos, null, 2), 'utf-8');
+  } catch {
+    // Ignore write errors
+  }
+}
+
 function realOsTelemetryMiddleware(): Plugin {
   sampleRealCpuUsage();
   return {
     name: 'real-os-telemetry-middleware',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const url = (req.url || '/').split('?')[0];
+        const rawUrl = req.url || '/';
+        const [url, queryStr] = rawUrl.split('?');
         const hostHdr = req.headers['x-forwarded-host']?.toString() || req.headers.host || os.hostname();
+
+        if (url === '/api/custom-logos' && req.method === 'GET') {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ logos: readCustomLogos() }));
+          return;
+        }
+
+        if (url === '/api/custom-logos' && req.method === 'POST') {
+          let bodyStr = '';
+          req.on('data', (chunk) => {
+            bodyStr += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const body = JSON.parse(bodyStr || '{}');
+              const key = String(body.key || '').trim();
+              const logo = String(body.logo || '').trim();
+              const logos = readCustomLogos();
+              if (key) {
+                if (logo) logos[key] = logo;
+                else delete logos[key];
+                writeCustomLogos(logos);
+              }
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, key, logos }));
+            } catch {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'JSON inválido' }));
+            }
+          });
+          return;
+        }
+
+        if (url === '/api/logos/search') {
+          const params = new URLSearchParams(queryStr || '');
+          const q = (params.get('q') || '').trim().toLowerCase();
+          const results: { title: string; subtitle: string; logo_url: string; fallback_url: string }[] = [];
+          const seen = new Set<string>();
+          const pushItem = (title: string, subtitle: string, logoUrl: string, fallback = '') => {
+            if (!logoUrl || seen.has(logoUrl)) return;
+            seen.add(logoUrl);
+            results.push({ title, subtitle, logo_url: logoUrl, fallback_url: fallback || logoUrl });
+          };
+          for (const [k, item] of Object.entries(BRAND_CATALOG)) {
+            if (!q || k.includes(q) || item.label.toLowerCase().includes(q) || item.domain.toLowerCase().includes(q)) {
+              const gFav = `https://www.google.com/s2/favicons?sz=128&domain=${item.domain}`;
+              pushItem(item.label, `Oficial · ${item.domain}`, item.logo, gFav);
+              if (item.logo !== gFav) {
+                pushItem(`${item.label} (Google Icon)`, item.domain, gFav, item.logo);
+              }
+            }
+          }
+          if (q && q.length >= 2) {
+            const cleanSlug = q.replace(/[^a-z0-9.]/g, '');
+            if (cleanSlug.includes('.')) {
+              pushItem(`Dominio ${cleanSlug}`, 'Google Favicon S2 (128px)', `https://www.google.com/s2/favicons?sz=128&domain=${cleanSlug}`);
+            } else if (cleanSlug) {
+              pushItem(`${q} (SimpleIcons)`, `cdn.simpleicons.org/${cleanSlug}`, `https://cdn.simpleicons.org/${cleanSlug}`);
+              pushItem(`${q} (.com Google)`, `${cleanSlug}.com`, `https://www.google.com/s2/favicons?sz=128&domain=${cleanSlug}.com`);
+            }
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ query: q, results: results.slice(0, 24) }));
+          return;
+        }
 
         if (url === '/api/metrics') {
           const cpu = sampleRealCpuUsage();
@@ -365,13 +490,17 @@ function realOsTelemetryMiddleware(): Plugin {
           const uptimeStr = d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m`;
 
           let osPretty = `${os.type()} ${os.release()}`;
+          let osId = 'linux';
           try {
             const osRel = fs.readFileSync('/etc/os-release', 'utf-8');
             const match = osRel.match(/^PRETTY_NAME="?([^"\n]+)"?/m);
             if (match?.[1]) osPretty = match[1];
+            const idMatch = osRel.match(/^ID="?([^"\n]+)"?/m);
+            if (idMatch?.[1]) osId = idMatch[1].trim().toLowerCase();
           } catch {
             // Use default os.type()
           }
+          const osCatalogEntry = BRAND_CATALOG[osId] || BRAND_CATALOG.linux;
 
           const timeStr = new Date().toLocaleTimeString('es-ES');
           historyBuffer.timestamps.push(timeStr);
@@ -388,6 +517,7 @@ function realOsTelemetryMiddleware(): Plugin {
           }
 
           const payload = {
+            custom_logos: readCustomLogos(),
             auth_status: {
               is_local: true,
               is_trusted: true,
@@ -400,6 +530,9 @@ function realOsTelemetryMiddleware(): Plugin {
             system: {
               hostname: os.hostname(),
               os: osPretty,
+              os_id: osId,
+              os_domain: osCatalogEntry.domain,
+              os_logo_url: osCatalogEntry.logo,
               kernel: os.release(),
               uptime_seconds: uptimeSec,
               uptime_str: uptimeStr,
@@ -443,6 +576,10 @@ function realOsTelemetryMiddleware(): Plugin {
               mac: nic.mac || 'INTERFAZ-ACTIVA',
               band: 'Ethernet',
               conn_type: 'cable',
+              brand: osId,
+              brand_name: osPretty,
+              brand_domain: osCatalogEntry.domain,
+              auto_logo_url: osCatalogEntry.logo,
               rssi: null,
               tx_rate: nic.speed_mbps ? `${nic.speed_mbps} Mbps` : ' Enlace Activo',
               is_online: true,

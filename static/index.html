@@ -602,16 +602,69 @@
     }
 
     .server-emblem {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      background: var(--accent-cyan-soft);
-      border: 1px solid rgba(56, 189, 248, 0.3);
+      width: 52px;
+      height: 52px;
+      border-radius: 13px;
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.16), rgba(15, 21, 35, 0.92));
+      border: 1px solid rgba(56, 189, 248, 0.35);
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--accent-cyan-bright);
       flex-shrink: 0;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .server-emblem:hover {
+      transform: translateY(-1px) scale(1.03);
+      border-color: var(--accent-cyan-bright);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+    }
+
+    .server-emblem img,
+    .device-circle img,
+    .nic-logo-box img {
+      width: 72%;
+      height: 72%;
+      object-fit: contain;
+      display: block;
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+    }
+
+    .server-emblem img.custom-cover,
+    .device-circle img.custom-cover,
+    .nic-logo-box img.custom-cover {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: inherit;
+    }
+
+    .logo-edit-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(6, 9, 17, 0.78);
+      color: #F8FAFC;
+      font-size: 9.5px;
+      font-weight: 700;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      text-align: center;
+      line-height: 1.1;
+      padding: 2px;
+      pointer-events: none;
+    }
+
+    .server-emblem:hover .logo-edit-overlay,
+    .interactive-logo:hover .logo-edit-overlay {
+      opacity: 1;
     }
 
     .host-headline {
@@ -1121,23 +1174,37 @@
     .badge-amber { background: var(--accent-amber-soft); color: var(--accent-amber-bright); border: 1px solid rgba(245, 158, 11, 0.28); }
     .badge-red { background: var(--accent-rose-soft); color: var(--accent-rose-bright); border: 1px solid rgba(239, 68, 68, 0.28); }
 
-    .device-circle {
-      width: 38px;
-      height: 38px;
-      border-radius: 9px;
+    .device-circle,
+    .nic-logo-box {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+    }
+
+    .interactive-logo {
+      cursor: pointer;
+    }
+
+    .interactive-logo:hover {
+      border-color: var(--accent-cyan-bright);
+      background: var(--bg-surface-elevated);
+      transform: scale(1.05);
     }
 
     .brand-badge {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      padding: 2px 7px;
+      padding: 2px 8px;
       border-radius: 5px;
       font-size: 11px;
       font-weight: 600;
@@ -1145,7 +1212,57 @@
       background: rgba(255, 255, 255, 0.03);
       white-space: nowrap;
     }
-    .brand-logo-svg { width: 13px; height: 13px; flex-shrink: 0; }
+    .brand-logo-svg { width: 13px; height: 13px; flex-shrink: 0; object-fit: contain; }
+
+    .logo-search-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(125px, 1fr));
+      gap: 10px;
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 4px 2px;
+    }
+
+    .logo-candidate-tile {
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.14s ease, background 0.14s ease, transform 0.14s ease;
+    }
+
+    .logo-candidate-tile:hover {
+      border-color: var(--accent-cyan-bright);
+      background: var(--bg-surface-elevated);
+      transform: translateY(-2px);
+    }
+
+    .logo-candidate-tile img {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+    }
+
+    .upload-dropzone {
+      border: 1.5px dashed rgba(56, 189, 248, 0.38);
+      background: rgba(6, 182, 212, 0.06);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .upload-dropzone:hover {
+      background: rgba(6, 182, 212, 0.12);
+      border-color: var(--accent-cyan-bright);
+    }
 
     .banned-ip-chip {
       display: inline-flex;
@@ -1470,17 +1587,21 @@
           <!-- System Identity & Live Telemetry Status Banner -->
           <div class="command-banner">
             <div class="command-banner-left">
-              <div class="server-emblem">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-                  <line x1="6" y1="6" x2="6.01" y2="6"/>
-                  <line x1="6" y1="18" x2="6.01" y2="18"/>
-                </svg>
+              <div class="server-emblem" id="hostOsEmblemBtn" onclick="openHostOsLogoPicker()" title="Logo del sistema operativo detectado · Haz clic para buscar en Google o subir un archivo local">
+                <div id="hostOsEmblemContent" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                  <img id="hostOsLogoImg" src="https://cdn.simpleicons.org/linux/FCC624" alt="OS Logo" onerror="this.onerror=null; this.src='https://www.google.com/s2/favicons?sz=128&domain=kernel.org';">
+                </div>
+                <div class="logo-edit-overlay">
+                  <span>🖼️</span>
+                  <span>Logo</span>
+                </div>
               </div>
               <div>
                 <div class="host-headline">
                   <h1 id="ovHostTitle">Detectando nodo...</h1>
+                  <button class="action-btn" style="height: 24px; padding: 0 8px; font-size: 11px;" onclick="openHostOsLogoPicker()" title="Cambiar el logo del sistema por búsqueda web o archivo local">
+                    🖼️ Cambiar logo
+                  </button>
                   <span class="meta-sep">·</span>
                   <a href="/dns" onclick="return navigateTo(event, 'dns')" id="ovPublicDomainBadge" class="mono" style="font-size: 13px; color: var(--accent-cyan-bright); text-decoration: none;">Detectando DNS...</a>
                 </div>
@@ -2547,6 +2668,82 @@
   </div>
 
   <!-- ======================================================================
+       MODAL: PERSONALIZAR LOGO (BÚSQUEDA AUTOMÁTICA GOOGLE/WEB & ARCHIVO LOCAL)
+       ====================================================================== -->
+  <div class="modal-overlay" id="logoPickerModal" onclick="if(event.target===this) closeLogoPickerModal()">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="font-family: var(--font-display); font-size: 16px; font-weight: 700;" id="logoModalTitle">Personalizar Logo del Sistema / Dispositivo</h3>
+          <div style="font-size: 11.5px; color: var(--text-muted);" id="logoModalSubtitle">Búsqueda automática en Google / Catálogo Web o subida desde archivo local</div>
+        </div>
+        <button class="action-btn" style="height: 28px; padding: 0 8px;" onclick="closeLogoPickerModal()">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+
+        <!-- Vista previa actual y botón de restaurar automático -->
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 16px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div class="server-emblem" style="cursor: default; width: 54px; height: 54px;">
+              <img id="logoModalPreviewImg" src="https://cdn.simpleicons.org/linux/FCC624" alt="Preview" onerror="this.onerror=null; this.src='https://www.google.com/s2/favicons?sz=128&domain=kernel.org';">
+            </div>
+            <div>
+              <div style="font-weight: 700; color: #FFFFFF; font-size: 14px;" id="logoModalTargetLabel">Elemento seleccionado</div>
+              <div style="font-size: 11.5px; color: var(--text-muted);" class="mono" id="logoModalStatusText">Logo activo actualmente</div>
+            </div>
+          </div>
+          <button class="action-btn" onclick="resetCustomLogoToAuto()" title="Volver al logo detectado automáticamente para este sistema o dispositivo">
+            🔄 Restaurar autodetección
+          </button>
+        </div>
+
+        <!-- Opción 1: Subir Archivo Local -->
+        <div>
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+            1. Subir Archivo Local desde tu Dispositivo
+          </div>
+          <label class="upload-dropzone" for="localLogoFileInput" id="logoUploadDropzone">
+            <input type="file" id="localLogoFileInput" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif,image/x-icon" style="display: none;" onchange="onLocalLogoFileChange(event)">
+            <div style="font-size: 20px; margin-bottom: 4px;">📁</div>
+            <div style="font-weight: 600; color: #F8FAFC; font-size: 13px;">Haz clic aquí o arrastra una imagen local (PNG, SVG, JPG, WEBP, ICO)</div>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Se guardará de forma persistente en el servidor para este nodo o dispositivo</div>
+          </label>
+        </div>
+
+        <!-- Opción 2: Buscar en Google / Catálogo Web en Tiempo Real -->
+        <div>
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+            2. Buscar Logo en Google / Catálogo Web de Sistemas y Marcas
+          </div>
+          <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <input type="text" id="logoWebSearchInput" placeholder="Ej: ubuntu, debian, proxmox, nintendo, synology, asus, iphone, realtek..." oninput="triggerLogoWebSearch(this.value)" style="flex: 1; height: 36px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #FFFFFF; font-size: 13px; outline: none;">
+            <button class="action-btn primary-cta" style="height: 36px;" onclick="triggerLogoWebSearch(document.getElementById('logoWebSearchInput').value, true)">
+              Buscar
+            </button>
+          </div>
+          <div class="logo-search-grid" id="logoWebSearchResultsGrid">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px;">
+              Escribe el nombre del sistema operativo, fabricante o dominio para buscar logos...
+            </div>
+          </div>
+        </div>
+
+        <!-- Opción 3: Pegar URL directa -->
+        <div>
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+            3. O usar URL directa de imagen
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <input type="url" id="logoDirectUrlInput" placeholder="https://ejemplo.com/logo.png" style="flex: 1; height: 34px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #FFFFFF; font-family: var(--font-mono); font-size: 12px; outline: none;">
+            <button class="action-btn" style="height: 34px;" onclick="applyDirectLogoUrl()">Aplicar URL</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
        REAL-TIME TELEMETRY ENGINE (100% OS-DRIVEN, ZERO HARDCODED SPECS)
        ====================================================================== -->
   <script>
@@ -2999,6 +3196,207 @@
       ctx.restore();
     }
 
+    // =========================================================================
+    // INTELLIGENT OS, INTERFACE & DEVICE LOGO ENGINE + LOCAL FILE OVERRIDE
+    // =========================================================================
+    let customLogosMap = {};
+    try {
+      const savedLocal = localStorage.getItem('sysmon_custom_logos_v1');
+      if (savedLocal) customLogosMap = JSON.parse(savedLocal) || {};
+    } catch (e) {}
+
+    let activeLogoModalTarget = {
+      key: 'host_os',
+      title: 'Nodo Principal',
+      defaultQuery: 'linux',
+      autoLogoUrl: 'https://cdn.simpleicons.org/linux/FCC624'
+    };
+    let logoSearchDebounceTimer = null;
+
+    const OS_AND_BRAND_DOMAINS = {
+      ubuntu: { label: 'Ubuntu Linux', domain: 'ubuntu.com', logo: 'https://cdn.simpleicons.org/ubuntu/E95420' },
+      debian: { label: 'Debian GNU/Linux', domain: 'debian.org', logo: 'https://cdn.simpleicons.org/debian/A81D33' },
+      arch: { label: 'Arch Linux', domain: 'archlinux.org', logo: 'https://cdn.simpleicons.org/archlinux/1793D1' },
+      fedora: { label: 'Fedora Linux', domain: 'fedoraproject.org', logo: 'https://cdn.simpleicons.org/fedora/51A2DA' },
+      alpine: { label: 'Alpine Linux', domain: 'alpinelinux.org', logo: 'https://cdn.simpleicons.org/alpinelinux/0D597F' },
+      kali: { label: 'Kali Linux', domain: 'kali.org', logo: 'https://cdn.simpleicons.org/kalilinux/557C94' },
+      linuxmint: { label: 'Linux Mint', domain: 'linuxmint.com', logo: 'https://cdn.simpleicons.org/linuxmint/87CF3E' },
+      manjaro: { label: 'Manjaro', domain: 'manjaro.org', logo: 'https://cdn.simpleicons.org/manjaro/35BF5C' },
+      opensuse: { label: 'openSUSE', domain: 'opensuse.org', logo: 'https://cdn.simpleicons.org/opensuse/73BA25' },
+      redhat: { label: 'Red Hat Linux', domain: 'redhat.com', logo: 'https://cdn.simpleicons.org/redhat/EE0000' },
+      centos: { label: 'CentOS', domain: 'centos.org', logo: 'https://cdn.simpleicons.org/centos/262577' },
+      rocky: { label: 'Rocky Linux', domain: 'rockylinux.org', logo: 'https://cdn.simpleicons.org/rockylinux/10B981' },
+      almalinux: { label: 'AlmaLinux', domain: 'almalinux.org', logo: 'https://cdn.simpleicons.org/almalinux/38BDF8' },
+      proxmox: { label: 'Proxmox VE', domain: 'proxmox.com', logo: 'https://cdn.simpleicons.org/proxmox/E57000' },
+      raspbian: { label: 'Raspberry Pi OS', domain: 'raspberrypi.com', logo: 'https://cdn.simpleicons.org/raspberrypi/A22846' },
+      raspberry: { label: 'Raspberry Pi', domain: 'raspberrypi.com', logo: 'https://cdn.simpleicons.org/raspberrypi/A22846' },
+      linux: { label: 'Linux OS', domain: 'kernel.org', logo: 'https://cdn.simpleicons.org/linux/FCC624' },
+      nintendo: { label: 'Nintendo', domain: 'nintendo.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=nintendo.com' },
+      xbox: { label: 'Microsoft Xbox', domain: 'xbox.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=xbox.com' },
+      playstation: { label: 'Sony PlayStation', domain: 'playstation.com', logo: 'https://cdn.simpleicons.org/playstation/0070D1' },
+      sony: { label: 'Sony', domain: 'sony.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=sony.com' },
+      samsung: { label: 'Samsung', domain: 'samsung.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=samsung.com' },
+      xiaomi: { label: 'Xiaomi', domain: 'mi.com', logo: 'https://cdn.simpleicons.org/xiaomi/FF6900' },
+      google: { label: 'Google', domain: 'google.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=google.com' },
+      asus: { label: 'ASUS', domain: 'asus.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=asus.com' },
+      vodafone: { label: 'Vodafone', domain: 'vodafone.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=vodafone.com' },
+      synology: { label: 'Synology', domain: 'synology.com', logo: 'https://cdn.simpleicons.org/synology/B5B5B6' },
+      tplink: { label: 'TP-Link Tapo', domain: 'tp-link.com', logo: 'https://cdn.simpleicons.org/tplink/4ACBD6' },
+      espressif: { label: 'Espressif IoT', domain: 'espressif.com', logo: 'https://cdn.simpleicons.org/espressif/E7352C' },
+      tuya: { label: 'Tuya Smart', domain: 'tuya.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=tuya.com' },
+      apple: { label: 'Apple', domain: 'apple.com', logo: 'https://cdn.simpleicons.org/apple/F8FAFC' },
+      acer: { label: 'Acer', domain: 'acer.com', logo: 'https://cdn.simpleicons.org/acer/83B81A' },
+      intel: { label: 'Intel', domain: 'intel.com', logo: 'https://cdn.simpleicons.org/intel/0071C5' },
+      amd: { label: 'AMD', domain: 'amd.com', logo: 'https://cdn.simpleicons.org/amd/ED1C24' },
+      nvidia: { label: 'NVIDIA', domain: 'nvidia.com', logo: 'https://cdn.simpleicons.org/nvidia/76B900' },
+      realtek: { label: 'Realtek', domain: 'realtek.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=realtek.com' },
+      hp: { label: 'HP', domain: 'hp.com', logo: 'https://cdn.simpleicons.org/hp/0096D6' },
+      dell: { label: 'Dell', domain: 'dell.com', logo: 'https://cdn.simpleicons.org/dell/007DB8' },
+      lenovo: { label: 'Lenovo', domain: 'lenovo.com', logo: 'https://cdn.simpleicons.org/lenovo/E2231A' },
+      lg: { label: 'LG', domain: 'lg.com', logo: 'https://cdn.simpleicons.org/lg/A50034' },
+      amazon: { label: 'Amazon', domain: 'amazon.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=amazon.com' },
+      microsoft: { label: 'Microsoft Windows', domain: 'microsoft.com', logo: 'https://www.google.com/s2/favicons?sz=128&domain=microsoft.com' },
+      tailscale: { label: 'Tailscale', domain: 'tailscale.com', logo: 'https://cdn.simpleicons.org/tailscale/F8FAFC' },
+      wireguard: { label: 'WireGuard', domain: 'wireguard.com', logo: 'https://cdn.simpleicons.org/wireguard/88171A' },
+      docker: { label: 'Docker', domain: 'docker.com', logo: 'https://cdn.simpleicons.org/docker/2496ED' }
+    };
+
+    function detectBrandKeyFromText(text) {
+      const t = (text || '').toLowerCase();
+      if (!t) return '';
+      if (t.includes('ubuntu')) return 'ubuntu';
+      if (t.includes('debian')) return 'debian';
+      if (t.includes('arch')) return 'arch';
+      if (t.includes('fedora')) return 'fedora';
+      if (t.includes('alpine')) return 'alpine';
+      if (t.includes('kali')) return 'kali';
+      if (t.includes('mint')) return 'linuxmint';
+      if (t.includes('manjaro')) return 'manjaro';
+      if (t.includes('suse')) return 'opensuse';
+      if (t.includes('proxmox')) return 'proxmox';
+      if (t.includes('raspberry') || t.includes('raspbian')) return 'raspbian';
+      if (t.includes('nintendo') || t.includes('switch') || t.includes('3ds') || t.includes('2ds') || t.includes('wii')) return 'nintendo';
+      if (t.includes('xbox') || t.includes('series-s') || t.includes('series-x') || t.includes('cminewar-s')) return 'xbox';
+      if (t.includes('playstation') || t.includes('ps4') || t.includes('ps5')) return 'playstation';
+      if (t.includes('samsung') || t.includes('galaxy') || /\bs2[0-5]\b/.test(t) || t.includes('tab-s')) return 'samsung';
+      if (t.includes('xiaomi') || t.includes('redmi') || t.includes('poco')) return 'xiaomi';
+      if (t.includes('google') || t.includes('pixel') || t.includes('chromecast') || t.includes('home-mini') || t.includes('nest')) return 'google';
+      if (t.includes('asus') || t.includes('rt-ax')) return 'asus';
+      if (t.includes('vodafone')) return 'vodafone';
+      if (t.includes('synology') || t.includes('diskstation') || t.includes('nas')) return 'synology';
+      if (t.includes('tapo') || t.includes('tp-link') || t.includes('tplink')) return 'tplink';
+      if (t.includes('esp32') || t.includes('esp8266') || t.includes('espressif') || t.includes('domotica') || t.includes('enchufe')) return 'espressif';
+      if (t.includes('tuya')) return 'tuya';
+      if (t.includes('sony') || t.includes('bravia') || t.includes('xperia')) return 'sony';
+      if (t.includes('apple') || t.includes('iphone') || t.includes('ipad') || t.includes('macbook')) return 'apple';
+      if (t.includes('acer')) return 'acer';
+      if (t.includes('intel') || t.includes('xeon')) return 'intel';
+      if (t.includes('realtek')) return 'realtek';
+      if (t.includes('tailscale')) return 'tailscale';
+      if (t.includes('wireguard') || t === 'wg0') return 'wireguard';
+      if (t.includes('windows')) return 'microsoft';
+      return '';
+    }
+
+    function resolveSystemOsLogo(sys) {
+      const custom = customLogosMap['host_os'];
+      if (custom) {
+        return { url: custom, fallback: 'https://cdn.simpleicons.org/linux/FCC624', isCustom: true, query: (sys && sys.os) || 'linux' };
+      }
+      const osId = (sys && sys.os_id) ? sys.os_id.toLowerCase() : detectBrandKeyFromText(sys && sys.os);
+      const entry = OS_AND_BRAND_DOMAINS[osId] || OS_AND_BRAND_DOMAINS[detectBrandKeyFromText(sys && sys.os)] || OS_AND_BRAND_DOMAINS.linux;
+      const primaryUrl = (sys && sys.os_logo_url) ? sys.os_logo_url : entry.logo;
+      const domain = (sys && sys.os_domain) ? sys.os_domain : entry.domain;
+      const googleFallback = `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(domain)}`;
+      return {
+        url: primaryUrl,
+        fallback: googleFallback,
+        isCustom: false,
+        query: osId || (sys && sys.os) || 'linux'
+      };
+    }
+
+    function resolveNicLogo(nic) {
+      const nicName = (nic && nic.name) ? nic.name : 'eth0';
+      const customKey = `nic:${nicName}`;
+      if (customLogosMap[customKey]) {
+        return { key: customKey, url: customLogosMap[customKey], fallback: 'https://cdn.simpleicons.org/linux/FCC624', isCustom: true, query: nicName };
+      }
+      const nl = nicName.toLowerCase();
+      let bKey = detectBrandKeyFromText(nicName);
+      if (!bKey) {
+        if (nl.startsWith('tailscale')) bKey = 'tailscale';
+        else if (nl.startsWith('wg')) bKey = 'wireguard';
+        else if (nl.startsWith('wl')) bKey = 'asus';
+        else if (nl.startsWith('enx')) bKey = 'realtek';
+        else if (nl.startsWith('eth') || nl.startsWith('enp') || nl.startsWith('eno')) bKey = 'intel';
+      }
+      const sys = (latestMetrics && latestMetrics.system) ? latestMetrics.system : {};
+      const entry = OS_AND_BRAND_DOMAINS[bKey] || OS_AND_BRAND_DOMAINS[sys.os_id] || OS_AND_BRAND_DOMAINS.linux;
+      const fallback = `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(entry.domain)}`;
+      return {
+        key: customKey,
+        url: entry.logo,
+        fallback,
+        isCustom: false,
+        query: bKey || nicName
+      };
+    }
+
+    function resolveNetworkDeviceLogo(c) {
+      const idPart = (c.mac && c.mac !== 'INTERFAZ-ACTIVA' && c.mac !== 'N/A') ? c.mac.toUpperCase() : (c.ip || c.name || 'unknown');
+      const customKey = `dev:${idPart}`;
+      const altIpKey = c.ip ? `dev:${c.ip}` : '';
+      const customUrl = customLogosMap[customKey] || (altIpKey && customLogosMap[altIpKey]);
+      if (customUrl) {
+        return {
+          key: customKey,
+          url: customUrl,
+          fallback: 'https://www.google.com/s2/favicons?sz=128&domain=google.com',
+          isCustom: true,
+          query: c.brand_name || c.vendor || c.brand || c.name || 'device'
+        };
+      }
+
+      let bKey = (c.brand && c.brand !== 'generic') ? c.brand.toLowerCase() : '';
+      if (!bKey) {
+        bKey = detectBrandKeyFromText(`${c.name || ''} ${c.brand_name || ''} ${c.vendor || ''}`);
+      }
+      const entry = OS_AND_BRAND_DOMAINS[bKey];
+      if (entry || c.auto_logo_url) {
+        const url = c.auto_logo_url || entry.logo;
+        const dom = c.brand_domain || (entry ? entry.domain : 'google.com');
+        return {
+          key: customKey,
+          url,
+          fallback: `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(dom)}`,
+          isCustom: false,
+          query: bKey || c.brand_name || c.name || 'router'
+        };
+      }
+
+      // Si no está en el mapa fijo, intentar deducir un dominio limpio del nombre del dispositivo o fabricante para Google Favicon S2
+      const rawToken = (c.vendor || c.brand_name || c.name || '').toLowerCase().split(/[\s(_-]+/)[0].replace(/[^a-z0-9]/g, '');
+      if (rawToken && rawToken.length >= 3 && !/^\d+$/.test(rawToken) && !rawToken.startsWith('192')) {
+        const guessedDomain = `${rawToken}.com`;
+        return {
+          key: customKey,
+          url: `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(guessedDomain)}`,
+          fallback: '',
+          isCustom: false,
+          query: rawToken
+        };
+      }
+
+      return {
+        key: customKey,
+        url: '',
+        fallback: '',
+        isCustom: false,
+        query: c.name || 'network'
+      };
+    }
+
     function getDeviceEmoji(type) {
       if (type === 'server' || type === 'nas') return '🖥️';
       if (type === 'router' || type === 'network') return '🌐';
@@ -3013,11 +3411,274 @@
 
     function getBrandLogoSvg(brand) {
       const b = (brand || '').toLowerCase();
-      if (b === 'nintendo') return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#e60012"><circle cx="12" cy="12" r="10"/></svg>`;
-      if (b === 'xbox') return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#107c10"><circle cx="12" cy="12" r="10"/></svg>`;
-      if (b === 'samsung' || b === 'asus' || b === 'synology' || b === 'tplink') return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#38bdf8"><circle cx="12" cy="12" r="10"/></svg>`;
-      if (b === 'xiaomi' || b === 'ubuntu' || b === 'tuya') return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="#f97316"><circle cx="12" cy="12" r="10"/></svg>`;
+      const entry = OS_AND_BRAND_DOMAINS[b];
+      if (entry) {
+        const fb = `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(entry.domain)}`;
+        return `<img class="brand-logo-svg" src="${escapeHtml(entry.logo)}" alt="${escapeHtml(b)}" onerror="this.onerror=null;this.src='${escapeHtml(fb)}';">`;
+      }
       return `<svg class="brand-logo-svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
+    }
+
+    function openHostOsLogoPicker() {
+      const sys = (latestMetrics && latestMetrics.system) ? latestMetrics.system : {};
+      const resolved = resolveSystemOsLogo(sys);
+      const hostLabel = `Nodo: ${sys.hostname || 'localhost'} (${sys.os || 'Linux'})`;
+      openLogoPickerModal('host_os', hostLabel, resolved.query, resolved.url);
+    }
+
+    function openLogoPickerModal(targetKey, targetTitle, defaultQuery = '', currentLogoUrl = '') {
+      activeLogoModalTarget = {
+        key: targetKey,
+        title: targetTitle || targetKey,
+        defaultQuery: defaultQuery || 'linux',
+        autoLogoUrl: currentLogoUrl || 'https://cdn.simpleicons.org/linux/FCC624'
+      };
+
+      const modal = document.getElementById('logoPickerModal');
+      const lbl = document.getElementById('logoModalTargetLabel');
+      const st = document.getElementById('logoModalStatusText');
+      const prevImg = document.getElementById('logoModalPreviewImg');
+      const searchIn = document.getElementById('logoWebSearchInput');
+      const urlIn = document.getElementById('logoDirectUrlInput');
+
+      const existingCustom = customLogosMap[targetKey];
+      const displayUrl = existingCustom || currentLogoUrl || 'https://cdn.simpleicons.org/linux/FCC624';
+
+      if (lbl) lbl.innerText = targetTitle || 'Personalizar Logo';
+      if (st) st.innerText = existingCustom ? 'Logo personalizado activo (Archivo local / URL)' : 'Logo detectado automáticamente';
+      if (prevImg) {
+        prevImg.src = displayUrl;
+        prevImg.className = (existingCustom && existingCustom.startsWith('data:image/')) ? 'custom-cover' : '';
+      }
+      if (urlIn) urlIn.value = (existingCustom && !existingCustom.startsWith('data:')) ? existingCustom : '';
+      if (searchIn) searchIn.value = defaultQuery || '';
+
+      if (modal) modal.classList.add('open');
+      triggerLogoWebSearch(defaultQuery || 'linux', true);
+    }
+
+    function closeLogoPickerModal() {
+      const modal = document.getElementById('logoPickerModal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    async function saveCustomLogoValue(targetKey, logoValue) {
+      if (!targetKey) return;
+      if (logoValue) {
+        customLogosMap[targetKey] = logoValue;
+      } else {
+        delete customLogosMap[targetKey];
+      }
+      try {
+        localStorage.setItem('sysmon_custom_logos_v1', JSON.stringify(customLogosMap));
+      } catch (e) {}
+
+      try {
+        const res = await fetch('/api/custom-logos', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ key: targetKey, logo: logoValue || '' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.logos) {
+            customLogosMap = Object.assign({}, data.logos, customLogosMap);
+            if (!logoValue) delete customLogosMap[targetKey];
+          }
+        }
+      } catch (e) {}
+
+      if (latestMetrics) {
+        applyMetricsToDOM(latestMetrics);
+      }
+    }
+
+    function selectWebLogoCandidate(encodedUrl, encodedTitle) {
+      const url = decodeURIComponent(encodedUrl || '');
+      const title = decodeURIComponent(encodedTitle || '');
+      if (!url) return;
+      const prevImg = document.getElementById('logoModalPreviewImg');
+      const st = document.getElementById('logoModalStatusText');
+      if (prevImg) {
+        prevImg.src = url;
+        prevImg.className = '';
+      }
+      if (st) st.innerText = `Seleccionado: ${title}`;
+      saveCustomLogoValue(activeLogoModalTarget.key, url);
+      showToast(`Logo actualizado para ${activeLogoModalTarget.title}`, 'success');
+      closeLogoPickerModal();
+    }
+
+    function applyDirectLogoUrl() {
+      const urlIn = document.getElementById('logoDirectUrlInput');
+      const val = (urlIn ? urlIn.value : '').trim();
+      if (!val) {
+        showToast('Introduce una URL válida de imagen', 'error');
+        return;
+      }
+      saveCustomLogoValue(activeLogoModalTarget.key, val);
+      showToast(`Logo aplicado a ${activeLogoModalTarget.title}`, 'success');
+      closeLogoPickerModal();
+    }
+
+    function resetCustomLogoToAuto() {
+      saveCustomLogoValue(activeLogoModalTarget.key, '');
+      showToast(`Logo restablecido a detección automática para ${activeLogoModalTarget.title}`, 'info');
+      closeLogoPickerModal();
+    }
+
+    function onLocalLogoFileChange(event) {
+      const file = event && event.target && event.target.files ? event.target.files[0] : null;
+      if (!file) return;
+      processLocalLogoFile(file);
+      event.target.value = '';
+    }
+
+    function processLocalLogoFile(file) {
+      if (!file.type.startsWith('image/')) {
+        showToast('Selecciona un archivo de imagen válido (PNG, SVG, JPG, WEBP, ICO)', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const rawDataUrl = e.target.result;
+        if (file.type === 'image/svg+xml' || rawDataUrl.length < 90000) {
+          finishLocalLogoUpload(rawDataUrl, file.name);
+          return;
+        }
+        // Optimizar imágenes grandes en un canvas de 160x160 manteniendo transparencia
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 160;
+          let w = img.width || maxDim;
+          let h = img.height || maxDim;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          const optimizedDataUrl = canvas.toDataURL('image/png');
+          finishLocalLogoUpload(optimizedDataUrl, file.name);
+        };
+        img.onerror = () => {
+          finishLocalLogoUpload(rawDataUrl, file.name);
+        };
+        img.src = rawDataUrl;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function finishLocalLogoUpload(dataUrl, fileName) {
+      const prevImg = document.getElementById('logoModalPreviewImg');
+      const st = document.getElementById('logoModalStatusText');
+      if (prevImg) {
+        prevImg.src = dataUrl;
+        prevImg.className = 'custom-cover';
+      }
+      if (st) st.innerText = `Archivo local cargado: ${fileName}`;
+      saveCustomLogoValue(activeLogoModalTarget.key, dataUrl);
+      showToast(`Imagen local "${fileName}" aplicada a ${activeLogoModalTarget.title}`, 'success');
+      closeLogoPickerModal();
+    }
+
+    function triggerLogoWebSearch(query, immediate = false) {
+      if (logoSearchDebounceTimer) clearTimeout(logoSearchDebounceTimer);
+      if (immediate) {
+        executeLogoWebSearch(query);
+      } else {
+        logoSearchDebounceTimer = setTimeout(() => executeLogoWebSearch(query), 240);
+      }
+    }
+
+    async function executeLogoWebSearch(query) {
+      const grid = document.getElementById('logoWebSearchResultsGrid');
+      if (!grid) return;
+      const q = (query || '').trim().toLowerCase();
+
+      const items = [];
+      const seen = new Set();
+      function addCandidate(title, subtitle, url, fallback) {
+        if (!url || seen.has(url)) return;
+        seen.add(url);
+        items.push({ title, subtitle, logo_url: url, fallback_url: fallback || url });
+      }
+
+      // 1. Resultados instantáneos del catálogo local de sistemas operativos y fabricantes
+      Object.entries(OS_AND_BRAND_DOMAINS).forEach(([k, info]) => {
+        if (!q || k.includes(q) || info.label.toLowerCase().includes(q) || info.domain.toLowerCase().includes(q)) {
+          const gFav = `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(info.domain)}`;
+          addCandidate(info.label, info.domain, info.logo, gFav);
+          if (info.logo !== gFav) {
+            addCandidate(`${info.label} (Google)`, info.domain, gFav, info.logo);
+          }
+        }
+      });
+
+      // 2. Si hay texto de búsqueda, añadir resolución directa en Google Favicon S2 y SimpleIcons
+      if (q.length >= 2) {
+        const cleanSlug = q.replace(/[^a-z0-9.]/g, '');
+        if (cleanSlug.includes('.')) {
+          addCandidate(`Google Favicon (${cleanSlug})`, cleanSlug, `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(cleanSlug)}`);
+        } else if (cleanSlug) {
+          addCandidate(`${q.toUpperCase()} (SimpleIcons)`, `simpleicons.org/${cleanSlug}`, `https://cdn.simpleicons.org/${encodeURIComponent(cleanSlug)}`, `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(cleanSlug)}.com`);
+          addCandidate(`${q.toUpperCase()} (Google .com)`, `${cleanSlug}.com`, `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(cleanSlug)}.com`);
+          addCandidate(`${q.toUpperCase()} (Google .org)`, `${cleanSlug}.org`, `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(cleanSlug)}.org`);
+        }
+      }
+
+      // Renderizar primeros candidatos instantáneamente
+      renderLogoCandidatesGrid(items);
+
+      // 3. Consultar backend (/api/logos/search) y Clearbit Autocomplete en vivo
+      try {
+        const res = await fetch('/api/logos/search?q=' + encodeURIComponent(q), { headers: authHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.results)) {
+            data.results.forEach(r => addCandidate(r.title, r.subtitle, r.logo_url, r.fallback_url));
+          }
+        }
+      } catch (e) {}
+
+      if (q.length >= 2) {
+        try {
+          const cbRes = await fetch(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(q)}`);
+          if (cbRes.ok) {
+            const cbList = await cbRes.json();
+            if (Array.isArray(cbList)) {
+              cbList.slice(0, 8).forEach(comp => {
+                const dom = comp.domain || '';
+                const gFav = dom ? `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(dom)}` : '';
+                if (comp.logo) addCandidate(comp.name || dom, dom, comp.logo, gFav);
+                if (gFav) addCandidate(`${comp.name || dom} (Google)`, dom, gFav, comp.logo);
+              });
+            }
+          }
+        } catch (e) {}
+      }
+
+      renderLogoCandidatesGrid(items.slice(0, 24));
+    }
+
+    function renderLogoCandidatesGrid(items) {
+      const grid = document.getElementById('logoWebSearchResultsGrid');
+      if (!grid) return;
+      if (!items || items.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px;">Sin resultados. Prueba con otro nombre o dominio (ej. debian.org, synology.com).</div>';
+        return;
+      }
+      grid.innerHTML = items.map(item => `
+        <div class="logo-candidate-tile" onclick="selectWebLogoCandidate('${encodeURIComponent(item.logo_url)}', '${encodeURIComponent(item.title)}')">
+          <img src="${escapeHtml(item.logo_url)}" alt="${escapeHtml(item.title)}" onerror="if(this.dataset.fb && this.src!==this.dataset.fb){this.src=this.dataset.fb;}else{this.style.opacity='0.25';}" data-fb="${escapeHtml(item.fallback_url || '')}">
+          <div style="font-size: 11.5px; font-weight: 600; color: #F8FAFC; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%;">${escapeHtml(item.title)}</div>
+          <div class="mono" style="font-size: 10px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%;">${escapeHtml(item.subtitle || '')}</div>
+        </div>
+      `).join('');
     }
 
     function getDetectedPublicDomain() {
@@ -3675,7 +4336,7 @@
       } else if (activeView === 'network') {
         drawTelemetryChart('canvasNet', hist.net_rx, '#34D399', hist.net_tx, '#38BDF8', null);
 
-        // Render Active OS Network Interfaces (NICs)
+        // Render Active OS Network Interfaces (NICs) with Automatic Logo & Local Upload Override
         const netObj = latestMetrics.net || {};
         const nicsList = Array.isArray(netObj.interfaces_list)
           ? netObj.interfaces_list
@@ -3685,39 +4346,56 @@
           if (nicsList.length === 0) {
             nicsGrid.innerHTML = '<div class="nic-card" style="color: var(--text-muted);">No se detectaron interfaces de red físicas activas.</div>';
           } else {
-            nicsGrid.innerHTML = nicsList.map(nic => `
-              <div class="nic-card">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="live-dot" style="background: ${nic.is_up !== false ? 'var(--accent-emerald)' : 'var(--accent-amber)'};"></span>
-                    <strong class="mono" style="font-size: 15px; color: #FFFFFF;">${escapeHtml(nic.name)}</strong>
+            nicsGrid.innerHTML = nicsList.map(nic => {
+              const nicLogo = resolveNicLogo(nic);
+              const isDataCover = nicLogo.isCustom && nicLogo.url.startsWith('data:image/');
+              const nicTitle = `Interfaz ${nic.name} (${nic.ip || 'Activa'})`;
+              return `
+                <div class="nic-card">
+                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                      <div class="nic-logo-box interactive-logo" onclick="openLogoPickerModal('${escapeHtml(nicLogo.key)}', '${escapeHtml(nicTitle)}', '${escapeHtml(nicLogo.query)}', '${escapeHtml(nicLogo.url)}')" title="Haz clic para cambiar el logo de la interfaz ${escapeHtml(nic.name)}">
+                        <img class="${isDataCover ? 'custom-cover' : ''}" src="${escapeHtml(nicLogo.url)}" alt="${escapeHtml(nic.name)}" onerror="if(this.dataset.fb && this.src!==this.dataset.fb){this.src=this.dataset.fb;}">
+                        <div class="logo-edit-overlay"><span>🖼️</span><span>Logo</span></div>
+                      </div>
+                      <div>
+                        <div style="display: flex; align-items: center; gap: 7px;">
+                          <span class="live-dot" style="background: ${nic.is_up !== false ? 'var(--accent-emerald)' : 'var(--accent-amber)'};"></span>
+                          <strong class="mono" style="font-size: 15px; color: #FFFFFF;">${escapeHtml(nic.name)}</strong>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Adaptador de Red del Sistema</div>
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span class="adw-badge badge-blue mono">${nic.speed_mbps ? nic.speed_mbps + ' Mbps' : 'Activa'}</span>
+                      <button class="action-btn" style="height: 26px; padding: 0 8px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(nicLogo.key)}', '${escapeHtml(nicTitle)}', '${escapeHtml(nicLogo.query)}', '${escapeHtml(nicLogo.url)}')" title="Cambiar logo de interfaz">🖼️</button>
+                    </div>
                   </div>
-                  <span class="adw-badge badge-blue mono">${nic.speed_mbps ? nic.speed_mbps + ' Mbps' : 'Activa'}</span>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+                    <div>
+                      <div style="color: var(--text-muted); font-size: 11px;">Dirección IPv4</div>
+                      <div class="mono" style="color: var(--accent-cyan-bright); font-weight: 600;">${escapeHtml(nic.ip || 'Sin IPv4 asignada')}</div>
+                    </div>
+                    <div>
+                      <div style="color: var(--text-muted); font-size: 11px;">Dirección Física MAC</div>
+                      <div class="mono" style="color: var(--text-secondary);">${escapeHtml(nic.mac || 'N/A')}</div>
+                    </div>
+                    <div>
+                      <div style="color: var(--text-muted); font-size: 11px;">Caudal Actual</div>
+                      <div class="mono" style="color: var(--accent-emerald-bright);">↓ ${formatSpeed(nic.rx_bytes_sec)} · ↑ ${formatSpeed(nic.tx_bytes_sec)}</div>
+                    </div>
+                    <div>
+                      <div style="color: var(--text-muted); font-size: 11px;">Tráfico Acumulado</div>
+                      <div class="mono" style="color: var(--text-secondary);">↓ ${formatBytes(nic.bytes_recv)} · ↑ ${formatBytes(nic.bytes_sent)}</div>
+                    </div>
+                  </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
-                  <div>
-                    <div style="color: var(--text-muted); font-size: 11px;">Dirección IPv4</div>
-                    <div class="mono" style="color: var(--accent-cyan-bright); font-weight: 600;">${escapeHtml(nic.ip || 'Sin IPv4 asignada')}</div>
-                  </div>
-                  <div>
-                    <div style="color: var(--text-muted); font-size: 11px;">Dirección Física MAC</div>
-                    <div class="mono" style="color: var(--text-secondary);">${escapeHtml(nic.mac || 'N/A')}</div>
-                  </div>
-                  <div>
-                    <div style="color: var(--text-muted); font-size: 11px;">Caudal Actual</div>
-                    <div class="mono" style="color: var(--accent-emerald-bright);">↓ ${formatSpeed(nic.rx_bytes_sec)} · ↑ ${formatSpeed(nic.tx_bytes_sec)}</div>
-                  </div>
-                  <div>
-                    <div style="color: var(--text-muted); font-size: 11px;">Tráfico Acumulado</div>
-                    <div class="mono" style="color: var(--text-secondary);">↓ ${formatBytes(nic.bytes_recv)} · ↑ ${formatBytes(nic.bytes_sent)}</div>
-                  </div>
-                </div>
-              </div>
-            `).join('');
+              `;
+            }).join('');
           }
         }
 
-        // Render Connected Network Clients
+        // Render Connected Network Clients with Automatic Brand/Device Logo & Local File Override
         const clients = latestMetrics.wifi_clients || [];
         const filtered = clients.filter(c => {
           if (netSubfilter === 'cable' && c.conn_type !== 'cable') return false;
@@ -3726,7 +4404,8 @@
           if (!q) return true;
           return (c.name && c.name.toLowerCase().includes(q)) ||
                  (c.ip && c.ip.toLowerCase().includes(q)) ||
-                 (c.mac && c.mac.toLowerCase().includes(q));
+                 (c.mac && c.mac.toLowerCase().includes(q)) ||
+                 (c.brand_name && c.brand_name.toLowerCase().includes(q));
         });
 
         const list = document.getElementById('networkDevicesList');
@@ -3738,22 +4417,36 @@
               const isCable = c.conn_type === 'cable' || c.band === 'Ethernet';
               const is5g = !isCable && c.band && c.band.includes('5');
               const badgeClass = isCable ? 'badge-purple' : (is5g ? 'badge-blue' : 'badge-green');
-              const badgeLabel = isCable ? 'Ethernet' : (c.band || 'Wi-Fi');
+              const badgeLabel = isCable ? (c.band || 'Ethernet') : (c.band || 'Wi-Fi');
+              const devLogo = resolveNetworkDeviceLogo(c);
+              const isCustomData = devLogo.isCustom && devLogo.url.startsWith('data:image/');
+              const fallbackEmoji = getDeviceEmoji(c.dev_icon || c.icon || c.dev_type);
+              const vendorLabel = (c.brand_name && c.brand_name !== 'Dispositivo') ? c.brand_name : (c.vendor || '');
+              const devTitle = `${c.name || c.ip} (${c.ip || c.mac || ''})`;
+
+              const avatarInner = devLogo.url
+                ? `<img class="${isCustomData ? 'custom-cover' : ''}" src="${escapeHtml(devLogo.url)}" alt="${escapeHtml(c.name || c.ip)}" data-fb="${escapeHtml(devLogo.fallback || '')}" onerror="if(this.dataset.fb && this.src!==this.dataset.fb){this.src=this.dataset.fb;}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline';}"><span style="display:none;font-size:18px;">${fallbackEmoji}</span>`
+                : `<span style="font-size: 18px;">${fallbackEmoji}</span>`;
+
               return `
                 <div class="data-row">
                   <div class="row-title-box">
-                    <div class="device-circle">${getDeviceEmoji(c.icon)}</div>
+                    <div class="device-circle interactive-logo" onclick="openLogoPickerModal('${escapeHtml(devLogo.key)}', '${escapeHtml(devTitle)}', '${escapeHtml(devLogo.query)}', '${escapeHtml(devLogo.url)}')" title="Haz clic para buscar un logo en Google o subir un icono local para ${escapeHtml(c.name || c.ip)}">
+                      ${avatarInner}
+                      <div class="logo-edit-overlay"><span>🖼️</span><span>Logo</span></div>
+                    </div>
                     <div>
                       <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                         <span class="row-label">${escapeHtml(c.name || c.ip)}</span>
                         <span class="adw-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>
-                        ${c.vendor ? `<span class="brand-badge">${getBrandLogoSvg(c.brand)} <span>${escapeHtml(c.vendor)}</span></span>` : ''}
+                        ${vendorLabel ? `<span class="brand-badge">${getBrandLogoSvg(c.brand || detectBrandKeyFromText(vendorLabel))} <span>${escapeHtml(vendorLabel)}</span></span>` : ''}
                       </div>
-                      <div class="row-sublabel mono">IP: ${escapeHtml(c.ip)} · MAC: ${escapeHtml(c.mac)}${c.rssi ? ` · Señal: ${c.rssi} dBm` : ''}${c.tx_rate ? ` · ${escapeHtml(c.tx_rate)}` : ''}</div>
+                      <div class="row-sublabel mono">IP: ${escapeHtml(c.ip)} · MAC: ${escapeHtml(c.mac)}${(c.rssi && c.rssi < 0) ? ` · Señal: ${c.rssi} dBm` : ''}${c.tx_rate ? ` · ${escapeHtml(c.tx_rate)}` : ''}</div>
                     </div>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                     ${(c.rx_bytes || c.tx_bytes) ? `<div class="mono" style="font-size: 12px; color: var(--text-secondary);">↓ ${formatBytes(c.tx_bytes || 0)} · ↑ ${formatBytes(c.rx_bytes || 0)}</div>` : ''}
+                    <button class="action-btn" style="height: 28px; padding: 0 9px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(devLogo.key)}', '${escapeHtml(devTitle)}', '${escapeHtml(devLogo.query)}', '${escapeHtml(devLogo.url)}')" title="Cambiar logo del dispositivo">🖼️ Logo</button>
                     ${c.mac && c.mac.includes(':') ? `<button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="wakeDevice('${escapeHtml(c.mac)}', '${encodeURIComponent(c.name || c.ip)}')">WoL</button>` : ''}
                   </div>
                 </div>
@@ -4251,9 +4944,27 @@
           lblTrust.innerText = auth.is_local ? 'Red Local (LAN)' : 'Acceso Remoto WAN';
         }
 
-        // 2. Command Banner & Overview 4 Pillars
+        if (data.custom_logos && typeof data.custom_logos === 'object') {
+          customLogosMap = Object.assign({}, data.custom_logos, customLogosMap);
+        }
+
+        // 2. Command Banner & Dynamic OS Logo Emblem next to Nodo: <hostname>
         const ovHostTitle = document.getElementById('ovHostTitle');
         if (ovHostTitle) ovHostTitle.innerText = sys.hostname ? `Nodo: ${sys.hostname}` : 'Nodo Activo';
+        const hostOsImg = document.getElementById('hostOsLogoImg');
+        if (hostOsImg) {
+          const osLogoInfo = resolveSystemOsLogo(sys);
+          if (hostOsImg.getAttribute('src') !== osLogoInfo.url) {
+            hostOsImg.onerror = () => {
+              hostOsImg.onerror = null;
+              if (osLogoInfo.fallback && hostOsImg.src !== osLogoInfo.fallback) {
+                hostOsImg.src = osLogoInfo.fallback;
+              }
+            };
+            hostOsImg.src = osLogoInfo.url;
+          }
+          hostOsImg.className = (osLogoInfo.isCustom && osLogoInfo.url.startsWith('data:image/')) ? 'custom-cover' : '';
+        }
         const ovPublicDomainBadge = document.getElementById('ovPublicDomainBadge');
         if (ovPublicDomainBadge) ovPublicDomainBadge.innerText = pubDomain;
         const ovSysOs = document.getElementById('ovSysOs');
@@ -4571,6 +5282,27 @@
       setInterval(() => checkSystemVersion(false), 300000);
 
       window.addEventListener('resize', () => renderActiveView());
+
+      // Soporte de Drag & Drop de archivos locales en el modal de personalización de logos
+      const dropzone = document.getElementById('logoUploadDropzone');
+      if (dropzone) {
+        dropzone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          dropzone.style.borderColor = 'var(--accent-cyan-bright)';
+          dropzone.style.background = 'rgba(6, 182, 212, 0.16)';
+        });
+        dropzone.addEventListener('dragleave', () => {
+          dropzone.style.borderColor = 'rgba(56, 189, 248, 0.38)';
+          dropzone.style.background = 'rgba(6, 182, 212, 0.06)';
+        });
+        dropzone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropzone.style.borderColor = 'rgba(56, 189, 248, 0.38)';
+          dropzone.style.background = 'rgba(6, 182, 212, 0.06)';
+          const file = e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files[0] : null;
+          if (file) processLocalLogoFile(file);
+        });
+      }
     });
   </script>
 </body>

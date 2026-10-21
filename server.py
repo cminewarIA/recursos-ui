@@ -82,7 +82,27 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TRUSTED_FILE = os.path.join(BASE_DIR, "trusted_devices.json")
 TRUST_LOCK = threading.Lock()
+CUSTOM_LOGOS_FILE = os.path.join(BASE_DIR, "custom_logos.json")
+CUSTOM_LOGOS_LOCK = threading.Lock()
 ADMIN_MASTER_KEY = os.environ.get("ADMIN_MASTER_KEY", "Cminewar2026!")  # Clave maestra de rescate / desbloqueo remoto
+
+def load_custom_logos():
+    if not os.path.isfile(CUSTOM_LOGOS_FILE):
+        return {}
+    try:
+        with open(CUSTOM_LOGOS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def save_custom_logos(logos_dict):
+    try:
+        with open(CUSTOM_LOGOS_FILE, "w", encoding="utf-8") as f:
+            json.dump(logos_dict, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception:
+        return False
 
 # ==============================================================================
 # Rate Limiting & Anti-Brute-Force Shield for Master Key
@@ -2013,8 +2033,58 @@ def get_dns_traffic_stats(client_filter=None, limit=50):
     except Exception as e:
         return {"available": False, "error": str(e), "clients": [], "recent_queries": []}
 
+BRAND_DOMAINS_MAP = {
+    "ubuntu": ("Ubuntu Linux", "ubuntu.com", "https://cdn.simpleicons.org/ubuntu/E95420"),
+    "debian": ("Debian GNU/Linux", "debian.org", "https://cdn.simpleicons.org/debian/A81D33"),
+    "arch": ("Arch Linux", "archlinux.org", "https://cdn.simpleicons.org/archlinux/1793D1"),
+    "fedora": ("Fedora Linux", "fedoraproject.org", "https://cdn.simpleicons.org/fedora/51A2DA"),
+    "alpine": ("Alpine Linux", "alpinelinux.org", "https://cdn.simpleicons.org/alpinelinux/0D597F"),
+    "kali": ("Kali Linux", "kali.org", "https://cdn.simpleicons.org/kalilinux/557C94"),
+    "linuxmint": ("Linux Mint", "linuxmint.com", "https://cdn.simpleicons.org/linuxmint/87CF3E"),
+    "manjaro": ("Manjaro", "manjaro.org", "https://cdn.simpleicons.org/manjaro/35BF5C"),
+    "opensuse": ("openSUSE", "opensuse.org", "https://cdn.simpleicons.org/opensuse/73BA25"),
+    "redhat": ("Red Hat Enterprise Linux", "redhat.com", "https://cdn.simpleicons.org/redhat/EE0000"),
+    "centos": ("CentOS", "centos.org", "https://cdn.simpleicons.org/centos/262577"),
+    "rocky": ("Rocky Linux", "rockylinux.org", "https://cdn.simpleicons.org/rockylinux/10B981"),
+    "almalinux": ("AlmaLinux", "almalinux.org", "https://cdn.simpleicons.org/almalinux/38BDF8"),
+    "proxmox": ("Proxmox VE", "proxmox.com", "https://cdn.simpleicons.org/proxmox/E57000"),
+    "raspbian": ("Raspberry Pi OS", "raspberrypi.com", "https://cdn.simpleicons.org/raspberrypi/A22846"),
+    "linux": ("Linux OS", "kernel.org", "https://cdn.simpleicons.org/linux/FCC624"),
+    "nintendo": ("Nintendo", "nintendo.com", "https://www.google.com/s2/favicons?sz=128&domain=nintendo.com"),
+    "xbox": ("Microsoft Xbox", "xbox.com", "https://www.google.com/s2/favicons?sz=128&domain=xbox.com"),
+    "playstation": ("Sony PlayStation", "playstation.com", "https://cdn.simpleicons.org/playstation/0070D1"),
+    "sony": ("Sony", "sony.com", "https://www.google.com/s2/favicons?sz=128&domain=sony.com"),
+    "samsung": ("Samsung", "samsung.com", "https://www.google.com/s2/favicons?sz=128&domain=samsung.com"),
+    "xiaomi": ("Xiaomi", "mi.com", "https://cdn.simpleicons.org/xiaomi/FF6900"),
+    "google": ("Google", "google.com", "https://www.google.com/s2/favicons?sz=128&domain=google.com"),
+    "asus": ("ASUS", "asus.com", "https://www.google.com/s2/favicons?sz=128&domain=asus.com"),
+    "vodafone": ("Vodafone", "vodafone.es", "https://www.google.com/s2/favicons?sz=128&domain=vodafone.com"),
+    "synology": ("Synology", "synology.com", "https://cdn.simpleicons.org/synology/B5B5B6"),
+    "tplink": ("TP-Link Tapo", "tp-link.com", "https://cdn.simpleicons.org/tplink/4ACBD6"),
+    "espressif": ("Espressif IoT", "espressif.com", "https://cdn.simpleicons.org/espressif/E7352C"),
+    "tuya": ("Tuya Smart", "tuya.com", "https://www.google.com/s2/favicons?sz=128&domain=tuya.com"),
+    "apple": ("Apple", "apple.com", "https://cdn.simpleicons.org/apple/F8FAFC"),
+    "acer": ("Acer", "acer.com", "https://cdn.simpleicons.org/acer/83B81A"),
+    "intel": ("Intel", "intel.com", "https://cdn.simpleicons.org/intel/0071C5"),
+    "amd": ("AMD", "amd.com", "https://cdn.simpleicons.org/amd/ED1C24"),
+    "nvidia": ("NVIDIA", "nvidia.com", "https://cdn.simpleicons.org/nvidia/76B900"),
+    "realtek": ("Realtek", "realtek.com", "https://www.google.com/s2/favicons?sz=128&domain=realtek.com"),
+    "hp": ("HP", "hp.com", "https://cdn.simpleicons.org/hp/0096D6"),
+    "dell": ("Dell", "dell.com", "https://cdn.simpleicons.org/dell/007DB8"),
+    "lenovo": ("Lenovo", "lenovo.com", "https://cdn.simpleicons.org/lenovo/E2231A"),
+    "lg": ("LG Electronics", "lg.com", "https://cdn.simpleicons.org/lg/A50034"),
+    "amazon": ("Amazon", "amazon.com", "https://www.google.com/s2/favicons?sz=128&domain=amazon.com"),
+    "microsoft": ("Microsoft Windows", "microsoft.com", "https://www.google.com/s2/favicons?sz=128&domain=microsoft.com"),
+    "ubiquiti": ("Ubiquiti UniFi", "ui.com", "https://cdn.simpleicons.org/ubiquiti/0559C9"),
+    "mikrotik": ("MikroTik", "mikrotik.com", "https://cdn.simpleicons.org/mikrotik/293239"),
+    "tailscale": ("Tailscale", "tailscale.com", "https://cdn.simpleicons.org/tailscale/F8FAFC"),
+    "wireguard": ("WireGuard", "wireguard.com", "https://cdn.simpleicons.org/wireguard/88171A"),
+    "docker": ("Docker", "docker.com", "https://cdn.simpleicons.org/docker/2496ED"),
+}
+
 def classify_device(name, mac):
     name_l = (name or "").lower()
+    mac_u = (mac or "").upper()
     
     # 1. Detectar Marca / Fabricante
     brand = "generic"
@@ -2026,51 +2096,84 @@ def classify_device(name, mac):
     elif any(k in name_l for k in ["xbox", "series-s", "series-x", "cminewar-s"]):
         brand = "xbox"
         brand_name = "Microsoft Xbox"
+    elif any(k in name_l for k in ["playstation", "ps4", "ps5", "dualsense"]):
+        brand = "playstation"
+        brand_name = "Sony PlayStation"
     elif any(k in name_l for k in ["samsung", "s21", "s10", "s20", "s22", "s23", "s24", "s25", "galaxy", "tab-s"]):
         brand = "samsung"
         brand_name = "Samsung"
     elif any(k in name_l for k in ["xiaomi", "redmi", "poco"]):
         brand = "xiaomi"
         brand_name = "Xiaomi"
-    elif any(k in name_l for k in ["google", "home-mini", "pixel", "chromecast"]):
+    elif any(k in name_l for k in ["google", "home-mini", "pixel", "chromecast", "nest"]):
         brand = "google"
         brand_name = "Google"
-    elif any(k in name_l for k in ["asus", "rt-ax56u"]):
+    elif any(k in name_l for k in ["asus", "rt-ax56u", "rog"]):
         brand = "asus"
         brand_name = "ASUS"
     elif any(k in name_l for k in ["vodafone"]):
         brand = "vodafone"
         brand_name = "Vodafone"
-    elif any(k in name_l for k in ["synology"]):
+    elif any(k in name_l for k in ["synology", "diskstation"]):
         brand = "synology"
         brand_name = "Synology"
-    elif any(k in name_l for k in ["tapo", "tp-link", "tplink"]):
+    elif any(k in name_l for k in ["tapo", "tp-link", "tplink", "archer", "deco"]):
         brand = "tplink"
         brand_name = "TP-Link Tapo"
     elif any(k in name_l for k in ["esp", "esp32", "esp8266", "espressif", "domotica", "enchufe"]):
         brand = "espressif"
         brand_name = "Espressif IoT"
-    elif any(k in name_l for k in ["tuya"]):
+    elif any(k in name_l for k in ["tuya", "smartlife"]):
         brand = "tuya"
         brand_name = "Tuya Smart"
-    elif any(k in name_l for k in ["sony", "playstation", "ps4", "ps5", "bravia", "xperia"]):
+    elif any(k in name_l for k in ["sony", "bravia", "xperia"]):
         brand = "sony"
         brand_name = "Sony"
-    elif any(k in name_l for k in ["apple", "iphone", "ipad", "macbook"]):
+    elif any(k in name_l for k in ["apple", "iphone", "ipad", "macbook", "imac", "airpods", "homepod"]):
         brand = "apple"
         brand_name = "Apple"
-    elif any(k in name_l for k in ["acer"]):
+    elif any(k in name_l for k in ["acer", "nitro", "predator"]):
         brand = "acer"
         brand_name = "Acer"
     elif any(k in name_l for k in ["ubuntu"]):
         brand = "ubuntu"
         brand_name = "Ubuntu"
-    elif any(k in name_l for k in ["intel", "xeon"]):
+    elif any(k in name_l for k in ["debian"]):
+        brand = "debian"
+        brand_name = "Debian"
+    elif any(k in name_l for k in ["raspberry", "raspbian", "pi-hole"]):
+        brand = "raspbian"
+        brand_name = "Raspberry Pi"
+    elif any(k in name_l for k in ["intel", "xeon", "nuc"]):
         brand = "intel"
         brand_name = "Intel"
+    elif any(k in name_l for k in ["lg", "webos"]):
+        brand = "lg"
+        brand_name = "LG"
+    elif any(k in name_l for k in ["amazon", "echo", "alexa", "firetv", "kindle"]):
+        brand = "amazon"
+        brand_name = "Amazon"
+    elif any(k in name_l for k in ["hp", "hewlett", "laserjet", "deskjet"]):
+        brand = "hp"
+        brand_name = "HP"
+    elif any(k in name_l for k in ["dell", "alienware", "optiplex"]):
+        brand = "dell"
+        brand_name = "Dell"
+    elif any(k in name_l for k in ["lenovo", "thinkpad", "ideapad"]):
+        brand = "lenovo"
+        brand_name = "Lenovo"
+    elif any(k in name_l for k in ["windows", "surface", "desktop-"]):
+        brand = "microsoft"
+        brand_name = "Microsoft Windows"
+    elif mac_u.startswith(("90:09:D0", "00:11:32")):
+        brand = "synology"
+        brand_name = "Synology"
+    elif mac_u.startswith(("D4:5D:64", "C8:7F:54", "04:D4:C4", "2C:FD:A1")):
+        brand = "asus"
+        brand_name = "ASUS"
 
     # 2. Detectar Tipo e Icono
-    if brand == "nintendo" or brand == "xbox" or any(k in name_l for k in ["playstation", "ps4", "ps5"]):
+    if brand in ("nintendo", "xbox", "playstation") or any(k in name_l for k in ["playstation", "ps4", "ps5"]):
         dev_type = "game_console"
         dev_icon = "gamepad"
     elif any(k in name_l for k in ["tab", "ipad", "tablet"]):
@@ -2091,7 +2194,7 @@ def classify_device(name, mac):
     elif any(k in name_l for k in ["nas", "synology", "servidor", "server"]):
         dev_type = "server"
         dev_icon = "server"
-    elif any(k in name_l for k in ["asus", "router", "repeater", "gateway", "switch"]):
+    elif any(k in name_l for k in ["asus", "router", "repeater", "gateway", "switch", "vodafone"]):
         dev_type = "network"
         dev_icon = "router"
     elif any(k in name_l for k in ["pc", "laptop", "desktop", "thinkpad", "macbook"]):
@@ -2101,12 +2204,74 @@ def classify_device(name, mac):
         dev_type = "device"
         dev_icon = "wifi"
 
+    b_info = BRAND_DOMAINS_MAP.get(brand)
+    brand_domain = b_info[1] if b_info else ""
+    auto_logo_url = b_info[2] if b_info else ""
+
     return {
         "type": dev_type,
         "icon": dev_icon,
         "brand": brand,
-        "brand_name": brand_name
+        "brand_name": brand_name,
+        "brand_domain": brand_domain,
+        "auto_logo_url": auto_logo_url
     }
+
+def search_logos_catalog(query):
+    q = (query or "").strip().lower()
+    results = []
+    seen_urls = set()
+
+    def add_item(title, subtitle, url, fallback_url=""):
+        if not url or url in seen_urls:
+            return
+        seen_urls.add(url)
+        results.append({
+            "title": title,
+            "subtitle": subtitle,
+            "logo_url": url,
+            "fallback_url": fallback_url or url
+        })
+
+    # 1. Coincidencias en el catálogo curado de sistemas operativos y fabricantes
+    for key, (label, domain, primary_url) in BRAND_DOMAINS_MAP.items():
+        if not q or q in key or q in label.lower() or q in domain.lower():
+            google_fav = f"https://www.google.com/s2/favicons?sz=128&domain={domain}"
+            add_item(label, f"Oficial · {domain}", primary_url, google_fav)
+            if primary_url != google_fav:
+                add_item(f"{label} (Google Icon)", domain, google_fav, primary_url)
+
+    # 2. Si el usuario escribió un dominio o marca, buscar en vivo en Clearbit Autocomplete + Google Favicons
+    if q and len(q) >= 2:
+        try:
+            req = urllib.request.Request(
+                f"https://autocomplete.clearbit.com/v1/companies/suggest?query={urllib.parse.quote(q)}",
+                headers={"User-Agent": "Mozilla/5.0"}
+            )
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+                if isinstance(data, list):
+                    for item in data[:8]:
+                        c_name = item.get("name") or q.capitalize()
+                        c_dom = item.get("domain") or ""
+                        c_logo = item.get("logo") or ""
+                        g_fav = f"https://www.google.com/s2/favicons?sz=128&domain={c_dom}" if c_dom else ""
+                        if c_logo:
+                            add_item(c_name, f"Web · {c_dom}", c_logo, g_fav)
+                        if g_fav:
+                            add_item(f"{c_name} (Google Favicon)", c_dom, g_fav, c_logo)
+        except Exception:
+            pass
+
+        # 3. Búsqueda directa por slug en SimpleIcons y Google S2 Favicon
+        clean_slug = re.sub(r'[^a-z0-9.]', '', q)
+        if "." in clean_slug:
+            add_item(f"Dominio {clean_slug}", "Google Favicon S2 (128px)", f"https://www.google.com/s2/favicons?sz=128&domain={clean_slug}")
+        elif clean_slug:
+            add_item(f"{q.capitalize()} (SimpleIcons)", f"cdn.simpleicons.org/{clean_slug}", f"https://cdn.simpleicons.org/{clean_slug}")
+            add_item(f"{q.capitalize()} (.com Google)", f"{clean_slug}.com", f"https://www.google.com/s2/favicons?sz=128&domain={clean_slug}.com")
+
+    return results[:24]
 
 MAC_RATE_CACHE = {}
 
@@ -2731,18 +2896,37 @@ def get_system_info():
         uptime_str = f"{days}d {hours}h {minutes}m" if days > 0 else f"{hours}h {minutes}m {seconds}s"
         
         os_name = "Linux"
+        os_id = "linux"
+        os_id_like = ""
         try:
-            with open("/etc/os-release", "r") as f:
+            with open("/etc/os-release", "r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
+                    line = line.strip()
                     if line.startswith("PRETTY_NAME="):
-                        os_name = line.split("=", 1)[1].strip().strip('"')
-                        break
+                        os_name = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    elif line.startswith("ID="):
+                        os_id = line.split("=", 1)[1].strip().strip('"').strip("'").lower()
+                    elif line.startswith("ID_LIKE="):
+                        os_id_like = line.split("=", 1)[1].strip().strip('"').strip("'").lower()
         except Exception:
             pass
+
+        lookup_key = os_id if os_id in BRAND_DOMAINS_MAP else (os_id_like.split()[0] if os_id_like and os_id_like.split()[0] in BRAND_DOMAINS_MAP else "linux")
+        for cand in ("ubuntu", "debian", "arch", "fedora", "alpine", "kali", "linuxmint", "manjaro", "opensuse", "proxmox", "raspbian", "redhat", "centos", "rocky", "almalinux"):
+            if cand in os_id or cand in os_name.lower():
+                lookup_key = cand
+                break
+
+        b_tuple = BRAND_DOMAINS_MAP.get(lookup_key, BRAND_DOMAINS_MAP["linux"])
+        os_domain = b_tuple[1]
+        os_logo_url = b_tuple[2]
 
         return {
             "hostname": HOSTNAME,
             "os": os_name,
+            "os_id": lookup_key,
+            "os_domain": os_domain,
+            "os_logo_url": os_logo_url,
             "kernel": KERNEL,
             "uptime_seconds": uptime_seconds,
             "uptime_str": uptime_str,
@@ -2755,6 +2939,10 @@ def get_system_info():
         return {
             "uptime_str": "Unknown",
             "hostname": HOSTNAME,
+            "os": "Linux",
+            "os_id": "linux",
+            "os_domain": "kernel.org",
+            "os_logo_url": "https://cdn.simpleicons.org/linux/FCC624",
             "kernel": KERNEL,
             "public_domain": detect_system_dns_domain(),
             "local_ip": SERVER_LOCAL_IP
@@ -3014,8 +3202,9 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         )
         self.send_header(
             'Content-Security-Policy',
-            f"default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com data:; "
-            f"connect-src 'self' https://api.github.com ws: wss: https://*.cminewar.duckdns.org https://*.duckdns.org; "
+            f"default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com data: blob:; "
+            f"img-src 'self' data: blob: https: http:; "
+            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com ws: wss: https://*.cminewar.duckdns.org https://*.duckdns.org; "
             f"frame-src 'self' https://cminewar.duckdns.org https://*.cminewar.duckdns.org https://*.duckdns.org https://*.{dom}; "
             f"frame-ancestors {csp_ancestors};"
         )
@@ -3082,6 +3271,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             }
             base_payload["version_info"] = get_version_info(force_refresh=False)
             base_payload["version_info"]["public_domain"] = req_domain
+            with CUSTOM_LOGOS_LOCK:
+                base_payload["custom_logos"] = load_custom_logos()
             data = json.dumps(base_payload).encode('utf-8')
 
             self.send_response(200)
@@ -3225,6 +3416,48 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     pass
             traffic = get_dns_traffic_stats(client_filter=client_ip, limit=50)
             resp = json.dumps(traffic).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 2f. LOGOS PERSONALIZADOS Y BÚSQUEDA AUTOMÁTICA DE LOGOS EN LA WEB
+        elif clean_path == "/api/custom-logos":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            with CUSTOM_LOGOS_LOCK:
+                logos = load_custom_logos()
+            resp = json.dumps({"logos": logos}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        elif clean_path == "/api/logos/search":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            q_val = ""
+            if "?" in self.path:
+                try:
+                    q_str = self.path.split("?", 1)[1]
+                    q_params = urllib.parse.parse_qs(q_str)
+                    q_val = q_params.get("q", [""])[0]
+                except Exception:
+                    pass
+            results = search_logos_catalog(q_val)
+            resp = json.dumps({"query": q_val, "results": results}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
@@ -3877,6 +4110,51 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             res = update_duckdns_now()
             resp = json.dumps(res).encode('utf-8')
             self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 8. Guardar / Restablecer Logo Personalizado (Archivo Local DataURL o URL Web)
+        elif self.path.split('?')[0] == "/api/custom-logos":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 4 * 1024 * 1024:  # Hasta 4 MB para archivos de imagen locales
+                self.send_response(413)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            post_data = self.rfile.read(content_length).decode('utf-8', errors='ignore')
+            try:
+                body = json.loads(post_data)
+                target_key = (body.get('key') or '').strip()
+                logo_val = (body.get('logo') or '').strip()
+            except Exception:
+                target_key, logo_val = '', ''
+
+            if not target_key or len(target_key) > 120:
+                resp = json.dumps({"success": False, "error": "Identificador de elemento inválido"}).encode('utf-8')
+                self.send_response(400)
+            else:
+                with CUSTOM_LOGOS_LOCK:
+                    logos = load_custom_logos()
+                    if logo_val:
+                        logos[target_key] = logo_val
+                    elif target_key in logos:
+                        del logos[target_key]
+                    save_custom_logos(logos)
+                resp = json.dumps({"success": True, "key": target_key, "logos": logos}).encode('utf-8')
+                self.send_response(200)
+
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
             self.send_header('Content-Length', str(len(resp)))
