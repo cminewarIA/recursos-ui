@@ -18,7 +18,7 @@
 - **Regla obligatoria**: Cada vez que se realice cualquier modificación, corrección, nueva funcionalidad, cambio de diseño o ajuste arquitectónico en el proyecto, se debe actualizar inmediatamente el archivo `README.md` con la descripción de los cambios y el estado actual del sistema.
 - **Objetivo**: Garantizar que la documentación del repositorio refleje fielmente en todo momento las características, estructura de directorios, endpoints y funcionamiento real del proyecto tanto en GitHub como en Google AI Studio.
 
-## 5. Control de Versión Unificado y Actualización Obligatoria (`VERSION`)
+## 5. Control de Versión Unificado y Criterio Estricto de Incremento (`VERSION`)
 - **Regla obligatoria**: 
   1. **Punto Único de Verdad**: La versión de la aplicación se define en un único archivo canónico: `/home/servidor/servicios/dashboard/VERSION`. Queda estrictamente prohibido codificar números de versión estáticos o hardcodeados en HTML, scripts o endpoints.
   2. **Consumo Centralizado**:
@@ -26,5 +26,9 @@
      - El frontend (`static/index.html` e `index.html`) actualiza de forma reactiva todos los elementos visuales (sidebar, cabecera, tarjeta de vista general y vista `/version`) consumiendo el dato centralizado.
      - El archivo `package.json` debe mantenerse permanentemente sincronizado con la misma versión.
   3. **Identificación al Inicio**: Al comenzar cualquier tarea, se debe consultar e identificar la versión activa en `VERSION`.
-  4. **Incremento al Finalizar**: Al concluir las modificaciones y antes de confirmar el commit y hacer `git push`, se debe incrementar el número de versión en `VERSION` (siguiendo versionado semántico: `MAJOR.MINOR.PATCH`, ej. de `2.1.0` a `2.2.0`), registrando el salto de versión en el mensaje del commit y en la documentación.
+  4. **Criterio Estricto para Subir Versiones (`MAJOR.MINOR.PATCH`)**:
+     Al concluir las modificaciones y antes de confirmar el commit y hacer `git push`, se debe incrementar el número de versión según los siguientes criterios específicos definidos por el usuario:
+     - **`X.0.0` (Cambio de Diseño)**: Se incrementa el primer número (`MAJOR`) **únicamente cuando se realiza un cambio de diseño** (diseño visual, maquetación, temas, rediseño de interfaz o estilo). **Los otros dos números se restablecen obligatoriamente a 0** (ejemplo: de `4.9.1` pasa a `5.0.0`).
+     - **`0.X.0` (Añadir o Quitar una Función)**: Se incrementa el segundo número (`MINOR`) **cuando se añade una nueva función o se retira una función existente**. El tercer número se restablece obligatoriamente a 0 (ejemplo: de `4.9.1` pasa a `4.10.0`).
+     - **`0.0.X` (Actualización o Ajuste de Pequeños Detalles)**: Se incrementa el tercer número (`PATCH`) **cuando se actualiza algo existente, se corrigen errores (bugfixes) o se ajustan pequeños detalles** (modificación de textos, reglas, ajustes de rendimiento o documentación sin alterar funciones completas ni el diseño general) (ejemplo: de `4.9.0` pasa a `4.9.1`).
 

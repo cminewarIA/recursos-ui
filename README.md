@@ -1,8 +1,16 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.9.0`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.9.1`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.9.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap / CartoDB Dark Matter)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.9.1`)**, telemetría de hardware en tiempo real, auditoría de red con **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap / CartoDB Dark Matter)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.9.1`
+- **Estandarización del Criterio Estricto de Versionado Semántico (`GEMINI.md`)**:
+  - Incorporada la regla formal de control de versiones unificado:
+    - **`X.0.0` (Cambio de Diseño)**: Se sube el primer número ante cambios de diseño/interfaz y se restablecen a 0 los otros dos.
+    - **`0.X.0` (Añadir o Quitar Función)**: Se sube el segundo número al añadir o retirar funciones y se restablece a 0 el tercer número.
+    - **`0.0.X` (Actualización o Ajuste de Pequeños Detalles)**: Se sube el tercer número ante correcciones, actualizaciones menores, reglas o documentación.
+  - Sincronización automática de directrices para Google AI Studio y Antigravity.
 
 ## ✨ Novedades en `v4.9.0`
 - **Exclusividad del Motor de Mapa Libre y Autónomo (OpenStreetMap / CartoDB Dark Matter)**:

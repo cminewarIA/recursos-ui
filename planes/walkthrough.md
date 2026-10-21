@@ -1,26 +1,15 @@
-# Recorrido de Verificación: Motor Exclusivo Libre OpenStreetMap (v4.9.0)
+# Recorrido de Verificación: Criterio Estricto de Incremento de Versiones (v4.9.1)
 
-Se ha completado la configuración para dejar de manera exclusiva el **mapa gratuito y libre de OpenStreetMap / CartoDB Dark Matter**, eliminando por completo cualquier dependencia, clave de API o modal de Google Maps.
+Se ha documentado, estandarizado y aplicado con precisión el criterio definido por el usuario para la asignación y subida de versiones:
 
-## Cambios Realizados
-1. **Frontend (`index.html` y `static/index.html`):**
-   - Eliminado el diálogo `#mapEngineModal` y los controles de selección de motor cartográfico.
-   - Reemplazado el botón de configuración por la insignia informativa `🗺️ OpenStreetMap (Libre)`.
-   - Simplificado el overlay de inicialización (`#networkConnectionsMapStatus`), eliminando botones redundantes.
-   - Refactorizado `NetworkConnectionsMapEngine` para operar exclusivamente con **Leaflet.js**:
-     - Carga directa y reactiva con teselas CartoDB Dark Matter (`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`).
-     - Renderizado de nodo servidor, conexiones remotas (entrantes en verde `#10B981`, salientes en cian `#06B6D4`, bloqueadas en rojo `#F43F5E`) y polilíneas direccionales.
-     - Conservadas las funciones de auto-encuadre `fitAllBounds()`, centrado de host `focusServerNode()` y enfoque por ID `focusConnectionById()`.
-     - Eliminadas funciones obsoletas y bloques de script superfluos.
-2. **Backend (`server.py`):**
-   - Endpoint `/api/maps/config` simplificado para responder de inmediato `{ "engine": "leaflet", "provider": "OpenStreetMap", "free": true }`.
-   - Eliminada la inyección de claves de Google Maps en el payload de métricas.
-3. **Versión y Repositorio:**
-   - Versión incrementada a `4.9.0` en `VERSION` y `package.json`.
-   - Actualizado `README.md` con la sección `## ✨ Novedades en v4.9.0`.
-   - Documentación y planes guardados en `planes/`.
+## Regla Estandarizada
+- **`X.0.0` (Cambio de Diseño)**: Se incrementa el primer número (`MAJOR`) ante cambios visuales, temas, interfaces o estructura visual. Los otros dos números se restablecen obligatoriamente a `0`.
+- **`0.X.0` (Añadir o Quitar una Función)**: Se incrementa el segundo número (`MINOR`) al añadir o remover una funcionalidad en el sistema. El tercer número se restablece obligatoriamente a `0`.
+- **`0.0.X` (Actualización o Ajuste de Pequeños Detalles)**: Se incrementa el tercer número (`PATCH`) cuando se corrigen errores (bugfixes), se actualiza una función existente, o se realizan ajustes menores de código, reglas o documentación.
 
-## Pruebas Realizadas
-- `sudo systemctl restart system-dashboard.service`: Servicio reiniciado y en ejecución activa.
-- `curl -s http://127.0.0.1:8085/api/maps/config`: Verificado retorno de `{ "engine": "leaflet", "provider": "OpenStreetMap", "free": true }`.
-- `curl -s http://127.0.0.1:8085/api/version`: Verificada versión `4.9.0`.
+## Archivos Modificados
+1. **[GEMINI.md](file:///home/servidor/servicios/dashboard/GEMINI.md)**: Actualizada la regla obligatoria 5 con la descripción exacta del criterio `X.0.0`, `0.X.0` y `0.0.X`.
+2. **[VERSION](file:///home/servidor/servicios/dashboard/VERSION)**: Incrementada de `4.9.0` a `4.9.1` (ajuste menor de reglas/documentación).
+3. **[package.json](file:///home/servidor/servicios/dashboard/package.json)**: Sincronizada con `4.9.1`.
+4. **[README.md](file:///home/servidor/servicios/dashboard/README.md)**: Documentadas las novedades de la versión `v4.9.1`.
+5. **[planes/](file:///home/servidor/servicios/dashboard/planes/)**: Planes y recorridos guardados para sincronización permanente entre Google AI Studio y Antigravity.
