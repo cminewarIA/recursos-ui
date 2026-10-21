@@ -3,10 +3,10 @@
 <a id="slide-01"></a>
 
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
-### *Apple Liquid Glass meets Tesla Touch Cockpit — Presentación Interactiva de Ingeniería (v4.13.1)*
+### *Apple Liquid Glass meets Tesla Touch Cockpit — Presentación Interactiva de Ingeniería (v4.14.0)*
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Versi%C3%B3n_Can%C3%B3nica-v4.13.1-0A84FF?style=for-the-badge&logo=apple&logoColor=white" alt="Version v4.13.1" />
+  <img src="https://img.shields.io/badge/Versi%C3%B3n_Can%C3%B3nica-v4.14.0-0A84FF?style=for-the-badge&logo=apple&logoColor=white" alt="Version v4.14.0" />
   <img src="https://img.shields.io/badge/Est%C3%A9tica-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white" alt="Apple Liquid Glass + Tesla UI" />
   <img src="https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white" alt="Zero Hardcoding" />
   <img src="https://img.shields.io/badge/Rendimiento-60_FPS_HiDPI_Retina-FF9F0A?style=for-the-badge&logo=speedtest&logoColor=white" alt="60 FPS Retina" />
@@ -25,7 +25,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO ACTIVO: SERVIDOR CENTRAL   │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO  │  📡 PI-HOLE DNS  │ v4.13.1 ║
+║  🟢 NODO ACTIVO: SERVIDOR CENTRAL   │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO  │  📡 PI-HOLE DNS  │ v4.14.0 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                      ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────┐  ┌──────────────────────┐   ║
@@ -48,7 +48,7 @@
 <summary>🎙️ <b>Notas del Orador — Slide 01: ¿Qué es System Cockpit? (Haz clic para desplegar)</b></summary>
 <br>
 
-> **Bienvenidos a la presentación oficial de System Cockpit (`v4.13.1`).**
+> **Bienvenidos a la presentación oficial de System Cockpit (`v4.14.0`).**
 > Este proyecto nace con una premisa radical: **¿Por qué los paneles de administración de servidores Linux parecen hojas de cálculo de los años 90 cuando conducimos vehículos con pantallas táctiles de 60 fotogramas por segundo?**
 >
 > System Cockpit fusiona dos filosofías de diseño líderes en el mundo:
@@ -136,7 +136,7 @@ graph LR
 
 </div>
 
-## 🌍 SLIDE 03 · Mapa Mundial de Tráfico, Clustering Dinámico y Motor GeoIP (`v4.1.0` – `v4.13.0`)
+## 🌍 SLIDE 03 · Mapa Mundial de Tráfico, Clustering Dinámico y Motor GeoIP (`v4.1.0` – `v4.14.0`)
 
 ### Visibilidad Planetaria desde el Nodo Central en Gran Canaria
 
@@ -150,6 +150,7 @@ flowchart TD
     C -- "Miss" --> Q["📥 Cola Asíncrona Background Worker\n(Lotes de hasta 15 IPs / 1.8s)"]
     Q --> API["🌐 Fetch No-Bloqueante a ip-api.com\n(País, Ciudad, Lat/Lon, ISP, ASN)"]
     API --> LRU["🧹 Utilidad de Poda LRU (v4.13.0)\n(Límite estricto: GEOIP_MAX_ENTRIES = 500)"]
+    API -. "Error / Rate-Limit / Timeout" .-> TERM["🖥️ Terminal de Errores del Nodo Principal\n(MainNodeErrorTerminal · v4.14.0)"]
     LRU --> M
     M --> CL["🔍 Clustering Espacial en Píxeles + Persistencia de Popup en 5 Niveles"]
 ```
@@ -169,6 +170,9 @@ flowchart TD
 * **⚡ Background Worker GeoIP + Poda Automática LRU (`v4.13.0`)**:
   * **Worker Asíncrono No Bloqueante**: Resuelve direcciones IP remotas contra `ip-api.com` en segundo plano en lotes de hasta **15 IPs cada 1.8 segundos**, enriqueciendo los nodos en vivo sin congelar jamás el hilo principal.
   * **Limpieza Automática de `localStorage` (`pruneGeoIpCacheStorage`)**: Cuando la caché supera el umbral `GEOIP_MAX_ENTRIES = 500`, el recolector elimina primero las entradas expiradas (`TTL > 24h`) y después desaloja las entradas más antiguas por marca de tiempo (`ts`), protegiendo la cuota de almacenamiento del navegador incluso ante tormentas de miles de IPs P2P/BitTorrent.
+* **🖥️ Terminal del Nodo Principal: Captura en Tiempo Real de Errores GeoIP & Red (`v4.14.0`)**:
+  * **Telemetría Unificada Cliente + Servidor**: El módulo `MainNodeErrorTerminal` intercepta en tiempo real fallos de peticiones HTTP (`4xx/5xx/429`), caídas de red (`NET_ERR`), tiempos de espera agotados (`TIMEOUT`) con medición de latencia en milisegundos, excepciones del **Worker GeoIP** (`ip-api.com/batch` y `/api/net/geoip/resolve`) y el historial de errores del worker backend (`geoip_worker.error_history`).
+  * **Triple Punto de Inspección Sincronizado**: Integrado bajo el banner de comando del Nodo Principal en *Vista General*, en la tarjeta del mapa de la pestaña *Red* y directamente dentro del popup interactivo de `🖥️ NODO CENTRAL DEL SERVIDOR` en el mapa mundial, con filtros por origen (*Todos*, *GeoIP Worker*, *Peticiones Red*) y botón **`🗑️ Limpiar historial`** sincronizado con `POST /api/net/geoip/clear-errors`.
 
 <details>
 <summary>🎙️ <b>Notas del Orador — Slide 03: Ingeniería del Mapa y Memoria GeoIP (Haz clic para desplegar)</b></summary>
@@ -510,13 +514,13 @@ graph TD
 | `/ram` | **💾 Memoria (RAM)** | Desglose física/caché/buffers, presión PSI, uso de Swap/Zram y procesos intensivos en memoria. |
 | `/gpu` | **🎮 Gráficos (GPU)** | Telemetría NVIDIA (`nvidia-smi`) y DRM/Sysfs, VRAM dedicada, temperatura, potencia y motores de vídeo. |
 | `/almacenamiento` | **💿 Almacenamiento** | Capacidad de particiones reales, IOPS de lectura/escritura, tiempos de espera y salud S.M.A.R.T. |
-| `/red` | **🌐 Red & Mapa Mundial** | Mapa geodésico OpenStreetMap, gráfico de pastel D3.js, flujos LAN/WAN Pi-hole, alerta Mbps y bloqueo IP. |
+| `/red` | **🌐 Red & Mapa Mundial** | Mapa geodésico OpenStreetMap, terminal de errores GeoIP/Red del nodo principal, gráfico D3.js, flujos Pi-hole y bloqueo IP. |
 | `/seguridad` | **🛡️ Seguridad / IPS** | Jaulas Fail2ban, bloqueo/desbloqueo manual y en 1 clic, intentos SSH fallidos y puertos `LISTEN`. |
 | `/servicios` | **⚙️ Servicios Linux** | Estado de demonios `systemd`, memoria por servicio, logs recientes y control de reinicio/parada. |
 | `/docker` | **🐳 Contenedores Docker** | Estadísticas en vivo por contenedor (CPU, RAM, Red, Puertos) y acciones de ciclo de vida. |
 | `/descargas` | **⬇️ qBittorrent** | Cola de descargas y subidas P2P, velocidades en tiempo real, progreso, ratio y espacio disponible. |
 | `/emby` | **🎬 Emby Media** | Catálogo de películas y series, sesiones de streaming activas, usuarios conectados y últimos añadidos. |
-| `/duckdns` · `/version` | **🦆 DuckDNS & 📦 Versión** | Estado de sincronización de IP pública dinámica y auditoría de la versión canónica activa (`v4.13.1`). |
+| `/duckdns` · `/version` | **🦆 DuckDNS & 📦 Versión** | Estado de sincronización de IP pública dinámica y auditoría de la versión canónica activa (`v4.14.0`). |
 
 </details>
 
@@ -526,8 +530,10 @@ graph TD
 
 | Método | Endpoint | Función Técnica |
 | :--- | :--- | :--- |
-| `GET` | `/api/metrics` | Payload maestro unificado (CPU, RAM, GPU, Discos, Red, Flujos Pi-hole, Seguridad, Servicios, Logos y Versión). |
-| `GET` | `/api/version` | Devuelve la versión canónica leída dinámicamente desde `./VERSION` (`4.13.1`). |
+| `GET` | `/api/metrics` | Payload maestro unificado (CPU, RAM, GPU, Discos, Red, Flujos Pi-hole, Worker GeoIP + Errores, Seguridad, Servicios, Logos y Versión). |
+| `GET` | `/api/version` | Devuelve la versión canónica leída dinámicamente desde `./VERSION` (`4.14.0`). |
+| `POST` | `/api/net/geoip/resolve` | Resuelve lotes de IPs públicas contra `ip-api.com/batch` con caché LRU/TTL y telemetría del Worker GeoIP. |
+| `POST` | `/api/net/geoip/clear-errors` | Limpia el historial de errores en memoria del Worker GeoIP del nodo principal (`GEOIP_ERROR_HISTORY`). |
 | `POST` | `/api/security/ban` | Bloquea una IP pública maliciosa en Fail2ban (`fail2ban-client`) o firewall (`iptables` / `ufw`). |
 | `POST` | `/api/security/unban` | Retira el bloqueo de una IP previamente sancionada en todas las jaulas y reglas activas. |
 | `POST` | `/api/service/action` | Ejecuta acciones autorizadas (`restart`, `start`, `stop`) sobre servicios en lista blanca. |
@@ -558,9 +564,13 @@ graph TD
 * **`0.0.X` (`PATCH`)**: Corrección de bugs, optimizaciones de detalle o actualización de documentación interactiva.
 
 <details open>
-<summary>🏆 <b>Serie v4.10.0 – v4.13.1: Inteligencia GeoIP, Analítica D3.js y Presentación Keynote (Actual)</b></summary>
+<summary>🏆 <b>Serie v4.10.0 – v4.14.0: Inteligencia GeoIP, Terminal de Errores del Nodo Principal, Analítica D3.js y Presentación Keynote (Actual)</b></summary>
 <br>
 
+* **`v4.14.0` (MINOR — Terminal de Errores en Tiempo Real del Nodo Principal para Worker GeoIP y Peticiones de Red)**:
+  * Nuevo componente **`MainNodeErrorTerminal`** integrado en el **Nodo Principal** (*Vista General*, tarjeta del mapa en *Red* y popup interactivo `🖥️ NODO CENTRAL DEL SERVIDOR` en el mapa mundial).
+  * Captura en tiempo real de errores del **Worker GeoIP** (`ip-api.com/batch`, rate-limits HTTP 429, fallos de resolución DNS/GeoIP en `server.py` y Web Worker en cliente) y de **peticiones de red HTTP** (`window.fetch` no-2xx, caídas de red y timeouts con latencia en `ms`).
+  * Filtros rápidos por origen (*Todos*, *GeoIP Worker*, *Peticiones Red*), persistencia acotada en `localStorage` y botón **`🗑️ Limpiar historial`** conectado al nuevo endpoint `POST /api/net/geoip/clear-errors`.
 * **`v4.13.1` (PATCH — Presentación Interactiva Keynote en `README.md`)**:
   * Transformación integral de `README.md` en una presentación interactiva de **10 diapositivas estilo Apple Keynote & Tesla Cockpit** con barra de controles, diagramas Mermaid de arquitectura y secuencia, wireframes ASCII, notas del orador desplegables y comparativa evolutiva.
   * Almacenamiento de planes y walkthroughs de verificación en `./planes/`.
@@ -617,7 +627,7 @@ graph TD
 
 ```text
 .
-├── VERSION                  # Punto Único de Verdad de la versión activa (4.13.1)
+├── VERSION                  # Punto Único de Verdad de la versión activa (4.14.0)
 ├── README.md                # Deck Interactivo Keynote de 10 Diapositivas (este documento)
 ├── GEMINI.md                # Constitución del proyecto y reglas Zero-Hardcoding
 ├── server.py                # Backend principal Python (Telemetría Kernel, Pi-hole DNS, Fail2ban IPS)
@@ -643,7 +653,7 @@ npm install && npm run dev
 <div align="center">
 <br>
 
-| ⏮️ Anterior | 🛸 **FIN DE LA PRESENTACIÓN — SYSTEM COCKPIT v4.13.1** | 🏠 Inicio |
+| ⏮️ Anterior | 🛸 **FIN DE LA PRESENTACIÓN — SYSTEM COCKPIT v4.14.0** | 🏠 Inicio |
 | :--- | :---: | ---: |
 | [**◀ Slide 09: Comparativa & Rutas API**](#slide-09) | *Diseñado con precisión óptica Liquid Glass y telemetría 100% Zero-Hardcoding* | [**⏮ Volver a Slide 01: Portada**](#slide-01) |
 

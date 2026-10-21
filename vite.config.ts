@@ -328,7 +328,59 @@ const geoIpWorkerStats = {
   lastSyncStr: '--',
   dirtyDisk: false,
   lastDiskSaveMs: 0,
+  errorsTotal: 0,
 };
+
+interface GeoIpWorkerErrorEntry {
+  id: string;
+  ts: number;
+  time_str: string;
+  source: string;
+  stage: string;
+  target: string;
+  code: string;
+  message: string;
+}
+
+const GEOIP_MAX_ERROR_HISTORY = 80;
+const geoIpErrorHistory: GeoIpWorkerErrorEntry[] = [];
+
+function recordGeoIpWorkerError(source: string, stage: string, target: string, code: string, message: string) {
+  const nowMs = Date.now();
+  const d = new Date(nowMs);
+  const timeStr = d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  const entry: GeoIpWorkerErrorEntry = {
+    id: `srv_err_${nowMs}_${geoIpErrorHistory.length}`,
+    ts: nowMs,
+    time_str: timeStr,
+    source: source || 'GEOIP_WORKER',
+    stage: stage || 'ip-api.com',
+    target: target || '--',
+    code: code || 'ERROR',
+    message: message || 'Error de resolución',
+  };
+  geoIpWorkerStats.errorsTotal++;
+  if (geoIpErrorHistory.length > 0) {
+    const last = geoIpErrorHistory[0];
+    if (last.target === entry.target && last.code === entry.code && nowMs - last.ts < 5000) {
+      last.ts = nowMs;
+      last.time_str = timeStr;
+      last.message = entry.message;
+      return;
+    }
+  }
+  geoIpErrorHistory.unshift(entry);
+  if (geoIpErrorHistory.length > GEOIP_MAX_ERROR_HISTORY) {
+    geoIpErrorHistory.length = GEOIP_MAX_ERROR_HISTORY;
+  }
+}
+
+function clearGeoIpWorkerErrors(): number {
+  const cleared = geoIpErrorHistory.length;
+  geoIpErrorHistory.length = 0;
+  geoIpWorkerStats.errorsTotal = 0;
+  return cleared;
+}
 
 function loadGeoIpDiskCache() {
   try {
@@ -422,6 +474,8 @@ function getGeoIpWorkerSummary() {
     pending_queue: geoIpPendingQueue.size,
     rate_limit_remaining: geoIpWorkerStats.rateLimitRemaining,
     last_sync: geoIpWorkerStats.lastSyncStr,
+    errors_count: geoIpErrorHistory.length,
+    error_history: geoIpErrorHistory.slice(0, 40),
   };
 }
 
@@ -696,18 +750,25 @@ async function resolveGeoIpBatchFromIpApi(ipsToResolve: string[]): Promise<Recor
             geoIpWorkerStats.dirtyDisk = true;
           } else {
             geoIpNegativeCache.set(qIp, Date.now());
+            const failMsg = String(item.message || 'IP no resoluble por ip-api.com');
+            recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', qIp, 'GEOIP_FAIL', `Fallo al geolocalizar IP ${qIp}: ${failMsg}`);
           }
         }
         for (const reqIp of batchSlice) {
           if (!seenQueries.has(reqIp)) {
             geoIpPendingQueue.delete(reqIp);
             geoIpNegativeCache.set(reqIp, Date.now());
+            recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', reqIp, 'NO_RESPONSE', `Sin respuesta en lote GeoIP para ${reqIp}`);
           }
         }
+      } else if (batchResp.rlRemaining === 0) {
+        recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', `Lote (${batchSlice.length} IPs)`, 'HTTP 429', 'Límite de tasa alcanzado en ip-api.com/batch (HTTP 429)');
       }
+    } else {
+      recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', `Lote (${batchSlice.length} IPs)`, 'NET_ERR', 'Sin respuesta o timeout al conectar con ip-api.com/batch');
     }
-  } catch {
-    // Non-blocking error handling
+  } catch (err) {
+    recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', `Lote (${batchSlice.length} IPs)`, 'NET_ERR', `Excepción en Worker GeoIP: ${err instanceof Error ? err.message : String(err)}`);
   } finally {
     geoIpWorkerStats.status = 'active';
   }
@@ -1294,11 +1355,25 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
                 })
               );
             } catch {
+              recordGeoIpWorkerError('NET_REQUEST', '/api/net/geoip/resolve', 'POST body', 'HTTP 400', 'Solicitud GeoIP con payload JSON inválido');
               res.statusCode = 400;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ success: false, error: 'Solicitud GeoIP inválida' }));
             }
           });
+          return;
+        }
+
+        if (url === '/api/net/geoip/clear-errors' && (req.method === 'POST' || req.method === 'DELETE')) {
+          const clearedCount = clearGeoIpWorkerErrors();
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: true,
+              cleared: clearedCount,
+              worker: getGeoIpWorkerSummary(),
+            })
+          );
           return;
         }
 

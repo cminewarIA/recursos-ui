@@ -198,7 +198,9 @@ CONNECTIONS_MAP_CACHE = {
         "api_batches_sent": 0,
         "pending_queue": 0,
         "rate_limit_remaining": 15,
-        "last_sync": "--"
+        "last_sync": "--",
+        "errors_count": 0,
+        "error_history": []
     }
 }
 CONNECTIONS_MAP_LOCK = threading.Lock()
@@ -208,10 +210,12 @@ GEOIP_TTL_SECONDS = 7 * 86400  # 7 days TTL for resolved GeoIP entries
 GEOIP_NEG_TTL_SECONDS = 900    # 15 minutes cooldown for unresolvable/failed IPs
 GEOIP_MAX_ENTRIES = 2000
 GEOIP_MAX_CACHE_ENTRIES = GEOIP_MAX_ENTRIES
+GEOIP_MAX_ERROR_HISTORY = 80
 
 GEOIP_CACHE = {}           # { ip: { "lat", "lng", "city", "region", "country", "country_code", "isp", "asn", "ts" } }
 GEOIP_NEGATIVE_CACHE = {}  # { ip: ts_failed }
 GEOIP_PENDING_QUEUE = set()
+GEOIP_ERROR_HISTORY = []   # [ { "id", "ts", "time_str", "source", "stage", "target", "code", "message" } ]
 GEOIP_WAKE_EVENT = threading.Event()
 SERVER_SELF_GEO = {}
 RECENT_HTTP_CLIENTS = {}   # { ip: { "ip", "port", "ts", "service" } }
@@ -227,8 +231,45 @@ GEOIP_WORKER_STATS = {
     "last_sync_ts": 0.0,
     "last_sync_str": "--",
     "dirty_disk": False,
-    "last_disk_save_ts": 0.0
+    "last_disk_save_ts": 0.0,
+    "errors_total": 0
 }
+
+def record_geoip_worker_error(source, stage, target, code, message):
+    """Registra en tiempo real errores del Worker GeoIP y de peticiones de red asociadas."""
+    now_ms = int(time.time() * 1000)
+    time_str = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    entry = {
+        "id": f"srv_err_{now_ms}_{len(GEOIP_ERROR_HISTORY)}",
+        "ts": now_ms,
+        "time_str": time_str,
+        "source": str(source or "GEOIP_WORKER"),
+        "stage": str(stage or "ip-api.com"),
+        "target": str(target or "--"),
+        "code": str(code or "ERROR"),
+        "message": str(message or "Error de resolución")
+    }
+    with GEOIP_LOCK:
+        GEOIP_WORKER_STATS["errors_total"] = GEOIP_WORKER_STATS.get("errors_total", 0) + 1
+        # Evitar duplicar exactamente el mismo objetivo y código en una ventana de 5s
+        if GEOIP_ERROR_HISTORY:
+            last = GEOIP_ERROR_HISTORY[0]
+            if last.get("target") == entry["target"] and last.get("code") == entry["code"] and (now_ms - last.get("ts", 0) < 5000):
+                last["ts"] = now_ms
+                last["time_str"] = time_str
+                last["message"] = entry["message"]
+                return
+        GEOIP_ERROR_HISTORY.insert(0, entry)
+        if len(GEOIP_ERROR_HISTORY) > GEOIP_MAX_ERROR_HISTORY:
+            del GEOIP_ERROR_HISTORY[GEOIP_MAX_ERROR_HISTORY:]
+
+def clear_geoip_worker_errors():
+    """Limpia el historial de errores en tiempo real del Worker GeoIP en el servidor."""
+    with GEOIP_LOCK:
+        cleared = len(GEOIP_ERROR_HISTORY)
+        GEOIP_ERROR_HISTORY.clear()
+        GEOIP_WORKER_STATS["errors_total"] = 0
+        return cleared
 
 PORT_SERVICE_LABELS = {
     20: "FTP Datos",
@@ -431,7 +472,9 @@ def get_geoip_worker_summary():
             "api_ips_resolved": GEOIP_WORKER_STATS["api_ips_resolved"],
             "pending_queue": len(GEOIP_PENDING_QUEUE),
             "rate_limit_remaining": GEOIP_WORKER_STATS["rate_limit_remaining"],
-            "last_sync": GEOIP_WORKER_STATS["last_sync_str"]
+            "last_sync": GEOIP_WORKER_STATS["last_sync_str"],
+            "errors_count": len(GEOIP_ERROR_HISTORY),
+            "error_history": list(GEOIP_ERROR_HISTORY[:40])
         }
 
 def enqueue_remote_ips_for_geoip(ips_iterable):
@@ -530,18 +573,34 @@ def resolve_geoip_batch_from_ip_api(ip_list):
                             GEOIP_WORKER_STATS["dirty_disk"] = True
                         else:
                             GEOIP_NEGATIVE_CACHE[q_ip] = time.time()
+                            fail_msg = str(item.get("message") or "IP no resoluble por ip-api.com")
+                            record_geoip_worker_error("GEOIP_WORKER", "ip-api.com/batch", q_ip, "GEOIP_FAIL", f"Fallo al geolocalizar IP {q_ip}: {fail_msg}")
 
                     for req_ip in batch_slice:
                         if req_ip not in seen_queries:
                             GEOIP_PENDING_QUEUE.discard(req_ip)
                             GEOIP_NEGATIVE_CACHE[req_ip] = time.time()
+                            record_geoip_worker_error("GEOIP_WORKER", "ip-api.com/batch", req_ip, "NO_RESPONSE", f"Sin respuesta en lote GeoIP para {req_ip}")
     except urllib.error.HTTPError as he:
         with GEOIP_LOCK:
             if he.code == 429:
                 GEOIP_WORKER_STATS["rate_limit_remaining"] = 0
                 GEOIP_WORKER_STATS["rate_limit_reset_ts"] = time.time() + 62.0
-    except Exception:
-        pass
+        record_geoip_worker_error(
+            "GEOIP_WORKER",
+            "ip-api.com/batch",
+            f"Lote ({len(batch_slice)} IPs)",
+            f"HTTP {he.code}",
+            f"Error HTTP {he.code} ({getattr(he, 'reason', 'HTTPError')}) al consultar ip-api.com/batch"
+        )
+    except Exception as ex:
+        record_geoip_worker_error(
+            "GEOIP_WORKER",
+            "ip-api.com/batch",
+            f"Lote ({len(batch_slice)} IPs)",
+            "NET_ERR",
+            f"Excepción de red en Worker GeoIP: {str(ex)}"
+        )
     finally:
         with GEOIP_LOCK:
             GEOIP_WORKER_STATS["status"] = "active"
@@ -793,8 +852,22 @@ def fetch_connections_geo_worker():
                                     "ts": now
                                 }
                                 GEOIP_WORKER_STATS["dirty_disk"] = True
-                except Exception:
-                    pass
+                        else:
+                            record_geoip_worker_error(
+                                "GEOIP_WORKER",
+                                "ip-api.com/json",
+                                SERVER_LOCAL_IP,
+                                "SELF_GEO_FAIL",
+                                f"Fallo al consultar IP WAN propia: {sdata.get('message', 'status!=success')}"
+                            )
+                except Exception as self_ex:
+                    record_geoip_worker_error(
+                        "GEOIP_WORKER",
+                        "ip-api.com/json",
+                        "WAN Self-IP",
+                        "NET_ERR",
+                        f"Error de red al resolver IP pública del nodo: {str(self_ex)}"
+                    )
 
             # 2. Resolve active DNS outbound targets
             for host_name, port_num, proto_str, svc_label in outbound_targets:
@@ -809,8 +882,14 @@ def fetch_connections_geo_worker():
                                 "protocol": proto_str,
                                 "service": svc_label
                             }
-                    except Exception:
-                        pass
+                    except Exception as dns_ex:
+                        record_geoip_worker_error(
+                            "NET_REQUEST",
+                            "DNS Lookup",
+                            host_name,
+                            "DNS_ERR",
+                            f"No se pudo resolver el host saliente {host_name}: {str(dns_ex)}"
+                        )
 
             # 3. Inspect active kernel sockets via psutil.net_connections
             listening_map = update_listening_ports_map()
@@ -5562,6 +5641,28 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             resp = json.dumps({
                 "success": True,
                 "results": resolved_map,
+                "worker": get_geoip_worker_summary()
+            }).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 9b. Limpiar historial de errores del Worker GeoIP en el nodo principal
+        elif self.path.split('?')[0] == "/api/net/geoip/clear-errors":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            cleared_count = clear_geoip_worker_errors()
+            resp = json.dumps({
+                "success": True,
+                "cleared": cleared_count,
                 "worker": get_geoip_worker_summary()
             }).encode('utf-8')
             self.send_response(200)
