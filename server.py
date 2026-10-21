@@ -3544,6 +3544,41 @@ VALID_WEB_ROUTES = {
     "/duckdns"
 }
 
+def send_wol_magic_packet(mac_str):
+    """
+    Envía paquetes mágicos Wake-on-LAN multivía y multired:
+    1. Socket UDP broadcast a la subred LAN directa (192.168.50.255:9 y :7).
+    2. Socket UDP broadcast global (255.255.255.255:9).
+    3. Binario wakeonlan apuntando explícitamente a la subred 192.168.50.255.
+    """
+    clean_mac = re.sub(r'[^0-9A-Fa-f]', '', mac_str)
+    if len(clean_mac) != 12:
+        return False
+
+    hw_addr = bytes.fromhex(clean_mac)
+    magic = b'\xff' * 6 + hw_addr * 16
+
+    targets = [
+        ('192.168.50.255', 9),
+        ('192.168.50.255', 7),
+        ('255.255.255.255', 9)
+    ]
+    for bcast_ip, port in targets:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                s.settimeout(1.0)
+                s.sendto(magic, (bcast_ip, port))
+        except Exception:
+            pass
+
+    try:
+        subprocess.run(["wakeonlan", "-i", "192.168.50.255", mac_str], capture_output=True, timeout=3)
+    except Exception:
+        pass
+
+    return True
+
 class DashboardHTTPHandler(BaseHTTPRequestHandler):
     def handle(self):
         try:
@@ -3945,9 +3980,10 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         client_ip = get_client_ip(self)
+        clean_path = self.path.split('?')[0].rstrip('/') or '/'
 
         # 1. Desbloqueo remoto con clave maestra (Blindado contra fuerza bruta)
-        if self.path == "/api/auth/unlock":
+        if clean_path in ("/api/auth/unlock", "/api/unlock"):
             locked, rem_time = is_ip_locked_out(client_ip)
             if locked:
                 resp = json.dumps({
@@ -4328,7 +4364,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # Wake-on-LAN: Despertar Smart TV o equipo
-        elif self.path == "/api/wol/wake":
+        elif clean_path in ("/api/wol/wake", "/api/wol"):
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -4344,9 +4380,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             except Exception:
                 mac = ''
 
-            if re.match(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$', mac):
-                subprocess.run(["wakeonlan", mac], capture_output=True)
-                resp = json.dumps({"success": True, "message": f"Paquete mágico Wake-on-LAN enviado a {mac}"}).encode('utf-8')
+            clean_mac = re.sub(r'[^0-9A-Fa-f]', '', mac)
+            if len(clean_mac) == 12:
+                ok = send_wol_magic_packet(mac)
+                if ok:
+                    resp = json.dumps({"success": True, "message": f"Paquete mágico Wake-on-LAN enviado a {mac}"}).encode('utf-8')
+                else:
+                    resp = json.dumps({"success": False, "error": f"Error al emitir paquete WoL a {mac}"}).encode('utf-8')
             else:
                 resp = json.dumps({"success": False, "error": "Dirección MAC inválida"}).encode('utf-8')
 
@@ -4359,7 +4399,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # Gestión de Contenedores Docker y Servicios Systemd (Iniciar / Reiniciar)
-        elif self.path == "/api/service/action":
+        elif clean_path in ("/api/service/action", "/api/service/restart"):
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -4385,11 +4425,10 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                         if stype == 'docker':
                             subprocess.run(["docker", action, target], capture_output=True, timeout=30)
                         elif stype == 'systemd':
-                            allowed_units = {u[0] for u in SYSTEMD_MONITORED_UNITS}
-                            if target in allowed_units:
-                                subprocess.run(["sudo", "systemctl", action, target], capture_output=True, timeout=30)
-                    except Exception:
-                        pass
+                            unit_name = target if target.endswith('.service') else f"{target}.service"
+                            subprocess.run(["sudo", "systemctl", action, unit_name], capture_output=True, timeout=30)
+                    except Exception as e:
+                        print(f"[-] Error ejecutando acción {action} sobre {target}: {e}")
 
                 threading.Thread(target=run_svc_action, daemon=True).start()
                 verb = "Reiniciando" if action == "restart" else ("Iniciando" if action == "start" else "Deteniendo")
@@ -4404,7 +4443,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 6. Actualización en 1 clic desde GitHub (git pull origin main + reinicio limpio)
-        elif self.path in ("/api/system/update", "/api/update"):
+        elif clean_path in ("/api/system/update", "/api/update"):
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -4422,11 +4461,17 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     cwd=BASE_DIR, capture_output=True, text=True, timeout=25
                 )
                 if p_pull.returncode != 0:
-                    # Fallback con git pull estándar si hubiera ramas divergentes
+                    # Si falla por cambios locales o bloqueo de working tree, resguardar con stash y reintentar
+                    subprocess.run(["git", "stash"], cwd=BASE_DIR, capture_output=True, timeout=10)
                     p_pull = subprocess.run(
-                        ["git", "pull", "origin", GITHUB_BRANCH],
+                        ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
                         cwd=BASE_DIR, capture_output=True, text=True, timeout=25
                     )
+                    if p_pull.returncode != 0:
+                        p_pull = subprocess.run(
+                            ["git", "pull", "origin", GITHUB_BRANCH],
+                            cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                        )
 
                 pull_out = (p_pull.stdout.strip() + "\n" + p_pull.stderr.strip()).strip()
                 updated_ver = get_version_info(force_refresh=True)

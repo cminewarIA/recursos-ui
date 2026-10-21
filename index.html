@@ -2124,7 +2124,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 90; /* Below floating dock at 99 */
+      z-index: 1200; /* Modal overlay sits comfortably above floating dock (99) and sidebar (100) */
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.2s ease;
@@ -2142,7 +2142,8 @@
       border-radius: var(--radius-xl);
       width: 100%;
       max-width: 620px;
-      overflow: hidden;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
     }
     .modal-header {
       padding: 18px 22px;
@@ -3770,7 +3771,7 @@
     </div>
   </div>
 
-  <div id="appToast" style="position: fixed; bottom: 92px; right: 20px; z-index: 2500; padding: 12px 18px; border-radius: 14px; background: var(--bg-surface-elevated); border: 1px solid var(--border-highlight); color: var(--text-primary); font-size: 12.5px; font-weight: 600; box-shadow: var(--glass-shadow); backdrop-filter: blur(20px); display: none; align-items: center; gap: 10px; max-width: 390px;">
+  <div id="appToast" style="position: fixed; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 2500; padding: 12px 18px; border-radius: 14px; background: var(--bg-surface-elevated); border: 1px solid var(--border-highlight); color: var(--text-primary); font-size: 12.5px; font-weight: 600; box-shadow: var(--glass-shadow); backdrop-filter: blur(20px); display: none; align-items: center; gap: 10px; width: max-content; max-width: calc(100vw - 32px); pointer-events: none;">
     <span id="appToastIcon">✔</span>
     <span id="appToastText"></span>
   </div>
@@ -6295,7 +6296,7 @@
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                     ${(c.rx_bytes || c.tx_bytes) ? `<div class="mono" style="font-size: 12px; color: var(--text-secondary);">↓ ${formatBytes(c.tx_bytes || 0)} · ↑ ${formatBytes(c.rx_bytes || 0)}</div>` : ''}
                     <button class="action-btn" style="height: 28px; padding: 0 9px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(devLogo.key)}', '${escapeHtml(devTitle)}', '${escapeHtml(devLogo.query)}', '${escapeHtml(devLogo.url)}')" title="Cambiar logo del dispositivo">🖼️ Logo</button>
-                    ${c.mac && c.mac.includes(':') ? `<button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="wakeDevice('${escapeHtml(c.mac)}', '${encodeURIComponent(c.name || c.ip)}')">WoL</button>` : ''}
+                    ${c.mac && c.mac.includes(':') ? `<button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="wakeDevice('${escapeHtml(c.mac)}', '${encodeURIComponent(c.name || c.ip)}', this)" title="Despertar dispositivo por red (Wake-on-LAN)">⚡ WoL</button>` : ''}
                   </div>
                 </div>
               `;
@@ -6326,7 +6327,7 @@
                   </div>
                   <div style="display: flex; align-items: center; gap: 10px;">
                     <span class="adw-badge ${isAct ? 'badge-green' : 'badge-red'}">${isAct ? 'Activo' : 'Detenido'}</span>
-                    <button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11.5px;" onclick="serviceAction('systemd', '${escapeHtml(s.unit)}', 'restart')">Reiniciar</button>
+                    <button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11.5px;" onclick="serviceAction('systemd', '${escapeHtml(s.unit)}', 'restart', this)">Reiniciar</button>
                   </div>
                 </div>
               `;
@@ -6357,7 +6358,7 @@
                   </div>
                   <div style="display: flex; align-items: center; gap: 12px;">
                     <span class="mono" style="font-weight: 700; color: var(--accent-cyan-bright);">${escapeHtml(d.cpu_percent || d.cpu_pct || '0%')}</span>
-                    <button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11.5px;" onclick="serviceAction('docker', '${escapeHtml(d.name)}', '${isRun ? 'restart' : 'start'}')">${isRun ? 'Reiniciar' : 'Iniciar'}</button>
+                    <button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11.5px;" onclick="serviceAction('docker', '${escapeHtml(d.name)}', '${isRun ? 'restart' : 'start'}', this)">${isRun ? 'Reiniciar' : 'Iniciar'}</button>
                   </div>
                 </div>
               `;
@@ -7206,12 +7207,21 @@
       }
     }
 
-    function serviceAction(type, target, action) {
-      const verb = action === 'restart' ? 'reiniciar' : 'iniciar';
+    function serviceAction(type, target, action, btn) {
+      const verb = action === 'restart' ? 'reiniciar' : (action === 'start' ? 'iniciar' : 'detener');
+      const verbing = action === 'restart' ? 'Reiniciando' : (action === 'start' ? 'Iniciando' : 'Deteniendo');
+      const originalHtml = btn ? btn.innerHTML : (action === 'restart' ? 'Reiniciar' : 'Iniciar');
+
       showConfirmModal(
-        `${action === 'restart' ? 'Reiniciar' : 'Iniciar'} servicio`,
+        `${action === 'restart' ? 'Reiniciar' : 'Iniciar'} ${type === 'docker' ? 'contenedor' : 'servicio'}`,
         `¿Confirmas que deseas ${verb} "${target}"?`,
         () => {
+          if (btn) {
+            btn.innerHTML = `⏳ ${verbing}...`;
+            btn.disabled = true;
+          }
+          showToast(`⏳ ${verbing} "${target}"...`, 'info');
+
           fetch('/api/service/action', {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
@@ -7219,25 +7229,77 @@
           })
           .then(r => r.json())
           .then(d => {
-            if (d.success) showToast(d.message || `Comando enviado a ${target}`, 'success');
-            else showToast(d.error || 'No se pudo ejecutar la acción', 'error');
-            setTimeout(updateMetrics, 1200);
+            if (d.success) {
+              if (btn) {
+                btn.innerHTML = '✔ Listo';
+                btn.style.borderColor = 'var(--accent-emerald)';
+                btn.style.color = 'var(--accent-emerald-bright)';
+              }
+              showToast(d.message || `${target} comando enviado con éxito`, 'success');
+            } else {
+              if (btn) btn.innerHTML = '⚠️ Error';
+              showToast(d.error || 'No se pudo ejecutar la acción', 'error');
+            }
+            setTimeout(updateMetrics, 1500);
           })
-          .catch(() => showToast('Error al comunicar con el servidor', 'error'));
+          .catch(() => {
+            if (btn) btn.innerHTML = '⚠️ Error';
+            showToast('Error de comunicación con el servidor', 'error');
+          })
+          .finally(() => {
+            if (btn) {
+              setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+                btn.style.borderColor = '';
+                btn.style.color = '';
+              }, 2800);
+            }
+          });
         }
       );
     }
 
-    function wakeDevice(mac, encName) {
+    function wakeDevice(mac, encName, btn) {
       const name = decodeURIComponent(encName || '');
+      const originalHtml = btn ? btn.innerHTML : '⚡ WoL';
+      if (btn) {
+        btn.innerHTML = '⏳ Enviando...';
+        btn.disabled = true;
+      }
       fetch('/api/wol/wake', {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ mac })
       })
       .then(r => r.json())
-      .then(d => showToast(d.message || `Paquete mágico WoL enviado a ${name || mac}`, 'success'))
-      .catch(() => showToast(`Error enviando paquete WoL a ${name || mac}`, 'error'));
+      .then(d => {
+        if (d.success) {
+          if (btn) {
+            btn.innerHTML = '✔ Enviado';
+            btn.style.borderColor = 'var(--accent-emerald)';
+            btn.style.color = 'var(--accent-emerald-bright)';
+          }
+          showToast(d.message || `⚡ Paquete mágico WoL enviado a ${name || mac}`, 'success');
+        } else {
+          if (btn) btn.innerHTML = '⚠️ Error';
+          showToast(d.error || 'Error al enviar WoL', 'error');
+        }
+      })
+      .catch(() => {
+        if (btn) btn.innerHTML = '⚠️ Error';
+        showToast(`Error de conexión al enviar WoL a ${name || mac}`, 'error');
+      })
+      .finally(() => {
+        if (btn) {
+          setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            btn.style.borderColor = '';
+            btn.style.color = '';
+          }, 2400);
+        }
+      });
     }
 
     // =========================================================================
