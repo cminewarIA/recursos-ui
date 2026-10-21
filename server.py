@@ -373,6 +373,14 @@ def load_geoip_disk_cache():
             GEOIP_CACHE.update(loaded)
             if isinstance(raw.get("server_self_geo"), dict) and isinstance(raw["server_self_geo"].get("lat"), (int, float)):
                 SERVER_SELF_GEO = dict(raw["server_self_geo"])
+            else:
+                SERVER_SELF_GEO = {}
+            # Ubicación fijada en el centro geográfico de Gran Canaria
+            SERVER_SELF_GEO["lat"] = float(os.environ.get("SERVER_GEO_LAT", 27.9600))
+            SERVER_SELF_GEO["lng"] = float(os.environ.get("SERVER_GEO_LNG", -15.5800))
+            SERVER_SELF_GEO["city"] = os.environ.get("SERVER_GEO_CITY", "Gran Canaria (Centro)")
+            SERVER_SELF_GEO["country"] = os.environ.get("SERVER_GEO_COUNTRY", "España")
+            SERVER_SELF_GEO["country_code"] = "ES"
     except Exception:
         pass
 
@@ -565,15 +573,15 @@ def fetch_connections_geo_worker():
                     )
                     with urllib.request.urlopen(req, timeout=3.0) as resp:
                         sdata = json.loads(resp.read().decode("utf-8", errors="ignore"))
-                        if sdata.get("status") == "success" and isinstance(sdata.get("lat"), (int, float)):
+                        if sdata.get("status") == "success":
                             with GEOIP_LOCK:
                                 SERVER_SELF_GEO = {
                                     "ip": sdata.get("query") or SERVER_LOCAL_IP,
-                                    "lat": float(sdata.get("lat")),
-                                    "lng": float(sdata.get("lon")),
-                                    "city": sdata.get("city") or "Nodo Servidor",
-                                    "country": sdata.get("country") or "",
-                                    "country_code": sdata.get("countryCode") or "",
+                                    "lat": float(os.environ.get("SERVER_GEO_LAT", 27.9600)),
+                                    "lng": float(os.environ.get("SERVER_GEO_LNG", -15.5800)),
+                                    "city": os.environ.get("SERVER_GEO_CITY", "Gran Canaria (Centro)"),
+                                    "country": sdata.get("country") or "España",
+                                    "country_code": sdata.get("countryCode") or "ES",
                                     "org": sdata.get("org") or sdata.get("isp") or HOSTNAME,
                                     "ts": now
                                 }
@@ -760,11 +768,11 @@ def fetch_connections_geo_worker():
             if candidate_ips:
                 resolve_geoip_batch_from_ip_api(candidate_ips)
 
-            srv_lat = SERVER_SELF_GEO.get("lat", 40.4168)
-            srv_lng = SERVER_SELF_GEO.get("lng", -3.7038)
-            srv_city = SERVER_SELF_GEO.get("city", "Nodo Servidor")
-            srv_country = SERVER_SELF_GEO.get("country", "")
-            srv_cc = SERVER_SELF_GEO.get("country_code", "")
+            srv_lat = SERVER_SELF_GEO.get("lat", 27.9600)
+            srv_lng = SERVER_SELF_GEO.get("lng", -15.5800)
+            srv_city = SERVER_SELF_GEO.get("city", "Gran Canaria (Centro)")
+            srv_country = SERVER_SELF_GEO.get("country", "España")
+            srv_cc = SERVER_SELF_GEO.get("country_code", "ES")
 
             connections_out = []
             lan_idx = 0

@@ -1,8 +1,18 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.10.0`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.10.1`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.10.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.10.1`)**, telemetría de hardware en tiempo real, auditoría de red con **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.10.1`
+- **Geolocalización Exacta del Nodo Host en el Centro Geográfico de Gran Canaria**:
+  - **Fijación de Coordenadas de Referencia**:
+    - Se calibró la posición del nodo central ("🖥️ Nodo Host") en las coordenadas exactas de la cumbre central de Gran Canaria (`27.9600° N, -15.5800° W`), sustituyendo la estimación por defecto costera de la IP WAN (`28.1, -15.4098`) y cualquier fallback previo a Madrid (`40.4168, -3.7038`).
+    - Las conexiones de dispositivos en red local (LAN) orbitan concéntricamente alrededor del centro de Gran Canaria con una separación visual limpia.
+  - **Encuadre y Zoom Optimizado en el Mapa**:
+    - La acción rápida de centrado `🖥️ Nodo Host` (`focusServerNode`) enfoca de forma óptima la isla de Gran Canaria con un zoom adaptado a nivel 10 y apertura de popup contextual.
+  - **Persistencia en Caché GeoIP y Entorno**:
+    - El valor queda asegurado en `geoip_cache.json`, en el worker GeoIP de `server.py` y configurable mediante variables de entorno opcionales (`SERVER_GEO_LAT`, `SERVER_GEO_LNG`, `SERVER_GEO_CITY`, `SERVER_GEO_COUNTRY`).
 
 ## ✨ Novedades en `v4.10.0`
 - **Identificación Precisa del Servicio por IP (Conexiones Entrantes y Salientes)**:

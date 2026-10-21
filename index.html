@@ -9661,8 +9661,8 @@
         const container = document.getElementById('networkConnectionsMapCanvas');
         if (!container) return false;
 
-        const initLat = (srvNode && typeof srvNode.lat === 'number') ? srvNode.lat : 40.4168;
-        const initLng = (srvNode && typeof srvNode.lng === 'number') ? srvNode.lng : -3.7038;
+        const initLat = (srvNode && typeof srvNode.lat === 'number') ? srvNode.lat : 27.9600;
+        const initLng = (srvNode && typeof srvNode.lng === 'number') ? srvNode.lng : -15.5800;
 
         if (typeof L === 'undefined') {
           this.setStatusOverlay(
@@ -9954,8 +9954,8 @@
         this.clearMapOverlays();
 
         const srvPos = {
-          lat: typeof srv.lat === 'number' ? srv.lat : 40.4168,
-          lng: typeof srv.lng === 'number' ? srv.lng : -3.7038
+          lat: typeof srv.lat === 'number' ? srv.lat : 27.9600,
+          lng: typeof srv.lng === 'number' ? srv.lng : -15.5800
         };
 
         // 1. Host Central Marker
@@ -10042,7 +10042,7 @@
         if (!this._lastConnData || !this._lastConnData.server_node || !this._leafletMap) return;
         const srv = this._lastConnData.server_node;
         if (typeof srv.lat !== 'number' || typeof srv.lng !== 'number') return;
-        this._leafletMap.setView([srv.lat, srv.lng], 9);
+        this._leafletMap.setView([srv.lat, srv.lng], 10);
         if (this._serverMarker) this._serverMarker.openPopup();
       },
 
