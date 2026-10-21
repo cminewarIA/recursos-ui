@@ -2934,46 +2934,11 @@
             </div>
 
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1;">
-              <button class="action-btn" style="min-height: 30px; height: 30px; padding: 0 12px; font-size: 11.5px;" onclick="MainNodeErrorTerminal.toggleOverviewTerminal()" id="ovNodeErrorTerminalToggleBtn" title="Abrir/ocultar terminal de errores en tiempo real del Nodo Principal (Worker GeoIP y Red)">
-                🖥️ <span id="ovNodeErrorBadgeText" class="mono">Terminal: 0 err</span>
-              </button>
               <button class="action-btn" style="min-height: 30px; height: 30px; padding: 0 12px; font-size: 11.5px;" onclick="openPerfAuditDialog()" title="Ver auditoría de rendimiento y optimización en tiempo real">
                 ⚡ <span id="ovPerfBadgeText">Auditoría 60fps</span>
               </button>
               <span class="adw-badge badge-green" id="ovBadgeStatus">Telemetría Activa</span>
               <span class="adw-badge badge-blue" id="ovBadgeTrust" onclick="openTrustDialog()" style="cursor: pointer;">Verificando red...</span>
-            </div>
-          </div>
-
-          <!-- Real-Time Error Terminal of the Main Node (Overview Docked Console) -->
-          <div class="node-error-terminal-card" id="ovMainNodeErrorTerminalCard" style="margin-bottom: 14px;">
-            <div class="node-error-terminal-bar">
-              <div class="node-error-terminal-title-group">
-                <span class="node-terminal-lights" aria-hidden="true">
-                  <span class="tl-red"></span>
-                  <span class="tl-amber"></span>
-                  <span class="tl-green"></span>
-                </span>
-                <span class="node-error-terminal-title">🖥️ TERMINAL DEL NODO PRINCIPAL · MONITOR DE ERRORES (WORKER GEOIP &amp; RED)</span>
-                <span class="adw-badge badge-green mono" id="ovNodeErrStatusBadge">0 errores</span>
-              </div>
-              <div class="node-error-terminal-actions">
-                <div class="segmented-control">
-                  <button type="button" class="seg-btn active" id="btnOvErrFilterAll" onclick="MainNodeErrorTerminal.setFilter('all')">Todos (<span id="cntOvErrAll">0</span>)</button>
-                  <button type="button" class="seg-btn" id="btnOvErrFilterGeo" onclick="MainNodeErrorTerminal.setFilter('geoip')">🌐 Worker GeoIP (<span id="cntOvErrGeo">0</span>)</button>
-                  <button type="button" class="seg-btn" id="btnOvErrFilterNet" onclick="MainNodeErrorTerminal.setFilter('network')">📡 Red HTTP (<span id="cntOvErrNet">0</span>)</button>
-                </div>
-                <button type="button" class="node-error-clear-btn" id="btnClearNodeErrorsOverview" onclick="MainNodeErrorTerminal.clearHistory()" title="Limpiar el historial de errores del Worker GeoIP y de peticiones de red">
-                  <span>🗑️</span>
-                  <span>Limpiar historial</span>
-                </button>
-              </div>
-            </div>
-            <div class="node-error-terminal-viewport" id="ovMainNodeErrorTerminalOutput" role="log" aria-live="polite">
-              <div class="node-err-empty-state">
-                <span>✔ [OK] Terminal del nodo principal activa · Capturando eventos del Worker GeoIP (ip-api.com) y peticiones de red en tiempo real.</span>
-                <span class="mono" style="opacity: 0.75;">0 errores registrados</span>
-              </div>
             </div>
           </div>
 
@@ -3538,38 +3503,6 @@
                     <span id="mapLegendBandwidthAlertText">Umbral NIC: Normal (&lt; 5.0 MB/s)</span>
                   </span>
                   <span id="lblMapProviderAttribution" style="font-family: var(--font-mono); font-size: 10px; opacity: 0.8;">OpenStreetMap (100% Libre)</span>
-                </div>
-              </div>
-
-              <!-- Terminal en Tiempo Real del Nodo Principal: Errores del Worker GeoIP y Peticiones de Red -->
-              <div class="node-error-terminal-card" id="netMainNodeErrorTerminalCard" style="margin-bottom: 14px;">
-                <div class="node-error-terminal-bar">
-                  <div class="node-error-terminal-title-group">
-                    <span class="node-terminal-lights" aria-hidden="true">
-                      <span class="tl-red"></span>
-                      <span class="tl-amber"></span>
-                      <span class="tl-green"></span>
-                    </span>
-                    <span class="node-error-terminal-title">🖥️ TERMINAL DEL NODO PRINCIPAL · ERRORES EN TIEMPO REAL (WORKER GEOIP &amp; PETICIONES DE RED)</span>
-                    <span class="adw-badge badge-green mono" id="netNodeErrStatusBadge">0 errores</span>
-                  </div>
-                  <div class="node-error-terminal-actions">
-                    <div class="segmented-control">
-                      <button type="button" class="seg-btn active" id="btnNetErrFilterAll" onclick="MainNodeErrorTerminal.setFilter('all')">Todos (<span id="cntNetErrAll">0</span>)</button>
-                      <button type="button" class="seg-btn" id="btnNetErrFilterGeo" onclick="MainNodeErrorTerminal.setFilter('geoip')">🌐 Worker GeoIP (<span id="cntNetErrGeo">0</span>)</button>
-                      <button type="button" class="seg-btn" id="btnNetErrFilterNet" onclick="MainNodeErrorTerminal.setFilter('network')">📡 Peticiones de Red (<span id="cntNetErrNet">0</span>)</button>
-                    </div>
-                    <button type="button" class="node-error-clear-btn" id="btnClearNodeErrorsNet" onclick="MainNodeErrorTerminal.clearHistory()" title="Limpiar el historial de errores del Worker GeoIP y de peticiones de red">
-                      <span>🗑️</span>
-                      <span>Limpiar historial</span>
-                    </button>
-                  </div>
-                </div>
-                <div class="node-error-terminal-viewport" id="netMainNodeErrorTerminalOutput" role="log" aria-live="polite">
-                  <div class="node-err-empty-state">
-                    <span>✔ [OK] Escuchando eventos de error en tiempo real del Worker GeoIP (ip-api.com) y peticiones HTTP/API...</span>
-                    <span class="mono" style="opacity: 0.75;">Sin errores en el historial</span>
-                  </div>
                 </div>
               </div>
 
@@ -9523,6 +9456,7 @@
               try {
                 const resp = await fetch(originUrl + '/api/net/geoip/resolve', {
                   method: 'POST',
+                  credentials: 'include',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ ips: batch, force_sync: forceSync })
                 });
@@ -9534,84 +9468,8 @@
                   if (data && data.worker) {
                     workerMeta = data.worker;
                   }
-                } else {
-                  self.postMessage({
-                    type: 'GEOIP_WORKER_ERROR',
-                    source: 'GEOIP_WORKER',
-                    stage: '/api/net/geoip/resolve',
-                    target: 'Lote (' + batch.length + ' IPs)',
-                    code: 'HTTP ' + resp.status,
-                    message: 'El endpoint GeoIP del servidor devolvió HTTP ' + resp.status
-                  });
                 }
-              } catch (err) {
-                self.postMessage({
-                  type: 'GEOIP_WORKER_ERROR',
-                  source: 'GEOIP_WORKER',
-                  stage: '/api/net/geoip/resolve',
-                  target: 'Lote (' + batch.length + ' IPs)',
-                  code: 'WORKER_FETCH_ERR',
-                  message: 'Error de red en Web Worker hacia backend GeoIP: ' + (err && err.message ? err.message : String(err))
-                });
-              }
-
-              const stillMissing = batch.filter(ip => !resolvedMap[ip]);
-              if (stillMissing.length > 0 && originUrl.startsWith('http://')) {
-                try {
-                  const directResp = await fetch('http://ip-api.com/batch?fields=status,message,country,countryCode,regionName,city,lat,lon,isp,org,as,query', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(stillMissing)
-                  });
-                  if (directResp.ok) {
-                    const arr = await directResp.json();
-                    if (Array.isArray(arr)) {
-                      for (const item of arr) {
-                        if (item && item.status === 'success' && typeof item.lat === 'number' && item.query) {
-                          resolvedMap[item.query] = {
-                            ip: item.query,
-                            lat: Number(item.lat),
-                            lng: Number(item.lon),
-                            city: item.city || 'Nodo Remoto',
-                            country: item.country || '',
-                            country_code: item.countryCode || '',
-                            isp: item.org || item.isp || '',
-                            asn: item.as || '',
-                            ts: Date.now()
-                          };
-                        } else if (item && item.status === 'fail') {
-                          self.postMessage({
-                            type: 'GEOIP_WORKER_ERROR',
-                            source: 'GEOIP_WORKER',
-                            stage: 'ip-api.com/batch',
-                            target: item.query || 'IP desconocida',
-                            code: 'GEOIP_FAIL',
-                            message: 'Fallo GeoIP para ' + (item.query || 'IP') + ': ' + (item.message || 'no resoluble')
-                          });
-                        }
-                      }
-                    }
-                  } else {
-                    self.postMessage({
-                      type: 'GEOIP_WORKER_ERROR',
-                      source: 'GEOIP_WORKER',
-                      stage: 'ip-api.com/batch',
-                      target: 'Lote (' + stillMissing.length + ' IPs)',
-                      code: 'HTTP ' + directResp.status,
-                      message: 'Fallo directo en ip-api.com/batch (HTTP ' + directResp.status + ')'
-                    });
-                  }
-                } catch (err2) {
-                  self.postMessage({
-                    type: 'GEOIP_WORKER_ERROR',
-                    source: 'GEOIP_WORKER',
-                    stage: 'ip-api.com/batch',
-                    target: 'Lote (' + stillMissing.length + ' IPs)',
-                    code: 'DIRECT_NET_ERR',
-                    message: 'Excepción al conectar con ip-api.com/batch: ' + (err2 && err2.message ? err2.message : String(err2))
-                  });
-                }
-              }
+              } catch (err) {}
 
               self.postMessage({
                 type: 'GEOIP_RESOLVED',
@@ -9973,23 +9831,10 @@
         if (this._initialized) return;
         this._initialized = true;
         try {
-          const savedClearedTs = Number(localStorage.getItem(this.CLEARED_TS_KEY) || 0);
-          if (savedClearedTs > 0) this._clearedAtTs = savedClearedTs;
-          const raw = localStorage.getItem(this.STORAGE_KEY);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              for (const item of parsed.slice(0, this.MAX_ENTRIES)) {
-                if (item && item.id && item.ts >= this._clearedAtTs) {
-                  this._errors.push(item);
-                  this._seenIds.add(item.id);
-                }
-              }
-            }
-          }
+          localStorage.removeItem(this.STORAGE_KEY);
         } catch (e) {}
-        this.installFetchInterceptor();
-        this.renderAll();
+        this._errors = [];
+        this._seenIds.clear();
       },
 
       formatTimeMs(tsMs) {
@@ -10144,78 +9989,8 @@
       },
 
       installFetchInterceptor() {
-        if (window.__nodeErrorFetchInstalled || typeof window.fetch !== 'function') return;
-        window.__nodeErrorFetchInstalled = true;
-        const origFetch = window.fetch.bind(window);
-        window.__rawOriginalFetch = origFetch;
-
-        window.fetch = async (...args) => {
-          const reqInfo = args[0];
-          const reqInit = args[1] || {};
-          const rawUrl = typeof reqInfo === 'string'
-            ? reqInfo
-            : (reqInfo && typeof reqInfo.url === 'string' ? reqInfo.url : String(reqInfo || ''));
-          const method = String(reqInit.method || (reqInfo && reqInfo.method) || 'GET').toUpperCase();
-
-          // Do not intercept the clear-errors call itself
-          if (rawUrl.includes('/api/net/geoip/clear-errors')) {
-            return origFetch(...args);
-          }
-
-          let shortTarget = rawUrl;
-          try {
-            const parsedUrl = new URL(rawUrl, window.location.origin);
-            shortTarget = parsedUrl.origin === window.location.origin
-              ? parsedUrl.pathname + (parsedUrl.search || '')
-              : parsedUrl.host + parsedUrl.pathname;
-          } catch (e) {}
-
-          const isGeoIp = rawUrl.toLowerCase().includes('geoip') || rawUrl.toLowerCase().includes('ip-api.com');
-          const source = isGeoIp ? 'GEOIP_WORKER' : 'NET_REQUEST';
-          const t0 = performance.now();
-
-          try {
-            const response = await origFetch(...args);
-            const elapsedMs = Math.round(performance.now() - t0);
-            if (!response.ok) {
-              let errDetail = response.statusText || `Respuesta no exitosa (${response.status})`;
-              try {
-                const cloned = response.clone();
-                const txt = await cloned.text();
-                if (txt) {
-                  try {
-                    const j = JSON.parse(txt);
-                    if (j && (j.error || j.message)) errDetail = String(j.error || j.message);
-                  } catch {
-                    errDetail = txt.slice(0, 120);
-                  }
-                }
-              } catch (e2) {}
-
-              this.recordError({
-                source,
-                stage: `${method} (${elapsedMs}ms)`,
-                target: shortTarget,
-                code: `HTTP ${response.status}`,
-                message: `${method} ${shortTarget} devolvió HTTP ${response.status}: ${errDetail}`
-              });
-            }
-            return response;
-          } catch (err) {
-            const elapsedMs = Math.round(performance.now() - t0);
-            const isAbort = err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().includes('abort'));
-            this.recordError({
-              source,
-              stage: `${method} (${elapsedMs}ms)`,
-              target: shortTarget,
-              code: isAbort ? 'TIMEOUT' : 'NET_ERR',
-              message: isAbort
-                ? `Tiempo de espera agotado (${elapsedMs}ms) en petición ${method} ${shortTarget}`
-                : `Fallo de red en petición ${method} ${shortTarget}: ${(err && err.message) ? err.message : String(err)}`
-            });
-            throw err;
-          }
-        };
+        // Desactivado: evitar monkey-patching global de fetch y no ensuciar la interfaz con logs
+        return;
       },
 
       getFilteredErrors() {
@@ -10604,15 +10379,9 @@
         wrap.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #0f172a; padding: 6px 8px; min-width: 270px; max-width: 360px; line-height: 1.45;';
 
         if (isServerHost) {
-          const errCount = MainNodeErrorTerminal ? MainNodeErrorTerminal._errors.length : 0;
-          const hasErr = errCount > 0;
-          const badgeBg = hasErr ? 'rgba(244, 63, 94, 0.16)' : 'rgba(16, 185, 129, 0.16)';
-          const badgeCol = hasErr ? '#e11d48' : '#059669';
-          const errEntriesHtml = MainNodeErrorTerminal ? MainNodeErrorTerminal.buildEntriesHtml(15, true) : '';
           wrap.innerHTML = `
-            <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-              <span>🖥️ NODO CENTRAL DEL SERVIDOR</span>
-              <span id="srvPopupNodeErrorBadge" style="font-family: monospace; font-size: 9.5px; padding: 1px 6px; border-radius: 999px; background: ${badgeBg}; color: ${badgeCol};">${errCount} ${errCount === 1 ? 'error' : 'errores'}</span>
+            <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin-bottom: 4px;">
+              🖥️ NODO CENTRAL DEL SERVIDOR
             </div>
             <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
               ${escapeHtml(item.org || 'Servidor Local')}
@@ -10621,19 +10390,8 @@
               IP LAN: <strong>${escapeHtml(item.ip || '--')}</strong><br>
               IP WAN: <strong>${escapeHtml(item.public_ip || '--')}</strong>
             </div>
-            <div style="font-size: 12px; color: #475569; margin-bottom: 8px;">
+            <div style="font-size: 12px; color: #475569;">
               📍 ${escapeHtml(item.city || 'Servidor')}${item.country ? ', ' + escapeHtml(item.country) : ''}
-            </div>
-            <div style="background: #0f172a; color: #f8fafc; border-radius: 8px; padding: 8px; margin-top: 6px; border: 1px solid #334155;">
-              <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
-                <span style="font-family: monospace; font-size: 10px; font-weight: 700; color: #38bdf8;">🖥️ TERMINAL GEOIP &amp; RED</span>
-                <button type="button" onclick="MainNodeErrorTerminal.clearHistory()" style="background: rgba(244, 63, 94, 0.2); border: 1px solid rgba(244, 63, 94, 0.45); color: #fda4af; border-radius: 5px; padding: 2px 7px; font-size: 10px; font-weight: 700; cursor: pointer;">
-                  🗑️ Limpiar historial
-                </button>
-              </div>
-              <div id="srvPopupNodeErrorTerminalOutput" style="max-height: 130px; overflow-y: auto; font-family: monospace; font-size: 10px; display: flex; flex-direction: column; gap: 4px;">
-                ${errEntriesHtml}
-              </div>
             </div>
             <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">
               OpenStreetMap (100% Libre) · GeoIP

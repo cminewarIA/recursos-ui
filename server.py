@@ -204,7 +204,7 @@ CONNECTIONS_MAP_CACHE = {
     }
 }
 CONNECTIONS_MAP_LOCK = threading.Lock()
-GEOIP_LOCK = threading.Lock()
+GEOIP_LOCK = threading.RLock()
 GEOIP_CACHE_FILE = os.path.join(BASE_DIR, "geoip_cache.json")
 GEOIP_TTL_SECONDS = 7 * 86400  # 7 days TTL for resolved GeoIP entries
 GEOIP_NEG_TTL_SECONDS = 900    # 15 minutes cooldown for unresolvable/failed IPs
@@ -369,16 +369,20 @@ def update_listening_ports_map(force=False):
 def _is_private_ip(ip_str):
     try:
         ip_obj = ipaddress.ip_address(ip_str)
-        return (
+        if (
             ip_obj.is_private
             or ip_obj.is_loopback
             or ip_obj.is_link_local
             or ip_obj.is_multicast
             or ip_obj.is_reserved
             or ip_obj.is_unspecified
-        )
+        ):
+            return True
+        if ip_obj in ipaddress.ip_network('100.64.0.0/10'):
+            return True
     except Exception:
         return True
+    return False
 
 def load_geoip_disk_cache():
     """Carga la caché persistente de GeoIP desde disco al iniciar el worker."""
@@ -5588,11 +5592,6 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         # 9. Resolución GeoIP en Lote / Bajo Demanda (Web Worker -> Backend Cache -> ip-api.com)
         elif self.path.split('?')[0] in ("/api/net/geoip/resolve", "/api/net/geoip"):
             auth = check_trust_status(self)
-            if not auth["is_trusted"]:
-                self.send_response(403)
-                self.send_security_headers()
-                self.end_headers()
-                return
 
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length > 65536:
