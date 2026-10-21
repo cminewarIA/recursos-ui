@@ -852,6 +852,17 @@ def detect_system_dns_domain():
         return DETECTED_DOMAIN_CACHE
 
     candidate_files = [
+        # 1. Rutas relativas al repositorio (GitHub / Google AI Studio / Simulador)
+        os.path.join(BASE_DIR, "Caddyfile"),
+        os.path.join(BASE_DIR, "caddy", "Caddyfile"),
+        os.path.join(BASE_DIR, "duck.sh"),
+        os.path.join(BASE_DIR, "duckdns", "duck.sh"),
+        os.path.join(BASE_DIR, "..", "caddy", "Caddyfile"),
+        os.path.join(BASE_DIR, "..", "duckdns", "duck.sh"),
+        "./Caddyfile",
+        "./duck.sh",
+        "./duckdns/duck.sh",
+        # 2. Rutas del servidor local físico
         "/etc/caddy/Caddyfile",
         "/home/servidor/Caddyfile",
         "/home/servidor/servicios/caddy/Caddyfile",
@@ -2270,8 +2281,13 @@ def fetch_docker_worker():
                 "available": False
             }
             try:
-                emby_db = "/home/servidor/servicios/emby/programdata/data/library.db"
-                if os.path.exists(emby_db):
+                emby_candidates = [
+                    os.path.join(BASE_DIR, "emby", "library.db"),
+                    os.path.join(BASE_DIR, "..", "emby", "programdata", "data", "library.db"),
+                    "/home/servidor/servicios/emby/programdata/data/library.db"
+                ]
+                emby_db = next((p for p in emby_candidates if os.path.isfile(p)), "")
+                if emby_db and os.path.exists(emby_db):
                     conn_emby = sqlite3.connect(f"file:{emby_db}?mode=ro", uri=True, timeout=1.5)
                     cur_emby = conn_emby.cursor()
                     cur_emby.execute("SELECT count(*) FROM MediaItems WHERE type = 5")
@@ -2311,8 +2327,14 @@ def fetch_docker_worker():
 
             parental_info = {"authorized": False, "status": "BLOCKED", "reason": "Galaxy A8 offline"}
             try:
-                st_file = "/home/servidor/servicios/control_acceso_s10/estado.json"
-                if os.path.exists(st_file):
+                st_candidates = [
+                    os.path.join(BASE_DIR, "control_acceso_s10", "estado.json"),
+                    os.path.join(BASE_DIR, "estado.json"),
+                    os.path.join(BASE_DIR, "..", "control_acceso_s10", "estado.json"),
+                    "/home/servidor/servicios/control_acceso_s10/estado.json"
+                ]
+                st_file = next((p for p in st_candidates if os.path.isfile(p)), "")
+                if st_file and os.path.exists(st_file):
                     with open(st_file, "r") as pf:
                         p_raw = json.load(pf)
                         st_val = p_raw.get("status", "BLOCKED")
@@ -2441,12 +2463,38 @@ def get_ip_to_device_name_map():
             ip_to_name[data['ip']] = data['name']
     return ip_to_name
 
-DUCKDNS_SCRIPT = "/home/servidor/servicios/duckdns/duck.sh"
+DUCKDNS_SCRIPT_CANDIDATES = [
+    # 1. Rutas relativas al repositorio (GitHub / Google AI Studio / Simulador)
+    os.path.join(BASE_DIR, "duckdns", "duck.sh"),
+    os.path.join(BASE_DIR, "duck.sh"),
+    os.path.join(BASE_DIR, "..", "duckdns", "duck.sh"),
+    os.path.join(BASE_DIR, "servicios", "duckdns", "duck.sh"),
+    "./duckdns/duck.sh",
+    "./duck.sh",
+    # 2. Rutas del servidor local físico
+    "/home/servidor/servicios/duckdns/duck.sh",
+    "/home/servidor/duckdns/duck.sh"
+]
+
+def get_duckdns_script_file():
+    for p in DUCKDNS_SCRIPT_CANDIDATES:
+        if os.path.isfile(p):
+            return p
+    return DUCKDNS_SCRIPT_CANDIDATES[0]
+
+DUCKDNS_SCRIPT = get_duckdns_script_file()
+
 DUCKDNS_LOG_CANDIDATES = [
+    # 1. Rutas relativas al repositorio (GitHub / Google AI Studio / Simulador)
+    os.path.join(BASE_DIR, "duck.log"),
+    os.path.join(BASE_DIR, "duckdns", "duck.log"),
+    os.path.join(BASE_DIR, "..", "duckdns", "duck.log"),
+    os.path.join(BASE_DIR, "logs", "duck.log"),
+    "./duck.log",
+    # 2. Rutas del servidor local físico
     "/mnt/almacenamiento/logs/duckdns/duck.log",
     "/home/servidor/servicios/duckdns/duck.log"
 ]
-DUCKDNS_IP_CACHE = "/home/servidor/servicios/duckdns/last_ip.txt"
 
 def get_duckdns_log_file():
     for p in DUCKDNS_LOG_CANDIDATES:
@@ -2454,12 +2502,32 @@ def get_duckdns_log_file():
             return p
     return DUCKDNS_LOG_CANDIDATES[0]
 
+DUCKDNS_IP_CACHE_CANDIDATES = [
+    # 1. Rutas relativas al repositorio (GitHub / Google AI Studio / Simulador)
+    os.path.join(BASE_DIR, "last_ip.txt"),
+    os.path.join(BASE_DIR, "duckdns", "last_ip.txt"),
+    os.path.join(BASE_DIR, "..", "duckdns", "last_ip.txt"),
+    "./last_ip.txt",
+    # 2. Rutas del servidor local físico
+    "/home/servidor/servicios/duckdns/last_ip.txt",
+    "/home/servidor/duckdns/last_ip.txt"
+]
+
+def get_duckdns_ip_cache_file():
+    for p in DUCKDNS_IP_CACHE_CANDIDATES:
+        if os.path.isfile(p):
+            return p
+    return DUCKDNS_IP_CACHE_CANDIDATES[0]
+
+DUCKDNS_IP_CACHE = get_duckdns_ip_cache_file()
+
 def get_duckdns_status():
     domain = "cminewar"
     token = ""
-    if os.path.isfile(DUCKDNS_SCRIPT):
+    script_p = get_duckdns_script_file()
+    if os.path.isfile(script_p):
         try:
-            with open(DUCKDNS_SCRIPT, "r", encoding="utf-8") as f:
+            with open(script_p, "r", encoding="utf-8") as f:
                 content = f.read()
                 m_dom = re.search(r'DOMAIN=["\']?([^"\'\s]+)["\']?', content)
                 m_tok = re.search(r'TOKEN=["\']?([^"\'\s]+)["\']?', content)
@@ -2471,9 +2539,10 @@ def get_duckdns_status():
             pass
 
     last_ip = ""
-    if os.path.isfile(DUCKDNS_IP_CACHE):
+    ip_cache_p = get_duckdns_ip_cache_file()
+    if os.path.isfile(ip_cache_p):
         try:
-            with open(DUCKDNS_IP_CACHE, "r", encoding="utf-8") as f:
+            with open(ip_cache_p, "r", encoding="utf-8") as f:
                 last_ip = f.read().strip()
         except Exception:
             pass
@@ -2508,7 +2577,7 @@ def get_duckdns_status():
         pass
 
     return {
-        "installed": os.path.isfile(DUCKDNS_SCRIPT),
+        "installed": os.path.isfile(script_p),
         "domain": domain,
         "full_domain": f"{domain}.duckdns.org",
         "token": token,
@@ -2517,7 +2586,7 @@ def get_duckdns_status():
         "last_log_entry": last_log_line,
         "last_update_time": last_update_time,
         "log_path": log_file,
-        "script_path": DUCKDNS_SCRIPT,
+        "script_path": script_p,
         "upstream_dns": upstream_dns
     }
 
@@ -2533,10 +2602,11 @@ def get_duckdns_logs(limit=60):
         return [f"Error leyendo log: {e}"]
 
 def update_duckdns_now():
-    if not os.path.isfile(DUCKDNS_SCRIPT):
+    script_p = get_duckdns_script_file()
+    if not os.path.isfile(script_p):
         return {"success": False, "message": "Script duck.sh no encontrado"}
     try:
-        res = subprocess.run(["bash", DUCKDNS_SCRIPT], capture_output=True, text=True, timeout=25)
+        res = subprocess.run(["bash", script_p], capture_output=True, text=True, timeout=25)
         st = get_duckdns_status()
         return {
             "success": res.returncode == 0,

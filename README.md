@@ -1,8 +1,18 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.9.2`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.9.3`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.9.2`)**, telemetría de hardware en tiempo real, auditoría de red con **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.9.3`)**, telemetría de hardware en tiempo real, auditoría de red con **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.9.3`
+- **Compatibilidad Universal de Rutas para Simulador de Google AI Studio y GitHub (`GEMINI.md` y `server.py`)**:
+  - **Resolución Dinámica de Rutas y Candidatos Relativos**:
+    - Se dotó al backend (`server.py`) de listas de candidatos para todos los recursos del sistema (DuckDNS, base de datos de Emby, scripts de sincronización, configuración de dominios e IP caché), comprobando primero rutas relativas al repositorio (`BASE_DIR` / `./`) antes de cualquier fallback local (`/home/servidor/...`).
+    - Evita que Google AI Studio o entornos en contenedores intenten montar o requieran carpetas del sistema local inexistentes en su simulador.
+  - **Nueva Regla 6 en `GEMINI.md` (Rutas Catalogadas en GitHub y Relativas)**:
+    - Se estandarizó la documentación de instrucciones para que cualquier agente reconozca las rutas catalogadas en GitHub (`./planes/`, `./VERSION`, `./README.md`, `./server.py`) como opciones de primera clase junto con las rutas absolutas locales.
+  - **Cero Errores en Entornos Híbridos o Simulados**:
+    - Los detectores y endpoints de DuckDNS, dominio y Emby devuelven estados limpios y controlados en lugar de excepciones de archivo no encontrado (`FileNotFoundError`).
 
 ## ✨ Novedades en `v4.9.2`
 - **Corrección de Marca de Agua 'API KEY REQUIRED' (OpenStreetMap Puro + Filtro Dark CSS)**:

@@ -1,7 +1,7 @@
 # Reglas y Pautas del Proyecto (Dashboard / Recursos)
 
 ## 1. Sincronización Previa Obligatoria (git pull)
-- **Regla obligatoria**: Antes de comenzar a modificar cualquier archivo en el proyecto o responder a una solicitud de cambio, siempre se debe ejecutar primero `git pull origin main` en `/home/servidor/servicios/dashboard`.
+- **Regla obligatoria**: Antes de comenzar a modificar cualquier archivo en el proyecto o responder a una solicitud de cambio, siempre se debe ejecutar primero `git pull origin main` en el directorio de trabajo del repositorio (en el servidor local: `/home/servidor/servicios/dashboard`, o en la raíz de trabajo `./` según esté catalogado en GitHub o en el simulador de Google AI Studio).
 - **Objetivo**: Asegurar que cualquier cambio, commit o trabajo realizado desde Google AI Studio en el móvil se descargue e integre en el servidor local antes de tocar código, evitando conflictos de versión o sobrescrituras.
 
 ## 2. Publicación Automática en GitHub (git push)
@@ -11,24 +11,29 @@
 - **Objetivo**: Mantener permanentemente sincronizado el proyecto para que los cambios se reflejen de inmediato en Google AI Studio y el móvil al pulsar *Pull Changes*.
 
 ## 3. Almacenamiento Obligatorio de Planes de Implementación y Walkthroughs (`planes/`)
-- **Regla obligatoria**: Todos los planes de implementación (`implementation_plan.md`), archivos de recorrido y verificación (`walkthrough.md`, `walkthrough_*.md`), bitácoras de trabajo, pruebas realizadas y documentación de avance deben guardarse SIEMPRE dentro de la carpeta `planes/` del proyecto (`/home/servidor/servicios/dashboard/planes/`). Jamás deben quedar limitados únicamente a carpetas internas temporales de las IA (`.gemini/antigravity/brain`).
+- **Regla obligatoria**: Todos los planes de implementación (`implementation_plan.md`), archivos de recorrido y verificación (`walkthrough.md`, `walkthrough_*.md`), bitácoras de trabajo, pruebas realizadas y documentación de avance deben guardarse SIEMPRE dentro de la carpeta `planes/` del proyecto (`./planes/` o `/home/servidor/servicios/dashboard/planes/`). Jamás deben quedar limitados únicamente a carpetas internas temporales de las IA (`.gemini/antigravity/brain`).
 - **Objetivo**: Asegurar que tanto Google AI Studio en el móvil como Antigravity compartan siempre el contexto exacto de en qué se ha estado trabajando, qué se ha probado y cómo se ha implementado, pudiendo consultarlo tras sincronizar (`git pull`).
 
 ## 4. Actualización Obligatoria del README (`README.md`)
-- **Regla obligatoria**: Cada vez que se realice cualquier modificación, corrección, nueva funcionalidad, cambio de diseño o ajuste arquitectónico en el proyecto, se debe actualizar inmediatamente el archivo `README.md` con la descripción de los cambios y el estado actual del sistema.
+- **Regla obligatoria**: Cada vez que se realice cualquier modificación, corrección, nueva funcionalidad, cambio de diseño o ajuste arquitectónico en el proyecto, se debe actualizar inmediatamente el archivo `README.md` (`./README.md`) con la descripción de los cambios y el estado actual del sistema.
 - **Objetivo**: Garantizar que la documentación del repositorio refleje fielmente en todo momento las características, estructura de directorios, endpoints y funcionamiento real del proyecto tanto en GitHub como en Google AI Studio.
 
 ## 5. Control de Versión Unificado y Criterio Estricto de Incremento (`VERSION`)
 - **Regla obligatoria**: 
-  1. **Punto Único de Verdad**: La versión de la aplicación se define en un único archivo canónico: `/home/servidor/servicios/dashboard/VERSION`. Queda estrictamente prohibido codificar números de versión estáticos o hardcodeados en HTML, scripts o endpoints.
+  1. **Punto Único de Verdad**: La versión de la aplicación se define en un único archivo canónico: `./VERSION` (o `/home/servidor/servicios/dashboard/VERSION` en el servidor local). Queda estrictamente prohibido codificar números de versión estáticos o hardcodeados en HTML, scripts o endpoints.
   2. **Consumo Centralizado**:
      - El backend (`server.py`) lee este archivo a través de la función `get_app_version()` y lo expone a través de `/api/metrics` y `/api/version`.
      - El frontend (`static/index.html` e `index.html`) actualiza de forma reactiva todos los elementos visuales (sidebar, cabecera, tarjeta de vista general y vista `/version`) consumiendo el dato centralizado.
-     - El archivo `package.json` debe mantenerse permanentemente sincronizado con la misma versión.
+     - El archivo `package.json` (`./package.json`) debe mantenerse permanentemente sincronizado con la misma versión.
   3. **Identificación al Inicio**: Al comenzar cualquier tarea, se debe consultar e identificar la versión activa en `VERSION`.
   4. **Criterio Estricto para Subir Versiones (`MAJOR.MINOR.PATCH`)**:
      Al concluir las modificaciones y antes de confirmar el commit y hacer `git push`, se debe incrementar el número de versión según los siguientes criterios específicos definidos por el usuario:
      - **`X.0.0` (Cambio de Diseño)**: Se incrementa el primer número (`MAJOR`) **únicamente cuando se realiza un cambio de diseño** (diseño visual, maquetación, temas, rediseño de interfaz o estilo). **Los otros dos números se restablecen obligatoriamente a 0** (ejemplo: de `4.9.1` pasa a `5.0.0`).
      - **`0.X.0` (Añadir o Quitar una Función)**: Se incrementa el segundo número (`MINOR`) **cuando se añade una nueva función o se retira una función existente**. El tercer número se restablece obligatoriamente a 0 (ejemplo: de `4.9.1` pasa a `4.10.0`).
-     - **`0.0.X` (Actualización o Ajuste de Pequeños Detalles)**: Se incrementa el tercer número (`PATCH`) **cuando se actualiza algo existente, se corrigen errores (bugfixes) o se ajustan pequeños detalles** (modificación de textos, reglas, ajustes de rendimiento o documentación sin alterar funciones completas ni el diseño general) (ejemplo: de `4.9.0` pasa a `4.9.1`).
+     - **`0.0.X` (Actualización o Ajuste de Pequeños Detalles)**: Se incrementa el tercer número (`PATCH`) **cuando se actualiza algo existente, se corrigen errores (bugfixes) o se ajustan pequeños detalles** (modificación de textos, reglas, ajustes de rendimiento o documentación sin alterar funciones completas ni el diseño general) (ejemplo: de `4.9.2` pasa a `4.9.3`).
+
+## 6. Compatibilidad de Rutas con Simulador de Google AI Studio y GitHub
+- **Regla obligatoria**:
+  1. **Evitar Forzar el Montaje de `/home/servidor` en Simuladores**: En Google AI Studio y entornos cloud/móvil, el repositorio se clona directamente en su propio contenedor (habitualmente `./` o `/workspace/recursos-ui`). Queda prohibido asumir como única opción la ruta absoluta del servidor físico (`/home/servidor/...`), ya que esto provoca que el simulador de Google AI Studio intente montar carpetas inexistentes o devuelva errores de archivo no encontrado.
+  2. **Rutas Candidatas Relativas**: En el código y scripts, las referencias a archivos del proyecto (`VERSION`, `planes/`, `static/`, scripts de DuckDNS o Caddy) deben contemplar siempre como primera opción las rutas relativas al repositorio (`./` y `BASE_DIR`), y como opción alternativa las rutas locales del servidor físico (`/home/servidor/...`), comprobando siempre su existencia previa con `os.path.exists()` o `os.path.isfile()` antes de abrirlos.
 
