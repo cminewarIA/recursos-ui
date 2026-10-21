@@ -695,6 +695,64 @@ class PiholeDnsTranslator:
             self.rdns_negative[ip] = now
         return ""
 
+    def fetch_active_device_flows(self, cutoff_seconds=900, max_entries=50):
+        """Extrae de Pi-hole las consultas DNS externas recientes realizadas por
+        otros dispositivos del hogar (móviles, consolas, TVs, tabletas)."""
+        dbpath = "/etc/pihole/pihole-FTL.db"
+        if not os.path.exists(dbpath):
+            return []
+        cutoff = int(time.time()) - cutoff_seconds
+        flows = []
+        try:
+            con = sqlite3.connect(f"file:{dbpath}?mode=ro", uri=True, timeout=1.0)
+            cur = con.cursor()
+            cur.execute("""
+                SELECT timestamp, domain, client 
+                FROM queries 
+                WHERE timestamp > ? 
+                  AND client NOT IN ('127.0.0.1', '::1', '192.168.50.2')
+                  AND status IN (1, 2, 3, 14, 17)
+                ORDER BY timestamp DESC
+                LIMIT 160
+            """, (cutoff,))
+            seen = set()
+            for ts, dom, client in cur.fetchall():
+                if not dom or dom.endswith(".local") or dom.endswith(".lan") or dom.endswith(".arpa"):
+                    continue
+                key = (client, dom)
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                ext_ip = None
+                for ip, d in self.ext_cache.items():
+                    if d == dom.lower():
+                        ext_ip = ip
+                        break
+                if not ext_ip:
+                    try:
+                        ext_ip = socket.gethostbyname(dom)
+                        if ext_ip and not _is_private_ip(ext_ip):
+                            self.ext_cache[ext_ip] = dom.lower()
+                    except Exception:
+                        pass
+
+                if ext_ip and not _is_private_ip(ext_ip):
+                    loc_name = self.translate_local(client) or f"Dispositivo {client}"
+                    flows.append({
+                        "client_ip": client,
+                        "client_name": loc_name,
+                        "domain": dom,
+                        "remote_ip": ext_ip,
+                        "timestamp": ts
+                    })
+                    if len(flows) >= max_entries:
+                        break
+            con.close()
+        except Exception:
+            pass
+        return flows
+
 def fetch_connections_geo_worker():
     global CONNECTIONS_MAP_CACHE, SERVER_SELF_GEO
     load_geoip_disk_cache()
@@ -937,6 +995,41 @@ def fetch_connections_geo_worker():
             except Exception:
                 pass
 
+            # 3c. Inspect active external DNS flows from home LAN devices (Pi-hole)
+            try:
+                device_flows = pihole_translator.fetch_active_device_flows(cutoff_seconds=900, max_entries=50)
+                for df in device_flows:
+                    d_client = df["client_ip"]
+                    d_name = df["client_name"]
+                    d_dom = df["domain"]
+                    d_rem_ip = df["remote_ip"]
+
+                    dedup_key = f"outgoing:{d_rem_ip}:{d_client}"
+                    if dedup_key in seen_keys:
+                        continue
+                    seen_keys.add(dedup_key)
+
+                    svc_label = f"{d_dom} (:443)"
+                    details_str = f"Saliente desde {d_name} ({d_client}) hacia {d_dom} ({d_rem_ip})"
+
+                    raw_sockets.append({
+                        "direction": "outgoing",
+                        "protocol": "DNS/TLS",
+                        "local_ip": d_client,
+                        "local_hostname": d_name,
+                        "local_port": 443,
+                        "remote_ip": d_rem_ip,
+                        "remote_port": 443,
+                        "domain": d_dom,
+                        "state": "ACTIVE",
+                        "service": svc_label,
+                        "process": "Pi-hole DNS Flow",
+                        "jail": "caddy-scan",
+                        "details": details_str
+                    })
+            except Exception:
+                pass
+
             # 4. Collect Fail2ban banned IPs
             with SECURITY_LOCK:
                 f2b_banned = list(SECURITY_CACHE.get("fail2ban", {}).get("banned_details", []))
@@ -1146,6 +1239,7 @@ def fetch_connections_geo_worker():
             inc_cnt = sum(1 for c in connections_out if c["direction"] == "incoming")
             out_cnt = sum(1 for c in connections_out if c["direction"] == "outgoing")
             blk_cnt = sum(1 for c in connections_out if c["direction"] == "blocked")
+            dev_cnt = sum(1 for c in connections_out if c.get("local_ip") not in (SERVER_LOCAL_IP, "127.0.0.1", "::1"))
             worker_summary = get_geoip_worker_summary()
 
             with CONNECTIONS_MAP_LOCK:
@@ -1164,7 +1258,8 @@ def fetch_connections_geo_worker():
                         "total": len(connections_out),
                         "incoming": inc_cnt,
                         "outgoing": out_cnt,
-                        "blocked": blk_cnt
+                        "blocked": blk_cnt,
+                        "devices": dev_cnt
                     },
                     "connections": connections_out,
                     "geoip_worker": worker_summary

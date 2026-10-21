@@ -3277,6 +3277,7 @@
                   <button class="seg-btn active" id="fMapConnAll" onclick="setConnectionsMapFilter('all')">Todas (<span id="cntMapAll">0</span>)</button>
                   <button class="seg-btn" id="fMapConnIn" onclick="setConnectionsMapFilter('incoming')">↓ Entrantes (<span id="cntMapIn">0</span>)</button>
                   <button class="seg-btn" id="fMapConnOut" onclick="setConnectionsMapFilter('outgoing')">↑ Salientes (<span id="cntMapOut">0</span>)</button>
+                  <button class="seg-btn" id="fMapConnDev" onclick="setConnectionsMapFilter('devices')">📱 Dispositivos (<span id="cntMapDev">0</span>)</button>
                   <button class="seg-btn" id="fMapConnBlk" onclick="setConnectionsMapFilter('blocked')">🛡️ Bloqueadas (<span id="cntMapBlk">0</span>)</button>
                 </div>
                 <button class="seg-btn" style="background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 6px 11px;" onclick="fitConnectionsMapBounds()" title="Ajustar zoom a todas las conexiones">🌍 Encuadrar Todo</button>
@@ -9626,6 +9627,7 @@
         all: 'fMapConnAll',
         incoming: 'fMapConnIn',
         outgoing: 'fMapConnOut',
+        devices: 'fMapConnDev',
         blocked: 'fMapConnBlk'
       };
       Object.entries(mapBtns).forEach(([k, id]) => {
@@ -9972,9 +9974,11 @@
           </div>
         ` : '';
 
+        const isDevice = item.local_ip && item.local_ip !== srv.ip && item.local_ip !== '192.168.50.2' && item.local_ip !== '127.0.0.1';
+        const localIcon = isDevice ? '📱' : '🖥️';
         const localDisplay = item.local_hostname
-          ? `<strong>${escapeHtml(item.local_hostname)}</strong> <span style="color: #64748b; font-size: 10px;">(${escapeHtml(item.local_ip)}:${item.local_port})</span>`
-          : `<strong>${escapeHtml(item.local_ip)}:${item.local_port}</strong>`;
+          ? `${localIcon} <strong>${escapeHtml(item.local_hostname)}</strong> <span style="color: #64748b; font-size: 10px;">(${escapeHtml(item.local_ip)}:${item.local_port})</span>`
+          : `${localIcon} <strong>${escapeHtml(item.local_ip)}:${item.local_port}</strong>`;
 
         const remoteDisplay = item.domain
           ? `<strong>${escapeHtml(item.remote_ip)}${item.remote_port ? ':' + item.remote_port : ''}</strong> <span style="color: #0284c7; font-size: 10px;">(${escapeHtml(item.domain)})</span>`
@@ -10055,13 +10059,15 @@
               const arrow = isInc ? '↓' : (isBlk ? '🛡️' : '↑');
               const color = isInc ? '#059669' : (isBlk ? '#e11d48' : '#0891b2');
               const bg = isInc ? 'rgba(16, 185, 129, 0.08)' : (isBlk ? 'rgba(244, 63, 94, 0.08)' : 'rgba(6, 182, 212, 0.08)');
+              const isDev = c.local_ip && c.local_ip !== ((this._lastConnData?.server_node?.ip) || '192.168.50.2') && c.local_ip !== '127.0.0.1';
+              const devIcon = isDev ? '📱' : '🖥️';
               return `
                 <div onclick="window.selectConnInGroupPopup('${groupKey}', '${escapeHtml(c.id)}')" style="display: flex; align-items: center; justify-content: space-between; background: ${bg}; border: 1px solid rgba(0,0,0,0.06); padding: 7px 9px; border-radius: 8px; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; gap: 8px;" onmouseenter="this.style.boxShadow='0 2px 6px rgba(0,0,0,0.12)'" onmouseleave="this.style.boxShadow='none'">
                   <div style="min-width: 0; flex: 1;">
                     <div style="font-size: 11.5px; font-family: monospace; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 5px;">
                       <span style="color: ${color}; font-weight: 800;">${arrow}</span>
                       <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(c.domain || c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
-                      <span style="color: #64748b; font-weight: 400; font-size: 10px; flex-shrink: 0;">← ${escapeHtml(c.local_hostname || c.local_ip)}</span>
+                      <span style="color: #64748b; font-weight: 400; font-size: 10px; flex-shrink: 0;">← ${devIcon} ${escapeHtml(c.local_hostname || c.local_ip)}</span>
                     </div>
                     <div style="font-size: 10.5px; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
                       <strong style="color: #1e293b;">${escapeHtml(c.service || 'Socket')}</strong> ${c.domain ? '· IP: ' + escapeHtml(c.remote_ip) : ''}
@@ -10390,10 +10396,16 @@
           blocked: allConns.filter(c => c.direction === 'blocked').length
         };
 
+        const srvIp = srv.ip || '192.168.50.2';
+        const devicesCount = summary.devices !== undefined
+          ? summary.devices
+          : allConns.filter(c => c.local_ip && c.local_ip !== srvIp && c.local_ip !== '127.0.0.1' && c.local_ip !== '::1').length;
+
         // Update filter badges & KPI strip
         setText('cntMapAll', summary.total || 0);
         setText('cntMapIn', summary.incoming || 0);
         setText('cntMapOut', summary.outgoing || 0);
+        setText('cntMapDev', devicesCount);
         setText('cntMapBlk', summary.blocked || 0);
 
         setText('mapSrvNodeIp', `${srv.public_ip || srv.ip || '127.0.0.1'}`);
@@ -10412,6 +10424,9 @@
 
         const filteredConns = allConns.filter(c => {
           if (connectionsMapFilter === 'all') return true;
+          if (connectionsMapFilter === 'devices') {
+            return c.local_ip && c.local_ip !== srvIp && c.local_ip !== '127.0.0.1' && c.local_ip !== '::1';
+          }
           return c.direction === connectionsMapFilter;
         });
 
@@ -10442,6 +10457,9 @@
                 ? `event.stopPropagation(); window.unblockIpDirectly('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.jail || '')}')`
                 : `event.stopPropagation(); window.blockIpDirectly('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.jail || 'caddy-scan')}', '${escapeHtml(c.service)}')`;
               const procInfo = c.process ? `<span style="opacity: 0.75; font-weight: 500;">· proc: <strong>${escapeHtml(c.process)}</strong></span>` : '';
+              const isDevRow = c.local_ip && c.local_ip !== srvIp && c.local_ip !== '127.0.0.1';
+              const devIcon = isDevRow ? '📱' : '🖥️';
+              const devColor = isDevRow ? '#38bdf8' : 'var(--accent-cyan-bright)';
               return `
                 <div class="conn-row-item" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
                   <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
@@ -10451,7 +10469,7 @@
                         <span class="mono">${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
                         ${c.domain ? `<span class="adw-badge badge-blue" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #3b82f6;" title="Dominio DNS Pi-hole">🌐 ${escapeHtml(c.domain)}</span>` : ''}
                         <span style="color: var(--text-muted); font-weight: 400;">←</span>
-                        <span class="mono" style="color: var(--accent-cyan-bright);">${escapeHtml(c.local_hostname || c.local_ip)}:${c.local_port}</span>
+                        <span class="mono" style="color: ${devColor}; font-weight: 700;">${devIcon} ${escapeHtml(c.local_hostname || c.local_ip)}:${c.local_port}</span>
                         <span class="adw-badge badge-blue" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700;" title="Servicio al que se conecta">${escapeHtml(c.service)}</span>
                         ${procInfo}
                         <span class="conn-geo-tag ${escapeHtml(geoSt)}">${geoTagLabel}</span>
