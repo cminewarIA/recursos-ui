@@ -23,23 +23,31 @@ const historyBuffer: Record<string, (number | string)[]> = {
 
 function readAppVersion(): string {
   try {
-    return fs.readFileSync(path.resolve(__dirname, 'VERSION'), 'utf-8').trim() || '3.0.0';
+    return fs.readFileSync(path.resolve(__dirname, 'VERSION'), 'utf-8').trim() || '4.0.0';
   } catch {
-    return '3.0.0';
+    return '4.0.0';
   }
 }
 
-function sampleRealCpuUsage(): { overall: number; perCore: number[]; model: string; arch: string; vendor: string; cacheSize: string; freqMhz: number } {
+let cachedStaticCpu: { model: string; arch: string; vendor: string; cacheSize: string } | null = null;
+let cachedDisks: { data: unknown[]; ts: number } = { data: [], ts: 0 };
+let cachedProcesses: { data: unknown[]; ts: number } = { data: [], ts: 0 };
+let cachedGitMeta: { sha: string; subject: string; date: string; ts: number } = {
+  sha: 'HEAD',
+  subject: 'Repositorio local sincronizado',
+  date: new Date().toISOString().slice(0, 16).replace('T', ' '),
+  ts: 0,
+};
+
+function getStaticCpuSpecs() {
+  if (cachedStaticCpu) return cachedStaticCpu;
   const cpus = os.cpus() || [];
   const arch = os.arch();
   let model = cpus[0]?.model?.trim() || '';
   let vendor = '';
   let cacheSize = '';
-  let freqMhz = cpus[0]?.speed || 0;
-
   try {
     const cpuinfo = fs.readFileSync('/proc/cpuinfo', 'utf-8');
-    const freqs: number[] = [];
     for (const line of cpuinfo.split('\n')) {
       const idx = line.indexOf(':');
       if (idx === -1) continue;
@@ -51,9 +59,33 @@ function sampleRealCpuUsage(): { overall: number; perCore: number[]; model: stri
         vendor = v;
       } else if (k === 'cache size' && !cacheSize) {
         cacheSize = v;
-      } else if (k === 'cpu mhz') {
-        const f = parseFloat(v);
-        if (!isNaN(f) && f > 0) freqs.push(f);
+      }
+    }
+  } catch {
+    // Fallback to os.cpus()
+  }
+  if (!model || model.toLowerCase() === 'unknown') {
+    model = `Linux Host CPU (${arch})`;
+  }
+  cachedStaticCpu = { model, arch, vendor, cacheSize };
+  return cachedStaticCpu;
+}
+
+function sampleRealCpuUsage(): { overall: number; perCore: number[]; model: string; arch: string; vendor: string; cacheSize: string; freqMhz: number } {
+  const cpus = os.cpus() || [];
+  const { model, arch, vendor, cacheSize } = getStaticCpuSpecs();
+  let freqMhz = cpus[0]?.speed || 0;
+
+  try {
+    const cpuinfo = fs.readFileSync('/proc/cpuinfo', 'utf-8');
+    const freqs: number[] = [];
+    for (const line of cpuinfo.split('\n')) {
+      if (line.startsWith('cpu MHz')) {
+        const idx = line.indexOf(':');
+        if (idx !== -1) {
+          const f = parseFloat(line.slice(idx + 1).trim());
+          if (!isNaN(f) && f > 0) freqs.push(f);
+        }
       }
     }
     if (freqs.length > 0) {
@@ -61,10 +93,6 @@ function sampleRealCpuUsage(): { overall: number; perCore: number[]; model: stri
     }
   } catch {
     // Fallback to os.cpus()
-  }
-
-  if (!model || model.toLowerCase() === 'unknown') {
-    model = `Linux Host CPU (${arch})`;
   }
 
   const currentTimes = cpus.map((c) => {
@@ -238,6 +266,10 @@ function sampleRealNetwork() {
 }
 
 function sampleRealDisks() {
+  const now = Date.now();
+  if (cachedDisks.data.length > 0 && now - cachedDisks.ts < 6000) {
+    return cachedDisks.data;
+  }
   const disks: unknown[] = [];
   try {
     const out = execSync('df -B1 -T -x tmpfs -x devtmpfs -x squashfs 2>/dev/null || df -k', { timeout: 1500 }).toString();
@@ -262,6 +294,7 @@ function sampleRealDisks() {
         percent,
       });
     }
+    cachedDisks = { data: disks, ts: now };
   } catch {
     // Ignore if df fails
   }
@@ -269,9 +302,13 @@ function sampleRealDisks() {
 }
 
 function sampleRealProcesses() {
+  const now = Date.now();
+  if (cachedProcesses.data.length > 0 && now - cachedProcesses.ts < 3000) {
+    return cachedProcesses.data;
+  }
   try {
     const out = execSync('ps -eo pid,user,pcpu,rss,comm --sort=-pcpu | head -n 45', { timeout: 1500 }).toString();
-    return out
+    const procs = out
       .split('\n')
       .slice(1)
       .map((line) => line.trim())
@@ -296,27 +333,35 @@ function sampleRealProcesses() {
           status: 'running',
         };
       });
+    cachedProcesses = { data: procs, ts: now };
+    return procs;
   } catch {
-    return [];
+    return cachedProcesses.data;
   }
 }
 
 function getRealVersionPayload(hostHeader: string) {
   const version = readAppVersion();
-  let localSha = 'HEAD';
-  let localSubject = 'Repositorio local sincronizado';
-  let localDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
-  try {
-    localSha = execSync('git rev-parse --short HEAD', { timeout: 1000 }).toString().trim() || 'HEAD';
-    const log = execSync('git log -1 --format="%s|%ci"', { timeout: 1000 }).toString().trim();
-    if (log.includes('|')) {
-      const [subj, dt] = log.split('|');
-      localSubject = subj;
-      localDate = dt.slice(0, 16);
+  const now = Date.now();
+  if (now - cachedGitMeta.ts > 20000) {
+    try {
+      const sha = execSync('git rev-parse --short HEAD', { timeout: 1000 }).toString().trim() || 'HEAD';
+      const log = execSync('git log -1 --format="%s|%ci"', { timeout: 1000 }).toString().trim();
+      let subj = cachedGitMeta.subject;
+      let dt = cachedGitMeta.date;
+      if (log.includes('|')) {
+        const parts = log.split('|');
+        subj = parts[0];
+        dt = parts[1].slice(0, 16);
+      }
+      cachedGitMeta = { sha, subject: subj, date: dt, ts: now };
+    } catch {
+      cachedGitMeta.ts = now;
     }
-  } catch {
-    // Git metadata optional
   }
+  const localSha = cachedGitMeta.sha;
+  const localSubject = cachedGitMeta.subject;
+  const localDate = cachedGitMeta.date;
   const pubDomain = (hostHeader || os.hostname()).split(':')[0];
   return {
     version,
@@ -513,7 +558,7 @@ function realOsTelemetryMiddleware(): Plugin {
           historyBuffer.disk_r.push(0);
           historyBuffer.disk_w.push(0);
           for (const k of Object.keys(historyBuffer)) {
-            if (historyBuffer[k].length > 40) historyBuffer[k] = historyBuffer[k].slice(-40);
+            if (historyBuffer[k].length > 60) historyBuffer[k] = historyBuffer[k].slice(-60);
           }
 
           const payload = {

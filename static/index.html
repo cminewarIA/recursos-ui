@@ -17,61 +17,138 @@
 
   <style>
     /* ==========================================================================
-       AETHER OBSIDIAN TELEMETRY OS — DESIGN CONSTITUTION (v3.0)
-       Zero-Hardcoding · High-Density Instrument Surfaces · Tabular Numerals
+       APPLE LIQUID GLASS & TESLA TOUCH COCKPIT — DESIGN SYSTEM (v4.0)
+       Zero-Hardcoding · Specular Liquid Glass · Titanium Light/Dark · Touch First
        ========================================================================== */
-    :root {
-      /* 60% Dominant Obsidian Canvas */
-      --bg-canvas: #060911;
-      --bg-sidebar: #0A0E17;
-      --bg-header: rgba(10, 14, 23, 0.86);
+    :root,
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      /* 60% Space Black / Obsidian Titanium Canvas */
+      --bg-canvas: #07080C;
+      --bg-canvas-glow-1: rgba(41, 151, 255, 0.13);
+      --bg-canvas-glow-2: rgba(48, 209, 88, 0.07);
+      --bg-sidebar: rgba(14, 16, 22, 0.82);
+      --bg-header: rgba(14, 16, 22, 0.72);
+      --bg-dock: rgba(18, 20, 28, 0.74);
 
-      /* 30% Structural Instrument Surfaces */
-      --bg-surface: #0F1523;
-      --bg-surface-elevated: #141C2E;
-      --bg-surface-hover: #182238;
-      --bg-surface-inset: #080C14;
+      /* 30% Liquid Glass & Brushed Titanium Surfaces */
+      --bg-surface: rgba(22, 25, 34, 0.68);
+      --bg-surface-elevated: rgba(30, 34, 46, 0.78);
+      --bg-surface-hover: rgba(38, 43, 58, 0.84);
+      --bg-surface-inset: rgba(8, 10, 15, 0.72);
 
-      --border-subtle: rgba(148, 163, 184, 0.11);
-      --border-strong: rgba(148, 163, 184, 0.22);
-      --border-highlight: rgba(56, 189, 248, 0.38);
+      --border-subtle: rgba(255, 255, 255, 0.085);
+      --border-strong: rgba(255, 255, 255, 0.18);
+      --border-highlight: rgba(41, 151, 255, 0.48);
+      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+      --card-shadow: 0 20px 45px -15px rgba(0, 0, 0, 0.65), 0 4px 14px rgba(0, 0, 0, 0.35);
 
-      /* High-Contrast Optical Typography */
-      --text-primary: #F8FAFC;
-      --text-secondary: #CBD5E1;
-      --text-muted: #8B9BB4;
-      --text-dim: #5B6B82;
+      /* High-Contrast Apple/Tesla Optical Typography */
+      --text-primary: #F5F5F7;
+      --text-secondary: #D2D2D7;
+      --text-muted: #86868B;
+      --text-dim: #58585E;
 
-      /* 10% High-Intent Semantic Telemetry Accents */
-      --accent-cyan: #06B6D4;
-      --accent-cyan-bright: #38BDF8;
-      --accent-cyan-soft: rgba(6, 182, 212, 0.14);
+      /* 10% Semantic Telemetry Accents (Apple/Tesla HMI Palette) */
+      --accent-cyan: #0071E3;
+      --accent-cyan-bright: #2997FF;
+      --accent-cyan-soft: rgba(41, 151, 255, 0.15);
 
-      --accent-violet: #8B5CF6;
-      --accent-violet-bright: #A78BFA;
-      --accent-violet-soft: rgba(139, 92, 246, 0.14);
+      --accent-violet: #BF5AF2;
+      --accent-violet-bright: #DA8FFF;
+      --accent-violet-soft: rgba(191, 90, 242, 0.15);
 
-      --accent-emerald: #10B981;
-      --accent-emerald-bright: #34D399;
-      --accent-emerald-soft: rgba(16, 185, 129, 0.14);
+      --accent-emerald: #30D158;
+      --accent-emerald-bright: #30D158;
+      --accent-emerald-soft: rgba(48, 209, 88, 0.15);
 
-      --accent-amber: #F59E0B;
-      --accent-amber-bright: #FBBF24;
-      --accent-amber-soft: rgba(245, 158, 11, 0.14);
+      --accent-amber: #FF9F0A;
+      --accent-amber-bright: #FFD60A;
+      --accent-amber-soft: rgba(255, 159, 10, 0.16);
 
-      --accent-rose: #EF4444;
-      --accent-rose-bright: #F87171;
-      --accent-rose-soft: rgba(239, 68, 68, 0.14);
+      --accent-rose: #FF453A;
+      --accent-rose-bright: #FF6961;
+      --accent-rose-soft: rgba(255, 69, 58, 0.16);
 
-      /* Spatial Radii */
-      --radius-lg: 14px;
-      --radius-md: 10px;
-      --radius-sm: 7px;
+      --chart-grid: rgba(255, 255, 255, 0.06);
+      --chart-fade-bottom: rgba(7, 8, 12, 0);
+
+      /* Spatial Radii (Apple Squircle Geometry) */
+      --radius-xl: 26px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
 
       /* 2+1 Font Stack Discipline */
       --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    /* Lunar Silver / Natural Titanium Finish (Light Mode) */
+    html[data-theme="light"] {
+      color-scheme: light;
+      --bg-canvas: #EEF1F6;
+      --bg-canvas-glow-1: rgba(0, 113, 227, 0.09);
+      --bg-canvas-glow-2: rgba(40, 205, 65, 0.06);
+      --bg-sidebar: rgba(245, 247, 250, 0.85);
+      --bg-header: rgba(248, 249, 252, 0.76);
+      --bg-dock: rgba(255, 255, 255, 0.80);
+
+      --bg-surface: rgba(255, 255, 255, 0.76);
+      --bg-surface-elevated: rgba(255, 255, 255, 0.92);
+      --bg-surface-hover: rgba(255, 255, 255, 0.98);
+      --bg-surface-inset: rgba(232, 236, 242, 0.75);
+
+      --border-subtle: rgba(15, 23, 42, 0.08);
+      --border-strong: rgba(15, 23, 42, 0.16);
+      --border-highlight: rgba(0, 113, 227, 0.42);
+      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
+      --card-shadow: 0 16px 36px -12px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+
+      --text-primary: #111318;
+      --text-secondary: #334155;
+      --text-muted: #64748B;
+      --text-dim: #94A3B8;
+
+      --accent-cyan: #0066CC;
+      --accent-cyan-bright: #0071E3;
+      --accent-cyan-soft: rgba(0, 113, 227, 0.11);
+
+      --accent-violet: #8944AB;
+      --accent-violet-bright: #9333EA;
+      --accent-violet-soft: rgba(147, 51, 234, 0.11);
+
+      --accent-emerald: #1D9E41;
+      --accent-emerald-bright: #16A34A;
+      --accent-emerald-soft: rgba(22, 163, 74, 0.11);
+
+      --accent-amber: #D97706;
+      --accent-amber-bright: #D97706;
+      --accent-amber-soft: rgba(217, 119, 6, 0.12);
+
+      --accent-rose: #DC2626;
+      --accent-rose-bright: #E11D48;
+      --accent-rose-soft: rgba(225, 29, 72, 0.11);
+
+      --chart-grid: rgba(15, 23, 42, 0.06);
+      --chart-fade-bottom: rgba(238, 241, 246, 0);
+    }
+
+    /* Native HTML5 View Transitions API Smooth Cross-Fade & Scale */
+    @keyframes vtFadeIn {
+      from { opacity: 0; transform: scale(0.985) translateY(6px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes vtFadeOut {
+      from { opacity: 1; transform: scale(1); }
+      to { opacity: 0; transform: scale(0.99); }
+    }
+    ::view-transition-old(root) {
+      animation: 150ms cubic-bezier(0.22, 1, 0.36, 1) both vtFadeOut;
+    }
+    ::view-transition-new(root) {
+      animation: 210ms cubic-bezier(0.22, 1, 0.36, 1) both vtFadeIn;
     }
 
     * {
@@ -80,6 +157,7 @@
       padding: 0;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+      -webkit-tap-highlight-color: transparent;
     }
 
     html, body {
@@ -87,14 +165,15 @@
       height: 100%;
       background-color: var(--bg-canvas);
       background-image:
-        radial-gradient(ellipse 75% 45% at 50% -10%, rgba(6, 182, 212, 0.10), transparent),
-        radial-gradient(ellipse 50% 40% at 95% 100%, rgba(139, 92, 246, 0.06), transparent);
+        radial-gradient(ellipse 80% 50% at 50% -15%, var(--bg-canvas-glow-1), transparent),
+        radial-gradient(ellipse 55% 45% at 92% 105%, var(--bg-canvas-glow-2), transparent);
       color: var(--text-primary);
       font-family: var(--font-sans);
       font-size: 14px;
       line-height: 1.5;
-      letter-spacing: 0.01em;
+      letter-spacing: -0.005em;
       overflow: hidden;
+      transition: background-color 0.28s ease, color 0.28s ease;
     }
 
     /* Enforce tabular numerals on all telemetry data */
@@ -105,27 +184,17 @@
     }
 
     /* Custom Scrollbars */
-    *::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    *::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.2);
-      border-radius: 3px;
-    }
-    *::-webkit-scrollbar-thumb:hover {
-      background: rgba(148, 163, 184, 0.35);
-    }
-    *::-webkit-scrollbar-track {
-      background: transparent;
-    }
+    *::-webkit-scrollbar { width: 6px; height: 6px; }
+    *::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.24); border-radius: 999px; }
+    *::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.42); }
+    *::-webkit-scrollbar-track { background: transparent; }
 
     /* ==========================================================================
        CLEAN SKELETON LOADERS (Shown while querying OS hardware sensors)
        ========================================================================== */
     @keyframes pulseShimmer {
       0% { opacity: 0.45; }
-      50% { opacity: 0.85; }
+      50% { opacity: 0.88; }
       100% { opacity: 0.45; }
     }
 
@@ -134,25 +203,15 @@
       animation: pulseShimmer 1.6s ease-in-out infinite;
     }
 
-    .skeleton-line {
-      display: inline-block;
-      height: 14px;
-      width: 120px;
-      border-radius: 4px;
-      background: linear-gradient(90deg, rgba(148,163,184,0.08) 25%, rgba(148,163,184,0.18) 50%, rgba(148,163,184,0.08) 75%);
-      background-size: 200% 100%;
-      animation: pulseShimmer 1.5s infinite;
-      vertical-align: middle;
-    }
-
     /* ==========================================================================
-       APPLICATION SHELL (SIDEBAR + MAIN VIEWPORT)
+       TESLA / VISIONOS FULL-BLEED COCKPIT SHELL
        ========================================================================== */
     .app-shell {
       display: flex;
       width: 100%;
       height: 100%;
       overflow: hidden;
+      position: relative;
     }
 
     .in-nextcloud, .in-nextcloud body, .in-nextcloud .app-shell {
@@ -160,20 +219,37 @@
       overflow: hidden !important;
     }
 
-    /* Sidebar Navigation (268px Workspace Contract) */
+    /* Collapsible Quick-Drawer Sidebar (Accessible via All-Modules trigger) */
     .sidebar {
-      width: 268px;
-      min-width: 268px;
+      position: fixed;
+      top: 68px;
+      left: 16px;
+      bottom: 94px;
+      width: 284px;
       background: var(--bg-sidebar);
-      border-right: 1px solid var(--border-subtle);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid var(--border-strong);
+      box-shadow: var(--card-shadow), var(--specular-inset);
+      border-radius: var(--radius-lg);
       display: flex;
       flex-direction: column;
       user-select: none;
-      z-index: 30;
+      z-index: 65;
+      transform: translateX(-320px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+    }
+
+    .sidebar.open {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
     }
 
     .sidebar-brand {
-      height: 60px;
+      height: 58px;
       padding: 0 18px;
       display: flex;
       align-items: center;
@@ -187,19 +263,6 @@
       display: flex;
       align-items: center;
       gap: 11px;
-    }
-
-    .brand- emblem {
-      width: 34px;
-      height: 34px;
-      border-radius: 9px;
-      background: linear-gradient(135deg, rgba(6, 182, 212, 0.22), rgba(59, 130, 246, 0.18));
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent-cyan-bright);
-      box-shadow: 0 0 20px rgba(6, 182, 212, 0.18);
     }
 
     .brand-title {
@@ -216,9 +279,9 @@
       font-weight: 600;
       color: var(--accent-cyan-bright);
       background: var(--accent-cyan-soft);
-      border: 1px solid rgba(6, 182, 212, 0.28);
-      padding: 2px 7px;
-      border-radius: 5px;
+      border: 1px solid var(--border-highlight);
+      padding: 2px 8px;
+      border-radius: 999px;
     }
 
     .sidebar-scroll {
@@ -227,7 +290,7 @@
       padding: 14px 10px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
     }
 
     .nav-group-label {
@@ -235,7 +298,7 @@
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: var(--text-dim);
+      color: var(--text-muted);
       padding: 0 10px 6px;
     }
 
@@ -243,50 +306,49 @@
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
     }
 
     .nav-link {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 11px;
+      min-height: 44px;
+      padding: 8px 12px;
       border-radius: var(--radius-sm);
-      color: var(--text-muted);
+      color: var(--text-secondary);
       text-decoration: none;
       font-size: 13px;
       font-weight: 500;
       border: 1px solid transparent;
-      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+      transition: all 0.16s ease;
       cursor: pointer;
-      white-space: nowrap;
     }
 
     .nav-link:hover {
-      background: rgba(148, 163, 184, 0.06);
+      background: rgba(148, 163, 184, 0.1);
       color: var(--text-primary);
     }
 
     .nav-link.active {
-      background: linear-gradient(90deg, rgba(6, 182, 212, 0.16), rgba(6, 182, 212, 0.05));
-      color: #FFFFFF;
-      border-color: rgba(56, 189, 248, 0.3);
+      background: var(--accent-cyan-soft);
+      color: var(--accent-cyan-bright);
+      border-color: var(--border-highlight);
       font-weight: 600;
     }
 
     .nav-link-left {
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 10px;
       min-width: 0;
     }
 
     .nav-icon {
-      width: 16px;
-      height: 16px;
+      width: 17px;
+      height: 17px;
       color: var(--text-muted);
       flex-shrink: 0;
-      transition: color 0.14s ease;
     }
 
     .nav-link.active .nav-icon {
@@ -297,20 +359,14 @@
       font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
-      background: rgba(148, 163, 184, 0.07);
-      padding: 1px 6px;
-      border-radius: 4px;
-    }
-
-    .nav-link.active .nav-counter {
-      background: rgba(6, 182, 212, 0.22);
-      color: var(--accent-cyan-bright);
+      background: rgba(148, 163, 184, 0.1);
+      padding: 2px 7px;
+      border-radius: 999px;
     }
 
     .sidebar-footer {
       padding: 12px 14px;
       border-top: 1px solid var(--border-subtle);
-      background: rgba(6, 9, 17, 0.55);
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -327,37 +383,31 @@
 
     .trust-button {
       width: 100%;
+      min-height: 42px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 10px;
+      padding: 8px 12px;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm);
-      color: var(--text-secondary);
-      font-size: 11.5px;
+      color: var(--text-primary);
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s ease, border-color 0.15s ease;
-    }
-
-    .trust-button:hover {
-      background: var(--bg-surface-hover);
-      border-color: var(--border-strong);
-      color: #FFFFFF;
     }
 
     .live-dot {
-      width: 7px;
-      height: 7px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: var(--accent-emerald);
-      box-shadow: 0 0 8px var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
       flex-shrink: 0;
     }
 
     /* ==========================================================================
-       MAIN CONTENT PANE & TOP COMMAND HEADERBAR
+       TESLA 3-ZONE TOP STATUS COCKPIT BAR
        ========================================================================== */
     .main-pane {
       flex: 1;
@@ -368,37 +418,41 @@
     }
 
     .top-header {
-      height: 60px;
-      padding: 0 26px;
+      height: 62px;
+      padding: 0 22px;
       background: var(--bg-header);
-      backdrop-filter: blur(16px);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      z-index: 20;
+      gap: 14px;
+      z-index: 40;
     }
 
     .header-left {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       min-width: 0;
     }
 
-    .mobile-menu-trigger {
-      display: none;
+    .cockpit-drawer-btn {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--specular-inset);
       color: var(--text-primary);
-      width: 34px;
-      height: 34px;
-      border-radius: var(--radius-sm);
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      transition: transform 0.14s ease, border-color 0.14s ease;
     }
+    .cockpit-drawer-btn:active { transform: scale(0.94); }
 
     .history-nav-group {
       display: inline-flex;
@@ -406,29 +460,27 @@
       gap: 2px;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      padding: 2px;
+      border-radius: 13px;
+      padding: 3px;
     }
 
     .history-btn {
       background: transparent;
       border: none;
       color: var(--text-secondary);
-      width: 28px;
-      height: 28px;
-      border-radius: 5px;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       transition: background 0.14s ease, color 0.14s ease, opacity 0.14s ease;
     }
-
     .history-btn:hover:not(:disabled) {
       background: var(--bg-surface-hover);
-      color: #FFFFFF;
+      color: var(--text-primary);
     }
-
     .history-btn:disabled {
       opacity: 0.3;
       cursor: not-allowed;
@@ -446,11 +498,7 @@
       color: var(--text-muted);
       text-decoration: none;
       font-size: 13px;
-      font-weight: 500;
-      transition: color 0.14s ease;
-    }
-    .breadcrumb-home:hover {
-      color: var(--text-primary);
+      font-weight: 600;
     }
 
     .breadcrumb-slash {
@@ -460,10 +508,10 @@
 
     .breadcrumb-current {
       font-family: var(--font-display);
-      font-size: 16px;
+      font-size: 16.5px;
       font-weight: 700;
       color: var(--text-primary);
-      letter-spacing: -0.01em;
+      letter-spacing: -0.02em;
       overflow: hidden;
       text-overflow: ellipsis;
     }
@@ -473,15 +521,29 @@
       font-size: 11px;
       color: var(--accent-cyan-bright);
       background: var(--accent-cyan-soft);
-      border: 1px solid rgba(6, 182, 212, 0.25);
-      padding: 2px 7px;
-      border-radius: 5px;
+      border: 1px solid var(--border-highlight);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    /* Center Telemetry Pulse Pill (Tesla Cockpit Status) */
+    .header-center-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--specular-inset);
+      font-size: 12px;
+      color: var(--text-secondary);
     }
 
     .header-right {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       flex-shrink: 0;
     }
 
@@ -490,123 +552,137 @@
       align-items: center;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      padding: 0 11px;
-      height: 34px;
-      width: 240px;
+      border-radius: 13px;
+      padding: 0 12px;
+      height: 40px;
+      width: 220px;
       transition: border-color 0.15s ease;
     }
-
     .search-box:focus-within {
       border-color: var(--accent-cyan-bright);
     }
-
     .search-box svg {
-      width: 14px;
-      height: 14px;
+      width: 15px;
+      height: 15px;
       color: var(--text-muted);
       margin-right: 8px;
       flex-shrink: 0;
     }
-
     .search-box input {
       background: transparent;
       border: none;
       outline: none;
       color: var(--text-primary);
-      font-size: 12.5px;
+      font-size: 13px;
       width: 100%;
       font-family: var(--font-sans);
     }
 
-    .search-box input::placeholder {
-      color: var(--text-dim);
-    }
-
+    /* Touch-First Action Buttons (Minimum 40-48px Target) */
     .action-btn {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      color: var(--text-secondary);
-      height: 34px;
-      padding: 0 12px;
-      border-radius: var(--radius-sm);
+      box-shadow: var(--specular-inset);
+      color: var(--text-primary);
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 13px;
       font-size: 12.5px;
       font-weight: 600;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 7px;
       cursor: pointer;
       text-decoration: none;
       white-space: nowrap;
-      transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+      transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), background 0.14s ease, border-color 0.14s ease;
     }
-
     .action-btn:hover:not(:disabled) {
       background: var(--bg-surface-hover);
       border-color: var(--border-strong);
-      color: #FFFFFF;
     }
-
+    .action-btn:active:not(:disabled) {
+      transform: scale(0.96);
+    }
     .action-btn:disabled {
-      opacity: 0.5;
+      opacity: 0.45;
       cursor: not-allowed;
     }
-
     .action-btn.primary-cta {
-      background: linear-gradient(135deg, #0891B2, #0284C7);
-      border-color: rgba(56, 189, 248, 0.45);
+      background: linear-gradient(135deg, #0071E3, #2997FF);
+      border-color: rgba(255, 255, 255, 0.28);
       color: #FFFFFF;
+      box-shadow: 0 6px 20px rgba(0, 113, 227, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
 
-    .action-btn.primary-cta:hover:not(:disabled) {
-      background: linear-gradient(135deg, #06B6D4, #0369A1);
+    /* Titanium Finish Theme Switcher Pill */
+    .theme-cycle-btn {
+      min-width: 42px;
+      padding: 0 12px;
     }
 
     /* ==========================================================================
-       VIEWPORT SCROLL & INSTRUMENT CONTAINERS
+       PANORAMIC BENTO VIEWPORT & APPLE LIQUID GLASS CONTAINERS
        ========================================================================== */
     .viewport-scroll {
       flex: 1;
       overflow-y: auto;
-      padding: 24px 28px 56px;
+      padding: 22px 26px 118px;
       -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
     }
 
     .view-page {
-      max-width: 1280px;
+      max-width: 1360px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 22px;
+      gap: 20px;
     }
 
-    /* Host Telemetry Command Banner */
+    /* Tesla Node Identity Cockpit Banner */
     .command-banner {
-      background: linear-gradient(180deg, rgba(20, 28, 46, 0.85) 0%, rgba(15, 21, 35, 0.95) 100%);
+      background: var(--bg-surface);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
       border: 1px solid var(--border-subtle);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-      border-radius: var(--radius-lg);
-      padding: 20px 24px;
+      box-shadow: var(--card-shadow), var(--specular-inset);
+      border-radius: var(--radius-xl);
+      padding: 22px 26px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 16px;
+      gap: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .command-banner::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 12% 50%, var(--bg-canvas-glow-1), transparent 55%);
+      pointer-events: none;
     }
 
     .command-banner-left {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 18px;
       min-width: 0;
+      position: relative;
+      z-index: 1;
     }
 
     .server-emblem {
-      width: 52px;
-      height: 52px;
-      border-radius: 13px;
-      background: linear-gradient(135deg, rgba(6, 182, 212, 0.16), rgba(15, 21, 35, 0.92));
-      border: 1px solid rgba(56, 189, 248, 0.35);
+      width: 60px;
+      height: 60px;
+      border-radius: 18px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-strong);
+      box-shadow: var(--specular-inset), 0 8px 20px rgba(0, 0, 0, 0.25);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -615,13 +691,14 @@
       position: relative;
       cursor: pointer;
       overflow: hidden;
-      transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease;
     }
-
     .server-emblem:hover {
-      transform: translateY(-1px) scale(1.03);
+      transform: scale(1.05);
       border-color: var(--accent-cyan-bright);
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+    }
+    .server-emblem:active {
+      transform: scale(0.95);
     }
 
     .server-emblem img,
@@ -631,7 +708,7 @@
       height: 72%;
       object-fit: contain;
       display: block;
-      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
     }
 
     .server-emblem img.custom-cover,
@@ -646,19 +723,18 @@
     .logo-edit-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(6, 9, 17, 0.78);
-      color: #F8FAFC;
-      font-size: 9.5px;
+      background: rgba(7, 8, 12, 0.78);
+      color: #F5F5F7;
+      font-size: 10px;
       font-weight: 700;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       opacity: 0;
-      transition: opacity 0.15s ease;
+      transition: opacity 0.16s ease;
       text-align: center;
       line-height: 1.1;
-      padding: 2px;
       pointer-events: none;
     }
 
@@ -676,10 +752,10 @@
 
     .host-headline h1 {
       font-family: var(--font-display);
-      font-size: 20px;
-      font-weight: 700;
-      color: #FFFFFF;
-      letter-spacing: -0.02em;
+      font-size: clamp(1.25rem, 2vw, 1.55rem);
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.03em;
     }
 
     .unboxed-meta {
@@ -689,7 +765,7 @@
       flex-wrap: wrap;
       font-size: 12.5px;
       color: var(--text-muted);
-      margin-top: 4px;
+      margin-top: 5px;
     }
 
     .meta-sep {
@@ -698,35 +774,50 @@
     }
 
     /* ==========================================================================
-       4-PILLAR RADIAL TELEMETRY DECK (OVERVIEW HERO GRID)
+       APPLE BENTO 12-COLUMN GRID & EXPANDABLE TOUCH CARDS
        ========================================================================== */
     .telemetry-pillars-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      grid-template-columns: repeat(12, 1fr);
       gap: 16px;
     }
 
     .pillar-card {
+      grid-column: span 3;
       background: var(--bg-surface);
+      backdrop-filter: blur(26px) saturate(185%);
+      -webkit-backdrop-filter: blur(26px) saturate(185%);
       border: 1px solid var(--border-subtle);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      box-shadow: var(--card-shadow), var(--specular-inset);
       border-radius: var(--radius-lg);
-      padding: 18px 20px;
+      padding: 20px 22px;
       text-decoration: none;
       color: inherit;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       gap: 14px;
-      transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.16s ease, background 0.16s ease;
+      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, background 0.2s ease;
       position: relative;
       overflow: hidden;
+      cursor: pointer;
+    }
+
+    @media (max-width: 1200px) {
+      .pillar-card { grid-column: span 6; }
+    }
+    @media (max-width: 680px) {
+      .pillar-card { grid-column: span 12; }
     }
 
     .pillar-card:hover {
-      transform: translateY(-2px);
+      transform: translateY(-3px);
       background: var(--bg-surface-elevated);
       border-color: var(--border-strong);
+    }
+
+    .pillar-card:active {
+      transform: scale(0.985);
     }
 
     .pillar-top {
@@ -737,37 +828,64 @@
     }
 
     .pillar-label {
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 11.5px;
+      font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .pillar-value {
       font-family: var(--font-mono);
-      font-size: 26px;
+      font-size: clamp(1.45rem, 2.1vw, 1.75rem);
       font-weight: 700;
-      color: #FFFFFF;
+      color: var(--text-primary);
       letter-spacing: -0.03em;
-      margin-top: 4px;
+      margin-top: 6px;
     }
 
     .pillar-spec {
       font-size: 12px;
       color: var(--text-muted);
-      margin-top: 3px;
-      line-height: 1.35;
+      margin-top: 4px;
+      line-height: 1.4;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
 
-    /* Circular SVG Gauge */
+    .bento-expand-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      opacity: 0.72;
+      transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+      z-index: 3;
+    }
+    .pillar-card:hover .bento-expand-btn {
+      opacity: 1;
+      background: var(--accent-cyan-soft);
+      color: var(--accent-cyan-bright);
+    }
+
+    /* Tesla Radial Instrument Gauge */
     .radial-gauge {
-      width: 58px;
-      height: 58px;
+      width: 62px;
+      height: 62px;
       flex-shrink: 0;
       position: relative;
       display: flex;
@@ -783,31 +901,32 @@
 
     .radial-track {
       fill: none;
-      stroke: rgba(148, 163, 184, 0.1);
-      stroke-width: 5;
+      stroke: rgba(148, 163, 184, 0.14);
+      stroke-width: 5.2;
     }
 
     .radial-progress {
       fill: none;
-      stroke-width: 5;
+      stroke-width: 5.2;
       stroke-linecap: round;
       stroke-dasharray: 138.2;
       stroke-dashoffset: 138.2;
-      transition: stroke-dashoffset 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: stroke-dashoffset 0.45s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     .radial-center-text {
       position: absolute;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 11.5px;
       font-weight: 700;
       color: var(--text-primary);
     }
 
     .mini-oscilloscope {
-      height: 46px;
+      height: 52px;
       width: 100%;
       margin-top: 2px;
+      position: relative;
     }
 
     .mini-oscilloscope canvas {
@@ -821,28 +940,34 @@
        ========================================================================== */
     .modules-bento-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
       gap: 16px;
     }
 
     .module-card {
       background: var(--bg-surface);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--card-shadow), var(--specular-inset);
       border-radius: var(--radius-lg);
-      padding: 18px 20px;
+      padding: 20px 22px;
       text-decoration: none;
       color: inherit;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       gap: 12px;
-      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, background 0.2s ease;
     }
 
     .module-card:hover {
-      transform: translateY(-2px);
+      transform: translateY(-3px);
       background: var(--bg-surface-elevated);
       border-color: var(--border-strong);
+    }
+    .module-card:active {
+      transform: scale(0.985);
     }
 
     .module-header {
@@ -855,22 +980,23 @@
     .module-title-group {
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 10px;
       font-family: var(--font-display);
-      font-size: 14.5px;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 700;
       color: var(--text-primary);
+      letter-spacing: -0.01em;
     }
 
     .module-arrow {
-      color: var(--text-dim);
-      font-size: 14px;
-      transition: transform 0.15s ease, color 0.15s ease;
+      color: var(--text-muted);
+      font-size: 15px;
+      transition: transform 0.16s ease, color 0.16s ease;
     }
 
     .module-card:hover .module-arrow {
       color: var(--accent-cyan-bright);
-      transform: translateX(3px);
+      transform: translateX(4px);
     }
 
     /* ==========================================================================
@@ -878,10 +1004,12 @@
        ========================================================================== */
     .hero-instrument-card {
       background: var(--bg-surface);
+      backdrop-filter: blur(26px) saturate(180%);
+      -webkit-backdrop-filter: blur(26px) saturate(180%);
       border: 1px solid var(--border-subtle);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-      border-radius: var(--radius-lg);
-      padding: 22px 24px;
+      box-shadow: var(--card-shadow), var(--specular-inset);
+      border-radius: var(--radius-xl);
+      padding: 24px 26px;
     }
 
     .instrument-header {
@@ -890,7 +1018,7 @@
       justify-content: space-between;
       gap: 16px;
       flex-wrap: wrap;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
     }
 
     .instrument-kicker {
@@ -903,9 +1031,9 @@
 
     .instrument-big-readout {
       font-family: var(--font-mono);
-      font-size: 32px;
+      font-size: clamp(1.8rem, 3vw, 2.35rem);
       font-weight: 700;
-      color: #FFFFFF;
+      color: var(--text-primary);
       letter-spacing: -0.03em;
       display: flex;
       align-items: baseline;
@@ -922,13 +1050,15 @@
 
     .oscilloscope-stage {
       width: 100%;
-      height: 170px;
+      height: 190px;
       position: relative;
       background: var(--bg-surface-inset);
-      border: 1px solid rgba(148, 163, 184, 0.08);
+      border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 8px;
+      padding: 10px;
       overflow: hidden;
+      cursor: crosshair;
+      touch-action: none;
     }
 
     .oscilloscope-stage canvas {
@@ -941,22 +1071,25 @@
     .hw-spec-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 12px;
+      gap: 14px;
     }
 
     .hw-spec-cell {
       background: var(--bg-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--specular-inset);
       border-radius: var(--radius-md);
-      padding: 14px 16px;
+      padding: 16px 18px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 5px;
     }
 
     .hw-spec-label {
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--text-muted);
@@ -974,7 +1107,7 @@
     .section-block {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
 
     .section-header-bar {
@@ -987,10 +1120,10 @@
 
     .section-title {
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 700;
       color: var(--text-primary);
-      letter-spacing: -0.01em;
+      letter-spacing: -0.015em;
     }
 
     .section-subtitle {
@@ -1000,7 +1133,10 @@
 
     .surface-panel {
       background: var(--bg-surface);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--card-shadow), var(--specular-inset);
       border-radius: var(--radius-lg);
       overflow: hidden;
     }
@@ -1009,10 +1145,10 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 13px 18px;
+      padding: 14px 20px;
       border-bottom: 1px solid var(--border-subtle);
       gap: 14px;
-      transition: background 0.12s ease;
+      transition: background 0.14s ease;
     }
 
     .data-row:last-child, .adw-action-row:last-child {
@@ -1020,7 +1156,7 @@
     }
 
     .data-row:hover, .adw-action-row:hover {
-      background: rgba(148, 163, 184, 0.04);
+      background: rgba(148, 163, 184, 0.05);
     }
 
     .row-title-box {
@@ -1054,11 +1190,13 @@
     /* Logical CPU Cores Matrix */
     .cores-matrix-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
       gap: 10px;
-      padding: 16px;
+      padding: 18px;
       background: var(--bg-surface);
+      backdrop-filter: blur(22px);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--specular-inset);
       border-radius: var(--radius-lg);
     }
 
@@ -1066,10 +1204,10 @@
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm);
-      padding: 10px 8px;
+      padding: 11px 10px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 7px;
     }
 
     .core-tile-top {
@@ -1080,53 +1218,49 @@
       font-size: 11px;
     }
 
-    .core-id {
-      color: var(--text-muted);
-    }
-
-    .core-pct {
-      font-weight: 700;
-      color: var(--text-primary);
-    }
+    .core-id { color: var(--text-muted); }
+    .core-pct { font-weight: 700; color: var(--text-primary); }
 
     .core-bar-track {
       width: 100%;
       height: 5px;
-      background: rgba(148, 163, 184, 0.1);
-      border-radius: 3px;
+      background: rgba(148, 163, 184, 0.14);
+      border-radius: 999px;
       overflow: hidden;
     }
 
     .core-bar-fill {
       height: 100%;
       background: var(--accent-cyan-bright);
-      border-radius: 3px;
+      border-radius: 999px;
       transition: width 0.25s ease, background-color 0.25s ease;
     }
 
     /* Active Network Interface Cards (NIC Hardware Inspector) */
     .nic-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(295px, 1fr));
       gap: 14px;
     }
 
     .nic-card {
       background: var(--bg-surface);
+      backdrop-filter: blur(22px);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--specular-inset);
       border-radius: var(--radius-md);
-      padding: 16px 18px;
+      padding: 18px 20px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
 
-    /* Interactive Segmented Filter Controls */
+    /* Interactive Segmented Filter Controls (Apple iOS Style) */
     .segmented-control {
       display: inline-flex;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
+      border-radius: 12px;
       padding: 3px;
       gap: 3px;
     }
@@ -1137,14 +1271,15 @@
       color: var(--text-muted);
       font-size: 12px;
       font-weight: 600;
-      padding: 5px 12px;
-      border-radius: 5px;
+      min-height: 34px;
+      padding: 5px 13px;
+      border-radius: 9px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       white-space: nowrap;
-      transition: background 0.14s ease, color 0.14s ease;
+      transition: background 0.15s ease, color 0.15s ease;
     }
 
     .seg-btn:hover, .pill-btn:hover {
@@ -1153,8 +1288,8 @@
 
     .seg-btn.active, .pill-btn.active {
       background: var(--bg-surface-elevated);
-      color: #FFFFFF;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      color: var(--text-primary);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
 
     /* Semantic Status Indicators */
@@ -1162,23 +1297,23 @@
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      padding: 3px 8px;
-      border-radius: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
       font-size: 11px;
       font-weight: 600;
       white-space: nowrap;
     }
-    .badge-blue { background: var(--accent-cyan-soft); color: var(--accent-cyan-bright); border: 1px solid rgba(6, 182, 212, 0.28); }
-    .badge-purple { background: var(--accent-violet-soft); color: var(--accent-violet-bright); border: 1px solid rgba(139, 92, 246, 0.28); }
-    .badge-green { background: var(--accent-emerald-soft); color: var(--accent-emerald-bright); border: 1px solid rgba(16, 185, 129, 0.28); }
-    .badge-amber { background: var(--accent-amber-soft); color: var(--accent-amber-bright); border: 1px solid rgba(245, 158, 11, 0.28); }
-    .badge-red { background: var(--accent-rose-soft); color: var(--accent-rose-bright); border: 1px solid rgba(239, 68, 68, 0.28); }
+    .badge-blue { background: var(--accent-cyan-soft); color: var(--accent-cyan-bright); border: 1px solid rgba(41, 151, 255, 0.28); }
+    .badge-purple { background: var(--accent-violet-soft); color: var(--accent-violet-bright); border: 1px solid rgba(191, 90, 242, 0.28); }
+    .badge-green { background: var(--accent-emerald-soft); color: var(--accent-emerald-bright); border: 1px solid rgba(48, 209, 88, 0.28); }
+    .badge-amber { background: var(--accent-amber-soft); color: var(--accent-amber-bright); border: 1px solid rgba(255, 159, 10, 0.28); }
+    .badge-red { background: var(--accent-rose-soft); color: var(--accent-rose-bright); border: 1px solid rgba(255, 69, 58, 0.28); }
 
     .device-circle,
     .nic-logo-box {
-      width: 42px;
-      height: 42px;
-      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      border-radius: 13px;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       display: flex;
@@ -1187,17 +1322,14 @@
       flex-shrink: 0;
       position: relative;
       overflow: hidden;
-      transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+      transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
     }
 
-    .interactive-logo {
-      cursor: pointer;
-    }
-
+    .interactive-logo { cursor: pointer; }
     .interactive-logo:hover {
       border-color: var(--accent-cyan-bright);
       background: var(--bg-surface-elevated);
-      transform: scale(1.05);
+      transform: scale(1.06);
     }
 
     .brand-badge {
@@ -1205,11 +1337,11 @@
       align-items: center;
       gap: 5px;
       padding: 2px 8px;
-      border-radius: 5px;
+      border-radius: 999px;
       font-size: 11px;
       font-weight: 600;
       border: 1px solid var(--border-subtle);
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(148, 163, 184, 0.06);
       white-space: nowrap;
     }
     .brand-logo-svg { width: 13px; height: 13px; flex-shrink: 0; object-fit: contain; }
@@ -1250,8 +1382,8 @@
     }
 
     .upload-dropzone {
-      border: 1.5px dashed rgba(56, 189, 248, 0.38);
-      background: rgba(6, 182, 212, 0.06);
+      border: 1.5px dashed var(--border-highlight);
+      background: var(--accent-cyan-soft);
       border-radius: var(--radius-md);
       padding: 16px;
       text-align: center;
@@ -1259,30 +1391,25 @@
       transition: background 0.15s ease, border-color 0.15s ease;
     }
 
-    .upload-dropzone:hover {
-      background: rgba(6, 182, 212, 0.12);
-      border-color: var(--accent-cyan-bright);
-    }
-
     .banned-ip-chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       background: var(--accent-rose-soft);
-      border: 1px solid rgba(239, 68, 68, 0.28);
-      color: #FCA5A5;
+      border: 1px solid rgba(255, 69, 58, 0.28);
+      color: var(--accent-rose-bright);
       font-family: var(--font-mono);
       font-size: 11.5px;
       padding: 5px 10px;
-      border-radius: 6px;
+      border-radius: 8px;
     }
 
     .btn-revoke {
       background: var(--accent-rose-soft);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: #FCA5A5;
-      border-radius: 6px;
-      padding: 5px 11px;
+      border: 1px solid rgba(255, 69, 58, 0.3);
+      color: var(--accent-rose-bright);
+      border-radius: 9px;
+      padding: 6px 12px;
       font-size: 11.5px;
       font-weight: 600;
       cursor: pointer;
@@ -1301,19 +1428,111 @@
       white-space: pre-wrap;
     }
 
-    /* Modals */
+    /* ==========================================================================
+       FLOATING APPLE/TESLA TOUCH DOCK (THUMB-ZONE ERGONOMICS)
+       ========================================================================== */
+    .floating-touch-dock-wrap {
+      position: fixed;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      z-index: 60;
+      max-width: calc(100vw - 20px);
+      pointer-events: none;
+    }
+
+    .floating-touch-dock {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      background: var(--bg-dock);
+      backdrop-filter: blur(30px) saturate(200%);
+      -webkit-backdrop-filter: blur(30px) saturate(200%);
+      border: 1px solid var(--border-strong);
+      box-shadow: 0 22px 50px rgba(0, 0, 0, 0.55), var(--specular-inset);
+      border-radius: 24px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .floating-touch-dock::-webkit-scrollbar { display: none; }
+
+    .dock-item {
+      min-width: 56px;
+      height: 52px;
+      padding: 0 10px;
+      border-radius: 16px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+    }
+
+    .dock-item:hover {
+      color: var(--text-primary);
+      background: rgba(148, 163, 184, 0.1);
+      transform: translateY(-3px);
+    }
+
+    .dock-item:active {
+      transform: scale(0.92);
+    }
+
+    .dock-item.active {
+      background: var(--accent-cyan-soft);
+      color: var(--accent-cyan-bright);
+      border-color: var(--border-highlight);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .dock-item.active::after {
+      content: "";
+      position: absolute;
+      bottom: 3px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent-cyan-bright);
+      box-shadow: 0 0 8px var(--accent-cyan-bright);
+    }
+
+    .dock-item svg {
+      width: 19px;
+      height: 19px;
+      flex-shrink: 0;
+    }
+
+    .dock-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+
+    /* Modals & Native Liquid Glass Inspector Dialog */
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(3, 6, 12, 0.8);
-      backdrop-filter: blur(8px);
+      background: rgba(4, 6, 12, 0.72);
+      backdrop-filter: blur(16px) saturate(160%);
+      -webkit-backdrop-filter: blur(16px) saturate(160%);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 100;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.16s ease;
+      transition: opacity 0.2s ease;
       padding: 16px;
     }
     .modal-overlay.open {
@@ -1321,46 +1540,34 @@
       pointer-events: auto;
     }
     .modal-card {
-      background: var(--bg-surface);
+      background: var(--bg-surface-elevated);
+      backdrop-filter: blur(30px);
       border: 1px solid var(--border-strong);
-      border-radius: var(--radius-lg);
+      box-shadow: var(--card-shadow), var(--specular-inset);
+      border-radius: var(--radius-xl);
       width: 100%;
-      max-width: 580px;
+      max-width: 620px;
       overflow: hidden;
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.75);
     }
     .modal-header {
-      padding: 16px 20px;
+      padding: 18px 22px;
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     .modal-body {
-      padding: 20px;
-      max-height: 75vh;
+      padding: 22px;
+      max-height: 78vh;
       overflow-y: auto;
     }
 
     @media (max-width: 960px) {
-      .sidebar {
-        display: none;
-        position: fixed;
-        inset: 0 auto 0 0;
-        box-shadow: 12px 0 32px rgba(0, 0, 0, 0.8);
-      }
-      .sidebar.open {
-        display: flex;
-      }
-      .mobile-menu-trigger {
-        display: inline-flex;
-      }
-      .viewport-scroll {
-        padding: 16px 14px 48px;
-      }
-      .search-box {
-        width: 150px;
-      }
+      .header-center-telemetry { display: none; }
+      .viewport-scroll { padding: 16px 14px 115px; }
+      .search-box { width: 145px; }
+      .top-header { padding: 0 14px; }
+      .command-banner { padding: 18px; }
     }
   </style>
 </head>
@@ -1369,12 +1576,12 @@
   <div class="app-shell">
 
     <!-- ======================================================================
-         SIDEBAR NAVIGATION (MULTI-PAGE CLEAN WEB ROUTES)
+         COLLAPSIBLE ALL-MODULES DRAWER (SECONDARY & DEEP NAVIGATION)
          ====================================================================== -->
     <aside class="sidebar" id="appSidebar">
       <a href="/" class="sidebar-brand" onclick="return navigateTo(event, 'overview')">
         <div class="brand-lockup">
-          <div class="brand-emblem" style="width:32px;height:32px;border-radius:8px;background:rgba(6,182,212,0.16);border:1px solid rgba(56,189,248,0.35);display:flex;align-items:center;justify-content:center;color:#38BDF8;">
+          <div style="width:32px;height:32px;border-radius:10px;background:var(--accent-cyan-soft);border:1px solid var(--border-highlight);display:flex;align-items:center;justify-content:center;color:var(--accent-cyan-bright);">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
@@ -1386,13 +1593,13 @@
 
       <nav class="sidebar-scroll">
         <div>
-          <div class="nav-group-label">Centro de Mando</div>
+          <div class="nav-group-label">Cabina Central</div>
           <ul class="nav-list">
             <li>
               <a href="/" class="nav-link active" id="navOverview" onclick="return navigateTo(event, 'overview')">
                 <div class="nav-link-left">
                   <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-                  <span>Vista General</span>
+                  <span>Cabina Bento</span>
                 </div>
                 <span class="nav-counter" id="badgeNavOverview">En vivo</span>
               </a>
@@ -1406,7 +1613,7 @@
             <li>
               <a href="/procesador" class="nav-link" id="navProcessor" onclick="return navigateTo(event, 'processor')">
                 <div class="nav-link-left">
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
                   <span>Procesador (CPU)</span>
                 </div>
                 <span class="nav-counter" id="badgeNavCpu">...</span>
@@ -1415,7 +1622,7 @@
             <li>
               <a href="/memoria" class="nav-link" id="navMemory" onclick="return navigateTo(event, 'memory')">
                 <div class="nav-link-left">
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 19v-3"/><path d="M10 19v-3"/><path d="M14 19v-3"/><path d="M18 19v-3"/><path d="M8 11V9"/><path d="M16 11V9"/><path d="M12 11V9"/><path d="M2 15h20"/><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1.1a2 2 0 0 0 0 3.837V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.1a2 2 0 0 0 0-3.837Z"/></svg>
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 15h20"/><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2Z"/></svg>
                   <span>Memoria RAM</span>
                 </div>
                 <span class="nav-counter" id="badgeNavRam">...</span>
@@ -1433,7 +1640,7 @@
             <li>
               <a href="/almacenamiento" class="nav-link" id="navDrives" onclick="return navigateTo(event, 'drives')">
                 <div class="nav-link-left">
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
                   <span>Almacenamiento</span>
                 </div>
                 <span class="nav-counter" id="badgeNavDisk">...</span>
@@ -1442,7 +1649,7 @@
             <li>
               <a href="/red" class="nav-link" id="navNetwork" onclick="return navigateTo(event, 'network')">
                 <div class="nav-link-left">
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/></svg>
                   <span>Red & Interfaces</span>
                 </div>
                 <span class="nav-counter" id="badgeNavNet">...</span>
@@ -1484,7 +1691,7 @@
             <li>
               <a href="/procesos" class="nav-link" id="navProcesses" onclick="return navigateTo(event, 'processes')">
                 <div class="nav-link-left">
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/></svg>
                   <span>Monitor de Procesos</span>
                 </div>
                 <span class="nav-counter" id="badgeNavProc">...</span>
@@ -1493,7 +1700,7 @@
             <li>
               <a href="/dns" class="nav-link" id="navDns" onclick="return navigateTo(event, 'dns')">
                 <div class="nav-link-left">
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
                   <span>DNS & DuckDNS</span>
                 </div>
                 <span class="nav-counter" id="badgeNavDns">...</span>
@@ -1532,14 +1739,15 @@
     </aside>
 
     <!-- ======================================================================
-         MAIN VIEWPORT PANE
+         MAIN VIEWPORT PANE (TESLA 3-ZONE TOP HUD + PANORAMIC BENTO)
          ====================================================================== -->
     <main class="main-pane">
 
       <header class="top-header">
+        <!-- ZONE 1: Navigation Drawer Trigger, History & Active Route -->
         <div class="header-left">
-          <button class="mobile-menu-trigger" onclick="toggleSidebar()" aria-label="Abrir navegación">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <button class="cockpit-drawer-btn" onclick="toggleSidebar()" title="Menú completo de módulos y subsistemas">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
           </button>
 
           <div class="history-nav-group">
@@ -1554,16 +1762,30 @@
           <div class="breadcrumb-trail">
             <a href="/" class="breadcrumb-home" onclick="return navigateTo(event, 'overview')">Recursos</a>
             <span class="breadcrumb-slash">/</span>
-            <span class="breadcrumb-current" id="currentViewTitle">Vista General</span>
+            <span class="breadcrumb-current" id="currentViewTitle">Cabina General</span>
             <span class="route-chip" id="currentRouteBadge">/</span>
           </div>
         </div>
 
+        <!-- ZONE 2: Tesla Center Live Telemetry Pulse & Real-Time Render Auditor -->
+        <div class="header-center-telemetry" id="hudCenterTelemetry" onclick="openPerfAuditDialog()" style="cursor: pointer;" title="Auditoría de rendimiento en tiempo real (Toca para inspeccionar FPS, latencia API y optimizaciones activas)">
+          <span class="live-dot" id="hudPulseDot"></span>
+          <span id="hudClockReadout" class="mono" style="font-weight: 700; color: var(--text-primary);">--:--:--</span>
+          <span class="meta-sep">·</span>
+          <span id="hudPerfLatency" class="mono" style="color: var(--accent-emerald-bright);">RAF 60fps</span>
+        </div>
+
+        <!-- ZONE 3: Search, Titanium Theme Switcher, OTA & Zero-Trust -->
         <div class="header-right">
           <div class="search-box" id="searchBox" style="display: none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="filterInput" placeholder="Filtrar..." oninput="onFilterChange()">
           </div>
+
+          <button class="action-btn theme-cycle-btn" id="btnThemeSwitch" onclick="cycleTitaniumTheme()" title="Cambiar acabado: Titanio Oscuro / Titanio Claro / Automático">
+            <span id="themeSwitchIcon">🌗</span>
+            <span id="themeSwitchLabel" style="font-size: 11.5px;">Auto</span>
+          </button>
 
           <a href="/version" class="action-btn" id="btnHeaderVersion" onclick="return navigateTo(event, 'version')" title="Estado de versión y sincronización OTA con GitHub">
             <span class="live-dot" id="dotVersionHeader"></span>
@@ -1572,7 +1794,7 @@
 
           <button class="action-btn" onclick="openTrustDialog()" title="Seguridad Zero-Trust y Dispositivos Confiables">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span>Dispositivos</span>
+            <span>Zero-Trust</span>
           </button>
         </div>
       </header>
@@ -1580,14 +1802,14 @@
       <div class="viewport-scroll" id="mainScrollContainer">
 
         <!-- ==================================================================
-             0. VISTA GENERAL (COMMAND CENTER OVERVIEW - RUTA /)
+             0. CABINA GENERAL (APPLE LIQUID GLASS BENTO + TESLA COCKPIT - RUTA /)
              ================================================================== -->
         <div class="view-page" id="viewOverview">
 
           <!-- System Identity & Live Telemetry Status Banner -->
           <div class="command-banner">
             <div class="command-banner-left">
-              <div class="server-emblem" id="hostOsEmblemBtn" onclick="openHostOsLogoPicker()" title="Logo del sistema operativo detectado · Haz clic para buscar en Google o subir un archivo local">
+              <div class="server-emblem" id="hostOsEmblemBtn" onclick="openHostOsLogoPicker()" title="Logo del sistema operativo detectado · Toca para buscar en Google o subir un archivo local">
                 <div id="hostOsEmblemContent" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
                   <img id="hostOsLogoImg" src="https://cdn.simpleicons.org/linux/FCC624" alt="OS Logo" onerror="this.onerror=null; this.src='https://www.google.com/s2/favicons?sz=128&domain=kernel.org';">
                 </div>
@@ -1599,8 +1821,8 @@
               <div>
                 <div class="host-headline">
                   <h1 id="ovHostTitle">Detectando nodo...</h1>
-                  <button class="action-btn" style="height: 24px; padding: 0 8px; font-size: 11px;" onclick="openHostOsLogoPicker()" title="Cambiar el logo del sistema por búsqueda web o archivo local">
-                    🖼️ Cambiar logo
+                  <button class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px; border-radius: 999px;" onclick="openHostOsLogoPicker()" title="Cambiar el logo del sistema por búsqueda web o archivo local">
+                    🖼️ Logo SO
                   </button>
                   <span class="meta-sep">·</span>
                   <a href="/dns" onclick="return navigateTo(event, 'dns')" id="ovPublicDomainBadge" class="mono" style="font-size: 13px; color: var(--accent-cyan-bright); text-decoration: none;">Detectando DNS...</a>
@@ -1612,18 +1834,21 @@
                   <span class="meta-sep">·</span>
                   <span>IP LAN <strong id="ovSysLocalIp" class="mono" style="color: var(--text-secondary);">...</strong></span>
                   <span class="meta-sep">·</span>
-                  <span>Uptime <strong id="ovSysUptime" class="mono" style="color: var(--accent-emerald-bright);">...</strong></span>
+                  <span>Activo <strong id="ovSysUptime" class="mono" style="color: var(--accent-emerald-bright);">...</strong></span>
                 </div>
               </div>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <span class="adw-badge badge-green" id="ovBadgeStatus">Sondeo en tiempo real</span>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1;">
+              <button class="action-btn" style="min-height: 30px; height: 30px; padding: 0 12px; font-size: 11.5px;" onclick="openPerfAuditDialog()" title="Ver auditoría de rendimiento y optimización en tiempo real">
+                ⚡ <span id="ovPerfBadgeText">Auditoría 60fps</span>
+              </button>
+              <span class="adw-badge badge-green" id="ovBadgeStatus">Telemetría Activa</span>
               <span class="adw-badge badge-blue" id="ovBadgeTrust" onclick="openTrustDialog()" style="cursor: pointer;">Verificando red...</span>
             </div>
           </div>
 
-          <!-- 4 Primary Hardware Telemetry Pillars with Radial SVG Gauges & Live Sparklines -->
+          <!-- 4 Primary Hardware Telemetry Pillars with Radial SVG Gauges, Expandable Sheet & Live Sparklines -->
           <div class="telemetry-pillars-grid">
 
             <!-- 1. CPU PILLAR -->
@@ -1635,15 +1860,19 @@
                   <div class="pillar-spec hw-detecting" id="ovCpuSub">Detectando procesador...</div>
                 </div>
                 <div class="radial-gauge">
-                  <svg viewBox="0 0 52 52">
-                    <circle class="radial-track" cx="26" cy="26" r="22"></circle>
-                    <circle class="radial-progress" id="gaugeCpuCircle" cx="26" cy="26" r="22" stroke="#38BDF8"></circle>
+                  <svg viewBox="0 0 56 56">
+                    <circle class="radial-track" cx="28" cy="28" r="22"></circle>
+                    <circle class="radial-progress" id="gaugeCpuCircle" cx="28" cy="28" r="22" stroke="#38BDF8"></circle>
                   </svg>
                   <span class="radial-center-text" id="gaugeCpuText">--%</span>
                 </div>
               </div>
               <div class="mini-oscilloscope">
                 <canvas id="ovCanvasCpu"></canvas>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                <span class="bento-expand-hint" onclick="openBentoSheet('processor', event)" title="Expandir tarjeta interactiva con gráfica táctil">⤢ Inspector Táctil</span>
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver núcleos →</span>
               </div>
             </a>
 
@@ -1656,15 +1885,19 @@
                   <div class="pillar-spec hw-detecting" id="ovRamSub">Detectando memoria instalada...</div>
                 </div>
                 <div class="radial-gauge">
-                  <svg viewBox="0 0 52 52">
-                    <circle class="radial-track" cx="26" cy="26" r="22"></circle>
-                    <circle class="radial-progress" id="gaugeRamCircle" cx="26" cy="26" r="22" stroke="#A78BFA"></circle>
+                  <svg viewBox="0 0 56 56">
+                    <circle class="radial-track" cx="28" cy="28" r="22"></circle>
+                    <circle class="radial-progress" id="gaugeRamCircle" cx="28" cy="28" r="22" stroke="#A78BFA"></circle>
                   </svg>
                   <span class="radial-center-text" id="gaugeRamText">--%</span>
                 </div>
               </div>
               <div class="mini-oscilloscope">
                 <canvas id="ovCanvasRam"></canvas>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                <span class="bento-expand-hint" onclick="openBentoSheet('memory', event)" title="Expandir tarjeta interactiva con gráfica táctil">⤢ Inspector Táctil</span>
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver RAM/Swap →</span>
               </div>
             </a>
 
@@ -1677,15 +1910,19 @@
                   <div class="pillar-spec hw-detecting" id="ovGpuSub">Sondeando bus PCIe / DRM...</div>
                 </div>
                 <div class="radial-gauge">
-                  <svg viewBox="0 0 52 52">
-                    <circle class="radial-track" cx="26" cy="26" r="22"></circle>
-                    <circle class="radial-progress" id="gaugeGpuCircle" cx="26" cy="26" r="22" stroke="#34D399"></circle>
+                  <svg viewBox="0 0 56 56">
+                    <circle class="radial-track" cx="28" cy="28" r="22"></circle>
+                    <circle class="radial-progress" id="gaugeGpuCircle" cx="28" cy="28" r="22" stroke="#34D399"></circle>
                   </svg>
                   <span class="radial-center-text" id="gaugeGpuText">--%</span>
                 </div>
               </div>
               <div class="mini-oscilloscope">
                 <canvas id="ovCanvasGpu"></canvas>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                <span class="bento-expand-hint" onclick="openBentoSheet('gpu', event)" title="Expandir tarjeta interactiva con gráfica táctil">⤢ Inspector Táctil</span>
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver sensores →</span>
               </div>
             </a>
 
@@ -1698,9 +1935,9 @@
                   <div class="pillar-spec hw-detecting" id="ovDiskSub">Analizando volúmenes montados...</div>
                 </div>
                 <div class="radial-gauge">
-                  <svg viewBox="0 0 52 52">
-                    <circle class="radial-track" cx="26" cy="26" r="22"></circle>
-                    <circle class="radial-progress" id="gaugeDiskCircle" cx="26" cy="26" r="22" stroke="#FBBF24"></circle>
+                  <svg viewBox="0 0 56 56">
+                    <circle class="radial-track" cx="28" cy="28" r="22"></circle>
+                    <circle class="radial-progress" id="gaugeDiskCircle" cx="28" cy="28" r="22" stroke="#FBBF24"></circle>
                   </svg>
                   <span class="radial-center-text" id="gaugeDiskText">--%</span>
                 </div>
@@ -1710,9 +1947,13 @@
                   <span id="ovDiskIoRead">Lectura: 0.0 KB/s</span>
                   <span id="ovDiskIoWrite">Escritura: 0.0 KB/s</span>
                 </div>
-                <div style="width: 100%; height: 6px; background: rgba(148,163,184,0.1); border-radius: 3px; overflow: hidden;">
+                <div style="width: 100%; height: 6px; background: rgba(148,163,184,0.14); border-radius: 3px; overflow: hidden;">
                   <div id="ovDiskBar" style="width: 0%; height: 100%; background: var(--accent-amber-bright); border-radius: 3px; transition: width 0.3s ease;"></div>
                 </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                <span class="bento-expand-hint" onclick="openBentoSheet('drives', event)" title="Expandir tarjeta interactiva con gráfica táctil">⤢ Inspector Táctil</span>
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver discos →</span>
               </div>
             </a>
 
@@ -1728,13 +1969,13 @@
                   <span style="color: var(--accent-cyan-bright);">🌐</span>
                   <span>Red, Interfaces & Clientes</span>
                 </div>
-                <span class="module-arrow">→</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('network', event)">⤢ Expandir</span>
               </div>
               <div>
-                <div class="mono" style="font-size: 20px; font-weight: 700; color: #FFFFFF;" id="ovNetSpeed">Detectando tráfico...</div>
+                <div class="mono" style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="ovNetSpeed">Detectando tráfico...</div>
                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovNetSub">Sondeando interfaces de red activas...</div>
               </div>
-              <div class="mini-oscilloscope" style="height: 40px;">
+              <div class="mini-oscilloscope" style="height: 44px;">
                 <canvas id="ovCanvasNet"></canvas>
               </div>
             </a>
@@ -1749,7 +1990,7 @@
                 <span class="module-arrow">→</span>
               </div>
               <div>
-                <div class="mono" style="font-size: 22px; font-weight: 700; color: #FFFFFF;" id="ovDockerCount">Sondeando...</div>
+                <div class="mono" style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="ovDockerCount">Sondeando...</div>
                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovDockerSub">Consultando daemon Docker y unidades systemd...</div>
               </div>
               <div style="font-size: 12px; color: var(--text-secondary);" id="ovSystemdSummary">Verificando estado de servicios...</div>
@@ -1765,7 +2006,7 @@
                 <span class="module-arrow">→</span>
               </div>
               <div>
-                <div class="mono" style="font-size: 18px; font-weight: 700; color: #FFFFFF;" id="ovSecPihole">Consultando Pi-hole FTL...</div>
+                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovSecPihole">Consultando Pi-hole FTL...</div>
                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovSecF2b">Consultando jaulas Fail2ban...</div>
               </div>
               <div style="font-size: 12px; color: var(--text-secondary);">Auditoría DNS Sinkhole y cortafuegos IPS</div>
@@ -1781,7 +2022,7 @@
                 <span class="module-arrow">→</span>
               </div>
               <div>
-                <div class="mono" style="font-size: 18px; font-weight: 700; color: #FFFFFF;" id="ovTorrentSpeed">↓ 0.0 KB/s · ↑ 0.0 KB/s</div>
+                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovTorrentSpeed">↓ 0.0 KB/s · ↑ 0.0 KB/s</div>
                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovTorrentSub">Conectando con qBittorrent y biblioteca Emby...</div>
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -1800,7 +2041,7 @@
                 <span class="module-arrow">→</span>
               </div>
               <div>
-                <div class="mono" style="font-size: 18px; font-weight: 700; color: #FFFFFF;" id="ovDnsDomainTitle">Detectando dominio...</div>
+                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovDnsDomainTitle">Detectando dominio...</div>
                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovDnsSub">Autodetección desde proxy inverso, DuckDNS y sistema</div>
               </div>
               <div style="font-size: 12px; color: var(--accent-cyan-bright);">Inspección de consultas DNS por dispositivo →</div>
@@ -1816,7 +2057,7 @@
                 <span class="module-arrow">→</span>
               </div>
               <div>
-                <div class="mono" style="font-size: 18px; font-weight: 700; color: #FFFFFF;" id="ovVersionCommit">Sincronizando versión...</div>
+                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovVersionCommit">Sincronizando versión...</div>
                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovVersionSub">Comparación en vivo con cminewarIA/recursos-ui</div>
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -2155,7 +2396,7 @@
             <div class="instrument-header">
               <div>
                 <div class="instrument-kicker">Escudo DNS & Prevención Activa de Intrusiones</div>
-                <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: #FFFFFF; margin-top: 4px;">Pi-hole FTL Sinkhole & Fail2ban IPS</h2>
+                <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-primary); margin-top: 4px;">Pi-hole FTL Sinkhole & Fail2ban IPS</h2>
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <span class="adw-badge badge-green" id="secPiholeBadge">Verificando Pi-hole...</span>
@@ -2209,11 +2450,11 @@
               <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
                 <div style="flex: 1; min-width: 200px;">
                   <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Dirección IP Objetivo</label>
-                  <input type="text" id="f2bInputIp" placeholder="Introduce una IP (ej. 198.51.100.42)" style="width: 100%; height: 36px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #FFFFFF; font-family: var(--font-mono); font-size: 13px; outline: none;">
+                  <input type="text" id="f2bInputIp" placeholder="Introduce una IP (ej. 198.51.100.42)" style="width: 100%; height: 36px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); font-size: 13px; outline: none;">
                 </div>
                 <div style="min-width: 180px;">
                   <label style="display: block; font-size: 11.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Jaula / Servicio</label>
-                  <select id="f2bSelectJail" style="width: 100%; height: 36px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #FFFFFF; font-size: 13px; outline: none;">
+                  <select id="f2bSelectJail" style="width: 100%; height: 36px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 13px; outline: none;">
                     <option value="nextcloud">Nextcloud</option>
                     <option value="sshd">SSH (sshd)</option>
                     <option value="caddy-scan">Caddy / Web</option>
@@ -2240,14 +2481,14 @@
                 </div>
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <select id="secJailFilter" onchange="filterF2bData()" style="height: 32px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #FFFFFF; font-size: 12px;">
+                <select id="secJailFilter" onchange="filterF2bData()" style="height: 32px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 12px;">
                   <option value="all">Todas las jaulas</option>
                   <option value="sshd">sshd</option>
                   <option value="nextcloud">nextcloud</option>
                   <option value="caddy-bad-bots">caddy-bad-bots</option>
                   <option value="recidive">recidive</option>
                 </select>
-                <input type="text" id="secIpSearch" oninput="filterF2bData()" placeholder="Filtrar IP o fecha..." style="height: 32px; padding: 0 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #FFFFFF; font-size: 12px; font-family: var(--font-mono); outline: none;">
+                <input type="text" id="secIpSearch" oninput="filterF2bData()" placeholder="Filtrar IP o fecha..." style="height: 32px; padding: 0 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 12px; font-family: var(--font-mono); outline: none;">
               </div>
             </div>
 
@@ -2321,7 +2562,7 @@
             <div class="instrument-header" style="margin-bottom: 0;">
               <div>
                 <div class="instrument-kicker">Transferencias P2P & Biblioteca Multimedia</div>
-                <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: #FFFFFF; margin-top: 4px;">qBittorrent & Emby Server</h2>
+                <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-primary); margin-top: 4px;">qBittorrent & Emby Server</h2>
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <a href="#" id="linkQbittorrent" target="_blank" rel="noopener" class="action-btn">Abrir qBittorrent ↗</a>
@@ -2398,7 +2639,7 @@
               <div>
                 <div class="instrument-kicker">Sincronización Continua con GitHub & Control de Versión</div>
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px;">
-                  <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: #FFFFFF;">Gestor de Versiones OTA</h2>
+                  <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-primary);">Gestor de Versiones OTA</h2>
                   <span class="adw-badge badge-blue mono" id="verHeaderVersionBadge">...</span>
                   <span class="adw-badge badge-green" id="verStatusBadge">Comprobando...</span>
                 </div>
@@ -2426,7 +2667,7 @@
                   </div>
                 </div>
                 <div style="display: flex; align-items: baseline; gap: 10px; margin-top: 6px;">
-                  <code style="font-size: 20px; font-weight: 700; color: #FFFFFF;" id="verLocalHash">...</code>
+                  <code style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="verLocalHash">...</code>
                   <span style="font-size: 12px; color: var(--accent-emerald-bright);" id="verLocalClean">● Verificado</span>
                 </div>
                 <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;" id="verLocalSubject">Consultando commit local...</div>
@@ -2504,7 +2745,7 @@
             <div class="instrument-header">
               <div>
                 <div class="instrument-kicker">Sincronización DDNS & Auditoría de Tráfico DNS</div>
-                <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: #FFFFFF; margin-top: 4px;">
+                <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-primary); margin-top: 4px;">
                   Dominio Activo: <span id="dnsHeroFullDomain" class="mono" style="color: var(--accent-cyan-bright);">Detectando...</span>
                 </h2>
               </div>
@@ -2523,7 +2764,7 @@
                   <span class="hw-spec-value" id="dnsCardDomain">Detectando...</span>
                   <button class="action-btn" style="height: 24px; padding: 0 8px; font-size: 11px;" onclick="copyDetectedDomain()">Copiar</button>
                 </div>
-                <span style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">IP Registrada: <strong id="dnsCardRegisteredIp" class="mono" style="color: #FFFFFF;">--</strong></span>
+                <span style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">IP Registrada: <strong id="dnsCardRegisteredIp" class="mono" style="color: var(--text-primary);">--</strong></span>
                 <span style="font-size: 11.5px; color: var(--text-dim);" class="mono" id="dnsCardLastUpdate">Último Heartbeat: --</span>
               </div>
 
@@ -2566,7 +2807,7 @@
                 <div class="section-subtitle">Volumen de consultas y dominios consultados por cada IP de la red</div>
               </div>
               <div style="display: flex; gap: 8px; align-items: center;">
-                <select id="selectDnsClientFilter" onchange="onDnsClientFilterChange(this.value)" style="height: 32px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #FFFFFF; font-size: 12px;">
+                <select id="selectDnsClientFilter" onchange="onDnsClientFilterChange(this.value)" style="height: 32px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 12px;">
                   <option value="">Todos los dispositivos</option>
                 </select>
                 <button class="action-btn" style="height: 32px; font-size: 12px;" onclick="loadDnsTrafficData()">Actualizar</button>
@@ -2606,6 +2847,193 @@
   </div>
 
   <!-- ======================================================================
+       SIDEBAR BACKDROP (TOUCH DRAWER OVERLAY)
+       ====================================================================== -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+  <!-- ======================================================================
+       MOBILE SWIPE PAGINATION DOTS + FLOATING TOUCH DOCK (iPAD / TESLA COCKPIT)
+       ====================================================================== -->
+  <div class="swipe-pagination-dots" id="swipePaginationDots" title="Desliza horizontalmente en pantalla táctil para cambiar de vista">
+    <span class="swipe-dot active" data-view="overview" onclick="navigateTo(event, 'overview')"></span>
+    <span class="swipe-dot" data-view="processor" onclick="navigateTo(event, 'processor')"></span>
+    <span class="swipe-dot" data-view="memory" onclick="navigateTo(event, 'memory')"></span>
+    <span class="swipe-dot" data-view="gpu" onclick="navigateTo(event, 'gpu')"></span>
+    <span class="swipe-dot" data-view="drives" onclick="navigateTo(event, 'drives')"></span>
+    <span class="swipe-dot" data-view="network" onclick="navigateTo(event, 'network')"></span>
+    <span class="swipe-dot" data-view="apps" onclick="navigateTo(event, 'apps')"></span>
+    <span class="swipe-dot" data-view="security" onclick="navigateTo(event, 'security')"></span>
+    <span class="swipe-dot" data-view="torrents" onclick="navigateTo(event, 'torrents')"></span>
+    <span class="swipe-dot" data-view="processes" onclick="navigateTo(event, 'processes')"></span>
+    <span class="swipe-dot" data-view="dns" onclick="navigateTo(event, 'dns')"></span>
+    <span class="swipe-dot" data-view="version" onclick="navigateTo(event, 'version')"></span>
+  </div>
+
+  <div class="floating-dock-shell">
+    <nav class="floating-dock" id="floatingTouchDock" aria-label="Dock táctil principal">
+      <a href="/" class="dock-item active" id="dockOverview" data-view="overview" onclick="return navigateTo(event, 'overview')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span class="dock-label">Cabina</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/procesador" class="dock-item" id="dockProcessor" data-view="processor" onclick="return navigateTo(event, 'processor')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+        <span class="dock-label">CPU</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/memoria" class="dock-item" id="dockMemory" data-view="memory" onclick="return navigateTo(event, 'memory')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M2 15h20"/><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2Z"/></svg>
+        <span class="dock-label">RAM</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/grafica" class="dock-item" id="dockGpu" data-view="gpu" onclick="return navigateTo(event, 'gpu')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/></svg>
+        <span class="dock-label">GPU</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/almacenamiento" class="dock-item" id="dockDrives" data-view="drives" onclick="return navigateTo(event, 'drives')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        <span class="dock-label">Discos</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/red" class="dock-item" id="dockNetwork" data-view="network" onclick="return navigateTo(event, 'network')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/></svg>
+        <span class="dock-label">Red</span>
+        <span class="dock-dot"></span>
+      </a>
+      <div class="dock-divider"></div>
+      <a href="/aplicaciones" class="dock-item" id="dockApps" data-view="apps" onclick="return navigateTo(event, 'apps')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        <span class="dock-label">Docker</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/seguridad" class="dock-item" id="dockSecurity" data-view="security" onclick="return navigateTo(event, 'security')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span class="dock-label">Escudo</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/descargas" class="dock-item" id="dockTorrents" data-view="torrents" onclick="return navigateTo(event, 'torrents')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="dock-label">Media</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/procesos" class="dock-item" id="dockProcesses" data-view="processes" onclick="return navigateTo(event, 'processes')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/></svg>
+        <span class="dock-label">Procesos</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/dns" class="dock-item" id="dockDns" data-view="dns" onclick="return navigateTo(event, 'dns')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+        <span class="dock-label">DNS</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/version" class="dock-item" id="dockVersion" data-view="version" onclick="return navigateTo(event, 'version')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+        <span class="dock-label">OTA Git</span>
+        <span class="dock-dot"></span>
+      </a>
+    </nav>
+  </div>
+
+  <!-- ======================================================================
+       NATIVE HTML5 <dialog>: EXPANDABLE BENTO TOUCH SHEET & SCRUBBING GRAPH
+       ====================================================================== -->
+  <dialog class="bento-dialog" id="bentoExpandDialog" onclick="if(event.target===this) closeBentoSheet()">
+    <div class="bento-dialog-header">
+      <div>
+        <div class="instrument-kicker" id="bentoSheetKicker">Inspector Táctil en Tiempo Real</div>
+        <h3 style="font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--text-primary);" id="bentoSheetTitle">Telemetría</h3>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button class="action-btn primary-cta" id="bentoSheetFullViewBtn" onclick="openBentoSheetFullView()">Abrir vista dedicada →</button>
+        <button class="action-btn" style="min-height: 36px; height: 36px; padding: 0 12px;" onclick="closeBentoSheet()">✕</button>
+      </div>
+    </div>
+    <div class="bento-dialog-body">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <div class="instrument-big-readout" style="font-size: 36px;" id="bentoSheetPrimaryVal">--</div>
+          <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;" id="bentoSheetSubVal">Desliza el dedo o cursor sobre la gráfica para inspeccionar muestras históricas</div>
+        </div>
+        <span class="adw-badge badge-blue mono" id="bentoSheetLiveBadge">60 Muestras · 2s</span>
+      </div>
+
+      <!-- Interactive Touch-Scrubbing Oscilloscope Stage -->
+      <div class="oscilloscope-stage" style="height: 220px;">
+        <div class="chart-scrub-Floating" id="bentoSheetScrubReadout">Muestra: --</div>
+        <canvas id="bentoSheetCanvas"></canvas>
+      </div>
+
+      <!-- Dynamic Hardware Specs Grid inside Expanded Sheet -->
+      <div class="hw-spec-grid" id="bentoSheetSpecsGrid"></div>
+    </div>
+  </dialog>
+
+  <!-- ======================================================================
+       NATIVE HTML5 <dialog>: AUDITORÍA Y OPTIMIZACIÓN DE RENDIMIENTO EN VIVO
+       ====================================================================== -->
+  <dialog class="bento-dialog" id="perfAuditDialog" onclick="if(event.target===this) closePerfAuditDialog()">
+    <div class="bento-dialog-header">
+      <div>
+        <div class="instrument-kicker">Motor Gráfico & Telemetría Desacoplada</div>
+        <h3 style="font-family: var(--font-display); font-size: 19px; font-weight: 800; color: var(--text-primary);">Auditoría de Rendimiento en Tiempo Real</h3>
+      </div>
+      <button class="action-btn" style="min-height: 36px; height: 36px; padding: 0 12px;" onclick="closePerfAuditDialog()">✕</button>
+    </div>
+    <div class="bento-dialog-body">
+      <div class="hw-spec-grid">
+        <div class="hw-spec-cell">
+          <span class="hw-spec-label">Cadencia de Cuadros (RAF)</span>
+          <span class="hw-spec-value" style="color: var(--accent-emerald-bright);" id="auditFpsVal">60 FPS</span>
+        </div>
+        <div class="hw-spec-cell">
+          <span class="hw-spec-label">Latencia API (/api/metrics)</span>
+          <span class="hw-spec-value" style="color: var(--accent-cyan-bright);" id="auditApiLatencyVal">-- ms</span>
+        </div>
+        <div class="hw-spec-cell">
+          <span class="hw-spec-label">Tiempo de Pintado DOM + Canvas</span>
+          <span class="hw-spec-value" id="auditRenderTimeVal">-- ms</span>
+        </div>
+        <div class="hw-spec-cell">
+          <span class="hw-spec-label">Memoria JS Heap (Navegador)</span>
+          <span class="hw-spec-value" id="auditHeapVal">Optimizando...</span>
+        </div>
+      </div>
+
+      <div class="surface-panel">
+        <div class="data-row">
+          <div>
+            <div class="row-label">Renderizado Sincronizado con requestAnimationFrame</div>
+            <div class="row-sublabel">Desacopla las lecturas de red del hilo de pintado para garantizar 60fps constantes</div>
+          </div>
+          <span class="adw-badge badge-green">Activo</span>
+        </div>
+        <div class="data-row">
+          <div>
+            <div class="row-label">Prevención de Solapamiento (AbortController + Lock)</div>
+            <div class="row-sublabel">Cancela peticiones colgadas si la red WAN experimenta alta latencia</div>
+          </div>
+          <span class="adw-badge badge-green" id="auditInFlightBadge">Sin colas</span>
+        </div>
+        <div class="data-row">
+          <div>
+            <div class="row-label">Caché Inteligente de Hardware Estático & Git TTL</div>
+            <div class="row-sublabel">Evita bloqueos de E/S en el servidor cacheando topología de CPU y estado Git</div>
+          </div>
+          <span class="adw-badge badge-blue">Optimizado</span>
+        </div>
+        <div class="data-row">
+          <div>
+            <div class="row-label">Transiciones Espaciales HTML5 View Transitions API</div>
+            <div class="row-sublabel">Animación acelerada por GPU al navegar entre módulos o deslizar en pantalla táctil</div>
+          </div>
+          <span class="adw-badge badge-purple" id="auditViewTransitionBadge">Soportado</span>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ======================================================================
        MODAL: AUDITORÍA DE DISPOSITIVOS ZERO-TRUST
        ====================================================================== -->
   <div class="modal-overlay" id="trustDialog" onclick="if(event.target===this) closeTrustDialog()">
@@ -2622,7 +3050,7 @@
           <div style="display: flex; align-items: center; gap: 10px;">
             <span class="live-dot" id="trustModalDot"></span>
             <div>
-              <div style="font-size: 13px; font-weight: 600; color: #FFFFFF;" id="trustModalStatusTitle">Verificando conexión...</div>
+              <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);" id="trustModalStatusTitle">Verificando conexión...</div>
               <div style="font-size: 11.5px; color: var(--text-secondary);" class="mono" id="trustModalStatusSub">Detectando IP...</div>
             </div>
           </div>
@@ -2662,7 +3090,7 @@
     </div>
   </div>
 
-  <div id="appToast" style="position: fixed; bottom: 20px; right: 20px; z-index: 2500; padding: 12px 16px; border-radius: 10px; background: rgba(15, 21, 35, 0.96); border: 1px solid rgba(56, 189, 248, 0.38); color: #F8FAFC; font-size: 12.5px; font-weight: 600; box-shadow: 0 16px 40px rgba(0,0,0,0.65); backdrop-filter: blur(12px); display: none; align-items: center; gap: 10px; max-width: 380px;">
+  <div id="appToast" style="position: fixed; bottom: 92px; right: 20px; z-index: 2500; padding: 12px 18px; border-radius: 14px; background: var(--bg-surface-elevated); border: 1px solid var(--border-highlight); color: var(--text-primary); font-size: 12.5px; font-weight: 600; box-shadow: var(--glass-shadow); backdrop-filter: blur(20px); display: none; align-items: center; gap: 10px; max-width: 390px;">
     <span id="appToastIcon">✔</span>
     <span id="appToastText"></span>
   </div>
@@ -2688,7 +3116,7 @@
               <img id="logoModalPreviewImg" src="https://cdn.simpleicons.org/linux/FCC624" alt="Preview" onerror="this.onerror=null; this.src='https://www.google.com/s2/favicons?sz=128&domain=kernel.org';">
             </div>
             <div>
-              <div style="font-weight: 700; color: #FFFFFF; font-size: 14px;" id="logoModalTargetLabel">Elemento seleccionado</div>
+              <div style="font-weight: 700; color: var(--text-primary); font-size: 14px;" id="logoModalTargetLabel">Elemento seleccionado</div>
               <div style="font-size: 11.5px; color: var(--text-muted);" class="mono" id="logoModalStatusText">Logo activo actualmente</div>
             </div>
           </div>
@@ -2705,7 +3133,7 @@
           <label class="upload-dropzone" for="localLogoFileInput" id="logoUploadDropzone">
             <input type="file" id="localLogoFileInput" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif,image/x-icon" style="display: none;" onchange="onLocalLogoFileChange(event)">
             <div style="font-size: 20px; margin-bottom: 4px;">📁</div>
-            <div style="font-weight: 600; color: #F8FAFC; font-size: 13px;">Haz clic aquí o arrastra una imagen local (PNG, SVG, JPG, WEBP, ICO)</div>
+            <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">Haz clic aquí o arrastra una imagen local (PNG, SVG, JPG, WEBP, ICO)</div>
             <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Se guardará de forma persistente en el servidor para este nodo o dispositivo</div>
           </label>
         </div>
@@ -2716,7 +3144,7 @@
             2. Buscar Logo en Google / Catálogo Web de Sistemas y Marcas
           </div>
           <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-            <input type="text" id="logoWebSearchInput" placeholder="Ej: ubuntu, debian, proxmox, nintendo, synology, asus, iphone, realtek..." oninput="triggerLogoWebSearch(this.value)" style="flex: 1; height: 36px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #FFFFFF; font-size: 13px; outline: none;">
+            <input type="text" id="logoWebSearchInput" placeholder="Ej: ubuntu, debian, proxmox, nintendo, synology, asus, iphone, realtek..." oninput="triggerLogoWebSearch(this.value)" style="flex: 1; height: 36px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 13px; outline: none;">
             <button class="action-btn primary-cta" style="height: 36px;" onclick="triggerLogoWebSearch(document.getElementById('logoWebSearchInput').value, true)">
               Buscar
             </button>
@@ -2734,7 +3162,7 @@
             3. O usar URL directa de imagen
           </div>
           <div style="display: flex; gap: 8px;">
-            <input type="url" id="logoDirectUrlInput" placeholder="https://ejemplo.com/logo.png" style="flex: 1; height: 34px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #FFFFFF; font-family: var(--font-mono); font-size: 12px; outline: none;">
+            <input type="url" id="logoDirectUrlInput" placeholder="https://ejemplo.com/logo.png" style="flex: 1; height: 34px; padding: 0 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); font-size: 12px; outline: none;">
             <button class="action-btn" style="height: 34px;" onclick="applyDirectLogoUrl()">Aplicar URL</button>
           </div>
         </div>
@@ -2962,49 +3390,34 @@
       }
     }
 
-    function switchView(viewName, pushState = true, fromHistoryBtn = false) {
-      if (viewName === 'system' || viewName === 'sistema') viewName = 'version';
+    function performSwitchViewDOM(viewName, pushState = true, fromHistoryBtn = false) {
       const allViews = Object.keys(VIEW_TO_PATH);
-      if (!allViews.includes(viewName)) {
-        viewName = PATH_TO_VIEW['/' + viewName] || 'overview';
-      }
-
       const targetPath = VIEW_TO_PATH[viewName] || '/';
-
-      if (pushState) {
-        if (navStack[navPointer] !== viewName) {
-          navStack = navStack.slice(0, navPointer + 1);
-          navStack.push(viewName);
-          navPointer = navStack.length - 1;
-        }
-        try {
-          if (window.location.pathname !== targetPath) {
-            window.history.pushState({ view: viewName, path: targetPath }, '', targetPath);
-          }
-        } catch (e) {
-          // Safe fallback if inside restricted iframe
-        }
-      } else if (!fromHistoryBtn) {
-        const existingIdx = navStack.lastIndexOf(viewName);
-        if (existingIdx !== -1) {
-          navPointer = existingIdx;
-        } else {
-          navStack.push(viewName);
-          navPointer = navStack.length - 1;
-        }
-      }
 
       updateHistoryButtonsState();
       activeView = viewName;
 
       allViews.forEach(v => {
-        const navEl = document.getElementById('nav' + v.charAt(0).toUpperCase() + v.slice(1));
-        const viewEl = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
+        const cap = v.charAt(0).toUpperCase() + v.slice(1);
+        const navEl = document.getElementById('nav' + cap);
+        const dockEl = document.getElementById('dock' + cap);
+        const viewEl = document.getElementById('view' + cap);
         if (navEl) navEl.classList.toggle('active', v === viewName);
+        if (dockEl) {
+          dockEl.classList.toggle('active', v === viewName);
+          if (v === viewName && typeof dockEl.scrollIntoView === 'function') {
+            try { dockEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); } catch (e) {}
+          }
+        }
         if (viewEl) viewEl.style.display = (v === viewName) ? 'flex' : 'none';
       });
 
-      const pageTitle = VIEW_TITLES[viewName] || 'Vista General';
+      const dots = document.querySelectorAll('#swipePaginationDots .swipe-dot');
+      dots.forEach(dot => {
+        dot.classList.toggle('active', dot.getAttribute('data-view') === viewName);
+      });
+
+      const pageTitle = VIEW_TITLES[viewName] || 'Cabina General';
       const titleEl = document.getElementById('currentViewTitle');
       if (titleEl) titleEl.innerText = pageTitle;
 
@@ -3034,7 +3447,9 @@
       }
 
       const sidebar = document.getElementById('appSidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
       if (sidebar) sidebar.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('open');
 
       if (viewName === 'version') {
         checkSystemVersion(false);
@@ -3043,6 +3458,48 @@
       }
 
       renderActiveView();
+    }
+
+    function switchView(viewName, pushState = true, fromHistoryBtn = false) {
+      if (viewName === 'system' || viewName === 'sistema') viewName = 'version';
+      const allViews = Object.keys(VIEW_TO_PATH);
+      if (!allViews.includes(viewName)) {
+        viewName = PATH_TO_VIEW['/' + viewName] || 'overview';
+      }
+
+      const targetPath = VIEW_TO_PATH[viewName] || '/';
+
+      if (pushState) {
+        if (navStack[navPointer] !== viewName) {
+          navStack = navStack.slice(0, navPointer + 1);
+          navStack.push(viewName);
+          navPointer = navStack.length - 1;
+        }
+        try {
+          if (window.location.pathname !== targetPath) {
+            window.history.pushState({ view: viewName, path: targetPath }, '', targetPath);
+          }
+        } catch (e) {}
+      } else if (!fromHistoryBtn) {
+        const existingIdx = navStack.lastIndexOf(viewName);
+        if (existingIdx !== -1) {
+          navPointer = existingIdx;
+        } else {
+          navStack.push(viewName);
+          navPointer = navStack.length - 1;
+        }
+      }
+
+      // Use native HTML5 View Transitions API when supported and changing views
+      if (document.startViewTransition && activeView !== viewName && pushState) {
+        try {
+          document.startViewTransition(() => {
+            performSwitchViewDOM(viewName, pushState, fromHistoryBtn);
+          });
+          return;
+        } catch (e) {}
+      }
+      performSwitchViewDOM(viewName, pushState, fromHistoryBtn);
     }
 
     if (window.self !== window.top) {
@@ -3056,8 +3513,66 @@
 
     function toggleSidebar() {
       const sb = document.getElementById('appSidebar');
-      if (sb) sb.classList.toggle('open');
+      const bd = document.getElementById('sidebarBackdrop');
+      if (sb) {
+        const isOpen = sb.classList.toggle('open');
+        if (bd) bd.classList.toggle('open', isOpen);
+      }
     }
+
+    // =========================================================================
+    // TITANIUM LIGHT / DARK / AUTO THEME ENGINE (APPLE PRO DISPLAY FINISH)
+    // =========================================================================
+    let currentTitaniumTheme = 'auto';
+    try {
+      currentTitaniumTheme = localStorage.getItem('sysmon_titanium_theme') || 'auto';
+    } catch (e) {}
+
+    function applyTitaniumTheme(mode) {
+      currentTitaniumTheme = mode || 'auto';
+      try { localStorage.setItem('sysmon_titanium_theme', currentTitaniumTheme); } catch (e) {}
+
+      let effective = currentTitaniumTheme;
+      if (effective === 'auto') {
+        const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        effective = prefersLight ? 'light' : 'dark';
+      }
+
+      document.documentElement.setAttribute('data-theme', effective);
+      const iconEl = document.getElementById('themeSwitchIcon');
+      const lblEl = document.getElementById('themeSwitchLabel');
+      if (iconEl && lblEl) {
+        if (currentTitaniumTheme === 'auto') {
+          iconEl.innerText = '🌗';
+          lblEl.innerText = 'Auto';
+        } else if (currentTitaniumTheme === 'light') {
+          iconEl.innerText = '☀️';
+          lblEl.innerText = 'Titanio Claro';
+        } else {
+          iconEl.innerText = '🌙';
+          lblEl.innerText = 'Titanio Oscuro';
+        }
+      }
+      if (latestMetrics) renderActiveView();
+    }
+
+    function cycleTitaniumTheme() {
+      const order = ['auto', 'light', 'dark'];
+      const next = order[(order.indexOf(currentTitaniumTheme) + 1) % order.length];
+      if (document.startViewTransition) {
+        try {
+          document.startViewTransition(() => applyTitaniumTheme(next));
+          return;
+        } catch (e) {}
+      }
+      applyTitaniumTheme(next);
+    }
+
+    try {
+      window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+        if (currentTitaniumTheme === 'auto') applyTitaniumTheme('auto');
+      });
+    } catch (e) {}
 
     function onFilterChange() {
       renderActiveView();
@@ -3118,18 +3633,66 @@
       }
     }
 
-    // High-DPI Futuristic Oscilloscope Chart Renderer
-    function drawTelemetryChart(canvasId, series1, color1, series2 = null, color2 = null, fixedMax = 100) {
+    // =========================================================================
+    // INTERACTIVE TOUCH-SCRUBBING OSCILLOSCOPE CHART ENGINE (60 SAMPLES)
+    // =========================================================================
+    const canvasScrubState = {};
+
+    function bindCanvasTouchScrubbing(canvas) {
+      if (!canvas || canvas.dataset.scrubBound === '1') return;
+      canvas.dataset.scrubBound = '1';
+      const id = canvas.id;
+
+      function updateScrubPosition(clientX) {
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) return;
+        const relX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+        canvasScrubState[id] = { active: true, ratio: relX / rect.width };
+        if (id === 'bentoSheetCanvas') {
+          renderBentoSheetChartOnly();
+        } else {
+          renderActiveView();
+        }
+      }
+
+      canvas.addEventListener('pointerdown', (e) => {
+        updateScrubPosition(e.clientX);
+      }, { passive: true });
+
+      canvas.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'mouse' || e.buttons > 0 || (canvasScrubState[id] && canvasScrubState[id].active)) {
+          updateScrubPosition(e.clientX);
+        }
+      }, { passive: true });
+
+      function clearScrub() {
+        if (canvasScrubState[id]) {
+          canvasScrubState[id].active = false;
+          const scrubPill = document.getElementById('bentoSheetScrubReadout');
+          if (id === 'bentoSheetCanvas' && scrubPill) scrubPill.classList.remove('visible');
+          if (id === 'bentoSheetCanvas') renderBentoSheetChartOnly();
+          else renderActiveView();
+        }
+      }
+
+      canvas.addEventListener('pointerup', clearScrub, { passive: true });
+      canvas.addEventListener('pointerleave', clearScrub, { passive: true });
+      canvas.addEventListener('pointercancel', clearScrub, { passive: true });
+    }
+
+    function drawTelemetryChart(canvasId, series1, color1, series2 = null, color2 = null, fixedMax = 100, unitSuffix = '%') {
       const canvas = document.getElementById(canvasId);
       if (!canvas) return;
+      bindCanvasTouchScrubbing(canvas);
+
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
 
-      if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
+      if (canvas.width !== Math.round(rect.width * dpr) || canvas.height !== Math.round(rect.height * dpr)) {
+        canvas.width = Math.round(rect.width * dpr);
+        canvas.height = Math.round(rect.height * dpr);
       }
 
       ctx.save();
@@ -3138,8 +3701,10 @@
       const h = rect.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Technical gridlines
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.07)';
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+
+      // Subtle Apple/Tesla horizon gridlines
+      ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.06)' : 'rgba(148, 163, 184, 0.08)';
       ctx.lineWidth = 1;
       for (let i = 1; i <= 3; i++) {
         const y = (h / 4) * i;
@@ -3149,19 +3714,25 @@
         ctx.stroke();
       }
 
-      function renderSpline(data, strokeColor, fillHex) {
-        if (!data || data.length < 2) return;
-        let maxVal = fixedMax;
-        if (maxVal === null) {
-          maxVal = Math.max(...data, 0.5);
-        }
+      let computedMax = fixedMax;
+      if (computedMax === null) {
+        const s1Max = Array.isArray(series1) && series1.length ? Math.max(...series1.map(v => Number(v) || 0)) : 0;
+        const s2Max = Array.isArray(series2) && series2.length ? Math.max(...series2.map(v => Number(v) || 0)) : 0;
+        computedMax = Math.max(s1Max, s2Max, 0.5) * 1.12;
+      }
 
+      function computePoints(data) {
+        if (!data || data.length < 2) return [];
         const step = w / (data.length - 1);
-        const pts = data.map((val, idx) => ({
+        return data.map((val, idx) => ({
           x: idx * step,
-          y: h - (Math.min(Math.max(Number(val) || 0, 0), maxVal) / maxVal) * (h - 8) - 4
+          y: h - (Math.min(Math.max(Number(val) || 0, 0), computedMax) / computedMax) * (h - 12) - 6,
+          val: Number(val) || 0
         }));
+      }
 
+      function renderSpline(pts, strokeColor, fillHex) {
+        if (pts.length < 2) return;
         ctx.beginPath();
         ctx.moveTo(pts[0].x, pts[0].y);
         for (let i = 0; i < pts.length - 1; i++) {
@@ -3172,7 +3743,7 @@
         ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
 
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 2.2;
+        ctx.lineWidth = 2.4;
         ctx.lineCap = 'round';
         ctx.stroke();
 
@@ -3182,18 +3753,221 @@
           ctx.closePath();
           const grad = ctx.createLinearGradient(0, 0, 0, h);
           grad.addColorStop(0, fillHex);
-          grad.addColorStop(1, 'rgba(6, 9, 17, 0)');
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
           ctx.fillStyle = grad;
           ctx.fill();
         }
       }
 
-      if (series2) {
-        renderSpline(series2, color2, null);
+      const pts2 = series2 ? computePoints(series2) : [];
+      const pts1 = computePoints(series1);
+
+      if (pts2.length) renderSpline(pts2, color2, null);
+      const alphaFill = color1.startsWith('#') ? color1 + (isLight ? '28' : '38') : 'rgba(56, 189, 248, 0.22)';
+      if (pts1.length) renderSpline(pts1, color1, alphaFill);
+
+      // Interactive Touch-Scrubbing Crosshair & Live Readout
+      const scrub = canvasScrubState[canvasId];
+      if (scrub && scrub.active && pts1.length > 1) {
+        const idx = Math.max(0, Math.min(pts1.length - 1, Math.round(scrub.ratio * (pts1.length - 1))));
+        const pt = pts1[idx];
+        const secsAgo = (pts1.length - 1 - idx) * 2;
+
+        ctx.save();
+        ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.35)' : 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(pt.x, 0);
+        ctx.lineTo(pt.x, h);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = color1;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 4.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        const unit = fixedMax === null ? ' MB/s' : unitSuffix;
+        const valText = `${pt.val.toFixed(1)}${unit}` + (pts2[idx] ? ` · ${pts2[idx].val.toFixed(1)}${unit}` : '') + ` (hace ${secsAgo}s)`;
+
+        if (canvasId === 'bentoSheetCanvas') {
+          const pill = document.getElementById('bentoSheetScrubReadout');
+          if (pill) {
+            pill.innerText = `Muestra histórica: ${valText}`;
+            pill.classList.add('visible');
+          }
+        } else if (h >= 75) {
+          ctx.font = '600 11px "JetBrains Mono", monospace';
+          const tw = ctx.measureText(valText).width + 14;
+          const bx = Math.min(Math.max(4, pt.x - tw / 2), w - tw - 4);
+          const by = Math.max(6, pt.y - 28);
+          ctx.fillStyle = isLight ? 'rgba(255,255,255,0.92)' : 'rgba(11,15,24,0.92)';
+          ctx.beginPath();
+          ctx.roundRect(bx, by, tw, 20, 6);
+          ctx.fill();
+          ctx.fillStyle = isLight ? '#0F172A' : '#F8FAFC';
+          ctx.fillText(valText, bx + 7, by + 13.5);
+        }
+        ctx.restore();
       }
-      const alphaFill = color1.startsWith('#') ? color1 + '36' : 'rgba(56, 189, 248, 0.2)';
-      renderSpline(series1, color1, alphaFill);
+
       ctx.restore();
+    }
+
+    // =========================================================================
+    // EXPANDABLE BENTO TOUCH SHEET (<dialog>) & PERFORMANCE AUDITOR
+    // =========================================================================
+    let activeBentoSheetModule = null;
+
+    function openBentoSheet(moduleKey, ev) {
+      if (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+      activeBentoSheetModule = moduleKey;
+      const dlg = document.getElementById('bentoExpandDialog');
+      if (!dlg) {
+        navigateTo(null, moduleKey);
+        return;
+      }
+      if (typeof dlg.showModal === 'function' && !dlg.open) {
+        dlg.showModal();
+      } else {
+        dlg.setAttribute('open', '');
+      }
+      updateBentoSheetLive();
+    }
+
+    function closeBentoSheet() {
+      const dlg = document.getElementById('bentoExpandDialog');
+      if (!dlg) return;
+      if (typeof dlg.close === 'function' && dlg.open) dlg.close();
+      else dlg.removeAttribute('open');
+      activeBentoSheetModule = null;
+    }
+
+    function openBentoSheetFullView() {
+      const target = activeBentoSheetModule || 'overview';
+      closeBentoSheet();
+      switchView(target, true);
+    }
+
+    function renderBentoSheetChartOnly() {
+      if (!activeBentoSheetModule || !latestMetrics) return;
+      const hist = latestMetrics.history || {};
+      if (activeBentoSheetModule === 'processor') {
+        drawTelemetryChart('bentoSheetCanvas', hist.cpu, '#38BDF8', null, null, 100, '%');
+      } else if (activeBentoSheetModule === 'memory') {
+        drawTelemetryChart('bentoSheetCanvas', hist.ram, '#A78BFA', hist.ram_total, '#38BDF8', 100, '%');
+      } else if (activeBentoSheetModule === 'gpu') {
+        drawTelemetryChart('bentoSheetCanvas', hist.gpu, '#34D399', null, null, 100, '%');
+      } else if (activeBentoSheetModule === 'drives') {
+        drawTelemetryChart('bentoSheetCanvas', hist.disk_w, '#FBBF24', hist.disk_r, '#38BDF8', null, ' MB/s');
+      } else if (activeBentoSheetModule === 'network') {
+        drawTelemetryChart('bentoSheetCanvas', hist.net_rx, '#34D399', hist.net_tx, '#38BDF8', null, ' MB/s');
+      }
+    }
+
+    function updateBentoSheetLive() {
+      if (!activeBentoSheetModule || !latestMetrics) return;
+      const cpu = latestMetrics.cpu || {};
+      const ram = latestMetrics.ram || {};
+      const gpu = latestMetrics.gpu || {};
+      const disks = latestMetrics.disks || [];
+      const diskIo = latestMetrics.disk_io || {};
+      const net = latestMetrics.net || {};
+
+      const titleEl = document.getElementById('bentoSheetTitle');
+      const kickerEl = document.getElementById('bentoSheetKicker');
+      const primEl = document.getElementById('bentoSheetPrimaryVal');
+      const subEl = document.getElementById('bentoSheetSubVal');
+      const gridEl = document.getElementById('bentoSheetSpecsGrid');
+
+      let specs = [];
+      if (activeBentoSheetModule === 'processor') {
+        if (kickerEl) kickerEl.innerText = 'Bento Touch Inspector · Procesador';
+        if (titleEl) titleEl.innerText = cpu.model || 'Procesador del Sistema';
+        if (primEl) primEl.innerText = `${Number(cpu.usage_percent || 0).toFixed(1)}%${cpu.temp_c ? ` · ${cpu.temp_c} °C` : ''}`;
+        if (subEl) subEl.innerText = `Frecuencia actual: ${cpu.freq_mhz || '--'} MHz · Desliza el dedo sobre la curva para inspeccionar muestras`;
+        specs = [
+          { label: 'Arquitectura & Vendor', val: `${cpu.architecture || '--'} (${cpu.vendor || 'Linux'})` },
+          { label: 'Núcleos / Hilos', val: `${cpu.physical_cores || 1}C / ${cpu.logical_cores || 1}T` },
+          { label: 'Carga Kernel (1m/5m/15m)', val: `${cpu.load_1m ?? 0} / ${cpu.load_5m ?? 0} / ${cpu.load_15m ?? 0}` },
+          { label: 'Caché L3 / Hwmon', val: cpu.cache_size || 'Detección directa kernel' }
+        ];
+      } else if (activeBentoSheetModule === 'memory') {
+        if (kickerEl) kickerEl.innerText = 'Bento Touch Inspector · Memoria Física';
+        if (titleEl) titleEl.innerText = 'Asignación RAM & Swap en Vivo';
+        if (primEl) primEl.innerText = `${formatBytes(ram.used_bytes)} / ${formatBytes(ram.total_bytes)}`;
+        if (subEl) subEl.innerText = `${Number(ram.percent || 0).toFixed(1)}% utilizado · Disponible inmediata: ${formatBytes(ram.available_bytes)}`;
+        specs = [
+          { label: 'Total Físico Instalado', val: formatBytes(ram.total_bytes, 2) },
+          { label: 'En Uso Activo', val: formatBytes(ram.used_bytes, 2) },
+          { label: 'Disponible Real', val: formatBytes(ram.available_bytes, 2) },
+          { label: 'Caché + Swap Activa', val: `${formatBytes(ram.cached_total_bytes || ram.cached_bytes || 0)} · Swap: ${formatBytes(ram.swap_used_bytes || 0)}` }
+        ];
+      } else if (activeBentoSheetModule === 'gpu') {
+        if (kickerEl) kickerEl.innerText = 'Bento Touch Inspector · Gráficos PCIe / DRM';
+        if (titleEl) titleEl.innerText = gpu.available ? (gpu.name || 'GPU Activa') : 'Subsistema Gráfico Integrado';
+        if (primEl) primEl.innerText = gpu.available ? `${gpu.gpu_util_percent || 0}%${gpu.temp_c ? ` · ${gpu.temp_c} °C` : ''}` : 'Sin GPU dedicada';
+        if (subEl) subEl.innerText = gpu.available ? `VRAM: ${gpu.vram_used_mb || 0} / ${gpu.vram_total_mb || 0} MB · Driver: ${gpu.driver || 'DRM'}` : 'Sondeo directo mediante nvidia-smi y /sys/class/drm';
+        specs = [
+          { label: 'Modelo Detectado', val: gpu.available ? (gpu.name || 'GPU') : 'Sin aceleradora dedicada' },
+          { label: 'Memoria VRAM', val: (gpu.available && gpu.vram_total_mb) ? `${gpu.vram_used_mb || 0} / ${gpu.vram_total_mb} MB` : 'Memoria unificada' },
+          { label: 'Temperatura & Consumo', val: gpu.available ? `${gpu.temp_c ?? '--'} °C · ${gpu.power_watts ?? '--'} W` : 'N/A' },
+          { label: 'Procesos Gráficos', val: `${((gpu.processes || []).length)} procesos activos` }
+        ];
+      } else if (activeBentoSheetModule === 'drives') {
+        const rootD = disks.find(d => d.mountpoint === '/') || disks[0] || {};
+        if (kickerEl) kickerEl.innerText = 'Bento Touch Inspector · Almacenamiento & I/O';
+        if (titleEl) titleEl.innerText = `${disks.length} Volúmenes Montados`;
+        if (primEl) primEl.innerText = `↓ ${formatSpeed(diskIo.read_bytes_sec)} · ↑ ${formatSpeed(diskIo.write_bytes_sec)}`;
+        if (subEl) subEl.innerText = `Volumen raíz (${rootD.device || '/'}): ${rootD.percent || 0}% usado (${formatBytes(rootD.free_bytes)} libres)`;
+        specs = disks.slice(0, 4).map(d => ({
+          label: `${d.mountpoint} (${d.fstype || 'FS'})`,
+          val: `${d.percent}% · ${formatBytes(d.used_bytes)} / ${formatBytes(d.total_bytes)}`
+        }));
+      } else if (activeBentoSheetModule === 'network') {
+        const nics = Array.isArray(net.interfaces_list) ? net.interfaces_list : [];
+        if (kickerEl) kickerEl.innerText = 'Bento Touch Inspector · Caudal de Red & NICs';
+        if (titleEl) titleEl.innerText = `Tráfico en Vivo (${net.local_ip || 'LAN'})`;
+        if (primEl) primEl.innerText = `↓ ${formatSpeed(net.rx_bytes_sec)} · ↑ ${formatSpeed(net.tx_bytes_sec)}`;
+        if (subEl) subEl.innerText = `${nics.length} interfaces activas · ${(latestMetrics.wifi_clients || []).length} clientes detectados`;
+        specs = nics.slice(0, 4).map(n => ({
+          label: `${n.name} (${n.ip || 'Activa'})`,
+          val: `↓ ${formatSpeed(n.rx_bytes_sec)} · ↑ ${formatSpeed(n.tx_bytes_sec)}`
+        }));
+      }
+
+      if (gridEl) {
+        gridEl.innerHTML = specs.map(s => `
+          <div class="hw-spec-cell">
+            <span class="hw-spec-label">${escapeHtml(s.label)}</span>
+            <span class="hw-spec-value">${escapeHtml(s.val)}</span>
+          </div>
+        `).join('');
+      }
+
+      renderBentoSheetChartOnly();
+    }
+
+    function openPerfAuditDialog() {
+      const dlg = document.getElementById('perfAuditDialog');
+      if (!dlg) return;
+      if (typeof dlg.showModal === 'function' && !dlg.open) dlg.showModal();
+      else dlg.setAttribute('open', '');
+      updatePerfAuditReadouts();
+    }
+
+    function closePerfAuditDialog() {
+      const dlg = document.getElementById('perfAuditDialog');
+      if (!dlg) return;
+      if (typeof dlg.close === 'function' && dlg.open) dlg.close();
+      else dlg.removeAttribute('open');
     }
 
     // =========================================================================
@@ -4081,7 +4855,7 @@
             grid.innerHTML = data.clients.slice(0, 6).map(c => `
               <div class="hw-spec-cell" style="cursor: pointer;" onclick="onDnsClientFilterChange('${escapeHtml(c.ip)}')">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="color: #FFFFFF; font-size: 13px;">${escapeHtml(c.name)}</strong>
+                  <strong style="color: var(--text-primary); font-size: 13px;">${escapeHtml(c.name)}</strong>
                   <span class="adw-badge ${c.pct_blocked > 10 ? 'badge-amber' : 'badge-green'}">${c.pct_blocked}% bloq.</span>
                 </div>
                 <div class="mono" style="font-size: 12px; color: var(--accent-cyan-bright);">${escapeHtml(c.ip)}</div>
@@ -4314,14 +5088,14 @@
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 12px; flex-wrap: wrap;">
                     <div>
                       <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <span style="font-weight: 700; font-size: 15px; color: #FFFFFF;">${escapeHtml(d.label || d.mountpoint)}</span>
+                        <span style="font-weight: 700; font-size: 15px; color: var(--text-primary);">${escapeHtml(d.label || d.mountpoint)}</span>
                         <span class="adw-badge badge-blue mono">${escapeHtml((d.fstype || 'FS').toUpperCase())}</span>
                         ${d.temp_c ? `<span class="adw-badge badge-amber mono">${d.temp_c} °C</span>` : ''}
                       </div>
                       <div class="mono" style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">Dispositivo: ${escapeHtml(d.device)} · Punto de montaje: ${escapeHtml(d.mountpoint)}</div>
                     </div>
                     <div style="text-align: right;" class="mono">
-                      <div style="font-weight: 700; font-size: 16px; color: #FFFFFF;">${d.percent}% usado</div>
+                      <div style="font-weight: 700; font-size: 16px; color: var(--text-primary);">${d.percent}% usado</div>
                       <div style="font-size: 12px; color: var(--text-muted);">${formatBytes(d.used_bytes)} / ${formatBytes(d.total_bytes)} (Libre: ${formatBytes(d.free_bytes)})</div>
                     </div>
                   </div>
@@ -4361,7 +5135,7 @@
                       <div>
                         <div style="display: flex; align-items: center; gap: 7px;">
                           <span class="live-dot" style="background: ${nic.is_up !== false ? 'var(--accent-emerald)' : 'var(--accent-amber)'};"></span>
-                          <strong class="mono" style="font-size: 15px; color: #FFFFFF;">${escapeHtml(nic.name)}</strong>
+                          <strong class="mono" style="font-size: 15px; color: var(--text-primary);">${escapeHtml(nic.name)}</strong>
                         </div>
                         <div style="font-size: 11px; color: var(--text-muted);">Adaptador de Red del Sistema</div>
                       </div>
@@ -4556,7 +5330,7 @@
                   <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
                     <code class="mono" style="font-size: 11.5px; color: var(--text-muted); min-width: 54px;">#${p.pid}</code>
                     <div style="min-width: 0;">
-                      <div style="font-weight: 600; color: #FFFFFF; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(p.name)}</div>
+                      <div style="font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(p.name)}</div>
                       <div class="mono" style="font-size: 11px; color: var(--text-muted);">Usuario: ${escapeHtml(p.user)} · RSS: ${p.mem_mb} MB</div>
                     </div>
                   </div>
@@ -4612,7 +5386,7 @@
           tBox.innerHTML = filtered.map(t => `
             <div class="data-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
               <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-                <strong style="color: #FFFFFF;">${escapeHtml(t.name)}</strong>
+                <strong style="color: var(--text-primary);">${escapeHtml(t.name)}</strong>
                 <span class="mono" style="font-weight: 700; color: var(--accent-cyan-bright);">${t.progress}%</span>
               </div>
               <div style="width: 100%; height: 6px; background: rgba(148,163,184,0.1); border-radius: 3px; overflow: hidden;">
@@ -4696,7 +5470,7 @@
             return `
               <div class="data-row" style="flex-direction: column; align-items: stretch; gap: 6px;">
                 <div style="display: flex; justify-content: space-between;">
-                  <strong class="mono" style="color: #FFFFFF;">${escapeHtml(item.domain)}</strong>
+                  <strong class="mono" style="color: var(--text-primary);">${escapeHtml(item.domain)}</strong>
                   <span class="mono" style="color: var(--accent-rose-bright); font-weight: 700;">${item.count.toLocaleString('es-ES')} bloq.</span>
                 </div>
                 <div style="width: 100%; height: 5px; background: rgba(148,163,184,0.1); border-radius: 3px; overflow: hidden;">
@@ -4843,12 +5617,104 @@
     }
 
     // =========================================================================
-    // LIVE POLLING LOOP & DOM SYNCHRONIZATION (ZERO HARDCODING)
+    // REAL-TIME PERFORMANCE AUDITOR, ABORTCONTROLLER LOCK & RAF RENDER PIPELINE
     // =========================================================================
     let isRedirectingAuth = false;
+    let metricsInFlightController = null;
+    let pendingRafRender = null;
+    let perfMetrics = {
+      fps: 60,
+      apiLatencyMs: 0,
+      domRenderMs: 0,
+      skippedCollisions: 0
+    };
+
+    // Live 60fps monitor
+    (function startRafFpsMonitor() {
+      let frameCount = 0;
+      let lastTick = performance.now();
+      function loop(now) {
+        frameCount++;
+        if (now - lastTick >= 1000) {
+          perfMetrics.fps = Math.min(120, Math.round((frameCount * 1000) / (now - lastTick)));
+          frameCount = 0;
+          lastTick = now;
+          updateHudPerformanceBar();
+        }
+        if (!document.hidden) {
+          requestAnimationFrame(loop);
+        } else {
+          setTimeout(() => requestAnimationFrame(loop), 1000);
+        }
+      }
+      requestAnimationFrame(loop);
+    })();
+
+    function updateHudPerformanceBar() {
+      const clockEl = document.getElementById('hudClockReadout');
+      if (clockEl) {
+        const now = new Date();
+        clockEl.innerText = now.toLocaleTimeString('es-ES', { hour12: false });
+      }
+      const latEl = document.getElementById('hudPerfLatency');
+      if (latEl) {
+        const apiStr = perfMetrics.apiLatencyMs > 0 ? ` · ${perfMetrics.apiLatencyMs}ms` : '';
+        latEl.innerText = `${perfMetrics.fps}fps${apiStr}`;
+      }
+      const badgeText = document.getElementById('ovPerfBadgeText');
+      if (badgeText) {
+        badgeText.innerText = `${perfMetrics.fps}fps · ${perfMetrics.apiLatencyMs || 1}ms API`;
+      }
+      const dlg = document.getElementById('perfAuditDialog');
+      if (dlg && dlg.open) {
+        updatePerfAuditReadouts();
+      }
+    }
+
+    function updatePerfAuditReadouts() {
+      const fpsEl = document.getElementById('auditFpsVal');
+      if (fpsEl) fpsEl.innerText = `${perfMetrics.fps} FPS`;
+      const apiEl = document.getElementById('auditApiLatencyVal');
+      if (apiEl) apiEl.innerText = `${perfMetrics.apiLatencyMs} ms`;
+      const renEl = document.getElementById('auditRenderTimeVal');
+      if (renEl) renEl.innerText = `${perfMetrics.domRenderMs.toFixed(2)} ms`;
+      const heapEl = document.getElementById('auditHeapVal');
+      if (heapEl) {
+        if (performance && performance.memory && performance.memory.usedJSHeapSize) {
+          heapEl.innerText = `${(performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1)} MB`;
+        } else {
+          heapEl.innerText = 'GC Activo (60 Muestras máx)';
+        }
+      }
+      const vtEl = document.getElementById('auditViewTransitionBadge');
+      if (vtEl) {
+        vtEl.innerText = document.startViewTransition ? 'View Transitions Activo' : 'Fallback CSS Activo';
+      }
+    }
+
     function updateMetrics() {
-      fetch('/api/metrics', { headers: authHeaders() })
+      // Skip background polling when browser tab is hidden to save CPU/battery
+      if (document.hidden && latestMetrics) return;
+
+      // Prevent overlapping requests on high-latency WAN connections
+      if (metricsInFlightController) {
+        perfMetrics.skippedCollisions++;
+        return;
+      }
+
+      const tStart = performance.now();
+      metricsInFlightController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        if (metricsInFlightController) metricsInFlightController.abort();
+      }, 6500);
+
+      fetch('/api/metrics', {
+        headers: authHeaders(),
+        signal: metricsInFlightController.signal
+      })
         .then(res => {
+          clearTimeout(timeoutId);
+          metricsInFlightController = null;
           if (res.status === 403) {
             if (!isRedirectingAuth) {
               isRedirectingAuth = true;
@@ -4861,13 +5727,25 @@
         })
         .then(data => {
           if (!data) return;
+          perfMetrics.apiLatencyMs = Math.max(1, Math.round(performance.now() - tStart));
           if (data.auth_status && data.auth_status.token) {
             try { localStorage.setItem('sysmon_device_token', data.auth_status.token); } catch (e) {}
           }
-          applyMetricsToDOM(data);
+          // Schedule DOM & Canvas synchronization inside requestAnimationFrame
+          if (pendingRafRender) cancelAnimationFrame(pendingRafRender);
+          pendingRafRender = requestAnimationFrame(() => {
+            const rStart = performance.now();
+            applyMetricsToDOM(data);
+            perfMetrics.domRenderMs = performance.now() - rStart;
+            updateHudPerformanceBar();
+          });
         })
         .catch(err => {
-          console.warn('Esperando telemetría del servidor:', err.message);
+          clearTimeout(timeoutId);
+          metricsInFlightController = null;
+          if (err && err.name !== 'AbortError') {
+            console.warn('Esperando telemetría del servidor:', err.message);
+          }
         });
     }
 
@@ -5226,6 +6104,9 @@
         if (linkEmby && localSrvIp) linkEmby.href = `http://${localSrvIp}:8096`;
 
         renderActiveView();
+        if (activeBentoSheetModule) {
+          updateBentoSheetLive();
+        }
       } catch (e) {
         console.error('Error sincronizando telemetría en el DOM:', e);
       }
@@ -5265,7 +6146,60 @@
       .catch(() => showToast(`Error enviando paquete WoL a ${name || mac}`, 'error'));
     }
 
+    // =========================================================================
+    // HORIZONTAL TOUCH SWIPE GESTURE ENGINE (iPAD / TESLA TOUCH NAVIGATION)
+    // =========================================================================
+    function initTouchSwipeNavigation() {
+      const container = document.getElementById('mainScrollContainer');
+      if (!container) return;
+
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchStartTime = 0;
+      let ignoreSwipe = false;
+
+      const SWIPE_VIEWS_ORDER = [
+        'overview', 'processor', 'memory', 'gpu', 'drives',
+        'network', 'apps', 'security', 'torrents', 'processes', 'dns', 'version'
+      ];
+
+      container.addEventListener('touchstart', (e) => {
+        if (!e.touches || e.touches.length !== 1) return;
+        const target = e.target;
+        // Do not hijack touch on interactive canvases, inputs, tables, or scrollable sub-containers
+        if (target && (target.closest('canvas') || target.closest('input') || target.closest('select') || target.closest('table'))) {
+          ignoreSwipe = true;
+          return;
+        }
+        ignoreSwipe = false;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchStartTime = Date.now();
+      }, { passive: true });
+
+      container.addEventListener('touchend', (e) => {
+        if (ignoreSwipe || !e.changedTouches || e.changedTouches.length !== 1) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        const dt = Date.now() - touchStartTime;
+
+        // Require deliberate horizontal swipe: >78px horizontal, <55px vertical, under 600ms
+        if (dt < 600 && Math.abs(dx) > 78 && Math.abs(dx) > Math.abs(dy) * 1.8) {
+          const idx = SWIPE_VIEWS_ORDER.indexOf(activeView);
+          if (idx === -1) return;
+          if (dx < 0 && idx < SWIPE_VIEWS_ORDER.length - 1) {
+            switchView(SWIPE_VIEWS_ORDER[idx + 1], true);
+          } else if (dx > 0 && idx > 0) {
+            switchView(SWIPE_VIEWS_ORDER[idx - 1], true);
+          }
+        }
+      }, { passive: true });
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
+      applyTitaniumTheme(currentTitaniumTheme);
+      initTouchSwipeNavigation();
+
       const initialView = resolveViewFromLocation();
       navStack = [initialView];
       navPointer = 0;
@@ -5277,6 +6211,10 @@
 
       updateMetrics();
       setInterval(updateMetrics, 2000);
+
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) updateMetrics();
+      });
 
       checkSystemVersion(false);
       setInterval(() => checkSystemVersion(false), 300000);

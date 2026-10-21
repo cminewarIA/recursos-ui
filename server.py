@@ -158,7 +158,7 @@ HISTORY = {
     "disk_r": [],
     "disk_w": []
 }
-MAX_HISTORY = 40
+MAX_HISTORY = 60
 
 # Dynamic Hardware & OS Information (Queried directly from OS kernel at startup)
 def _detect_cpu_static_specs():
