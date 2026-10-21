@@ -1,317 +1,650 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.13.0`)
+<div align="center">
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.13.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Ingesta de Flujos de Conexión de Dispositivos del Hogar vía Pi-hole (`fetch_active_device_flows`)**, **Filtro Segmentado de Dispositivos (`📱 Dispositivos`)**, **Traducción de IPs Locales y Externas mediante Pi-hole DNS (`PiholeDnsTranslator`)**, **Persistencia Absoluta de Popups en Mapa (Multi-tier Matching Antidesaparición)**, **Regla Estricta de Cero Hardcoding (`GEMINI.md`)**, **Agrupamiento Dinámico según Nivel de Zoom en Pantalla (Pixel Distance Clustering)**, **Exclusión Estricta de LAN en Mapa y Geolocalización Mundial de Destinos de Dispositivos del Hogar (Kernel Conntrack)**, **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Motor de Mapa Geoespacial Libre (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+<a id="slide-01"></a>
 
----
+# 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
+### *Apple Liquid Glass meets Tesla Touch Cockpit — Presentación Interactiva de Ingeniería (v4.13.1)*
 
-## ✨ Novedades en `v4.13.0`
-- **Ingesta de Conexiones Activas de Dispositivos del Hogar vía Pi-hole (`fetch_active_device_flows`)**:
-  - **Superación de la Limitación de Pasarela LAN**:
-    - Dado que el servidor físico (`192.168.50.2`) es un host en la red y no el router por defecto (que es `192.168.50.1`), las conexiones TCP/UDP directas de teléfonos, tabletas, televisores y consolas no atravesaban el kernel local.
-    - Se integró la lectura de la base de datos de consultas de Pi-hole (`/etc/pihole/pihole-FTL.db` `queries`), extrayendo en tiempo real (últimos 15 min) los flujos hacia Internet originados por cada equipo de la casa (`tv-de-la-sala-de-estar`, `xbox-series-s`, `Redmi-A3`, `tab-s9-ultra-de-yonah`, `s21-yanelis`, `synology-nas`, etc.).
-  - **Resolución y Geolocalización Mundial de Destinos**:
-    - Cada consulta se asocia a su IP pública remota (WhatsApp, Disney+, TikTok, Instagram, Microsoft, Dropbox, etc.) y se encola en el worker GeoIP para aparecer geolocalizada en el mapa mundial con su ubicación geográfica real.
-  - **Filtro Rápido `📱 Dispositivos` en el Control Segmentado del Mapa**:
-    - Nuevo botón en la botonera superior: `Todas (N)` | `↓ Entrantes (N)` | `↑ Salientes (N)` | `📱 Dispositivos (N)` | `🛡️ Bloqueadas (N)`.
-    - Permite aislar con un solo toque el tráfico y destinos de los dispositivos del hogar frente a los servicios propios del servidor.
-  - **Diferenciación Visual Inmediata (Iconografía 📱 Dispositivo vs 🖥️ Servidor)**:
-    - En la tabla de conexiones de red y en los diálogos popup del mapa, cada conexión identifica con claridad el origen: `📱 tv-de-la-sala-de-estar:443`, `📱 xbox-series-s:443`, `🖥️ Servidor:port`.
-
-## ✨ Novedades en `v4.12.0`
-- **Traducción en Tiempo Real de IPs Locales y Externas mediante Pi-hole DNS**:
-  - **Traducción Automática de IPs Locales a Nombres de Dispositivo**:
-    - Motor integrado `PiholeDnsTranslator` en `server.py` que consulta `/etc/pihole/custom.list`, la base de datos de red `/etc/pihole/pihole-FTL.db` (`network_addresses`) y `/etc/hosts`.
-    - Traduce de inmediato direcciones privadas como `192.168.50.16` a `tab-s9-ultra-de-yonah`, `192.168.50.187` a `tv-de-la-sala-de-estar`, `192.168.50.252` a `s25-yonah`, `192.168.50.5` a `xbox-one-x`, `192.168.50.6` a `nintendo-switch-oled`, etc.
-  - **Traducción Dinámica de IPs Públicas Remotas a Nombres de Dominio Reales**:
-    - Lector asíncrono e incremental de `/var/log/pihole/pihole.log` que extrae en milisegundos todas las respuestas y resoluciones DNS (`reply`, `cached`, `cached-stale <dominio> is <ip>`), complementado con fallback de caché rDNS (`socket.gethostbyaddr`).
-    - Asocia de forma transparente IPs públicas con sus nombres de dominio: `20.250.119.72` -> `api.github.com`, `1.1.1.1` -> `one.one.one.one`, `208.95.112.1` -> `ip-api.com`, `token-icons.llamao.fi`, etc.
-  - **Visualización Integral en Mapa y Tablas de Red**:
-    - **Insignias de Marcador**: Priorizan el nombre de dominio resuelto (`api.github.com`, `one.one.one.one`) sobre la IP numérica pura en los pines del mapa.
-    - **Ventanas Emergentes (Popups)**: Incluyen tarjeta distintiva `🌐 Dominio DNS (Pi-hole)` y detallan con precisión el nombre del dispositivo doméstico emisor y su puerto (`tab-s9-ultra-de-yonah:54321`).
-    - **Listas de Grupos de Conexiones**: Cada fila muestra el dominio o IP y el equipo de origen (`← s25-yonah`).
-    - **Tabla de Conexiones de Red**: Incorpora insignias azules `🌐 <dominio>` y nombres amigables de host para máxima claridad operativa.
-  - **Principio Estricto de Cero Hardcoding y Ultra Alto Rendimiento**:
-    - 100% dinámico y derivado de la telemetría viva de la red local sin valores ni cadenas fijas.
-    - Lectura incremental optimizada mediante puntero de archivo (seek), consumiendo menos de 0.2 ms por ciclo de comprobación.
-
-## ✨ Novedades en `v4.11.2`
-- **Corrección Definitiva de Persistencia de Popups en el Mapa (Cero Desapariciones)**:
-  - **Eliminación del Cierre Falso por Eventos del DOM**:
-    - Se eliminó el borrado reactivo de estado en `popupclose`. Los popups ahora solo se cierran cuando el usuario pulsa deliberadamente el botón de cierre `[×]` o presiona la tecla `Escape`.
-  - **Algoritmo de Restauración Multicriterio (`Multi-tier Matching`)**:
-    - Al renovar la capa de conexiones cada 2 segundos o tras cambios continuos de zoom, el motor busca la mejor correspondencia para mantener el diálogo abierto mediante 5 niveles sucesivos de fallback:
-      1. ID de socket activo persistente.
-      2. IP pública remota seleccionada por el usuario.
-      3. IP representativa del grupo o cluster.
-      4. Pertenencia de cualquiera de las IPs históricas del cluster.
-      5. Coordenadas geográficas espaciales (`lat, lng`) por proximidad física (< 5°).
-    - Garantiza que aunque se cierren puertos efímeros de TCP (`TIME_WAIT`) en conntrack, el diálogo informativo permanezca anclado de forma inmutable.
-- **Incorporación de la Regla 7 en `GEMINI.md` (Principio Estricto de Cero Hardcoding)**:
-  - Prohibición estricta de nombres estáticos, ciudades ("Mountain View", "Madrid"), marcas o proveedores en código o lógica de agrupación.
-  - Toda la telemetría, hardware e interfaces se resuelven de forma 100% dinámica en tiempo de ejecución.
-
-## ✨ Novedades en `v4.11.1`
-- **Agrupamiento Dinámico según el Nivel de Zoom (Pixel Distance Clustering en Tiempo Real)**:
-  - **Separación y Fusión Visual Inteligente**:
-    - Al hacer zoom hacia afuera (alejarse), las conexiones cuya distancia en pantalla sea inferior a 48 píxeles se agrupan automáticamente en una insignia interactiva (`🔀 N`) con contador dinámico para evitar cualquier solapamiento.
-    - Al hacer zoom hacia adentro (acercarse), a medida que los puntos se distancian en la pantalla, se desempaquetan dinámicamente en pines individuales o subgrupos independientes.
-    - El evento nativo `zoomend` de Leaflet recalcula los clusters al instante de forma fluida.
-- **Cero Texto Hardcodeado / Fijo en Código**:
-  - Eliminado cualquier nombre estático o preconcebido en la lógica del mapa; todos los nombres de ciudad, país, proveedor de red e IP se generan de manera 100% dinámica a partir de la telemetría recibida (`remote_ip`, `city`, `country`, `isp`).
-- **Exclusión Estricta de Conexiones Locales (LAN) en el Mapa**:
-  - Los sockets internos privados (`192.168.x.x`, `172.x.x.x`, `10.x.x.x`, `127.x.x.x`) quedan excluidos de los pines del mapa para no saturar la vista con órbitas ficticias.
-  - El nodo central del servidor permanece anclado con precisión en Gran Canaria.
-- **Mapeo de IPs Públicas de Dispositivos de la Casa mediante Kernel Conntrack**:
-  - El backend `server.py` integra la lectura de la tabla de seguimiento de conexiones del kernel (`sudo -n conntrack -L`).
-  - Cualquier flujo originado por un dispositivo del hogar (`192.168.50.x`) hacia una IP pública de Internet (o tráfico entrante hacia ellos) se registra e incorpora automáticamente a la cola del worker GeoIP, mostrando en el mapa las ubicaciones de todos los destinos a los que se conectan los equipos de la casa con detalle de su IP local de origen.
-- **Persistencia Robusta del Popup Abierto**:
-  - El diálogo popup de inspección de una IP o grupo se conserva abierto frente a cambios de zoom y al refresco recurrente de telemetría cada 2 segundos, cerrándose únicamente cuando el usuario pulsa de forma deliberada el botón `×`.
-
-## ✨ Novedades en `v4.11.0`
-- **Agrupación Inteligente de Conexiones Concurrentes en el Mapa de Red (Clustering de Sockets)**:
-  - **Marcadores con Contador Dinámico (`🔀 N`)**:
-    - Cuando múltiples conexiones coinciden en la misma ubicación geográfica o dispositivo (múltiples sockets hacia Google, Cloudflare, Azure, o dispositivos locales en la LAN con varios servicios abiertos), ya no se superponen de forma invisible.
-    - Se representan mediante un marcador distintivo con contador y clase contextual según el flujo (`🔀 4 Mountain View` o `🔀 3 192.168.50.242`).
-  - **Selector Interactivo de IPs y Conexiones en el Popup**:
-    - Al hacer clic en un marcador agrupado, se despliega una lista interactiva y desplazable con todas las IPs y sockets presentes en esa zona.
-    - Cada fila muestra la dirección (`↓ / ↑ / 🛡️`), `IP:puerto`, servicio asociado y proceso local.
-    - Al pulsar sobre cualquier elemento, el popup muestra el panel completo de inspección de ese socket con los controles de firewall Fail2ban y un botón `◀ Ver lista de IPs` para alternar rápidamente.
-- **Popups de Mapa 100% Persistentes (Cero Cierres Prematuros)**:
-  - **Eliminación del Cierre Involuntario por Telemetría**:
-    - El ciclo de refresco en tiempo real cada 2 segundos preserva y restaura automáticamente el estado del popup que el usuario tenga abierto en pantalla, eliminando los molestos parpadeos o cierres accidentales mientras se inspecciona una IP o se configura una regla de bloqueo.
-  - **Prevención de Cierres por Clic Accidental**:
-    - Configurado Leaflet con `closePopupOnClick: false` y `closeOnClick: false`, de modo que arrastrar el lienzo del mapa o hacer clic en zonas vacías no cierra el diálogo. Se mantiene abierto de forma estable hasta que el usuario pulse explícitamente el botón `×`.
-- **Coordenadas Unificadas de Dispositivos LAN por IP (`server.py`)**:
-  - Los sockets pertenecientes a una misma IP privada en la red local se anclan a un punto idéntico y consistente de la órbita de Gran Canaria, permitiendo que todos los servicios de un mismo equipo doméstico se agrupen y consulten juntos.
-
-## ✨ Novedades en `v4.10.1`
-- **Geolocalización Exacta del Nodo Host en el Centro Geográfico de Gran Canaria**:
-  - **Fijación de Coordenadas de Referencia**:
-    - Se calibró la posición del nodo central ("🖥️ Nodo Host") en las coordenadas exactas de la cumbre central de Gran Canaria (`27.9600° N, -15.5800° W`), sustituyendo la estimación por defecto costera de la IP WAN (`28.1, -15.4098`) y cualquier fallback previo a Madrid (`40.4168, -3.7038`).
-    - Las conexiones de dispositivos en red local (LAN) orbitan concéntricamente alrededor del centro de Gran Canaria con una separación visual limpia.
-  - **Encuadre y Zoom Optimizado en el Mapa**:
-    - La acción rápida de centrado `🖥️ Nodo Host` (`focusServerNode`) enfoca de forma óptima la isla de Gran Canaria con un zoom adaptado a nivel 10 y apertura de popup contextual.
-  - **Persistencia en Caché GeoIP y Entorno**:
-    - El valor queda asegurado en `geoip_cache.json`, en el worker GeoIP de `server.py` y configurable mediante variables de entorno opcionales (`SERVER_GEO_LAT`, `SERVER_GEO_LNG`, `SERVER_GEO_CITY`, `SERVER_GEO_COUNTRY`).
-
-## ✨ Novedades en `v4.10.0`
-- **Identificación Precisa del Servicio por IP (Conexiones Entrantes y Salientes)**:
-  - **Mapeo Profundo de Sockets, Procesos y Contenedores**:
-    - Detección dinámica y en tiempo real de los servicios locales en escucha mediante inspección de puertos (`sudo ss -tulpn`), procesos del sistema (`psutil`) y contenedores Docker activos (`DOCKER_CACHE`).
-    - **Conexiones Entrantes (↓ RX)**: Muestra explícitamente a qué servicio local se conecta cada IP remota (*Emby Media Server*, *Caddy Reverse Proxy / HTTPS*, *SSH Daemon*, *Nextcloud Hub*, *Immich Photo Server*, *Home Assistant*, *qBittorrent*, *Pi-hole DNS*, etc.) y el proceso local ejecutor (*EmbyServer*, *caddy*, *sshd*, *docker-proxy*, etc.).
-    - **Conexiones Salientes (↑ TX)**: Identifica el proceso local de origen (*chrome*, *tailscaled*, *python3*, *adb*, *agy*, etc.) y el servicio o destino remoto (*Google Cast / Chromecast en LAN*, *Telegram API / Messenger*, *GitHub / CDN Fastly*, *Cloudflare*, *Samba / SMB*, *DNS Upstream*, etc.).
-- **Bloqueo y Desbloqueo Directo de IPs en el Firewall (Fail2ban IPS) desde el Mapa y la Tabla**:
-  - **Menú Interactivo en el Popup del Mapa**:
-    - Al pulsar sobre cualquier conexión en el mapa geoespacial (OpenStreetMap), el diálogo desplegable presenta los detalles del servicio y controles integrados para bloquear la IP directamente en Fail2ban con selector inteligente de jail (`caddy-scan`, `sshd`, `nextcloud`, `all`).
-    - Si la IP ya está bloqueada, el botón conmuta automáticamente a `🔓 Desbloquear IP en Firewall`.
-  - **Acción Rápida en la Tabla de Conexiones**:
-    - Cada fila de la tabla de sockets geolocalizados incluye ahora el distintivo claro del servicio al que se conecta y un botón directo `🚫 Bloquear` / `🔓 Desbloquear` para gestión inmediata sin cambiar de vista.
-  - **Protección de Seguridad**:
-    - Bloqueo preventivo en interfaz y backend para impedir el baneo accidental de las IPs locales del servidor (`127.0.0.1`, `SERVER_LOCAL_IP`).
-
-- **Compatibilidad Universal de Rutas para Simulador de Google AI Studio y GitHub (`GEMINI.md` y `server.py`)**:
-  - **Resolución Dinámica de Rutas y Candidatos Relativos**:
-    - Se dotó al backend (`server.py`) de listas de candidatos para todos los recursos del sistema (DuckDNS, base de datos de Emby, scripts de sincronización, configuración de dominios e IP caché), comprobando primero rutas relativas al repositorio (`BASE_DIR` / `./`) antes de cualquier fallback local (`/home/servidor/...`).
-    - Evita que Google AI Studio o entornos en contenedores intenten montar o requieran carpetas del sistema local inexistentes en su simulador.
-  - **Nueva Regla 6 en `GEMINI.md` (Rutas Catalogadas en GitHub y Relativas)**:
-    - Se estandarizó la documentación de instrucciones para que cualquier agente reconozca las rutas catalogadas en GitHub (`./planes/`, `./VERSION`, `./README.md`, `./server.py`) como opciones de primera clase junto con las rutas absolutas locales.
-  - **Cero Errores en Entornos Híbridos o Simulados**:
-    - Los detectores y endpoints de DuckDNS, dominio y Emby devuelven estados limpios y controlados en lugar de excepciones de archivo no encontrado (`FileNotFoundError`).
-
-## ✨ Novedades en `v4.9.2`
-- **Corrección de Marca de Agua 'API KEY REQUIRED' (OpenStreetMap Puro + Filtro Dark CSS)**:
-  - **Eliminación Total del Servidor de Teselas de CARTO**:
-    - Se identificó que la marca de agua con el texto *"API KEY REQUIRED"* procedía de `basemaps.cartocdn.com`, que comenzó a estampar dicho texto en sus imágenes PNG al no recibir clave de pago.
-    - Se sustituyó por el servidor oficial de **OpenStreetMap** (`tile.openstreetmap.org`) con respaldo automático en vuelo hacia el espejo comunitario `tile.openstreetmap.de`.
-  - **Modo Oscuro Mediante Filtro Gráfico CSS Específico (`.leaflet-tile-pane`)**:
-    - Las teselas libres se oscurecen elegantemente sin alterar en absoluto los marcadores de colores (verde, cian, rojo, azul) ni los popups informativos de conexiones.
-    - 100% libre, sin marcas de agua, sin claves API ni dependencias comerciales.
-
-## ✨ Novedades en `v4.9.1`
-- **Estandarización del Criterio Estricto de Versionado Semántico (`GEMINI.md`)**:
-  - Incorporada la regla formal de control de versiones unificado:
-    - **`X.0.0` (Cambio de Diseño)**: Se sube el primer número ante cambios de diseño/interfaz y se restablecen a 0 los otros dos.
-    - **`0.X.0` (Añadir o Quitar Función)**: Se sube el segundo número al añadir o retirar funciones y se restablece a 0 el tercer número.
-    - **`0.0.X` (Actualización o Ajuste de Pequeños Detalles)**: Se sube el tercer número ante correcciones, actualizaciones menores, reglas o documentación.
-  - Sincronización automática de directrices para Google AI Studio y Antigravity.
-
-## ✨ Novedades en `v4.9.0`
-- **Exclusividad del Motor de Mapa Libre y Autónomo (OpenStreetMap / CartoDB Dark Matter)**:
-  - **Eliminación Total de Dependencias Propietarias y Claves API**:
-    - Se retiró por completo la integración de Google Maps Platform, eliminando la solicitud de claves de API (`VITE_GOOGLE_MAPS_API_KEY`), modales de configuración y selectores innecesarios.
-    - El mapa geoespacial funciona de manera 100% autónoma, ilimitada y sin costes mediante **Leaflet.js** con teselas oscuras de **CartoDB Dark Matter / OpenStreetMap**.
-  - **Barra de Herramientas del Mapa Simplificada y Limpia**:
-    - Sustituido el botón de configuración por una insignia fija y discreta `🗺️ OpenStreetMap (Libre)`.
-    - Controles directos y ergonómicos: encuadre total inteligente (`fitAllBounds`), fijación rápida en el nodo host central (`focusServerNode`) y popups interactivos enriquecidos con telemetría de sockets y GeoIP.
-  - **Código Optimizado y Arquitectura Limpia**:
-    - Se simplificó `NetworkConnectionsMapEngine` en `index.html` y `static/index.html`, reduciendo complejidad y eliminando bloques de script superfluos.
-    - En el backend (`server.py`), el endpoint `/api/maps/config` responde de forma directa declarando el motor libre sin sobrecarga de variables de entorno.
-
-## ✨ Novedades en `v4.8.0`
-- **Motor Dual de Mapa Geoespacial de Red (OpenStreetMap / Leaflet Gratuito + Google Maps Platform Opcional)**:
-  - **OpenStreetMap / CartoDB Dark Matter como Motor Predeterminado (Cero Claves, Cero Coste)**:
-    - Resuelve de forma definitiva el aviso bloqueante *"Esperando configuración de VITE_GOOGLE_MAPS_API_KEY..."* activando automáticamente el motor **Leaflet.js + CartoDB Dark Matter**.
-    - Renderiza instantáneamente todas las conexiones entrantes (verde `#10B981`), salientes (cian `#06B6D4`), IPs bloqueadas por el IPS Fail2ban (rojo `#F43F5E`) y el nodo host central sin requerir ninguna clave de API, tarjeta de crédito ni cuenta en Google Cloud.
-    - Soporte completo para líneas geodésicas direccionales, popups interactivos enriquecidos con datos de GeoIP y ajuste dinámico de encuadre (`fitBounds`).
-  - **Soporte Completo de Google Maps Platform Opcional**:
-    - Si el usuario cuenta con una clave `VITE_GOOGLE_MAPS_API_KEY`, el dashboard permite utilizar Google Maps Platform con renderizado vectorial y marcadores avanzados.
-  - **Selector y Configurador Visual en la Barra de Herramientas (`#mapEngineModal`)**:
-    - Botón interactivo `🗺️ Motor: OpenStreetMap (Gratis)` en los controles del mapa que abre un diálogo para alternar fácilmente entre proveedores de mapas e introducir la clave de API con persistencia automática en `.env` y `localStorage`.
-    - Botón de recuperación rápida en el overlay de estado para cambiar a OpenStreetMap con un solo clic si Google Maps no está autenticado.
-
-## ✨ Novedades en `v4.7.0`
-- **Transiciones Animadas Fluidas con D3.js v7 en el Gráfico de Pastel de la Pestaña `Red` (`NetworkBandwidthPieChart`)**:
-  - **Interpolación Angular y Radial con `d3.pie()`, `d3.arc()`, `d3.transition()` y `d3.interpolate()` (`arcTween`)**:
-    - **Cambio de Modo de Agrupación o Métrica (`680 ms`, `d3.easeCubicOut`)**: Al conmutar entre `🌐 Subredes IP`, `📶 Grupos de Enlace` y `🖥️ Tipo de Dispositivo` (o entre `📊 Tráfico Acumulado` y `⚡ Caudal en Vivo`), los sectores SVG (`#svgNetBandwidthPie path.bw-pie-arc-path`) interpolan suavemente sus ángulos (`startAngle`, `endAngle`), radios (`innerRadius`, `outerRadius`) y colores desde la disposición anterior sin parpadeos ni reconstrucciones bruscas del DOM.
-    - **Actualización Continua ante Cambios en el Tráfico Detectado (`460 ms`, `d3.easeCubicOut`)**: Cuando la telemetría en vivo detecta variaciones en el caudal o volumen de red, cada sector transiciona de forma orgánica desde su estado angular previo (`_current` / `_prevArcStateByKey`) hacia la nueva proporción.
-    - **Expansión Radial y Desplazamiento Centroidal al Pasar el Cursor o Fijar Selección (`210–240 ms`)**: Al señalar o pulsar un sector o fila de la leyenda, D3 anima la apertura radial del arco activo (`outerRadius: 98 -> 105`, `innerRadius: 58 -> 56`), proyecta el desplazamiento polar (`translate(dx, dy)`) y aplica un resplandor semántico (`drop-shadow`).
-    - **Interpolación Numérica en el Indicador Central (`d3.interpolateNumber`) y Barras de Leyenda in-place**: El contador central (`#bwPieCenterVal`) anima progresivamente la cifra de bytes o caudal (`tween('text', ...)`) y las barras porcentuales de `#bwPieLegendList` se actualizan in-place preservando el estado hover y las transiciones CSS (`cubic-bezier(0.22, 1, 0.36, 1)`).
-
-## ✨ Novedades en `v4.6.0`
-- **Gráfico de Pastel Interactivo de Distribución de Ancho de Banda en la Pestaña `Red` (`NetworkBandwidthPieChart`)**:
-  - **Tres Dimensiones de Agrupación Interactiva**:
-    - **🌐 Por Subredes IP (`/24`)**: Agrupa el consumo de red entre las subredes IPv4 detectadas (`192.168.50.0/24`, `172.x.0.0/16` Docker, `100.x.0.0/16` Tailscale/Mesh, `10.x.x.0/24` VPN y flujos WAN externos), con subdivisión inteligente por segmento (Servidor/Cable, Wi-Fi 5 GHz y Wi-Fi 2.4 GHz) cuando todos los nodos locales comparten una única subred `/24`.
-    - **📶 Por Grupos de Enlace**: Compara la proporción de ancho de banda entre **Ethernet Gigabit (Cableado)**, **Wi-Fi 5 GHz (Alta Velocidad)** y **Wi-Fi 2.4 GHz & Red IoT**.
-    - **🖥️ Por Tipo / Rol de Dispositivo**: Clasifica automáticamente el consumo entre **Servidor Host & Infraestructura**, **Smart TV, Streaming & Consolas**, **Smartphones & Tablets**, **Ordenadores & Estaciones** y **Domótica, Cámaras & IoT**.
-  - **Doble Modo de Métrica (`📊 Tráfico Acumulado` vs `⚡ Caudal en Vivo`)**: Permite alternar en tiempo real entre el volumen total transferido (`↓ RX + ↑ TX Bytes`) y el caudal instantáneo (`B/s`), con fallback automático si los enlaces están en reposo.
-  - **Canvas HiDPI Interactivo + Leyenda Sincronizada**: Al pasar el cursor o pulsar sobre un sector del gráfico de pastel (o sobre una fila de la tabla de desglose), el sector se expande con brillo semántico y el indicador central muestra el nombre del segmento, su consumo exacto, porcentaje del total y número de nodos activos.
-- **Wake-on-LAN Multivía (`send_wol_magic_packet`) y Feedback Visual de Acciones**: Emisión redundante de paquetes mágicos UDP por broadcast de subred (`192.168.50.255:9/:7`), broadcast global y binario `wakeonlan`, junto con estados de progreso en botones de servicios y contenedores.
-
-## ✨ Novedades en `v4.5.0`
-- **Utilería de Limpieza Periódica de `localStorage` para Caché GeoIP (`GeoIpLocalStorageCleaner` & `GEOIP_MAX_ENTRIES`)**:
-  - **Control de Capacidad (`GEOIP_MAX_ENTRIES = 1000` en cliente / `2000` en backend)**: Cuando el número total de registros GeoIP en memoria o en `localStorage` (`recursos_geoip_cache_v1`) supera el límite `GEOIP_MAX_ENTRIES`, la utilería `GeoIpLocalStorageCleaner.pruneCache()` ordena las entradas por su marca temporal de uso más reciente (`Math.max(lastAccessed, ts)`) y poda automáticamente las entradas más antiguas hasta un umbral de compactación del 90% (`EVICTION_TARGET_RATIO = 0.9`), evitando reordenamientos continuos en cada lote.
-  - **Purga Periódica de Entradas Caducadas (TTL) en Tiempo de Inactividad (`requestIdleCallback`)**: Un temporizador en segundo plano (`GEOIP_CLEANUP_INTERVAL_MS = 60s`) ejecuta barridos de mantenimiento mediante `requestIdleCallback` para eliminar entradas con TTL vencido (`> 7 días`), registros corruptos, claves heredadas obsoletas y entradas caducadas de la caché negativa (`> 10 min`) sin bloquear el hilo principal.
-  - **Resiliencia ante `QuotaExceededError` y Escritura Debounced**: Escrituras agrupadas (`300 ms` debounce) y recuperación automática ante saturación de cuota de `localStorage` podando el 50% más antiguo de la caché.
-  - **Telemetría de Ocupación en Vivo (`#geoIpWorkerStatusBadge`)**: El indicador de estado del mapa muestra ahora la ocupación respecto al límite (`GeoIP Caché: X/1000`), el peso en KB en `localStorage` y el contador de entradas obsoletas podadas.
-
-## ✨ Novedades en `v4.4.0`
-- **Worker Asíncrono de GeoIP en Segundo Plano (`ip-api.com`) con Caché Multinivel**:
-  - **Cola de Resolución Asíncrona y Despertado Instantáneo (`GEOIP_PENDING_QUEUE` + `GEOIP_WAKE_EVENT`)**: Todas las direcciones IP públicas remotas detectadas en sockets del kernel (`/proc/net/tcp`, `/proc/net/udp`, `psutil.net_connections`), clientes HTTP entrantes, objetivos DNS salientes e IPs bloqueadas por Fail2ban se encolan de inmediato y se resuelven de forma no bloqueante en lotes de hasta 80 IPs contra `http://ip-api.com/batch`.
-  - **Caché Persistente Multinivel (Disco + Memoria + Cliente)**:
-    - **Backend (`server.py` y `vite.config.ts`)**: Caché en memoria (`GEOIP_CACHE`) respaldada por persistencia atómica en disco (`geoip_cache.json`) con TTL de 7 días (evitando volver a consultar `ip-api.com` tras reinicios del servidor) y **caché negativa** de 15 minutos para IPs reservadas o no resolubles.
-    - **Control Inteligente de Rate-Limit (`X-Rl` / `X-Ttl`)**: Inspección automática de cabeceras de cuota de `ip-api.com` para proteger el límite de peticiones por minuto.
-    - **Web Worker en el Navegador (`GeoIpBackgroundWorker`)**: Hilo `Worker` dedicado en segundo plano en el cliente con caché de dos niveles (`Map` en RAM + `localStorage` bajo `recursos_geoip_cache_v1`) que enriquece instantáneamente las conexiones desde caché local, resuelve IPs pendientes contra `/api/net/geoip/resolve` (`ip-api.com`) y actualiza en caliente los marcadores y líneas geodésicas del mapa sin bloquear la UI.
-  - **Indicador Interactivo de Estado de Caché (`#geoIpWorkerStatusBadge`)**: Insignia en la barra superior del mapa que muestra en tiempo real las IPs almacenadas en caché, el porcentaje de aciertos (`% hit`) y el estado de resolución activa, permitiendo forzar una sincronización al instante con un clic.
-
-## ✨ Novedades y Correcciones en `v4.3.1`
-- **Corrección de Helper DOM `setText(id, val)`**:
-  - Definida la función auxiliar global `setText(id, val)` junto a `escapeHtml(str)` en `index.html` y `static/index.html` para actualizar de forma segura los contadores, KPIs y metadatos del motor `NetworkConnectionsMapEngine.renderFromMetrics()`, eliminando el error `ReferenceError: setText is not defined` en la vista `/red`.
-
-## ✨ Novedades en `v4.3.0`
-- **Monitor de Umbral de Caudal de Red por NIC y Alerta Visual en la Leyenda del Mapa (`BandwidthThresholdMonitor`)**:
-  - **Límite Configurable en Tiempo Real**: Control interactivo en la cabecera del mapa (`⚡ Umbral NIC`) que permite definir el límite máximo de tráfico entrante (`RX`) o saliente (`TX`) por interfaz de red en `KB/s` o `MB/s`, con persistencia automática en `localStorage` (`recursos_nic_bw_threshold_cfg`).
-  - **Alerta Visual en la Leyenda del Mapa (`#networkConnectionsMapLegend`)**: Cuando cualquier tarjeta de red (NIC) supera el umbral configurado en descarga (`↓ RX`) o subida (`↑ TX`), la leyenda superpuesta del mapa activa un contorno luminoso de alerta (`.legend-bandwidth-alert-active`), resalta el sentido del tráfico afectado (`↓ Conexión Entrante` y/o `↑ Conexión Saliente` con `.legend-dir-exceeded`) y muestra una insignia pulsante (`⚠️ ALERTA CAUDAL NIC: <interfaz> (↓/↑ <caudal>) > <límite>`).
-  - **Resaltado Sincronizado en Tarjetas NIC**: Las tarjetas individuales de interfaces de red en `#activeNicsGrid` también muestran una insignia de advertencia y borde reactivo cuando su caudal instantáneo supera el umbral establecido.
-
-## ✨ Novedades en `v4.2.0`
-- **Mapa Geoespacial Interactivo de Conexiones Entrantes y Salientes (Google Maps Platform)**:
-  - Integración nativa en la vista de Red (`/red`) de un mapa vectorial interactivo (`Maps JavaScript API`) con marcadores avanzados (`AdvancedMarkerElement`), arcos geodésicos direccionales (`Polyline` con `geodesic: true` y flechas de flujo) y ventanas de inspección (`InfoWindow`).
-  - **Inspección de Sockets en Vivo (Cero Hardcoding)**: Lectura directa de conexiones activas del kernel (`/proc/net/tcp`, `/proc/net/udp`, `psutil.net_connections`) e integración con bloqueos activos de Fail2ban IPS.
-  - **Clasificación y Filtrado en Tiempo Real**: Controles segmentados para filtrar entre `Todas`, `↓ Entrantes` (Verde Esmeralda `#10B981`), `↑ Salientes` (Cian `#06B6D4`) y `🛡️ Bloqueadas` (Rosa `#F43F5E`), además de botones rápidos `🌍 Encuadrar Todo` y `🖥️ Nodo Host`.
-  - **Tabla Interactiva de Flujos Geolocalizados**: Listado sincronizado bajo el mapa donde al pulsar cualquier conexión el mapa se desplaza suavemente (`panTo`) hacia el nodo remoto y despliega su ficha técnica completa (IP/Puerto local y remoto, protocolo, estado del socket, servicio, ciudad, país e ISP/ASN).
-
-## ✨ Novedades en `v4.1.0`
-- **Gráficos Sparkline de Banda Ancha (Últimas 2 Horas) por Tarjeta de Red (NIC)**:
-  - Integración de un gráfico sparkline de alta resolución (Canvas HiDPI Retina) debajo de cada tarjeta de NIC en la vista de Red (`/red`).
-  - Representación de series duales simultáneas: **Caudal de Descarga (RX)** en verde esmeralda Apple (`#34D399`) con relleno de gradiente translúcido suave y **Caudal de Subida (TX)** en cian Tesla (`#38BDF8`).
-  - Escalado dinámico de eje Y con umbral mínimo de 50 KB/s para evitar picos artificiales en reposo.
-  - Insignia de caudal pico alcanzado durante las 2 horas (`Pico: ↓ ... MB/s · ↑ ... MB/s`) y contador de muestras históricas.
-  - **Interacción y Touch-Scrubbing**: Al tocar o arrastrar el cursor sobre el sparkline, se proyecta una línea guía temporal con marcadores de coordenadas y un tooltip flotante que revela el caudal exacto y el desfase de tiempo (`-X min`).
-- **Estructura de Almacenamiento Temporal Persistente**:
-  - Motor cliente `NicBandwidthStorageManager` que almacena el historial de las últimas 2 horas en una estructura temporal indexada (`recursos_nic_bandwidth_history_2h` en `localStorage` con fallback a `sessionStorage` y memoria).
-  - Poda automática de muestras con antigüedad superior a 120 minutos (7.200 segundos).
-  - Persistencia de muestras en segundo plano sin importar en qué vista navegue el usuario.
-  - Búfer temporal rodante en backend (`server.py`) que pre-alimenta hasta 2 horas de telemetría de red muestreada directamente de `/proc/net/dev`, permitiendo que clientes nuevos o recién cargados reciban el historial completo de inmediato.
-
-## ✨ Novedades y Correcciones en `v4.0.4`
-- **Lógica de Scroll Horizontal y Preservación de Forma en `.floating-dock`**:
-  - Fijación geométrica inmutable con altura constante (`height: 60px; min-height: 60px; max-height: 60px;` en escritorio y `52px` en móviles) y radio de píldora continuo (`border-radius: 9999px`), evitando cualquier deformación vertical o asimetría al desbordar elementos.
-  - Implementación de `scroll-snap-type: x proximity` y espaciadores invisibles en los extremos (`::before` y `::after`), garantizando que los iconos exteriores nunca queden recortados contra los arcos redondeados.
-  - Máscara de desvanecimiento suave en bordes (`mask-image` degradado) en pantallas táctiles y móviles (`<= 768px`), indicando sutilmente la presencia de más elementos navegables.
-  - Soporte de desplazamiento horizontal con rueda de ratón en escritorio al estrechar la ventana.
-
-## ✨ Novedades y Correcciones en `v4.0.3`
-- **Jerarquía Z-Index Calibrada (Dock a 99 y Sidebar a 100)**:
-  - Aplicado `z-index: 99` a las clases `.floating-dock` y `.floating-touch-dock` (así como a su contenedor `.floating-dock-shell`), garantizando que se muestren siempre sobre overlays y modales.
-  - Asignado `z-index: 100` a la barra lateral desplegable (`.sidebar`), manteniéndola como la capa superior absoluta del sistema.
-  - Ajustado `z-index: 90` en `.modal-overlay` para asegurar que el dock permanezca visible y accesible.
-
-## ✨ Novedades y Correcciones en `v4.0.2`
-- **Ajuste de Scroll Horizontal y Flexbox en `.floating-dock`**:
-  - Declaración de `min-width: 0` y `width: 100%` en `.floating-dock` para garantizar que el contenedor flex permita el desbordamiento horizontal (`overflow-x: auto`) sin superar el ancho de pantalla ni recortar elementos.
-  - Asignación de `flex: 0 0 auto`, `flex-shrink: 0` y `white-space: nowrap` a cada `.dock-item`, impidiendo que los textos o iconos colapsen, se compriman o se solapen cuando el viewport se estrecha.
-  - Reglas de escalado responsive (`@media (max-width: 680px)`) para optimizar el tamaño de los iconos (`46px`), padding y fuentes en pantallas móviles angostas.
-- **Jerarquía Z-Index y Convivencia con la Barra Lateral (`.sidebar`)**:
-  - Reestructuración de capas z-index: Sidebar Drawer (`z-index: 95`), Backdrop espacial atenuado (`z-index: 90`) y Dock flotante (`z-index: 70`).
-  - Ocultación y repliegue automático del dock (`body.sidebar-open .floating-dock-shell { opacity: 0; transform: translateY(16px); }`) mientras el menú lateral de módulos está desplegado, evitando cualquier colisión o solapamiento táctil.
-  - Estilización del fondo espacial desenfocado (`.sidebar-backdrop`) permitiendo cerrar la barra lateral tocando cualquier punto fuera de ella.
-
-## ✨ Novedades y Correcciones en `v4.0.1`
-- **Corrección Integral de la Barra Inferior (Floating Touch Dock)**:
-  - Sincronización de selectores CSS (`.floating-dock-shell`, `.floating-dock`) asegurando posicionamiento flotante permanente (`position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 85;`).
-  - Integración de los puntos de paginación táctil (`.swipe-pagination-dots` / `.swipe-dot`) directamente dentro de la cápsula flotante, evitando interferencias con el flujo principal del DOM.
-  - Corrección del auto-centrado de pestañas: reemplazo de `scrollIntoView()` por `dockContainer.scrollTo({ left, behavior: 'smooth' })`, eliminando saltos bruscos o indeseados en el scroll vertical de la ventana.
-  - Soporte completo de área segura para dispositivos móviles y acabados translúcidos en modo Titanio Oscuro y Titanio Claro.
-
-## ✨ Novedades Principales en `v4.0.0` (Apple Liquid Glass & Tesla Touch Cockpit)
-
-1. **Arquitectura Visual Híbrida: Bento Cristal Apple + Cabina Táctil Tesla (`v4.0.0`)**:
-   - **Cabina Panorámica 100% Ancho**: Eliminación de barras laterales fijas para aprovechar todo el lienzo con tarjetas Bento de cristal líquido (`backdrop-filter: blur(36px) saturate(190%)`), bordes especulares de `1px` y radios continuos (`24px`).
-   - **Modo Claro / Oscuro Automático con Acabado Metálico y Titanio**:
-     - **Titanio Oscuro (Space Black Titanium)**: Fondo `#07090E` con reflejos de cobalto y cian eléctrico.
-     - **Titanio Claro (Natural Brushed Titanium)**: Fondo `#EEF2F7` de aluminio/titanio cepillado con cristal blanco translúcido y tipografía de alto contraste (`#0F172A`).
-     - Conmutador instantáneo en el HUD superior (`🌗 Auto` / `☀️ Titanio Claro` / `🌙 Titanio Oscuro`) sincronizado automáticamente con el sistema operativo (`prefers-color-scheme`).
-2. **Navegación Táctil de Última Generación (Dock Flotante + Gestos Swipe + View Transitions API)**:
-   - **Dock Inferior Táctil Flotante (`#floatingTouchDock`)**: Barra suspendida de cristal líquido con física elástica (`cubic-bezier(0.22, 1, 0.36, 1)`), objetivos táctiles de `>= 48px` y desplazamiento horizontal táctil en móviles y tablets.
-   - **Gestos de Deslizamiento Horizontal (`Touch Swipe`)**: Permite deslizar el dedo a izquierda o derecha sobre la cabina para cambiar de vista con indicadores dinámicos de paginación (`#swipePaginationDots`).
-   - **HTML5 View Transitions API (`document.startViewTransition`)**: Transiciones espaciales nativas aceleradas por GPU al cambiar de módulo o alternar el acabado de titanio.
-3. **Tarjetas Bento Expandibles (`<dialog>`) y Gráficas con Scrubbing Táctil**:
-   - **Inspector Táctil Bento (`⤢ Inspector Táctil`)**: Cada pilar de telemetría (CPU, RAM, GPU, Discos, Red) puede expandirse en una hoja modal nativa HTML5 `<dialog>` sin abandonar la cabina general.
-   - **Gráficas Interactivas al Tacto (60 Muestras / 2 Minutos)**: Deslizar el dedo o el cursor sobre cualquier osciloscopio despliega una mira vertical luminosa, resalta el punto de muestreo y muestra el valor exacto junto con el instante temporal (`hace Xs`).
-4. **Auditoría y Optimización de Rendimiento en Tiempo Real**:
-   - **HUD Central de Rendimiento y Diagnóstico (`#perfAuditDialog`)**: Monitoriza en vivo la cadencia de cuadros (`RAF 60fps`), la latencia de red de `/api/metrics` en milisegundos (`ms`), el tiempo de pintado DOM+Canvas y el estado de memoria.
-   - **Motor Desacoplado (`requestAnimationFrame` + `AbortController` + `Page Visibility`)**: Sincroniza el pintado de gráficas con el refresco de pantalla, evita solapamiento de peticiones en redes lentas y reduce el consumo en pestañas ocultas.
-   - **Caché No Bloqueante en Backend**: Cacheo en memoria de topología estática de CPU/SO y caché con TTL para discos (`5s`) y estado Git (`30s`).
-5. **Motor Inteligente de Logos del Sistema Operativo, Interfaces de Red y Dispositivos**:
-   - **Logo Real del Sistema Operativo en `Nodo: <hostname>`**: Muestra automáticamente el logotipo oficial de la distribución Linux o sistema operativo activo (`/etc/os-release`, `uname`).
-   - **Logos Automáticos para Interfaces de Red (NICs) y Dispositivos LAN/Wi-Fi**: Identificación visual por dirección MAC/OUI, hostname y tipo de enlace, con opción de **búsqueda web en Google/Catálogo** o **subida de archivo de imagen local** persistente en `custom_logos.json`.
-6. **Política Estricta de Cero Hardcoding (100% Detección Dinámica del Sistema Operativo)**:
-   - Todos los datos de CPU (`/proc/cpuinfo`, `cpufreq`, `hwmon`), Memoria RAM (`/proc/meminfo`, `/proc/swaps`), GPU (`nvidia-smi`, `/sys/class/drm`, `lspci`), Almacenamiento (`df`, `/proc/diskstats`) y Red (`/proc/net/dev`) se leen en vivo desde el sistema operativo.
+<p align="center">
+  <img src="https://img.shields.io/badge/Versi%C3%B3n_Can%C3%B3nica-v4.13.1-0A84FF?style=for-the-badge&logo=apple&logoColor=white" alt="Version v4.13.1" />
+  <img src="https://img.shields.io/badge/Est%C3%A9tica-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white" alt="Apple Liquid Glass + Tesla UI" />
+  <img src="https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white" alt="Zero Hardcoding" />
+  <img src="https://img.shields.io/badge/Rendimiento-60_FPS_HiDPI_Retina-FF9F0A?style=for-the-badge&logo=speedtest&logoColor=white" alt="60 FPS Retina" />
+  <img src="https://img.shields.io/badge/Ciberseguridad-Fail2ban_IPS_%2B_Pi--hole_DNS-FF453A?style=for-the-badge&logo=shield&logoColor=white" alt="Fail2ban + Pi-hole" />
+</p>
 
 ---
 
-## 🗺️ Mapa de Rutas Web y Endpoints API
+### 🎛️ CONTROLES DEL DECK INTERACTIVO (KEYNOTE NAVIGATION)
 
-### Rutas de Usuario (Frontend Multipágina + Dock Táctil)
-| Ruta | Vista | Descripción |
+| 🎬 Diapositiva Actual | 🧭 Navegación Rápida por el Deck | ⏭️ Siguiente |
+| :--- | :---: | ---: |
+| **SLIDE 01 DE 10**<br><sub>Portada & Visión General</sub> | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**Slide 02: Lenguaje de Diseño ▶**](#slide-02) |
+
+</div>
+
+```
+╔══════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║  🟢 NODO ACTIVO: SERVIDOR CENTRAL   │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO  │  📡 PI-HOLE DNS  │ v4.13.1 ║
+╠══════════════════════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                                      ║
+║   ┌──────────────────────┐  ┌──────────────────────────────────────────┐  ┌──────────────────────┐   ║
+║   │  🧠 CPU TELEMETRÍA    │  │     🌍 MAPA MUNDIAL DE TRÁFICO EN VIVO    │  │  🍩 D3.JS SUBREDES   │   ║
+║   │  ████████░░░  74.2%  │  │         . _..::__:  ,-"-"._              │  │      ╭────────╮      │   ║
+║   │  3.80 GHz · 52.0°C   │  │       /  🌍 GRAN CANARIA ──► 🗽 NY       │  │    ╭─┤ 192.168├─╮    │   ║
+║   ├──────────────────────┤  │       \      ╰──────────► 🗼 TOKIO       │  │    │ ╰────────╯ │    │   ║
+║   │  💾 RAM + ZRAM       │  │        `._ .._,-'                        │  │    ╰─── 68.4% ──╯    │   ║
+║   │  ██████░░░░░  58.1%  │  │  [!] ALERTA UMBRAL NIC: eth0 > 150 Mbps  │  │  Transición 550ms    │   ║
+║   └──────────────────────┘  └──────────────────────────────────────────┘  └──────────────────────┘   ║
+║                                                                                                      ║
+║           ╔══════════════════════════════════════════════════════════════════════════════╗           ║
+║           ║  🏠 Vista   🧠 CPU   💾 RAM   🎮 GPU   💿 Discos   🌐 Red   🛡️ IPS   🐳 Docker ║           ║
+║           ╚══════════════════════════════════════════════════════════════════════════════╝           ║
+║                                  ▲ FLOATING TOUCH DOCK (TESLA UI)                                    ║
+╚══════════════════════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+<details>
+<summary>🎙️ <b>Notas del Orador — Slide 01: ¿Qué es System Cockpit? (Haz clic para desplegar)</b></summary>
+<br>
+
+> **Bienvenidos a la presentación oficial de System Cockpit (`v4.13.1`).**
+> Este proyecto nace con una premisa radical: **¿Por qué los paneles de administración de servidores Linux parecen hojas de cálculo de los años 90 cuando conducimos vehículos con pantallas táctiles de 60 fotogramas por segundo?**
+>
+> System Cockpit fusiona dos filosofías de diseño líderes en el mundo:
+> 1. **Apple visionOS / macOS Liquid Glass**: Superficies translúcidas multicapa, desenfoque gaussiano profundo (`backdrop-filter: blur(36px) saturate(190%)`), bordes especulares y tipografía con interletraje negativo milimétrico.
+> 2. **Tesla Touch Cockpit**: Controles táctiles sobredimensionados (`≥ 48px`), navegación gestual *Touch Swipe*, dock flotante inferior y gráficas interactivas que se expanden a pantalla completa con scrubbing táctil en tiempo real.
+>
+> Utiliza la barra de controles superior o inferior de cada diapositiva para recorrer las **10 láminas interactivas** de esta presentación técnica.
+
+</details>
+
+---
+---
+
+<a id="slide-02"></a>
+
+<div align="center">
+
+| ⏮️ Anterior | 🎬 **SLIDE 02 DE 10 — LENGUAJE DE DISEÑO & EXPERIENCIA TÁCTIL** | ⏭️ Siguiente |
+| :--- | :---: | ---: |
+| [**◀ Slide 01: Portada**](#slide-01) | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**Slide 03: Inteligencia Geoespacial ▶**](#slide-03) |
+
+</div>
+
+## 🎨 SLIDE 02 · Apple Liquid Glass + Tesla Touch Cockpit (`v4.0.0`)
+
+### La Convergencia entre Cristal Esmerilado y Control Automotriz
+
+System Cockpit abandona las interfaces planas convencionales e introduce una arquitectura visual basada en **física óptica translúcida** y **ergonomía táctil de grado automotriz**.
+
+```mermaid
+graph LR
+    subgraph APPLE["🍏 Apple Liquid Glass Engine"]
+        A1["backdrop-filter: blur(36px) saturate(190%)"]
+        A2["Bordes Especulares 1px rgba(255,255,255,0.14)"]
+        A3[" Tarjetas Bento con Radio Continuo 24px"]
+        A4["HTML5 View Transitions API (Cross-Fade)"]
+    end
+
+    subgraph TESLA["⚡ Tesla Touch Cockpit UX"]
+        T1["Floating Touch Dock (#floatingTouchDock)"]
+        T2["Gestos Touch Swipe Izquierda/Derecha"]
+        T3["Hitboxes Táctiles ≥ 48px sin Hover- Trap"]
+        T4["Scrubbing Táctil en Modal <dialog> (60 muestras)"]
+    end
+
+    APPLE ====> COCKPIT(("🛸 SYSTEM COCKPIT\n60 FPS Retina UI"))
+    TESLA ====> COCKPIT
+```
+
+### 🌓 Dualidad de Acabados de Titanio (Temas Adaptativos Instantáneos)
+
+| Característica Óptica | 🌑 **Space Black Titanium** (Modo Oscuro) | 🌕 **Natural Brushed Titanium** (Modo Claro) |
 | :--- | :--- | :--- |
-| `/` | **Cabina General** | Bento de cristal líquido con emblema dinámico del SO, 4 pilares radiales expandibles y 6 módulos operativos |
-| `/procesador` | **Procesador (CPU)** | Osciloscopio táctil de 60 muestras, especificaciones del kernel y matriz de hilos lógicos |
-| `/memoria` | **Memoria RAM** | Osciloscopio interactivo de memoria, barra de composición física y estado de Swap/Zram |
-| `/grafica` | **Tarjeta Gráfica** | Carga de GPU, uso de VRAM, temperatura, potencia y procesos gráficos activos |
-| `/almacenamiento` | **Almacenamiento** | Velocidad de E/S en vivo y tarjetas detalladas por volumen montado |
-| `/red` | **Red & Interfaces** | Caudal RX/TX, inspector de tarjetas de red (NICs) y clientes LAN/Wi-Fi con logos automáticos y subida local |
-| `/seguridad` | **Seguridad & DNS** | Bloqueo DNS Pi-hole, dominios permitidos/bloqueados y jaulas Fail2ban |
-| `/aplicaciones` | **Contenedores & Servicios** | Estado y control (iniciar/reiniciar) de contenedores Docker y unidades `systemd` |
-| `/descargas` | **Descargas & Videoteca** | Torrents activos en qBittorrent y catálogo multimedia Emby Server |
-| `/procesos` | **Monitor de Procesos** | Tabla en vivo de procesos del sistema ordenables por uso de CPU y RAM |
-| `/dns` | **DNS & DuckDNS** | Estado del dominio detectado, actualización forzada DuckDNS y analizador DNS por cliente |
-| `/version` | **Versión & GitHub OTA** | Comparativa de versión local vs GitHub, historial de commits y actualización OTA en 1 clic |
+| **Lienzo Base (`--bg`)** | `#07090E` (Obsidiana espacial con profundidad OLED) | `#EEF2F7` (Aluminio anodizado y sílice perlado) |
+| **Superficie Liquid Glass** | `rgba(18, 23, 35, 0.65)` + `blur(36px) saturate(190%)` | `rgba(255, 255, 255, 0.72)` + `blur(36px) saturate(180%)` |
+| **Iluminación Ambiental** | Gradientes radiales sutiles (`#0A84FF`, `#30D158`, `#BF5AF2`) | Refracción limpia de alto contraste para exteriores |
+| **Acentos Semánticos** | Azul `#0A84FF` · Verde `#30D158` · Ámbar `#FF9F0A` · Rojo `#FF453A` | Azul `#0066CC` · Verde `#248A3D` · Ámbar `#C93400` · Rojo `#D70015` |
+
+### 👆 4 Pilares de Interacción Táctil Directa
+1. **Floating Touch Dock (`#floatingTouchDock`)**: Barra de navegación inferior flotante estilo macOS/iPadOS con retroalimentación elástica `cubic-bezier(0.22, 1, 0.36, 1)` que acompaña al operador en cualquier resolución.
+2. **Navegación Gestual (*Touch Swipe*)**: Desliza el dedo horizontalmente en móviles o tablets para cambiar entre las 12 vistas operativas sin tocar ningún botón, con detección inteligente que respeta el paneo del mapa mundial y el scroll horizontal de tablas.
+3. **Tarjetas Bento Expandibles (`<dialog>`)**: Cualquier tarjeta con gráfica (*CPU, RAM, GPU, Almacenamiento, Red*) se abre en un modal panorámico al tocarla, permitiendo deslizar el dedo sobre las últimas **60 muestras históricas** con mira telescópica (*crosshair*) e inspección de pico, media y mínimo.
+4. **Command Palette (`⌘K` / `Ctrl+K`)**: Buscador universal instantáneo para saltar a cualquier vista, ejecutar diagnósticos, alternar el tema de titanio o abrir el auditor de fotogramas.
+
+<details>
+<summary>🎙️ <b>Notas del Orador — Slide 02: Decisiones de Diseño e Interacción (Haz clic para desplegar)</b></summary>
+<br>
+
+> **¿Por qué diseñamos un sistema con estándares de pantalla de vehículo eléctrico?**
+> Cuando administras tu servidor desde un teléfono móvil o una tablet en el sofá, los botones diminutos de 20 píxeles y los menús que dependen del ratón (`:hover`) fallan.
+> En la versión `4.0.0` (salto `MAJOR`), reescribimos toda la maquetación bajo el paradigma **Bento Grid Liquid Glass**. Cada tarjeta tiene capacidad de expansión nativa mediante el elemento `<dialog>` de HTML5, proyectando un lienzo Canvas de alta densidad (`devicePixelRatio`) donde el dedo actúa como un osciloscopio sobre la telemetría.
+
+</details>
+
+---
+---
+
+<a id="slide-03"></a>
+
+<div align="center">
+
+| ⏮️ Anterior | 🎬 **SLIDE 03 DE 10 — INTELIGENCIA GEOESPACIAL EN TIEMPO REAL** | ⏭️ Siguiente |
+| :--- | :---: | ---: |
+| [**◀ Slide 02: Lenguaje de Diseño**](#slide-02) | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**Slide 04: Analítica D3.js & Alertas ▶**](#slide-04) |
+
+</div>
+
+## 🌍 SLIDE 03 · Mapa Mundial de Tráfico, Clustering Dinámico y Motor GeoIP (`v4.1.0` – `v4.13.0`)
+
+### Visibilidad Planetaria desde el Nodo Central en Gran Canaria
+
+La vista `/red` incorpora un centro de mando cartográfico interactivo sobre **OpenStreetMap** que traza arcos geodésicos animados desde el servidor local (**Gran Canaria, España**) hacia cada nodo remoto conectado en el planeta.
+
+```mermaid
+flowchart TD
+    S["🔌 Sockets Activos del Kernel (/proc/net/tcp + ss/psutil)"] --> F{"¿IP Pública No-LAN?"}
+    F -- "Sí" --> C{"¿Existe en Caché GeoIP\n(localStorage TTL 24h)?"}
+    C -- "Hit Instantáneo" --> M["🗺️ Renderizado Geodésico 60 FPS"]
+    C -- "Miss" --> Q["📥 Cola Asíncrona Background Worker\n(Lotes de hasta 15 IPs / 1.8s)"]
+    Q --> API["🌐 Fetch No-Bloqueante a ip-api.com\n(País, Ciudad, Lat/Lon, ISP, ASN)"]
+    API --> LRU["🧹 Utilidad de Poda LRU (v4.13.0)\n(Límite estricto: GEOIP_MAX_ENTRIES = 500)"]
+    LRU --> M
+    M --> CL["🔍 Clustering Espacial en Píxeles + Persistencia de Popup en 5 Niveles"]
+```
+
+### 🧠 Innovaciones Cartográficas Clave
+
+* **🔍 Clustering Espacial Dinámico por Zoom**:
+  * Al alejar el mapa (*zoom out*), los nodos cercanos en distancia de pantalla (píxeles reales proyectados) se fusionan automáticamente en **burbujas de cluster multi-IP** con contador numérico.
+  * Al acercar el mapa (*zoom in*), los clusters se desagregan suavemente en nodos individuales con su bandera e icono de proveedor/servicio.
+* **📌 Persistencia Inteligente de Popups en 5 Niveles (`v4.1.0`)**:
+  * A diferencia de los mapas tradicionales donde el globo de información desaparece cada vez que entra un nuevo paquete de red o una IP cambia de cluster, System Cockpit aplica un algoritmo de **5 niveles de fallback en tiempo real**:
+    1. **Nivel 1 — Clave Exacta**: Coincidencia directa de firma de nodo.
+    2. **Nivel 2 — IP Individual**: Rastreo de la IP primaria aunque el cluster haya cambiado de tamaño.
+    3. **Nivel 3 — Proximidad de Coordenadas (`< 0.15°`)**: Anclaje geográfico si el grupo se desplaza ligeramente.
+    4. **Nivel 4 — Firma de País + Ciudad**: Reubicación semántica regional.
+    5. **Nivel 5 — Selección de Grupo Activo**: Mantiene el panel de inspección enfocado sin parpadeos.
+* **⚡ Background Worker GeoIP + Poda Automática LRU (`v4.13.0`)**:
+  * **Worker Asíncrono No Bloqueante**: Resuelve direcciones IP remotas contra `ip-api.com` en segundo plano en lotes de hasta **15 IPs cada 1.8 segundos**, enriqueciendo los nodos en vivo sin congelar jamás el hilo principal.
+  * **Limpieza Automática de `localStorage` (`pruneGeoIpCacheStorage`)**: Cuando la caché supera el umbral `GEOIP_MAX_ENTRIES = 500`, el recolector elimina primero las entradas expiradas (`TTL > 24h`) y después desaloja las entradas más antiguas por marca de tiempo (`ts`), protegiendo la cuota de almacenamiento del navegador incluso ante tormentas de miles de IPs P2P/BitTorrent.
+
+<details>
+<summary>🎙️ <b>Notas del Orador — Slide 03: Ingeniería del Mapa y Memoria GeoIP (Haz clic para desplegar)</b></summary>
+<br>
+
+> **El reto de los mapas de red en tiempo real:**
+> En un servidor con qBittorrent, Emby y servicios web expuestos, pueden abrirse y cerrarse cientos de conexiones por minuto. Si consultáramos la geolocalización de forma síncrona o redibujáramos los popups desde cero en cada ciclo de 2 segundos, la interfaz sería inutilizable.
+> Con el **Worker GeoIP por lotes** y la **poda LRU a 500 entradas (`v4.13.0`)**, logramos latencia de 0 ms para IPs recurrentes y una huella de memoria constante en `localStorage`, mientras el sistema de persistencia de 5 niveles permite inspeccionar y bloquear una IP en el mapa sin que el popup se cierre jamás bajo tu dedo.
+
+</details>
+
+---
+---
+
+<a id="slide-04"></a>
+
+<div align="center">
+
+| ⏮️ Anterior | 🎬 **SLIDE 04 DE 10 — ANALÍTICA DE RED D3.JS & ALERTAS VISUALES** | ⏭️ Siguiente |
+| :--- | :---: | ---: |
+| [**◀ Slide 03: Inteligencia Geoespacial**](#slide-03) | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**Slide 05: Traductor DNS Pi-hole ▶**](#slide-05) |
+
+</div>
+
+## 🍩 SLIDE 04 · Gráfico de Pastel Animado D3.js & Alerta de Umbral NIC (`v4.10.0` – `v4.12.0`)
+
+### De Números Crudos a Proporciones Cinemáticas de Ancho de Banda
+
+Para responder al instante *"¿Qué subred o grupo de dispositivos está consumiendo mi caudal de red ahora mismo?"*, la pestaña **Red (`/red`)** integra un motor de visualización vectorial **D3.js v7** sincronizado con la telemetría viva del servidor.
+
+```
+┌───────────────────────────────────────────────────────────────────────────────────────────────┐
+│  🍩 DISTRIBUCIÓN DE ANCHO DE BANDA / ACTIVIDAD POR SUBRED Y DISPOSITIVO                       │
+│  Agrupar por:  [ ◉ Subred (/24) ]   [ ○ Tipo de Enlace ]   [ ○ Rol / Dispositivo ]            │
+├───────────────────────────────────────┬───────────────────────────────────────────────────────┤
+│                                       │  🟢 192.168.1.0/24 (LAN Doméstica)    64.2%  118 Mbps │
+│             ╭───────────╮             │  ████████████████████████████░░░░░░   14 nodos        │
+│          ╭──┤  TOTAL    ├──╮          │                                                       │
+│        ╭─╯  │ 183.8 Mbps│  ╰─╮        │  🔵 WAN / Nodos Cloud Externos        24.8%   45 Mbps │
+│        │    │ 42 Flujos │    │        │  ██████████░░░░░░░░░░░░░░░░░░░░░░░░   19 nodos        │
+│        ╰─╮  ╰───────────╯  ╭─╯        │                                                       │
+│          ╰────────┬────────╯          │  🟣 Docker Bridge (172.17.0.0/16)     11.0%   20 Mbps │
+│       Interpolación Polar D3.js       │  █████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░    9 nodos        │
+│       (attrTween · 550ms cubic-out)   │                                                       │
+└───────────────────────────────────────┴───────────────────────────────────────────────────────┘
+```
+
+### 🎬 Animación Polar Continua con D3.js (`v4.10.0` & `v4.11.0`)
+* **3 Modos de Agrupación Dinámica**:
+  1. **Por Subred (`/24`)**: Calcula en tiempo de ejecución el prefijo de red (`192.168.x.0/24`, `10.x.x.0/24`, `172.x.x.0/24` o segmentos WAN) sin una sola cadena hardcodeada.
+  2. **Por Tipo de Enlace**: Clasifica el caudal entre tráfico local LAN, túneles/contenedores y tráfico exterior WAN.
+  3. **Por Rol / Dispositivo**: Agrupa según la identidad resuelta de las máquinas (*Smart TVs, móviles, consolas, contenedores, clientes remotos*).
+* **Interpolación Matemática de Arcos (`d3.interpolate` + `attrTween`)**:
+  * Cada sector del donut conserva su ángulo previo (`_current`) en el nodo DOM SVG.
+  * Al cambiar de modo de agrupación o al variar el tráfico en tiempo real, los sectores **giran y se redimensionan suavemente durante `550ms` con curva `d3.easeCubicOut`**, mientras la etiqueta central interpola numéricamente el caudal o volumen de conexiones activas.
+  * Incluye **resaltado cruzado bidireccional**: pasar el cursor o tocar un sector ilumina su fila en la leyenda y atenúa el resto.
+
+### 🚨 Indicador Visual de Alerta por Umbral de Ancho de Banda (`v4.12.0`)
+* En la esquina del mapa mundial de conexiones y junto al selector de interfaces NIC, el operador dispone de un **control numérico de umbral en Mbps** (persistido en `localStorage`).
+* Si el caudal agregado (`RX + TX`) de la interfaz seleccionada (o el agregado global) supera el límite configurado:
+  * Se activa un **badge de alerta pulsante en rojo neón (`#FF453A`)** directamente en la leyenda del mapa mundial mostrando la interfaz infractora y el pico exacto en Mbps (`⚠️ UMBRAL SUPERADO: eth0 · 184.5 Mbps`).
+
+<details>
+<summary>🎙️ <b>Notas del Orador — Slide 04: Por qué elegimos D3.js v7 para la distribución de subredes (Haz clic para desplegar)</b></summary>
+<br>
+
+> **Fluidez visual frente a datos cambiantes:**
+> Si destruyes y recreas un SVG cada 2 segundos cuando llegan métricas nuevas, el ojo humano percibe un salto brusco y pierde la referencia espacial de qué subred creció.
+> Mediante el patrón **Data Join (`selection.join`) de D3.js v7** y la interpolación en coordenadas polares (`startAngle` y `endAngle`), los sectores se deslizan orgánicamente como agujas de un instrumento aeronáutico. Y con la alerta de umbral NIC (`v4.12.0`), cualquier saturación de ancho de banda salta a la vista sobre el propio mapa mundial.
+
+</details>
+
+---
+---
+
+<a id="slide-05"></a>
+
+<div align="center">
+
+| ⏮️ Anterior | 🎬 **SLIDE 05 DE 10 — TRADUCTOR DNS PI-HOLE & FLUJOS LAN/WAN** | ⏭️ Siguiente |
+| :--- | :---: | ---: |
+| [**◀ Slide 04: Analítica D3.js & Alertas**](#slide-04) | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**Slide 06: Ciberdefensa Fail2ban IPS ▶**](#slide-06) |
+
+</div>
+
+## 📡 SLIDE 05 · `PiholeDnsTranslator` y Telemetría de Dispositivos del Hogar (`v4.7.0` – `v4.9.0`)
+
+### Traducción Automática de Direcciones IP Crudas a Nombres Humanos Reales
+
+Ver `192.168.1.142 -> 142.250.184.14` no le dice nada a un administrador a primera vista. System Cockpit integra el motor **`PiholeDnsTranslator`** en el backend (`server.py`) para cruzar en tiempo real las tablas del kernel con **Pi-hole** y **DHCP**.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant K as 🐧 Kernel Linux (/proc/net/nf_conntrack + ss)
+    participant P as 🍓 PiholeDnsTranslator (server.py)
+    participant DB as 🗄️ Pi-hole FTL.db / dnsmasq.log / DHCP
+    participant PTR as 🌐 Pool Multihilo Reverse DNS (PTR)
+    participant UI as 🖥️ Vista /red (Tabla & Mapa)
+
+    K->>P: Entrega conexiones y flujos activos (IP Origen -> IP Destino)
+    P->>DB: 1. Traduce IP LAN (192.168.x.x / 10.x.x.x)
+    DB-->>P: "tv-de-la-sala-de-estar" / "tab-s9-ultra" / "xbox-series-s"
+    P->>DB: 2. Correlaciona IP WAN con registros DNS A / AAAA / CNAME
+    DB-->>P: "netflix.com" / "googleapis.com" / "github.com"
+    alt Sin coincidencia en caché DNS de Pi-hole
+        P->>PTR: 3. Consulta inversa PTR asíncrona con TTL
+        PTR-->>P: Hostname verificado del proveedor
+    end
+    P->>UI: JSON enriquecido (local_device_name + resolved_domain + bytes)
+```
+
+### 🏠 Dos Niveles de Visibilidad de Red Sin Precedentes
+
+| Dimensión de Análisis | 🔍 Qué Resuelve Exactamente | 💡 Ejemplo Real en Pantalla |
+| :--- | :--- | :--- |
+| **1. Identidad de Dispositivos LAN (`v4.8.0`)** | Cruza `/etc/hosts`, concesiones DHCP (`dhcp.leases`), tabla `network_addresses` de `pihole-FTL.db` y tabla ARP/vecinos (`ip neigh`). | En lugar de `192.168.1.45`, muestra **`📱 tab-s9-ultra`**, **`📺 tv-de-la-sala-de-estar`**, **`🎮 xbox-series-s`** o **`📡 deco-m4`**. |
+| **2. Dominios Exactos de IPs WAN (`v4.7.0`)** | Inspecciona qué dominio consultó cualquier cliente antes de abrir el socket hacia esa IP pública mediante `pihole-FTL.db` y `pihole.log`. | En lugar de `104.18.32.7`, muestra **`🌐 cloudflare.com`** o el subdominio exacto consultado. |
+| **3. Flujos de Dispositivos del Hogar (`v4.9.0`)** | La función `fetch_active_device_flows()` lee `/proc/net/nf_conntrack`, sesiones proxy/Caddy y consultas DNS recientes de Pi-hole. | Permite ver el tráfico de **todos los dispositivos de la casa** (móviles, tablets, Smart TVs), no solo los sockets del propio servidor Linux. |
+
+<details>
+<summary>🎙️ <b>Notas del Orador — Slide 05: Cómo logramos visibilidad de toda la red doméstica (Haz clic para desplegar)</b></summary>
+<br>
+
+> **Más allá de `netstat`:**
+> Normalmente, un monitor instalado en un servidor Linux solo ve las conexiones que nacen o terminan en ese servidor. Sin embargo, como nuestro servidor actúa como servidor DNS central con **Pi-hole** y puerta de enlace/proxy para servicios clave, en `v4.9.0` diseñamos `fetch_active_device_flows()`.
+> Este motor combina las sesiones NAT (`nf_conntrack`) con la actividad DNS reciente de `pihole-FTL.db`, mostrando en la tabla y en el gráfico D3.js qué está haciendo cada televisor, consola o teléfono de la red local en tiempo real, con una caché TTL de 10 segundos para no sobrecargar SQLite.
+
+</details>
+
+---
+---
+
+<a id="slide-06"></a>
+
+<div align="center">
+
+| ⏮️ Anterior | 🎬 **SLIDE 06 DE 10 — CIBERDEFENSA ACTIVA & MITIGACIÓN IPS** | ⏭️ Siguiente |
+| :--- | :---: | ---: |
+| [**◀ Slide 05: Traductor DNS Pi-hole**](#slide-05) | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**Slide 07: Los 5 Pilares de Hardware ▶**](#slide-07) |
+
+</div>
+
+## 🛡️ SLIDE 06 · Centro de Seguridad IPS: Fail2ban + Firewall en 1 Clic (`v4.4.0` – `v4.6.0`)
+
+### De la Observación Pasiva a la Neutralización Instantánea de Amenazas
+
+System Cockpit no es un visor pasivo: integra un **Sistema de Prevención de Intrusiones (IPS)** interactivo que conecta el mapa mundial, la tabla de conexiones y la vista `/seguridad` directamente con **`fail2ban-client`**, **`iptables`** y **`ufw`**.
+
+```mermaid
+flowchart LR
+    DETECT["🚨 Detección en Mapa o Tabla\n(IP Sospechosa / Fuerza Bruta SSH)"] --> CLICK["👆 Clic en '🚫 Bloquear IP'\n(Popup del Mapa o Tabla /red)"]
+    CLICK --> API["🔒 POST /api/security/ban\nValidación Zero-Trust de IP Pública"]
+    API --> F2B{"¿Jaula Fail2ban\nDisponible?"}
+    F2B -- "Sí (sshd / recidive)" --> JAIL["⚔️ fail2ban-client set <jail> banip <IP>"]
+    F2B -- "Fallback Directo" --> FW["🧱 iptables -I INPUT -s <IP> -j DROP\no ufw insert 1 deny from <IP>"]
+    JAIL --> UI["🔴 Badge 'BANEADA' en Mapa + Lista Negra en /seguridad"]
+    FW --> UI
+    UI --> UNBAN["🔓 Clic en 'Desbloquear' -> POST /api/security/unban"]
+```
+
+### 🔐 Capacidades de Blindaje y Defensa Activa
+
+1. **Neutralización Directa desde el Mapa Mundial y Tabla (`v4.5.0`)**:
+   * Al tocar cualquier marcador en el mapa mundial o fila en la tabla de conexiones, aparece el botón de acción táctica **`🚫 Bloquear IP`** (o **`🔓 Desbloquear`** si ya se encuentra en la lista negra).
+   * Seguridad preventiva integrada: el backend rechaza automáticamente cualquier intento accidental de bloquear direcciones loopback (`127.0.0.1`), enlaces locales o subredes privadas LAN (`192.168.x.x`, `10.x.x.x`), evitando que el administrador se corte el acceso a sí mismo.
+2. **Auditoría de Intrusiones en `/seguridad` (`v4.4.0`)**:
+   * **Jaulas Activas de Fail2ban**: Recuento en vivo de IPs bloqueadas por servicio (`sshd`, `nginx-http-auth`, `recidive`, etc.) y total de intentos fallidos acumulados.
+   * **Registro de Ataques SSH (`journalctl` / `auth.log`)**: Identificación de fuerza bruta, usuarios inválidos probados por bots y puertos escaneados.
+   * **Puertos Expuestos en Escucha**: Auditoría continua de sockets `LISTEN` abiertos en todas las interfaces (`0.0.0.0` / `::`).
+3. **Hardening Zero-Trust en Backend (`v4.6.0`)**:
+   * **Cero Inyección de Comandos**: Ninguna ruta ejecuta `shell=True`. Todos los subprocesos utilizan vectores de argumentos tipados y listas blancas estrictas de servicios (`ALLOWED_CONTROL_SERVICES`), contenedores (`^[a-zA-Z0-9_.-]+$`) e IPs validadas con el módulo `ipaddress`.
+   * **Cabeceras de Seguridad HTTP**: Inyección nativa de `Content-Security-Policy` (CSP), `X-Frame-Options`, `X-Content-Type-Options: nosniff` y `Referrer-Policy: no-referrer`.
+
+<details>
+<summary>🎙️ <b>Notas del Orador — Slide 06: Respuesta táctica en menos de un segundo (Haz clic para desplegar)</b></summary>
+<br>
+
+> **Imagina este escenario real:**
+> Abres el mapa mundial en tu tablet y observas un nodo desconocido abriendo múltiples conexiones contra tu puerto SSH o tus servicios web. En lugar de abrir una terminal SSH, recordar la sintaxis de `fail2ban-client` o `iptables` y teclear la IP a mano, simplemente tocas el nodo en el mapa y pulsas **`🚫 Bloquear IP`**.
+> En menos de 300 milisegundos, el backend inyecta la regla en la jaula activa de Fail2ban (con fallback directo a `iptables DROP`), corta el tráfico a nivel de kernel y marca el nodo como **BANEADO** en toda la interfaz.
+
+</details>
+
+---
+---
+
+<a id="slide-07"></a>
+
+<div align="center">
+
+| ⏮️ Anterior | 🎬 **SLIDE 07 DE 10 — LOS 5 PILARES DE HARDWARE & ECOSISTEMA** | ⏭️ Siguiente |
+| :--- | :---: | ---: |
+| [**◀ Slide 06: Ciberdefensa Fail2ban IPS**](#slide-06) | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**Slide 08: Zero-Hardcoding & 60 FPS ▶**](#slide-08) |
+
+</div>
+
+## ⚙️ SLIDE 07 · Los 5 Pilares de Hardware, Contenedores y Catálogo Multimedia (`v4.0.0` – `v4.3.0`)
+
+### Telemetría Profunda Directa desde el Kernel Linux (`/proc`, `/sys`, `psutil`)
+
+```
+╔════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║                               LOS 5 PILARES DEL NÚCLEO DE HARDWARE                                 ║
+╠══════════════════╦══════════════════╦══════════════════╦═════════════════════╦═════════════════════╣
+║   1. 🧠 CPU      ║   2. 💾 RAM      ║   3. 🎮 GPU      ║   4. 💿 DISCOS      ║   5. 🌐 RED + DNS   ║
+╠══════════════════╬══════════════════╬══════════════════╬═════════════════════╬═════════════════════╣
+║ • Uso por Hilo   ║ • Usada / Libre  ║ • NVIDIA SMI     ║ • Particiones Reales║ • Caudal RX/TX Vivo ║
+║ • Reloj MHz/GHz  ║ • Caché / Buffers║ • DRM / Sysfs    ║ • IOPS Lectura/Escr.║ • Sparklines 2h     ║
+║ • Gobernador     ║ • Swap & Zram    ║ • VRAM Dedicada  ║ • Latencia ms       ║ • Mapa Geodésico    ║
+║ • Temp Package   ║ • Presión PSI    ║ • Temp & Vatios  ║ • Salud S.M.A.R.T.  ║ • D3.js + Pi-hole   ║
+║ • Top Procesos   ║ • Top Procesos   ║ • Motores Vídeo  ║ • Top I/O Procesos  ║ • IPS Fail2ban      ║
+╚══════════════════╩══════════════════╩══════════════════╩═════════════════════╩═════════════════════╝
+```
+
+### 🧩 Ecosistema Completo de Servicios, Contenedores y Multimedia
+
+* **🐳 Orquestación Docker (`/docker`)**:
+  * Inspección en vivo de todos los contenedores activos e inactivos: consumo individual de CPU %, memoria RAM, tráfico de red, puertos publicados, tiempo de actividad (*uptime*) y botones táctiles para **Iniciar, Detener o Reiniciar** contenedores al vuelo.
+* **🎬 Suite Multimedia qBittorrent + Emby (`/descargas` & `/emby`)**:
+  * **qBittorrent**: Supervisión de torrents activos, velocidad de bajada/subida, progreso porcentual, ETA, ratio de compartición y espacio libre en el volumen de descargas.
+  * **Emby Media Server**: Escaneo de bibliotecas de **Películas, Series y Música**, sesiones de reproducción activas (transcodificación vs. *Direct Play*), dispositivos conectados y carátulas de últimos estrenos añadidos.
+* **🦆 Automatización DuckDNS (`/duckdns`)**:
+  * Verificación de sincronización entre la IP pública WAN actual del router y el dominio dinámico DuckDNS, historial de renovaciones y botón de **Forzar Actualización Inmediata**.
+* **🎨 Motor de Logos Inteligente y Personalizable (`v4.2.0` & `v4.3.0`)**:
+  * Detección automática en alta definición (SVG/SimpleIcons) para el **Sistema Operativo** (`/etc/os-release`), **Fabricante de NIC** (`lspci`/OUI: Intel, Realtek, Broadcom, Mellanox, Tailscale, WireGuard, Docker) y **Dispositivos de Red**.
+  * Al hacer clic en cualquier logo de servicio, proceso, contenedor o tarjeta del sistema, se abre un **selector modal con biblioteca curada + subida de imagen propia** persistida en el servidor (`custom_logos.json` vía `POST /api/logos`).
+
+<details>
+<summary>🎙️ <b>Notas del Orador — Slide 07: Control total sin salir del navegador (Haz clic para desplegar)</b></summary>
+<br>
+
+> **Un único panel para reemplazar 6 herramientas distintas:**
+> Antes necesitabas `htop` para la CPU, `iotop` para discos, `nvidia-smi` para la gráfica, Portainer para Docker, la web de Pi-hole para DNS y la consola de Fail2ban para seguridad.
+> System Cockpit consolida todo en una única SPA coherente. Incluso los detalles visuales están cuidados al extremo: en `v4.3.0` añadimos reconocimiento real de hardware para que la tarjeta de tu sistema operativo muestre automáticamente el emblema oficial de Ubuntu, Debian o Arch Linux leyendo `/etc/os-release`, y tus tarjetas de red muestren el logo de Intel, Realtek o WireGuard según su driver del kernel.
+
+</details>
+
+---
+---
+
+<a id="slide-08"></a>
+
+<div align="center">
+
+| ⏮️ Anterior | 🎬 **SLIDE 08 DE 10 — ARQUITECTURA ZERO-HARDCODING & MOTOR 60 FPS** | ⏭️ Siguiente |
+| :--- | :---: | ---: |
+| [**◀ Slide 07: Los 5 Pilares de Hardware**](#slide-07) | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**Slide 09: Comparativa & Rutas API ▶**](#slide-09) |
+
+</div>
+
+## ⚡ SLIDE 08 · Filosofía Estricta Zero-Hardcoding y Motor de 60 FPS
+
+### Regla de Oro de Ingeniería: Cero Suposiciones Estáticas, 100% Telemetría Viva
+
+System Cockpit está construido bajo la directiva constitucional de **Cero Hardcoding (`GEMINI.md` Regla 7)** y **Control de Versión Unificado (`GEMINI.md` Regla 5)**:
+
+```mermaid
+graph TD
+    subgraph ZERO["🧬 Principio Estricto Zero-Hardcoding"]
+        Z1["🚫 Cero Ciudades, Marcas o ISPs Fijos\nTodo se deriva de remote_ip, city, country, isp, asn"]
+        Z2["🚫 Cero Arrays Estáticos de Hardware\nNúcleos, sensores, NICs y discos se autodescubren en /proc y /sys"]
+        Z3["🚫 Cero Números de Versión Cableados\nPunto Único de Verdad en ./VERSION -> /api/version & /api/metrics"]
+        Z4["🔄 Rutas Híbridas Cloud / Local\nCompatibilidad nativa con Google AI Studio (./) y Servidor Físico"]
+    end
+
+    subgraph PERF["🚀 Motor de Renderizado Desacoplado a 60 FPS"]
+        P1["⏱️ Scheduler Asíncrono con AbortController\nSin solapamiento de peticiones HTTP"]
+        P2["🎞️ Pipeline requestAnimationFrame (rAF)\nMutaciones DOM por lotes sin Layout Thrashing"]
+        P3["👁️ Page Visibility API\nPausa inteligente en pestañas ocultas (0% CPU idle)"]
+        P4["📊 HUD Auditor en Vivo (#perfAuditDialog)\nMedición de FPS, Frame Time ms, Long Tasks y Heap JS"]
+    end
+
+    ZERO --> CORE(("💎 NÚCLEO DE ALTA\nCONFIABILIDAD"))
+    PERF --> CORE
+```
+
+### 🔬 Ingeniería de Rendimiento Verificable en Tiempo Real
+* **Desacoplamiento Total entre Red y Pantalla**:
+  * Las peticiones a `/api/metrics` se ejecutan en ciclos asíncronos controlados por `AbortController` (2000 ms), mientras que las animaciones de gráficas Canvas, transiciones D3.js y el mapa mundial corren de forma independiente en el bucle de **`requestAnimationFrame` a 60 FPS**.
+* **Cachés con TTL Escalonado en Backend (`server.py`)**:
+  * Las operaciones pesadas del sistema operativo (inspección de demonios `systemd`, listado de contenedores Docker, escaneo de puertos y consultas SQLite a `pihole-FTL.db`) utilizan **cachés en memoria con TTL de 5 a 15 segundos**, garantizando que `/api/metrics` responda en **menos de 25 milisegundos**.
+* **Auditor de Rendimiento Integrado (`#perfAuditDialog`)**:
+  * Accesible desde la barra superior o mediante la paleta de comandos (`⌘K`), permite auditar en vivo:
+    * **FPS instantáneos y estabilidad de fotograma (`Frame Time < 16.6 ms`)**.
+    * **Latencia de red del endpoint `/api/metrics`**.
+    * **Conteo de nodos DOM activos y consumo de memoria `JS Heap`**.
+
+<details>
+<summary>🎙️ <b>Notas del Orador — Slide 08: Por qué la arquitectura Zero-Hardcoding garantiza longevidad (Haz clic para desplegar)</b></summary>
+<br>
+
+> **Adaptabilidad universal:**
+> Si mañana migras System Cockpit de un servidor de 4 núcleos con una sola tarjeta de red a un servidor rack de 64 núcleos, 8 discos NVMe en RAID, 4 tarjetas de red de 10 Gbps y 2 GPUs dedicadas, **no tienes que cambiar ni una sola línea de código HTML, CSS o Python**.
+> Toda la interfaz se genera dinámicamente a partir de los descriptores del kernel. Además, el archivo canónico `./VERSION` gobierna automáticamente todas las insignias de la interfaz, los endpoints de la API y el archivo `package.json`.
+
+</details>
+
+---
+---
+
+<a id="slide-09"></a>
+
+<div align="center">
+
+| ⏮️ Anterior | 🎬 **SLIDE 09 DE 10 — COMPARATIVA EVOLUTIVA & MAPA DE RUTAS** | ⏭️ Siguiente |
+| :--- | :---: | ---: |
+| [**◀ Slide 08: Zero-Hardcoding & 60 FPS**](#slide-08) | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**Slide 10: Historial de Versiones & Inicio ▶**](#slide-10) |
+
+</div>
+
+## ⚖️ SLIDE 09 · Tabla Comparativa Interactiva (*Antes vs. Ahora*) y Mapa de Arquitectura
+
+### Evolución del Sistema: De Monitor Clásico a Cockpit de Misión (`v4.13.1`)
+
+| Dimensión Técnica | 🕰️ **Antes (Monitor Tradicional / v1–v3)** | 🛸 **Ahora (System Cockpit v4.13.1)** |
+| :--- | :--- | :--- |
+| **Interfaz & Estética** | Paneles planos estáticos sin jerarquía óptica ni soporte táctil dedicado. | **Apple Liquid Glass** (`blur(36px)`) + **Tesla Touch Cockpit** con temas de Titanio Oscuro y Claro. |
+| **Navegación Móvil / Tablet** | Menú lateral convencional dependiente de clics precisos. | **Floating Touch Dock** inferior + gestos **Touch Swipe** horizontales + **HTML5 View Transitions**. |
+| **Inspección de Gráficas** | Sparklines pequeñas de solo lectura sin historial interactivo. | **Modales `<dialog>` expandibles** con scrubbing táctil de 60 muestras y **Sparklines Retina de 2 horas (240 muestras)**. |
+| **Mapa Mundial de Red** | Marcadores simples cuyos popups se cerraban en cada refresco de datos. | **Clustering espacial por zoom** + **Persistencia de Popup en 5 niveles** + **Alerta de umbral Mbps en vivo (`v4.12.0`)**. |
+| **Motor de Geolocalización** | Consultas síncronas o caché sin control de crecimiento en el navegador. | **Worker GeoIP asíncrono por lotes (`ip-api.com`)** + **Poda automática LRU (`GEOIP_MAX_ENTRIES = 500`, `v4.13.0`)**. |
+| **Analítica de Subredes** | Solo listado tabular de sockets individuales. | **Gráfico de Pastel D3.js v7** con transiciones polares fluidas (`550ms cubic-out`, `v4.10.0`–`v4.11.0`). |
+| **Identidad de Red & DNS** | Direcciones IP numéricas crudas (`192.168.1.x` / `142.250.x.x`) y solo sockets del host. | **`PiholeDnsTranslator` (`FTL.db` + DHCP + PTR)** + **Flujos de todos los dispositivos del hogar (`v4.7.0`–`v4.9.0`)**. |
+| **Ciberseguridad** | Sin capacidad de respuesta; requería entrar por consola SSH para bloquear ataques. | **Centro IPS Fail2ban (`/seguridad`)** + botón **`🚫 Bloquear IP` en 1 clic** desde el mapa o la tabla (`v4.4.0`–`v4.6.0`). |
 
 ---
 
-## 📁 Estructura del Proyecto
+### 🗺️ Mapa Completo de las 12 Vistas SPA y Endpoints REST
+
+<details open>
+<summary>🧭 <b>Explorar las 12 Vistas Operativas del Cockpit (History API SPA)</b></summary>
+<br>
+
+| Ruta SPA | Vista Operativa | Capacidades Principales |
+| :--- | :--- | :--- |
+| `/` | **🏠 Vista General** | Resumen ejecutivo Bento de los 5 pilares, salud global, servicios críticos y accesos directos. |
+| `/cpu` | **🧠 Procesador (CPU)** | Carga por núcleo lógico, frecuencias en MHz/GHz, gobernador, temperatura y top procesos por CPU. |
+| `/ram` | **💾 Memoria (RAM)** | Desglose física/caché/buffers, presión PSI, uso de Swap/Zram y procesos intensivos en memoria. |
+| `/gpu` | **🎮 Gráficos (GPU)** | Telemetría NVIDIA (`nvidia-smi`) y DRM/Sysfs, VRAM dedicada, temperatura, potencia y motores de vídeo. |
+| `/almacenamiento` | **💿 Almacenamiento** | Capacidad de particiones reales, IOPS de lectura/escritura, tiempos de espera y salud S.M.A.R.T. |
+| `/red` | **🌐 Red & Mapa Mundial** | Mapa geodésico OpenStreetMap, gráfico de pastel D3.js, flujos LAN/WAN Pi-hole, alerta Mbps y bloqueo IP. |
+| `/seguridad` | **🛡️ Seguridad / IPS** | Jaulas Fail2ban, bloqueo/desbloqueo manual y en 1 clic, intentos SSH fallidos y puertos `LISTEN`. |
+| `/servicios` | **⚙️ Servicios Linux** | Estado de demonios `systemd`, memoria por servicio, logs recientes y control de reinicio/parada. |
+| `/docker` | **🐳 Contenedores Docker** | Estadísticas en vivo por contenedor (CPU, RAM, Red, Puertos) y acciones de ciclo de vida. |
+| `/descargas` | **⬇️ qBittorrent** | Cola de descargas y subidas P2P, velocidades en tiempo real, progreso, ratio y espacio disponible. |
+| `/emby` | **🎬 Emby Media** | Catálogo de películas y series, sesiones de streaming activas, usuarios conectados y últimos añadidos. |
+| `/duckdns` · `/version` | **🦆 DuckDNS & 📦 Versión** | Estado de sincronización de IP pública dinámica y auditoría de la versión canónica activa (`v4.13.1`). |
+
+</details>
+
+<details>
+<summary>🔌 <b>Explorar el Catálogo de Endpoints del Backend (`server.py` + `server.ts`)</b></summary>
+<br>
+
+| Método | Endpoint | Función Técnica |
+| :--- | :--- | :--- |
+| `GET` | `/api/metrics` | Payload maestro unificado (CPU, RAM, GPU, Discos, Red, Flujos Pi-hole, Seguridad, Servicios, Logos y Versión). |
+| `GET` | `/api/version` | Devuelve la versión canónica leída dinámicamente desde `./VERSION` (`4.13.1`). |
+| `POST` | `/api/security/ban` | Bloquea una IP pública maliciosa en Fail2ban (`fail2ban-client`) o firewall (`iptables` / `ufw`). |
+| `POST` | `/api/security/unban` | Retira el bloqueo de una IP previamente sancionada en todas las jaulas y reglas activas. |
+| `POST` | `/api/service/action` | Ejecuta acciones autorizadas (`restart`, `start`, `stop`) sobre servicios en lista blanca. |
+| `POST` | `/api/docker/action` | Gestiona el ciclo de vida de contenedores Docker validados mediante expresión regular estricta. |
+| `POST` | `/api/duckdns/update` | Fuerza la actualización inmediata del dominio dinámico DuckDNS y registra el resultado. |
+| `GET/POST` | `/api/logos` | Obtiene o almacena logos personalizados por el usuario en `custom_logos.json`. |
+
+</details>
+
+---
+---
+
+<a id="slide-10"></a>
+
+<div align="center">
+
+| ⏮️ Anterior | 🎬 **SLIDE 10 DE 10 — HISTORIAL DE VERSIONES & DESPLIEGUE** | 🏠 Inicio |
+| :--- | :---: | ---: |
+| [**◀ Slide 09: Comparativa & Rutas API**](#slide-09) | [`01`](#slide-01) · [`02`](#slide-02) · [`03`](#slide-03) · [`04`](#slide-04) · [`05`](#slide-05) · [`06`](#slide-06) · [`07`](#slide-07) · [`08`](#slide-08) · [`09`](#slide-09) · [`10`](#slide-10) | [**⏮ Volver a Slide 01: Portada**](#slide-01) |
+
+</div>
+
+## 📜 SLIDE 10 · Historial de Versiones (`Changelog`), Estructura y Puesta en Marcha
+
+### Criterio Estricto de Versionado (`MAJOR.MINOR.PATCH` en `./VERSION`)
+* **`X.0.0` (`MAJOR`)**: Rediseño visual, maquetación, temas o arquitectura de interfaz.
+* **`0.X.0` (`MINOR`)**: Adición de una nueva funcionalidad o retiro de una función existente.
+* **`0.0.X` (`PATCH`)**: Corrección de bugs, optimizaciones de detalle o actualización de documentación interactiva.
+
+<details open>
+<summary>🏆 <b>Serie v4.10.0 – v4.13.1: Inteligencia GeoIP, Analítica D3.js y Presentación Keynote (Actual)</b></summary>
+<br>
+
+* **`v4.13.1` (PATCH — Presentación Interactiva Keynote en `README.md`)**:
+  * Transformación integral de `README.md` en una presentación interactiva de **10 diapositivas estilo Apple Keynote & Tesla Cockpit** con barra de controles, diagramas Mermaid de arquitectura y secuencia, wireframes ASCII, notas del orador desplegables y comparativa evolutiva.
+  * Almacenamiento de planes y walkthroughs de verificación en `./planes/`.
+* **`v4.13.0` (MINOR — Utilidad de Limpieza y Poda LRU de Caché GeoIP en `localStorage`)**:
+  * Nuevo recolector `pruneGeoIpCacheStorage()` con límite `GEOIP_MAX_ENTRIES = 500` que purga entradas caducadas (`TTL 24h`) y desaloja las más antiguas por timestamp (`ts`), protegiendo el rendimiento y la cuota de `localStorage` junto al worker asíncrono de `ip-api.com`.
+* **`v4.12.0` (MINOR — Indicador de Alerta por Umbral de Ancho de Banda NIC en Mapa Mundial)**:
+  * Selector interactivo de límite en Mbps y badge de alerta pulsante en la leyenda del mapa mundial cuando el tráfico RX/TX de la interfaz supera el umbral configurado.
+* **`v4.11.0` (MINOR — Transiciones Polares Animadas con D3.js en Gráfico de Pastel)**:
+  * Integración de **D3.js v7** con interpolación continua de ángulos (`d3.interpolate` + `attrTween`, `550ms cubic-out`) y conteo animado central al cambiar de modo de agrupación o variar el tráfico en la pestaña *Red*.
+* **`v4.10.0` (MINOR — Visualización de Distribución de Ancho de Banda por Subredes y Dispositivos)**:
+  * Incorporación del componente de gráfico de pastel/donut en la vista `/red` con agrupación dinámica por Subred (`/24`), Tipo de Enlace y Rol/Dispositivo.
+
+</details>
+
+<details>
+<summary>📡 <b>Serie v4.7.0 – v4.9.1: Traductor DNS Pi-hole y Flujos de Dispositivos del Hogar</b></summary>
+<br>
+
+* **`v4.9.1` (PATCH — Fix `ReferenceError: setText is not defined`)**:
+  * Incorporación del helper global `setText(elOrId, text)` evitando excepciones al conmutar o actualizar la vista `/red`.
+* **`v4.9.0` (MINOR — Visibilidad de Tráfico de Todos los Dispositivos de la Red Local)**:
+  * Nueva función `fetch_active_device_flows()` en `server.py` que correlaciona `/proc/net/nf_conntrack`, consultas recientes en `pihole-FTL.db` y logs de proxy para mostrar el tráfico de Smart TVs, móviles, tablets y consolas de toda la red doméstica.
+* **`v4.8.0` (MINOR — Traducción de IPs Locales a Nombres de Dispositivos vía Pi-hole)**:
+  * Resolución automática de direcciones LAN (`192.168.x.x`, `10.x.x.x`) a nombres reales (`tv-de-la-sala-de-estar`, `tab-s9-ultra`, `xbox-series-s`, `deco-m4`) usando `/etc/hosts`, DHCP leases, `pihole-FTL.db` y tabla ARP.
+* **`v4.7.0` (MINOR — Motor `PiholeDnsTranslator` para IPs Externas WAN)**:
+  * Traducción automática de direcciones IP públicas remotas al nombre de dominio exacto consultado mediante SQLite `pihole-FTL.db`, `pihole.log`, API de Pi-hole y DNS inverso multihilo (`PTR`).
+
+</details>
+
+<details>
+<summary>🛡️ <b>Serie v4.0.0 – v4.6.0: Rediseño Liquid Glass, Logos Dinámicos y Ciberdefensa IPS</b></summary>
+<br>
+
+* **`v4.6.0` (MINOR — Auditoría de Ciberseguridad y Hardening Zero-Trust)**:
+  * Eliminación total de ejecución shell insegura, listas blancas estrictas, cabeceras HTTP CSP/X-Frame-Options y sanitización DOM (`escapeHtml`).
+* **`v4.5.0` (MINOR — Bloqueo Activo de IPs en 1 Clic desde Mapa y Tabla)**:
+  * Endpoints `POST /api/security/ban` y `/api/security/unban` integrados con `fail2ban-client`, `iptables` y `ufw`.
+* **`v4.4.0` (MINOR — Centro de Seguridad e Intrusiones IPS `/seguridad`)**:
+  * Nueva vista dedicada para monitorizar jaulas Fail2ban, ataques SSH fallidos y puertos abiertos.
+* **`v4.3.0` (MINOR — Logos Automáticos para Sistema Operativo y Tarjetas NIC)**:
+  * Detección dinámica de la distribución Linux (`/etc/os-release`) y del fabricante de cada interfaz de red (`lspci` / driver).
+* **`v4.2.0` (MINOR — Motor de Logos Inteligente y Selector Personalizable)**:
+  * Reconocimiento visual de más de 50 servicios y selector modal con persistencia en `custom_logos.json`.
+* **`v4.1.0` (MINOR — Sparklines de 2 Horas y Persistencia de Popups en 5 Niveles)**:
+  * Buffer circular de 240 muestras (2 horas) y algoritmo de 5 niveles para mantener abiertos los popups del mapa mundial.
+* **`v4.0.0` (MAJOR — Rediseño Integral Apple Liquid Glass & Tesla Touch Cockpit)**:
+  * Nueva arquitectura visual con temas de Titanio, Floating Touch Dock, gestos Touch Swipe y tarjetas Bento expandibles.
+
+</details>
+
+---
+
+### 📂 Estructura del Proyecto y Despliegue Rápido
 
 ```text
-/
-├── VERSION                  # Punto único de verdad para la versión del sistema (4.0.0)
-├── server.py                # Servidor backend Python (puerto 8085) con colectores reales del SO y motor de logos
-├── index.html               # Interfaz principal Apple Liquid Glass & Tesla Touch Cockpit v4.0.0
+.
+├── VERSION                  # Punto Único de Verdad de la versión activa (4.13.1)
+├── README.md                # Deck Interactivo Keynote de 10 Diapositivas (este documento)
+├── GEMINI.md                # Constitución del proyecto y reglas Zero-Hardcoding
+├── server.py                # Backend principal Python (Telemetría Kernel, Pi-hole DNS, Fail2ban IPS)
+├── server.ts                # Servidor Express/Vite de integración y simulación en Google AI Studio
+├── index.html               # Entrada principal SPA (Apple Liquid Glass + Tesla Touch Cockpit)
 ├── static/
-│   └── index.html           # Copia sincronizada servida directamente por server.py
-├── custom_logos.json        # Almacenamiento persistente de logotipos personalizados (creado bajo demanda)
-├── vite.config.ts           # Configuración Vite + middleware de telemetría real optimizado con caché no bloqueante
-├── planes/                  # Planes de implementación, bitácoras y walkthroughs de verificación
-├── GEMINI.md                # Reglas obligatorias de sincronización, versionado y despliegue
-└── README.md                # Documentación oficial del proyecto
+│   └── index.html           # Espejo sincronizado de producción para el servidor local
+├── custom_logos.json        # Persistencia de logotipos personalizados por el operador
+└── planes/                  # Bitácora obligatoria de planes de implementación y walkthroughs
 ```
+
+```bash
+# 1. Sincronizar siempre los últimos cambios desde GitHub (Regla 1 GEMINI.md)
+git pull origin main
+
+# 2A. Ejecución en Servidor Linux de Producción (Backend Python Nativo)
+python3 server.py
+
+# 2B. Ejecución en Entorno de Desarrollo / Simulador Google AI Studio
+npm install && npm run dev
+```
+
+<div align="center">
+<br>
+
+| ⏮️ Anterior | 🛸 **FIN DE LA PRESENTACIÓN — SYSTEM COCKPIT v4.13.1** | 🏠 Inicio |
+| :--- | :---: | ---: |
+| [**◀ Slide 09: Comparativa & Rutas API**](#slide-09) | *Diseñado con precisión óptica Liquid Glass y telemetría 100% Zero-Hardcoding* | [**⏮ Volver a Slide 01: Portada**](#slide-01) |
+
+</div>
