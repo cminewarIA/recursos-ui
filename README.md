@@ -1,8 +1,25 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.10.1`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.11.0`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.10.1`)**, telemetría de hardware en tiempo real, auditoría de red con **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Motor de Mapa Geoespacial 100% Libre y Gratuito (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.11.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (Fail2ban IPS)**, **Agrupación Inteligente de Conexiones Concurrentes en el Mapa (`🔀 N`) con Selector Interactivo de IPs y Popups 100% Persistentes**, **Motor de Mapa Geoespacial Libre (OpenStreetMap Directo + Filtro Dark CSS Nativo sin Marcas de Agua)** con **Nodo Host Centrado en Gran Canaria**, **Gráfico de Pastel Interactivo con Transiciones Animadas D3.js (`d3.pie`, `d3.arc`, `d3.interpolate`) de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.11.0`
+- **Agrupación Inteligente de Conexiones Concurrentes en el Mapa de Red (Clustering de Sockets)**:
+  - **Marcadores con Contador Dinámico (`🔀 N`)**:
+    - Cuando múltiples conexiones coinciden en la misma ubicación geográfica o dispositivo (múltiples sockets hacia Google, Cloudflare, Azure, o dispositivos locales en la LAN con varios servicios abiertos), ya no se superponen de forma invisible.
+    - Se representan mediante un marcador distintivo con contador y clase contextual según el flujo (`🔀 4 Mountain View` o `🔀 3 192.168.50.242`).
+  - **Selector Interactivo de IPs y Conexiones en el Popup**:
+    - Al hacer clic en un marcador agrupado, se despliega una lista interactiva y desplazable con todas las IPs y sockets presentes en esa zona.
+    - Cada fila muestra la dirección (`↓ / ↑ / 🛡️`), `IP:puerto`, servicio asociado y proceso local.
+    - Al pulsar sobre cualquier elemento, el popup muestra el panel completo de inspección de ese socket con los controles de firewall Fail2ban y un botón `◀ Ver lista de IPs` para alternar rápidamente.
+- **Popups de Mapa 100% Persistentes (Cero Cierres Prematuros)**:
+  - **Eliminación del Cierre Involuntario por Telemetría**:
+    - El ciclo de refresco en tiempo real cada 2 segundos preserva y restaura automáticamente el estado del popup que el usuario tenga abierto en pantalla, eliminando los molestos parpadeos o cierres accidentales mientras se inspecciona una IP o se configura una regla de bloqueo.
+  - **Prevención de Cierres por Clic Accidental**:
+    - Configurado Leaflet con `closePopupOnClick: false` y `closeOnClick: false`, de modo que arrastrar el lienzo del mapa o hacer clic en zonas vacías no cierra el diálogo. Se mantiene abierto de forma estable hasta que el usuario pulse explícitamente el botón `×`.
+- **Coordenadas Unificadas de Dispositivos LAN por IP (`server.py`)**:
+  - Los sockets pertenecientes a una misma IP privada en la red local se anclan a un punto idéntico y consistente de la órbita de Gran Canaria, permitiendo que todos los servicios de un mismo equipo doméstico se agrupen y consulten juntos.
 
 ## ✨ Novedades en `v4.10.1`
 - **Geolocalización Exacta del Nodo Host en el Centro Geográfico de Gran Canaria**:

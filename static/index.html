@@ -1698,6 +1698,40 @@
       border-color: #F43F5E;
       box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.24), 0 4px 12px rgba(0, 0, 0, 0.45);
     }
+    .gmp-conn-marker.grouped {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.98));
+      border-color: #a855f7;
+      box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.28), 0 4px 14px rgba(0, 0, 0, 0.5);
+    }
+    .gmp-conn-marker.grouped.incoming {
+      border-color: #10B981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.28), 0 4px 14px rgba(0, 0, 0, 0.5);
+    }
+    .gmp-conn-marker.grouped.outgoing {
+      border-color: #06B6D4;
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.28), 0 4px 14px rgba(0, 0, 0, 0.5);
+    }
+    .gmp-conn-marker.grouped.blocked {
+      border-color: #F43F5E;
+      box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.32), 0 4px 14px rgba(0, 0, 0, 0.5);
+    }
+    .gmp-conn-marker .group-count-pill {
+      background: #a855f7;
+      color: #ffffff;
+      border-radius: 999px;
+      padding: 1px 6px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .gmp-conn-marker.incoming .group-count-pill {
+      background: #10B981;
+    }
+    .gmp-conn-marker.outgoing .group-count-pill {
+      background: #06B6D4;
+    }
+    .gmp-conn-marker.blocked .group-count-pill {
+      background: #F43F5E;
+    }
     /* Estilos de compatibilidad Leaflet para marcadores gmp-conn-marker y popups */
     .gmp-conn-marker-wrap {
       background: none !important;
@@ -9615,16 +9649,27 @@
       NetworkConnectionsMapEngine.focusConnectionById(connId);
     }
 
+    window.selectConnInGroupPopup = function(groupKey, connId) {
+      NetworkConnectionsMapEngine.selectConnInGroup(groupKey, connId);
+    };
+
+    window.showConnListInGroupPopup = function(groupKey) {
+      NetworkConnectionsMapEngine.showGroupList(groupKey);
+    };
+
     const NetworkConnectionsMapEngine = {
       _leafletMap: null,
       _isBootstrapping: false,
       _isReady: false,
       _lastSignature: '',
       _markersMap: new Map(),
+      _groupsMap: new Map(),
       _serverMarker: null,
       _polylines: [],
       _hasInitialFit: false,
       _lastConnData: null,
+      _activePopupState: null,
+      _isRedrawing: false,
 
       setStatusOverlay(visible, title, desc) {
         const overlay = document.getElementById('networkConnectionsMapStatus');
@@ -9650,6 +9695,8 @@
         this._isBootstrapping = false;
         this._hasInitialFit = false;
         this._lastSignature = '';
+        this._activePopupState = null;
+        this._isRedrawing = false;
         const container = document.getElementById('networkConnectionsMapCanvas');
         if (container) container.innerHTML = '';
       },
@@ -9680,7 +9727,8 @@
             center: [initLat, initLng],
             zoom: 3,
             zoomControl: true,
-            attributionControl: false
+            attributionControl: false,
+            closePopupOnClick: false
           });
 
           const mainTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -9695,6 +9743,25 @@
             }
           });
           mainTileLayer.addTo(this._leafletMap);
+
+          // Escuchar eventos de popup para recordar qué popup está abierto y evitar que los refrescos de métricas lo cierren
+          this._leafletMap.on('popupopen', (e) => {
+            const popup = e.popup;
+            if (popup && popup._ownerType === 'server') {
+              this._activePopupState = { type: 'server' };
+            } else if (popup && popup._ownerType === 'group') {
+              this._activePopupState = {
+                type: 'group',
+                groupKey: popup._groupKey,
+                selectedConnId: popup._selectedConnId || null
+              };
+            }
+          });
+          this._leafletMap.on('popupclose', (e) => {
+            if (!this._isRedrawing) {
+              this._activePopupState = null;
+            }
+          });
 
           this._isReady = true;
           this._isBootstrapping = false;
@@ -9721,18 +9788,22 @@
           this._serverMarker = null;
         }
         for (const m of this._markersMap.values()) {
-          if (m.marker) m.marker.remove();
+          if (m && m.marker) m.marker.remove();
         }
         this._markersMap.clear();
+        for (const g of this._groupsMap.values()) {
+          if (g && g.marker) g.marker.remove();
+        }
+        this._groupsMap.clear();
         for (const line of this._polylines) {
           if (line) line.remove();
         }
         this._polylines = [];
       },
 
-      buildInfoWindowNode(item, isServerHost = false) {
+      buildInfoWindowNode(item, isServerHost = false, groupKey = null, groupLength = 1) {
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #0f172a; padding: 6px 8px; min-width: 260px; max-width: 320px; line-height: 1.45;';
+        wrap.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #0f172a; padding: 6px 8px; min-width: 270px; max-width: 360px; line-height: 1.45;';
 
         if (isServerHost) {
           wrap.innerHTML = `
@@ -9755,6 +9826,15 @@
           `;
           return wrap;
         }
+
+        const returnBarHtml = (groupKey && groupLength > 1) ? `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0;">
+            <button type="button" class="action-btn" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #1e293b; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;" onclick="window.showConnListInGroupPopup('${groupKey}')">
+              <span>◀</span> <span>Ver lista (${groupLength} IPs)</span>
+            </button>
+            <span style="font-size: 10px; font-weight: 700; color: #7e22ce; background: rgba(168, 85, 247, 0.12); padding: 2px 7px; border-radius: 999px;">${groupLength} IPs en zona</span>
+          </div>
+        ` : '';
 
         const dirLabel = item.direction === 'incoming'
           ? '↓ CONEXIÓN ENTRANTE (RX)'
@@ -9818,6 +9898,7 @@
         }
 
         wrap.innerHTML = `
+          ${returnBarHtml}
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${dirColor}; margin-bottom: 4px;">
             ${dirLabel} · ${escapeHtml(item.protocol || 'TCP')}
           </div>
@@ -9841,6 +9922,97 @@
           </div>
         `;
         return wrap;
+      },
+
+      buildGroupInfoWindowNode(group, selectedConnId = null, groupKey = '') {
+        if (!Array.isArray(group) || group.length === 0) return document.createElement('div');
+        if (group.length === 1 || selectedConnId) {
+          const item = (selectedConnId && group.find(c => c.id === selectedConnId)) || group[0];
+          return this.buildInfoWindowNode(item, false, groupKey, group.length);
+        }
+
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; color: #0f172a; padding: 6px 8px; min-width: 280px; max-width: 360px; line-height: 1.45;';
+
+        const city = group[0].city || 'Zona Remota';
+        const country = group[0].country ? `, ${group[0].country}` : '';
+        const isp = group[0].isp || 'Red';
+        const isLan = group.some(c => c.geo_status === 'lan');
+
+        wrap.innerHTML = `
+          <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #a855f7; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+            <span>🔀 ${group.length} CONEXIONES CONCURRENTES</span>
+            <span style="background: rgba(168, 85, 247, 0.15); color: #7e22ce; padding: 2px 7px; border-radius: 999px; font-weight: 700;">${group.length} sockets</span>
+          </div>
+          <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
+            📍 ${escapeHtml(city)}${escapeHtml(country)}
+          </div>
+          <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">
+            🏢 ${escapeHtml(isp)} ${group[0].asn ? '· ' + escapeHtml(group[0].asn) : ''}
+          </div>
+          <div style="font-size: 11px; font-weight: 600; color: #334155; margin-bottom: 6px;">
+            Selecciona una conexión para ver detalles o bloquear:
+          </div>
+          <div style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px;">
+            ${group.map(c => {
+              const isInc = c.direction === 'incoming';
+              const isBlk = c.direction === 'blocked';
+              const arrow = isInc ? '↓' : (isBlk ? '🛡️' : '↑');
+              const color = isInc ? '#059669' : (isBlk ? '#e11d48' : '#0891b2');
+              const bg = isInc ? 'rgba(16, 185, 129, 0.08)' : (isBlk ? 'rgba(244, 63, 94, 0.08)' : 'rgba(6, 182, 212, 0.08)');
+              return `
+                <div onclick="window.selectConnInGroupPopup('${groupKey}', '${escapeHtml(c.id)}')" style="display: flex; align-items: center; justify-content: space-between; background: ${bg}; border: 1px solid rgba(0,0,0,0.06); padding: 7px 9px; border-radius: 8px; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; gap: 8px;" onmouseenter="this.style.boxShadow='0 2px 6px rgba(0,0,0,0.12)'" onmouseleave="this.style.boxShadow='none'">
+                  <div style="min-width: 0; flex: 1;">
+                    <div style="font-size: 11.5px; font-family: monospace; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 5px;">
+                      <span style="color: ${color}; font-weight: 800;">${arrow}</span>
+                      <span>${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
+                      <span style="color: #64748b; font-weight: 400; font-size: 10px;">→ :${c.local_port}</span>
+                    </div>
+                    <div style="font-size: 10.5px; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
+                      <strong style="color: #1e293b;">${escapeHtml(c.service || 'Socket')}</strong> ${c.process ? '· (' + escapeHtml(c.process) + ')' : ''}
+                    </div>
+                  </div>
+                  <div style="font-size: 10px; font-weight: 700; color: #2563eb; background: rgba(37, 99, 235, 0.12); padding: 3px 7px; border-radius: 6px; flex-shrink: 0;">
+                    Ver ›
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 9.5px; color: #64748b; display: flex; justify-content: space-between; align-items: center;">
+            <span>${isLan ? '🏠 Red Local (LAN)' : '⚡ OpenStreetMap · GeoIP'}</span>
+            <span>OpenStreetMap (Libre)</span>
+          </div>
+        `;
+        return wrap;
+      },
+
+      selectConnInGroup(groupKey, connId) {
+        const entry = this._groupsMap.get(groupKey);
+        if (!entry || !entry.marker) return;
+        this._activePopupState = { type: 'group', groupKey: groupKey, selectedConnId: connId };
+        const node = this.buildGroupInfoWindowNode(entry.group, connId, groupKey);
+        entry.marker.setPopupContent(node);
+        const popup = entry.marker.getPopup();
+        if (popup) {
+          popup._ownerType = 'group';
+          popup._groupKey = groupKey;
+          popup._selectedConnId = connId;
+        }
+      },
+
+      showGroupList(groupKey) {
+        const entry = this._groupsMap.get(groupKey);
+        if (!entry || !entry.marker) return;
+        this._activePopupState = { type: 'group', groupKey: groupKey, selectedConnId: null };
+        const node = this.buildGroupInfoWindowNode(entry.group, null, groupKey);
+        entry.marker.setPopupContent(node);
+        const popup = entry.marker.getPopup();
+        if (popup) {
+          popup._ownerType = 'group';
+          popup._groupKey = groupKey;
+          popup._selectedConnId = null;
+        }
       },
 
       async renderFromMetrics(metricsData, forceRedraw = false) {
@@ -9951,6 +10123,9 @@
         if (!forceRedraw && sig === this._lastSignature) return;
         this._lastSignature = sig;
 
+        const savedPopupState = this._activePopupState ? { ...this._activePopupState } : null;
+        this._isRedrawing = true;
+
         this.clearMapOverlays();
 
         const srvPos = {
@@ -9969,49 +10144,132 @@
           title: `Nodo Servidor (${srv.public_ip || srv.ip || 'Host'})`
         }).addTo(this._leafletMap);
 
-        srvMarker.bindPopup(this.buildInfoWindowNode(srv, true), {
+        const srvPopup = L.popup({
           maxWidth: 360,
-          className: 'leaflet-custom-popup'
+          className: 'leaflet-custom-popup',
+          autoClose: false,
+          closeOnClick: false
+        });
+        srvPopup.setContent(this.buildInfoWindowNode(srv, true));
+        srvPopup._ownerType = 'server';
+        srvMarker.bindPopup(srvPopup);
+        srvMarker.on('click', () => {
+          this._activePopupState = { type: 'server' };
         });
         this._serverMarker = srvMarker;
 
-        // 2. Remote Connection Markers & Polylines
+        // 2. Agrupar conexiones por coordenadas (~110m de proximidad o misma IP)
+        const groups = new Map();
         for (const conn of filteredConns) {
           if (typeof conn.lat !== 'number' || typeof conn.lng !== 'number') continue;
+          const groupKey = `${conn.lat.toFixed(3)}_${conn.lng.toFixed(3)}`;
+          if (!groups.has(groupKey)) {
+            groups.set(groupKey, []);
+          }
+          groups.get(groupKey).push(conn);
+        }
 
-          const arrowChar = conn.direction === 'incoming' ? '↓' : (conn.direction === 'blocked' ? '🛡️' : '↑');
-          const badgeHtml = `<div class="gmp-conn-marker ${conn.direction}"><span>${arrowChar}</span><span>${escapeHtml(conn.remote_ip)}</span></div>`;
+        // 3. Crear marcadores (individuales o agrupados con contador) y polilíneas
+        for (const [groupKey, conns] of groups.entries()) {
+          const first = conns[0];
+          const isGroup = conns.length > 1;
+          const isBlocked = conns.some(c => c.direction === 'blocked');
+          const hasIncoming = conns.some(c => c.direction === 'incoming');
+          const dirClass = isBlocked ? 'blocked' : (hasIncoming ? 'incoming' : 'outgoing');
+
+          let badgeHtml = '';
+          if (isGroup) {
+            const allSameIp = conns.every(c => c.remote_ip === first.remote_ip);
+            const label = allSameIp ? first.remote_ip : (first.city || first.remote_ip);
+            badgeHtml = `<div class="gmp-conn-marker ${dirClass} grouped"><span class="group-count-pill">🔀 ${conns.length}</span><span>${escapeHtml(label)}</span></div>`;
+          } else {
+            const arrowChar = first.direction === 'incoming' ? '↓' : (first.direction === 'blocked' ? '🛡️' : '↑');
+            badgeHtml = `<div class="gmp-conn-marker ${dirClass}"><span>${arrowChar}</span><span>${escapeHtml(first.remote_ip)}</span></div>`;
+          }
+
           const icon = L.divIcon({
             className: 'gmp-conn-marker-wrap',
             html: badgeHtml,
             iconSize: null
           });
 
-          const marker = L.marker([conn.lat, conn.lng], {
+          const markerTitle = isGroup
+            ? `${conns.length} conexiones (${first.city || first.remote_ip})`
+            : `${first.service} (${first.remote_ip})`;
+
+          const marker = L.marker([first.lat, first.lng], {
             icon: icon,
-            title: `${conn.service} (${conn.remote_ip})`
+            title: markerTitle
           }).addTo(this._leafletMap);
 
-          marker.bindPopup(this.buildInfoWindowNode(conn, false), {
-            maxWidth: 360,
-            className: 'leaflet-custom-popup'
+          const popup = L.popup({
+            maxWidth: 380,
+            minWidth: 280,
+            className: 'leaflet-custom-popup',
+            autoClose: false,
+            closeOnClick: false
+          });
+          popup._ownerType = 'group';
+          popup._groupKey = groupKey;
+          popup._selectedConnId = null;
+
+          const initialContent = this.buildGroupInfoWindowNode(conns, null, groupKey);
+          popup.setContent(initialContent);
+          marker.bindPopup(popup);
+
+          marker.on('click', () => {
+            const currentSelected = (this._activePopupState && this._activePopupState.groupKey === groupKey)
+              ? this._activePopupState.selectedConnId
+              : (conns.length === 1 ? conns[0].id : null);
+            this._activePopupState = {
+              type: 'group',
+              groupKey: groupKey,
+              selectedConnId: currentSelected
+            };
+            popup._selectedConnId = currentSelected;
+            const content = this.buildGroupInfoWindowNode(conns, currentSelected, groupKey);
+            marker.setPopupContent(content);
           });
 
-          this._markersMap.set(conn.id, { marker, conn });
+          this._groupsMap.set(groupKey, { marker, group: conns, lat: first.lat, lng: first.lng });
+          for (const c of conns) {
+            this._markersMap.set(c.id, { marker, conn: c, groupKey });
+          }
 
-          const strokeHex = conn.direction === 'incoming'
-            ? '#10B981'
-            : (conn.direction === 'blocked' ? '#F43F5E' : '#06B6D4');
+          const strokeHex = isBlocked
+            ? '#F43F5E'
+            : (hasIncoming ? '#10B981' : '#06B6D4');
 
-          const poly = L.polyline([[srvPos.lat, srvPos.lng], [conn.lat, conn.lng]], {
+          const poly = L.polyline([[srvPos.lat, srvPos.lng], [first.lat, first.lng]], {
             color: strokeHex,
-            weight: 2.2,
-            opacity: 0.82,
-            dashArray: conn.direction === 'incoming' ? '4, 4' : null
+            weight: isGroup ? 2.8 : 2.2,
+            opacity: 0.85,
+            dashArray: hasIncoming ? '4, 4' : null
           }).addTo(this._leafletMap);
 
           this._polylines.push(poly);
         }
+
+        // 4. Restaurar popup si estaba abierto previamente (previene cierre involuntario)
+        if (savedPopupState) {
+          if (savedPopupState.type === 'server' && this._serverMarker) {
+            this._serverMarker.openPopup();
+          } else if (savedPopupState.type === 'group' && savedPopupState.groupKey) {
+            const groupEntry = this._groupsMap.get(savedPopupState.groupKey);
+            if (groupEntry && groupEntry.marker) {
+              const node = this.buildGroupInfoWindowNode(groupEntry.group, savedPopupState.selectedConnId, savedPopupState.groupKey);
+              groupEntry.marker.setPopupContent(node);
+              const p = groupEntry.marker.getPopup();
+              if (p) {
+                p._ownerType = 'group';
+                p._groupKey = savedPopupState.groupKey;
+                p._selectedConnId = savedPopupState.selectedConnId;
+              }
+              groupEntry.marker.openPopup();
+            }
+          }
+        }
+        this._isRedrawing = false;
 
         if (!this._hasInitialFit && filteredConns.length > 0) {
           this._hasInitialFit = true;
@@ -10026,9 +10284,9 @@
         if (srv && typeof srv.lat === 'number' && typeof srv.lng === 'number') {
           pts.push([srv.lat, srv.lng]);
         }
-        for (const entry of this._markersMap.values()) {
-          if (entry.conn && typeof entry.conn.lat === 'number') {
-            pts.push([entry.conn.lat, entry.conn.lng]);
+        for (const entry of this._groupsMap.values()) {
+          if (typeof entry.lat === 'number' && typeof entry.lng === 'number') {
+            pts.push([entry.lat, entry.lng]);
           }
         }
         if (pts.length > 1) {
@@ -10050,8 +10308,20 @@
         if (!this._leafletMap) return;
         const entry = this._markersMap.get(connId);
         if (!entry) return;
+        const groupEntry = this._groupsMap.get(entry.groupKey);
+        if (!groupEntry) return;
+
         this._leafletMap.setView([entry.conn.lat, entry.conn.lng], 9);
-        if (entry.marker) entry.marker.openPopup();
+        this._activePopupState = { type: 'group', groupKey: entry.groupKey, selectedConnId: connId };
+        const node = this.buildGroupInfoWindowNode(groupEntry.group, connId, entry.groupKey);
+        groupEntry.marker.setPopupContent(node);
+        const popup = groupEntry.marker.getPopup();
+        if (popup) {
+          popup._ownerType = 'group';
+          popup._groupKey = entry.groupKey;
+          popup._selectedConnId = connId;
+        }
+        groupEntry.marker.openPopup();
       }
     };
   </script>

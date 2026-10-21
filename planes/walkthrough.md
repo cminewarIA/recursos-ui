@@ -1,22 +1,22 @@
-# Verificación y Recorrido: Geolocalización del Servidor en el Centro de Gran Canaria (`v4.10.1`)
+# Recorrido de Verificación: Agrupación de Conexiones en Mapa, Selector de IPs y Popups Persistentes (`v4.11.0`)
 
 ## Resumen del Cambio
-- **Objetivo**: Fijar la posición geográfica de nuestro servidor central ("🖥️ Nodo Host") en el centro exacto de Gran Canaria en lugar de la posición estimada por la IP WAN en la costa o el fallback histórico a Madrid.
-- **Coordenadas Aplicadas**: Latitud `27.9600° N`, Longitud `-15.5800° W` (Cumbre central de la isla de Gran Canaria / Tejeda).
-- **Ciudad/Identificador**: `Gran Canaria (Centro)`.
-- **País**: `España` (`ES`).
+- **Objetivo**: Resolver la superposición de marcadores concurrentes en el mapa de red, permitiendo ver marcadores agrupados con contador (`🔀 N`), una lista interactiva de IPs al pulsar sobre ellos con selector de detalle y acciones Fail2ban, y eliminar el cierre involuntario de los popups debido al polling de telemetría cada 2s o a clics en el mapa.
+- **Versión**: Incrementada a `4.11.0` (según Regla 5: `0.X.0` al añadir nueva funcionalidad).
 
-## Cambios Realizados
+## Componentes Modificados
 1. **`server.py`**:
-   - `load_geoip_disk_cache()`: Asigna por defecto y valida `SERVER_SELF_GEO` con `27.9600`, `-15.5800`, `Gran Canaria (Centro)`, `España`.
-   - `fetch_connections_geo_worker()`: Al obtener los datos de la IP pública desde `ip-api.com`, preserva los atributos WAN (IP, ISP, ASN) pero fija la latitud y longitud a `27.9600` y `-15.5800`, admitiendo anulación por variables de entorno (`SERVER_GEO_LAT`, `SERVER_GEO_LNG`).
-   - Fallbacks de `srv_lat` y `srv_lng` actualizados a `27.9600` y `-15.5800`.
-   - Dispositivos LAN orbitan concéntricamente alrededor de las coordenadas del centro de Gran Canaria.
-2. **`geoip_cache.json`**:
-   - Actualizada la entrada `"server_self_geo"` con `lat: 27.9600`, `lng: -15.5800`, `city: "Gran Canaria (Centro)"`.
-3. **`static/index.html` e `index.html`**:
-   - `ensureInitialized`: Valores iniciales de fallback `initLat: 27.9600` e `initLng: -15.5800`.
-   - `renderFromMetrics`: `srvPos` con fallback `27.9600, -15.5800`.
-   - `focusServerNode()`: Nivel de zoom ajustado a `10` para encuadrar la totalidad de Gran Canaria.
-4. **Control de Versión (`VERSION`, `package.json`, `README.md`)**:
-   - Incrementado a `4.10.1` según la Regla 5 (`0.0.X` para ajustes de detalles y coordenadas).
+   - `lan_coords_map` y `pending_coords_map`: Los sockets de una misma IP local o en espera comparten exactamente las mismas coordenadas en la órbita de Gran Canaria para agruparse coherentemente en un único pin de dispositivo físico.
+2. **`static/index.html` e `index.html`**:
+   - **CSS**: Clases `.gmp-conn-marker.grouped` y `.group-count-pill` para diferenciar marcadores agrupados con contadores estilizados según el flujo (`incoming`, `outgoing`, `blocked`).
+   - **Leaflet Map Config**: `closePopupOnClick: false` en `L.map` y `autoClose: false`, `closeOnClick: false` en los popups.
+   - **Gestión de Estado de Popup (`_activePopupState`)**: Registra el popup abierto (`server` o `group` con `groupKey` y `selectedConnId`).
+   - **Preservación en Redibujado (`renderFromMetrics`)**: Durante las actualizaciones periódicas de 2 segundos, `savedPopupState` reabre de forma inmediata el popup sin parpadeos ni pérdidas de datos.
+   - **`buildGroupInfoWindowNode`**:
+     - Vista listado con todas las IPs, servicios y flechas de dirección.
+     - Vista detalle al pulsar cualquier IP de la lista con botón `◀ Ver lista de IPs (N)`.
+   - **Integración con Tabla**: `focusConnectionById(connId)` localiza el grupo y abre la vista detallada de esa conexión de forma directa.
+3. **`VERSION` y `package.json`**:
+   - Establecidos a `4.11.0`.
+4. **`README.md`**:
+   - Documentada la versión `4.11.0` y sus características.

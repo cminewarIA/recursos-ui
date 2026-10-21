@@ -777,6 +777,8 @@ def fetch_connections_geo_worker():
             connections_out = []
             lan_idx = 0
             pending_idx = 0
+            lan_coords_map = {}
+            pending_coords_map = {}
             import math
             for s in raw_sockets:
                 r_ip = s["remote_ip"]
@@ -789,11 +791,15 @@ def fetch_connections_geo_worker():
                     isp, asn = geo["isp"], geo["asn"]
                     geo_status = "cached"
                 elif is_lan:
-                    lan_idx += 1
-                    angle = (lan_idx * 137.5 * 3.14159265) / 180.0
-                    radius = 0.022 + (lan_idx % 4) * 0.008
-                    lat = round(srv_lat + radius * math.cos(angle), 5)
-                    lng = round(srv_lng + radius * math.sin(angle) * 1.4, 5)
+                    if r_ip in lan_coords_map:
+                        lat, lng = lan_coords_map[r_ip]
+                    else:
+                        lan_idx += 1
+                        angle = (lan_idx * 137.5 * 3.14159265) / 180.0
+                        radius = 0.022 + (lan_idx % 4) * 0.008
+                        lat = round(srv_lat + radius * math.cos(angle), 5)
+                        lng = round(srv_lng + radius * math.sin(angle) * 1.4, 5)
+                        lan_coords_map[r_ip] = (lat, lng)
                     city = "Red Local (LAN)"
                     country = srv_country
                     cc = srv_cc
@@ -801,11 +807,15 @@ def fetch_connections_geo_worker():
                     asn = "LAN-LOCAL"
                     geo_status = "lan"
                 else:
-                    pending_idx += 1
-                    angle = (pending_idx * 105.0 * 3.14159265) / 180.0
-                    radius = 0.35 + (pending_idx % 5) * 0.12
-                    lat = round(srv_lat + radius * math.cos(angle), 5)
-                    lng = round(srv_lng + radius * math.sin(angle) * 1.4, 5)
+                    if r_ip in pending_coords_map:
+                        lat, lng = pending_coords_map[r_ip]
+                    else:
+                        pending_idx += 1
+                        angle = (pending_idx * 105.0 * 3.14159265) / 180.0
+                        radius = 0.35 + (pending_idx % 5) * 0.12
+                        lat = round(srv_lat + radius * math.cos(angle), 5)
+                        lng = round(srv_lng + radius * math.sin(angle) * 1.4, 5)
+                        pending_coords_map[r_ip] = (lat, lng)
                     city = "Resolviendo GeoIP..."
                     country = ""
                     cc = ""

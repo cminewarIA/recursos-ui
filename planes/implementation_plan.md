@@ -1,81 +1,60 @@
-# Plan de Implementación: Identificación de Servicio por IP y Bloqueo Directo desde el Mapa (`v4.10.0`)
+# Plan de Implementación: Agrupación de Conexiones en Mapa, Selector de IPs y Popups Persistentes (`v4.11.0`)
 
-Permitir al usuario ver con claridad qué servicio se está conectando con cada IP (tanto en conexiones entrantes como salientes) en la pestaña de redes, y dotar al mapa geoespacial y a la tabla de conexiones de un menú interactivo para bloquear o desbloquear IPs en tiempo real en el firewall del sistema (Fail2ban IPS).
-
-## 📌 Contexto y Objetivos
-
-1. **Identificación de Servicio por IP**:
-   - Actualmente, algunas conexiones muestran únicamente el puerto o una etiqueta genérica.
-   - Se requiere identificar con precisión a qué servicio local se conectan las IPs entrantes (por ejemplo, *Emby Media Server*, *Caddy Reverse Proxy / HTTPS*, *SSH Daemon*, *qBittorrent*, *Home Assistant*, *Immich*, *Pi-hole DNS*) y hacia qué servicio externo o destino van las salientes (*Google Cast / Smart TV*, *Telegram API*, *GitHub CDN*, *Samba*, etc.), incluyendo el proceso local involucrado (*EmbyServer*, *caddy*, *sshd*, *chrome*, *tailscaled*, etc.).
-2. **Acción de Bloqueo / Desbloqueo Directo**:
-   - Al pulsar sobre cualquier nodo o conexión en el mapa geoespacial (OpenStreetMap), el popup desplegará los detalles del servicio y controles directos para bloquear la IP en Fail2ban (con selección inteligente de jail: `caddy-scan`, `sshd`, `nextcloud`, `recidive`).
-   - Si la IP ya estuviera bloqueada, se ofrecerá la opción de desbloquearla con 1 clic.
-   - Se incorporará además un botón de acción rápida en la tabla interactiva de conexiones geolocalizadas.
-3. **Control Estricto de Versiones**:
-   - Al tratarse de una nueva función para el usuario, según la Regla 5 de `GEMINI.md`, se incrementará la versión a **`4.10.0`** (`0.X.0`).
+## Descripción del Problema y Objetivos
+1. **Superposición de Marcadores**: Cuando múltiples conexiones coinciden en las mismas coordenadas (por ejemplo, múltiples sockets hacia Google, Cloudflare, Azure o dispositivos en red local con varios servicios), los pines se dibujaban uno encima del otro, ocultando las demás conexiones y haciendo imposible verlas todas.
+2. **Visualización de Conexiones Múltiples ("ver como varios")**: El usuario solicita que si hay varias conexiones en un punto, el marcador se distinga visualmente como un grupo con su contador (ej. `🔀 4 Mountain View` o `🔀 2 192.168.50.242`), y que al pulsar sobre él se despliegue una **lista interactiva de las IPs**.
+3. **Cierre Prematuro del Popup ("se me cierra enseguida")**: Leaflet cerraba el popup por dos motivos:
+   - Cada 2 segundos el polling de `/api/metrics` redibuja las capas del mapa (`clearMapOverlays()`), destruyendo el marcador que tenía el popup abierto.
+   - La opción por defecto de Leaflet `closeOnClick: true` / `closePopupOnClick: true` cerraba el popup al hacer clic o arrastrar mínimamente el mapa.
+   El objetivo es que **el popup permanezca abierto de forma fija y estable** hasta que el usuario decida cerrarlo con el botón `×`.
 
 ---
 
-## 🛠️ Cambios Propuestos
+## Cambios Propuestos
 
-### Backend (`server.py`)
-
-#### [MODIFY] [server.py](file:///home/servidor/servicios/dashboard/server.py)
-- **Mapeo Avanzado de Puertos y Servicios (`KNOWN_PORTS` / `PORT_SERVICE_LABELS`)**:
-  - Ampliar el diccionario de puertos para reconocer todos los servicios instalados (Emby, Caddy, Nextcloud, Immich, Home Assistant, Pi-hole, qBittorrent, SSH, Samba, Google Cast, Tuya IoT, Ollama, go2rtc, WireGuard/Tailscale, etc.).
-- **Detección Dinámica de Procesos y Contenedores**:
-  - Función de inspección de puertos en escucha y sockets activos (`psutil` + mapeo de procesos/contenedores Docker desde `DOCKER_CACHE`).
-  - Resolución enriquecida para conexiones salientes: vinculación del proceso local (p. ej. `chrome`, `tailscaled`, `python3`) con el servicio de destino (DNS, Cast, SMB, CDN, APIs).
-- **Mejoras en el Endpoint `/api/fail2ban/ban`**:
-  - Selección inteligente de jail automática según el puerto/servicio (p. ej. puerto 22 -> `sshd`, 80/443 -> `caddy-scan`, otros -> `nextcloud` o `all`).
-  - Protección de seguridad para impedir bloquear la IP local del servidor (`127.0.0.1`, `SERVER_LOCAL_IP`).
-  - Respuesta detallada en JSON para notificación inmediata en frontend.
-
----
-
-### Frontend (`static/index.html` e `index.html`)
-
-#### [MODIFY] [static/index.html](file:///home/servidor/servicios/dashboard/static/index.html) e [index.html](file:///home/servidor/servicios/dashboard/index.html)
-- **Popup Interactivo del Mapa (`NetworkConnectionsMapEngine.buildInfoWindowNode`)**:
-  - Sección destacada con el **Servicio Conectado** y proceso responsable.
-  - Bloque de control de seguridad Fail2ban:
-    - Selector rápido de jail (o predeterminado inteligente según el servicio).
-    - Botón `🛡️ Bloquear IP en Firewall` con confirmación y ejecución asíncrona.
-    - Si la IP está en estado bloqueado: botón `🟢 Desbloquear IP`.
-    - Feedback inmediato mediante Toasts del sistema y actualización reactiva de métricas y mapa.
-- **Tabla de Flujos Geolocalizados (`#networkConnectionsTableList`)**:
-  - Resaltado prominente del servicio conectado para cada IP.
-  - Botón de acción rápida `🛡️ Bloquear` / `Desbloquear` en cada fila.
-- **KPIs y Filtros de Red**:
-  - Mostrar los principales servicios detectados en las tarjetas de conexiones entrantes y salientes.
+### 1. `static/index.html` e `index.html` (Frontend)
+- **Agrupación de Conexiones por Coordenadas**:
+  - Agrupar `filteredConns` mediante una clave geográfica (`lat_lng` redondeada a 3 decimales o identidad IP).
+  - Si un grupo tiene 1 conexión: se renderiza el marcador individual habitual (`↓ IP` / `↑ IP`).
+  - Si un grupo tiene 2 o más conexiones: se renderiza con estilo `.gmp-conn-marker.grouped` mostrando `🔀 [N] [Ciudad o IP]`.
+- **Nuevo Generador de Popups para Grupos (`buildGroupInfoWindowNode`)**:
+  - **Vista Lista (por defecto)**:
+    - Encabezado con el número total de conexiones y ubicación geográfica.
+    - Lista interactiva y desplazable con cada IP, puertos, servicio (`Emby`, `Google Cast`, etc.), estado del socket y flecha de dirección (`↓ / ↑`).
+    - Al hacer clic sobre cualquier IP de la lista, el popup conmuta a la vista detallada de esa IP específica.
+  - **Vista Detallada**:
+    - Muestra todos los detalles técnicos (proceso local, puertos, ISP, ASN, telemetría).
+    - Menú y botón de control de firewall Fail2ban (`🚫 Bloquear IP` / `🔓 Desbloquear`).
+    - Botón `◀ Ver todas las conexiones (N)` para regresar a la lista de IPs sin cerrar el popup.
+- **Persistencia de Popups y Prevención de Cierres Prematuros**:
+  - Configurar Leaflet con `closePopupOnClick: false`, `closeOnClick: false`, `autoClose: false`.
+  - Guardar el estado activo del popup (`_activePopupState = { type, groupKey, selectedConnId }`).
+  - Durante el refresco cíclico de métricas (`renderFromMetrics`):
+    - Activar bandera `_isRedrawing = true`.
+    - Si había un popup abierto, restaurarlo automáticamente tras el refresco sin parpadeos ni pérdidas de foco.
+    - El popup solo se cerrará cuando el usuario pulse explícitamente el botón de cierre `×` o seleccione otro nodo.
+- **Integración con la Tabla de Conexiones**:
+  - `focusConnectionById(connId)` localizará el grupo correspondiente, centrará el mapa y abrirá el popup directamente en la vista de detalle de esa conexión.
 
 ---
 
-### Documentación y Versión
-
-#### [MODIFY] [VERSION](file:///home/servidor/servicios/dashboard/VERSION)
-- Incrementar a `4.10.0`.
-
-#### [MODIFY] [package.json](file:///home/servidor/servicios/dashboard/package.json)
-- Sincronizar versión a `4.10.0`.
-
-#### [MODIFY] [README.md](file:///home/servidor/servicios/dashboard/README.md)
-- Añadir sección `## ✨ Novedades en v4.10.0` detallando la identificación de servicios y el bloqueo directo desde el mapa.
-
-#### [NEW] `planes/2026-10-21_servicio_por_ip_y_bloqueo_en_mapa.md` y `planes/implementation_plan.md`
-- Almacenar este plan en la carpeta obligatoria `planes/`.
+## Cambios en Control de Versiones y Documentación
+- `VERSION` → `4.11.0` (según Regla 5: `0.X.0` al añadir nueva funcionalidad de agrupación interactiva y persistencia).
+- `package.json` → `4.11.0`.
+- `README.md` → Actualizar título y añadir sección `## ✨ Novedades en v4.11.0`.
+- `planes/2026-10-21_agrupacion_conexiones_y_popup_persistente.md` y `planes/walkthrough.md`.
 
 ---
 
-## 🧪 Plan de Verificación
-
-### Pruebas Automatizadas y de Backend
-1. Ejecutar script de prueba en Python para comprobar la resolución de servicios y procesos en sockets activos.
-2. Probar llamada al endpoint `/api/fail2ban/ban` y `/api/fail2ban/unban` con IP de prueba no crítica y verificar la respuesta y estado en Fail2ban.
-3. Verificar reinicio del servicio `system-dashboard.service` sin fallos.
-
-### Pruebas de Interfaz y Frontend
-1. Consultar `/api/version` y verificar `version: 4.10.0`.
-2. Verificar que en la pestaña de redes se listen los servicios claramente para cada conexión entrante y saliente.
-3. Comprobar que al hacer clic en un marcador del mapa se abre el popup con el servicio conectado y el botón interactivo de bloqueo.
-4. Probar la interactividad de bloqueo/desbloqueo y comprobar la aparición del toast de confirmación.
+## Plan de Verificación
+1. **Prueba de Agrupación Visual**:
+   - Abrir vista de Red en el dashboard y comprobar que puntos con conexiones concurrentes (ej. Mountain View, Frankfurt o dispositivos LAN con varios sockets) muestran la insignia `🔀 N`.
+2. **Prueba de Lista de IPs y Selección**:
+   - Hacer clic en un marcador múltiple: verificar que se despliega la lista con las IPs.
+   - Pulsar sobre una IP: verificar que se abren sus detalles y controles de firewall.
+   - Pulsar `◀ Volver a la lista`: verificar que regresa al listado de conexiones.
+3. **Prueba de Persistencia ante Refrescos**:
+   - Dejar el popup abierto durante más de 10-15 segundos mientras el dashboard recibe actualizaciones cada 2 segundos.
+   - Comprobar que el popup **no se cierra**, permitiendo leer los datos y pulsar los botones tranquilamente.
+4. **Verificación de Versión**:
+   - Probar `curl http://127.0.0.1:8085/api/version` y comprobar `4.11.0`.
