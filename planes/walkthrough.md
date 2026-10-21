@@ -1,8 +1,9 @@
-# Walkthrough Activo — v4.3.0 (Monitor de Umbral de Caudal NIC y Alerta en Leyenda del Mapa)
+# Walkthrough Activo — v4.6.0 (Gráfico de Pastel de Distribución de Ancho de Banda en Pestaña Red)
 
-Ver documento detallado en `planes/walkthrough_v4_3_0_bandwidth_threshold_monitor.md`.
+Ver documento detallado en `planes/walkthrough_v4_6_0_bandwidth_pie_chart.md`.
 
-## Verificación Realizada
-1. Motor `BandwidthThresholdMonitor` integrado con evaluación continua en `applyMetricsToDOM()` y persistencia en `localStorage` (`recursos_nic_bw_threshold_cfg`).
-2. Alerta visual reactiva integrada en la leyenda del mapa (`#networkConnectionsMapLegend`, `#mapLegendBandwidthAlert`, `#mapLegendItemIncoming`, `#mapLegendItemOutgoing`) y en las tarjetas de interfaces (`#activeNicsGrid`).
-3. Sincronización de `index.html` -> `static/index.html` y actualización de `VERSION` a `4.3.0`.
+## Verificación Realizada (`v4.6.0`)
+1. Añadido el bloque `#netBandwidthPieSection` y el motor `NetworkBandwidthPieChart` en la pestaña **Red** (`#viewNetwork`) de `index.html` y `static/index.html`.
+2. Soportadas 3 vistas de agrupación (**Subredes IP `/24`**, **Grupos de Enlace** y **Tipo de Dispositivo**) y 2 modos de métrica (**Tráfico Acumulado** y **Caudal en Vivo**).
+3. Conservada la utilería `GeoIpLocalStorageCleaner` con poda automática bajo `GEOIP_MAX_ENTRIES` tanto en cliente como en servidor (`server.py`).
+4. Sincronizada versión canónica `4.6.0` en `VERSION`, `package.json` y `README.md`.

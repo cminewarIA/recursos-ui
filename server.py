@@ -188,12 +188,47 @@ _load_dotenv_file()
 CONNECTIONS_MAP_CACHE = {
     "server_node": {},
     "summary": {"total": 0, "incoming": 0, "outgoing": 0, "blocked": 0},
-    "connections": []
+    "connections": [],
+    "geoip_worker": {
+        "status": "initializing",
+        "cached_ips": 0,
+        "cache_hits": 0,
+        "cache_misses": 0,
+        "hit_rate_pct": 100.0,
+        "api_batches_sent": 0,
+        "pending_queue": 0,
+        "rate_limit_remaining": 15,
+        "last_sync": "--"
+    }
 }
 CONNECTIONS_MAP_LOCK = threading.Lock()
-GEOIP_CACHE = {}  # { ip: { "lat", "lng", "city", "country", "country_code", "isp", "asn", "ts" } }
+GEOIP_LOCK = threading.Lock()
+GEOIP_CACHE_FILE = os.path.join(BASE_DIR, "geoip_cache.json")
+GEOIP_TTL_SECONDS = 7 * 86400  # 7 days TTL for resolved GeoIP entries
+GEOIP_NEG_TTL_SECONDS = 900    # 15 minutes cooldown for unresolvable/failed IPs
+GEOIP_MAX_ENTRIES = 2000
+GEOIP_MAX_CACHE_ENTRIES = GEOIP_MAX_ENTRIES
+
+GEOIP_CACHE = {}           # { ip: { "lat", "lng", "city", "region", "country", "country_code", "isp", "asn", "ts" } }
+GEOIP_NEGATIVE_CACHE = {}  # { ip: ts_failed }
+GEOIP_PENDING_QUEUE = set()
+GEOIP_WAKE_EVENT = threading.Event()
 SERVER_SELF_GEO = {}
-RECENT_HTTP_CLIENTS = {}  # { ip: { "ip", "port", "ts", "service" } }
+RECENT_HTTP_CLIENTS = {}   # { ip: { "ip", "port", "ts", "service" } }
+
+GEOIP_WORKER_STATS = {
+    "status": "active",
+    "cache_hits": 0,
+    "cache_misses": 0,
+    "api_batches_sent": 0,
+    "api_ips_resolved": 0,
+    "rate_limit_remaining": 15,
+    "rate_limit_reset_ts": 0.0,
+    "last_sync_ts": 0.0,
+    "last_sync_str": "--",
+    "dirty_disk": False,
+    "last_disk_save_ts": 0.0
+}
 
 PORT_SERVICE_LABELS = {
     22: "SSH Daemon (OpenSSH)",
@@ -218,12 +253,223 @@ PORT_SERVICE_LABELS = {
 def _is_private_ip(ip_str):
     try:
         ip_obj = ipaddress.ip_address(ip_str)
-        return ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_multicast
+        return (
+            ip_obj.is_private
+            or ip_obj.is_loopback
+            or ip_obj.is_link_local
+            or ip_obj.is_multicast
+            or ip_obj.is_reserved
+            or ip_obj.is_unspecified
+        )
     except Exception:
         return True
 
+def load_geoip_disk_cache():
+    """Carga la caché persistente de GeoIP desde disco al iniciar el worker."""
+    global GEOIP_CACHE, SERVER_SELF_GEO
+    if not os.path.exists(GEOIP_CACHE_FILE):
+        return
+    try:
+        with open(GEOIP_CACHE_FILE, "r", encoding="utf-8", errors="ignore") as f:
+            raw = json.load(f)
+        if not isinstance(raw, dict):
+            return
+        now = time.time()
+        cutoff = now - GEOIP_TTL_SECONDS
+        entries = raw.get("entries", raw) if isinstance(raw.get("entries"), dict) else raw
+        loaded = {}
+        for ip_k, val in entries.items():
+            if isinstance(val, dict) and isinstance(val.get("lat"), (int, float)) and isinstance(val.get("lng"), (int, float)):
+                ts = float(val.get("ts", now))
+                if ts >= cutoff:
+                    loaded[str(ip_k)] = {
+                        "ip": str(ip_k),
+                        "lat": float(val["lat"]),
+                        "lng": float(val["lng"]),
+                        "city": str(val.get("city") or "Nodo Remoto"),
+                        "region": str(val.get("region") or ""),
+                        "country": str(val.get("country") or ""),
+                        "country_code": str(val.get("country_code") or ""),
+                        "isp": str(val.get("isp") or ""),
+                        "asn": str(val.get("asn") or ""),
+                        "ts": ts
+                    }
+        with GEOIP_LOCK:
+            GEOIP_CACHE.update(loaded)
+            if isinstance(raw.get("server_self_geo"), dict) and isinstance(raw["server_self_geo"].get("lat"), (int, float)):
+                SERVER_SELF_GEO = dict(raw["server_self_geo"])
+    except Exception:
+        pass
+
+def save_geoip_disk_cache(force=False):
+    """Persiste de forma atómica la caché GeoIP en disco para reducir carga sobre ip-api.com tras reinicios."""
+    now = time.time()
+    with GEOIP_LOCK:
+        if not force and not GEOIP_WORKER_STATS["dirty_disk"]:
+            return
+        if not force and (now - GEOIP_WORKER_STATS["last_disk_save_ts"] < 15.0):
+            return
+        # Prune oldest if over max limit
+        if len(GEOIP_CACHE) > GEOIP_MAX_CACHE_ENTRIES:
+            sorted_keys = sorted(GEOIP_CACHE.keys(), key=lambda k: GEOIP_CACHE[k].get("ts", 0), reverse=True)
+            keep_keys = set(sorted_keys[:GEOIP_MAX_CACHE_ENTRIES])
+            for k in list(GEOIP_CACHE.keys()):
+                if k not in keep_keys:
+                    del GEOIP_CACHE[k]
+        snapshot = {
+            "updated_at": now,
+            "server_self_geo": dict(SERVER_SELF_GEO) if SERVER_SELF_GEO else {},
+            "entries": dict(GEOIP_CACHE)
+        }
+        GEOIP_WORKER_STATS["dirty_disk"] = False
+        GEOIP_WORKER_STATS["last_disk_save_ts"] = now
+
+    try:
+        tmp_path = GEOIP_CACHE_FILE + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f, ensure_ascii=False)
+        os.replace(tmp_path, GEOIP_CACHE_FILE)
+    except Exception:
+        pass
+
+def get_geoip_worker_summary():
+    with GEOIP_LOCK:
+        hits = GEOIP_WORKER_STATS["cache_hits"]
+        misses = GEOIP_WORKER_STATS["cache_misses"]
+        total_lookups = hits + misses
+        hit_rate = round((hits / total_lookups) * 100.0, 1) if total_lookups > 0 else 100.0
+        return {
+            "status": GEOIP_WORKER_STATS["status"],
+            "cached_ips": len(GEOIP_CACHE),
+            "cache_hits": hits,
+            "cache_misses": misses,
+            "hit_rate_pct": hit_rate,
+            "api_batches_sent": GEOIP_WORKER_STATS["api_batches_sent"],
+            "api_ips_resolved": GEOIP_WORKER_STATS["api_ips_resolved"],
+            "pending_queue": len(GEOIP_PENDING_QUEUE),
+            "rate_limit_remaining": GEOIP_WORKER_STATS["rate_limit_remaining"],
+            "last_sync": GEOIP_WORKER_STATS["last_sync_str"]
+        }
+
+def enqueue_remote_ips_for_geoip(ips_iterable):
+    """Encola direcciones IP remotas públicas para resolución asíncrona en segundo plano."""
+    now = time.time()
+    added = False
+    with GEOIP_LOCK:
+        for raw_ip in ips_iterable:
+            ip_s = str(raw_ip or "").strip().replace("::ffff:", "")
+            if not ip_s or _is_private_ip(ip_s):
+                continue
+            if ip_s in GEOIP_CACHE:
+                continue
+            neg_ts = GEOIP_NEGATIVE_CACHE.get(ip_s, 0)
+            if now - neg_ts < GEOIP_NEG_TTL_SECONDS:
+                continue
+            if ip_s not in GEOIP_PENDING_QUEUE:
+                GEOIP_PENDING_QUEUE.add(ip_s)
+                added = True
+    if added:
+        GEOIP_WAKE_EVENT.set()
+
+def resolve_geoip_batch_from_ip_api(ip_list):
+    """Consulta ip-api.com en lote (o individual si es 1 IP) respetando límites de tasa y actualizando GEOIP_CACHE."""
+    now = time.time()
+    clean_ips = []
+    with GEOIP_LOCK:
+        if now < GEOIP_WORKER_STATS["rate_limit_reset_ts"] and GEOIP_WORKER_STATS["rate_limit_remaining"] <= 1:
+            return {}
+        for ip_s in ip_list:
+            if not ip_s or _is_private_ip(ip_s):
+                continue
+            if ip_s in GEOIP_CACHE:
+                continue
+            if now - GEOIP_NEGATIVE_CACHE.get(ip_s, 0) < GEOIP_NEG_TTL_SECONDS:
+                continue
+            if ip_s not in clean_ips:
+                clean_ips.append(ip_s)
+
+    if not clean_ips:
+        return {}
+
+    batch_slice = clean_ips[:80]
+    resolved_now = {}
+    try:
+        with GEOIP_LOCK:
+            GEOIP_WORKER_STATS["status"] = "resolving"
+        batch_payload = json.dumps(batch_slice).encode("utf-8")
+        req = urllib.request.Request(
+            "http://ip-api.com/batch?fields=status,message,country,countryCode,regionName,city,lat,lon,isp,org,as,query",
+            data=batch_payload,
+            headers={"Content-Type": "application/json", "User-Agent": "RecursosDashboard-GeoIPWorker/4.4"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
+            rl_rem = resp.headers.get("X-Rl")
+            rl_ttl = resp.headers.get("X-Ttl")
+            b_res = json.loads(resp.read().decode("utf-8", errors="ignore"))
+
+            with GEOIP_LOCK:
+                GEOIP_WORKER_STATS["api_batches_sent"] += 1
+                GEOIP_WORKER_STATS["last_sync_ts"] = time.time()
+                GEOIP_WORKER_STATS["last_sync_str"] = datetime.now().strftime("%H:%M:%S")
+                if rl_rem is not None and str(rl_rem).isdigit():
+                    GEOIP_WORKER_STATS["rate_limit_remaining"] = int(rl_rem)
+                if rl_ttl is not None and str(rl_ttl).isdigit() and GEOIP_WORKER_STATS["rate_limit_remaining"] <= 2:
+                    GEOIP_WORKER_STATS["rate_limit_reset_ts"] = time.time() + int(rl_ttl) + 1
+
+                if isinstance(b_res, list):
+                    seen_queries = set()
+                    for item in b_res:
+                        if not isinstance(item, dict):
+                            continue
+                        q_ip = str(item.get("query", "")).strip()
+                        if not q_ip:
+                            continue
+                        seen_queries.add(q_ip)
+                        GEOIP_PENDING_QUEUE.discard(q_ip)
+                        if item.get("status") == "success" and isinstance(item.get("lat"), (int, float)) and isinstance(item.get("lon"), (int, float)):
+                            entry = {
+                                "ip": q_ip,
+                                "lat": float(item["lat"]),
+                                "lng": float(item["lon"]),
+                                "city": str(item.get("city") or "Nodo Remoto"),
+                                "region": str(item.get("regionName") or ""),
+                                "country": str(item.get("country") or ""),
+                                "country_code": str(item.get("countryCode") or ""),
+                                "isp": str(item.get("org") or item.get("isp") or ""),
+                                "asn": str(item.get("as") or ""),
+                                "ts": time.time()
+                            }
+                            GEOIP_CACHE[q_ip] = entry
+                            GEOIP_NEGATIVE_CACHE.pop(q_ip, None)
+                            resolved_now[q_ip] = entry
+                            GEOIP_WORKER_STATS["api_ips_resolved"] += 1
+                            GEOIP_WORKER_STATS["dirty_disk"] = True
+                        else:
+                            GEOIP_NEGATIVE_CACHE[q_ip] = time.time()
+
+                    for req_ip in batch_slice:
+                        if req_ip not in seen_queries:
+                            GEOIP_PENDING_QUEUE.discard(req_ip)
+                            GEOIP_NEGATIVE_CACHE[req_ip] = time.time()
+    except urllib.error.HTTPError as he:
+        with GEOIP_LOCK:
+            if he.code == 429:
+                GEOIP_WORKER_STATS["rate_limit_remaining"] = 0
+                GEOIP_WORKER_STATS["rate_limit_reset_ts"] = time.time() + 62.0
+    except Exception:
+        pass
+    finally:
+        with GEOIP_LOCK:
+            GEOIP_WORKER_STATS["status"] = "active"
+
+    if resolved_now:
+        save_geoip_disk_cache(force=False)
+    return resolved_now
+
 def fetch_connections_geo_worker():
     global CONNECTIONS_MAP_CACHE, SERVER_SELF_GEO
+    load_geoip_disk_cache()
     resolved_outbound_hosts = {}
     outbound_targets = [
         ("api.github.com", 443, "TCP", "GitHub OTA Sync (api.github.com)"),
@@ -239,22 +485,24 @@ def fetch_connections_geo_worker():
             if not SERVER_SELF_GEO or (now - SERVER_SELF_GEO.get("ts", 0) > 1800):
                 try:
                     req = urllib.request.Request(
-                        "http://ip-api.com/json/?fields=status,country,countryCode,city,lat,lon,isp,org,as,query",
-                        headers={"User-Agent": "RecursosDashboard/4.0"}
+                        "http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,lat,lon,isp,org,as,query",
+                        headers={"User-Agent": "RecursosDashboard-GeoIPWorker/4.4"}
                     )
                     with urllib.request.urlopen(req, timeout=3.0) as resp:
                         sdata = json.loads(resp.read().decode("utf-8", errors="ignore"))
                         if sdata.get("status") == "success" and isinstance(sdata.get("lat"), (int, float)):
-                            SERVER_SELF_GEO = {
-                                "ip": sdata.get("query") or SERVER_LOCAL_IP,
-                                "lat": float(sdata.get("lat")),
-                                "lng": float(sdata.get("lon")),
-                                "city": sdata.get("city") or "Nodo Servidor",
-                                "country": sdata.get("country") or "",
-                                "country_code": sdata.get("countryCode") or "",
-                                "org": sdata.get("org") or sdata.get("isp") or HOSTNAME,
-                                "ts": now
-                            }
+                            with GEOIP_LOCK:
+                                SERVER_SELF_GEO = {
+                                    "ip": sdata.get("query") or SERVER_LOCAL_IP,
+                                    "lat": float(sdata.get("lat")),
+                                    "lng": float(sdata.get("lon")),
+                                    "city": sdata.get("city") or "Nodo Servidor",
+                                    "country": sdata.get("country") or "",
+                                    "country_code": sdata.get("countryCode") or "",
+                                    "org": sdata.get("org") or sdata.get("isp") or HOSTNAME,
+                                    "ts": now
+                                }
+                                GEOIP_WORKER_STATS["dirty_disk"] = True
                 except Exception:
                     pass
 
@@ -317,55 +565,53 @@ def fetch_connections_geo_worker():
             with SECURITY_LOCK:
                 f2b_banned = list(SECURITY_CACHE.get("fail2ban", {}).get("banned_details", []))
 
-            # 5. Prune expired GEOIP_CACHE entries (>25 days) and batch-resolve unknown public IPs
-            ttl_cutoff = now - (25 * 86400)
-            for k_ip in list(GEOIP_CACHE.keys()):
-                if GEOIP_CACHE[k_ip].get("ts", 0) < ttl_cutoff:
-                    del GEOIP_CACHE[k_ip]
+            # 5. Prune expired GEOIP_CACHE entries (>7 days), negative cache (>15 min), and enforce GEOIP_MAX_ENTRIES
+            ttl_cutoff = now - GEOIP_TTL_SECONDS
+            neg_cutoff = now - GEOIP_NEG_TTL_SECONDS
+            with GEOIP_LOCK:
+                for k_ip in list(GEOIP_CACHE.keys()):
+                    if GEOIP_CACHE[k_ip].get("ts", 0) < ttl_cutoff:
+                        del GEOIP_CACHE[k_ip]
+                if len(GEOIP_CACHE) > GEOIP_MAX_ENTRIES:
+                    sorted_ips = sorted(GEOIP_CACHE.items(), key=lambda x: x[1].get("ts", 0), reverse=True)
+                    keep_ips = {k for k, _ in sorted_ips[:int(GEOIP_MAX_ENTRIES * 0.85)]}
+                    for k_ip in list(GEOIP_CACHE.keys()):
+                        if k_ip not in keep_ips:
+                            del GEOIP_CACHE[k_ip]
+                for k_ip in list(GEOIP_NEGATIVE_CACHE.keys()):
+                    if GEOIP_NEGATIVE_CACHE[k_ip] < neg_cutoff:
+                        del GEOIP_NEGATIVE_CACHE[k_ip]
 
-            candidate_ips = set()
+            # 6. Collect all detected remote public IPs and check cache vs queue
+            detected_public_ips = []
             for s in raw_sockets:
-                if not _is_private_ip(s["remote_ip"]) and s["remote_ip"] not in GEOIP_CACHE:
-                    candidate_ips.add(s["remote_ip"])
+                if not _is_private_ip(s["remote_ip"]):
+                    detected_public_ips.append(s["remote_ip"])
             for ep in resolved_outbound_hosts.values():
-                if not _is_private_ip(ep["ip"]) and ep["ip"] not in GEOIP_CACHE:
-                    candidate_ips.add(ep["ip"])
+                if not _is_private_ip(ep["ip"]):
+                    detected_public_ips.append(ep["ip"])
             for cl_ip in list(RECENT_HTTP_CLIENTS.keys()):
-                if not _is_private_ip(cl_ip) and cl_ip not in GEOIP_CACHE:
-                    candidate_ips.add(cl_ip)
+                if not _is_private_ip(cl_ip):
+                    detected_public_ips.append(cl_ip)
             for b_item in f2b_banned[:25]:
                 b_ip = b_item.get("ip", "")
-                if b_ip and not _is_private_ip(b_ip) and b_ip not in GEOIP_CACHE:
-                    candidate_ips.add(b_ip)
+                if b_ip and not _is_private_ip(b_ip):
+                    detected_public_ips.append(b_ip)
+
+            candidate_ips = []
+            with GEOIP_LOCK:
+                for q_ip in set(detected_public_ips):
+                    if q_ip in GEOIP_CACHE:
+                        GEOIP_WORKER_STATS["cache_hits"] += 1
+                    elif now - GEOIP_NEGATIVE_CACHE.get(q_ip, 0) < GEOIP_NEG_TTL_SECONDS:
+                        continue
+                    else:
+                        GEOIP_WORKER_STATS["cache_misses"] += 1
+                        GEOIP_PENDING_QUEUE.add(q_ip)
+                candidate_ips = list(GEOIP_PENDING_QUEUE)[:80]
 
             if candidate_ips:
-                try:
-                    batch_payload = json.dumps(list(candidate_ips)[:80]).encode("utf-8")
-                    req = urllib.request.Request(
-                        "http://ip-api.com/batch?fields=status,country,countryCode,city,lat,lon,isp,org,as,query",
-                        data=batch_payload,
-                        headers={"Content-Type": "application/json", "User-Agent": "RecursosDashboard/4.0"},
-                        method="POST"
-                    )
-                    with urllib.request.urlopen(req, timeout=3.5) as resp:
-                        b_res = json.loads(resp.read().decode("utf-8", errors="ignore"))
-                        if isinstance(b_res, list):
-                            for item in b_res:
-                                if isinstance(item, dict) and item.get("status") == "success" and isinstance(item.get("lat"), (int, float)):
-                                    q_ip = str(item.get("query", ""))
-                                    if q_ip:
-                                        GEOIP_CACHE[q_ip] = {
-                                            "lat": float(item["lat"]),
-                                            "lng": float(item["lon"]),
-                                            "city": item.get("city") or "Nodo Remoto",
-                                            "country": item.get("country") or "",
-                                            "country_code": item.get("countryCode") or "",
-                                            "isp": item.get("org") or item.get("isp") or "",
-                                            "asn": item.get("as") or "",
-                                            "ts": now
-                                        }
-                except Exception:
-                    pass
+                resolve_geoip_batch_from_ip_api(candidate_ips)
 
             srv_lat = SERVER_SELF_GEO.get("lat", 40.4168)
             srv_lng = SERVER_SELF_GEO.get("lng", -3.7038)
@@ -375,19 +621,22 @@ def fetch_connections_geo_worker():
 
             connections_out = []
             lan_idx = 0
+            pending_idx = 0
+            import math
             for s in raw_sockets:
                 r_ip = s["remote_ip"]
                 is_lan = _is_private_ip(r_ip)
-                geo = GEOIP_CACHE.get(r_ip)
+                with GEOIP_LOCK:
+                    geo = GEOIP_CACHE.get(r_ip)
                 if geo:
                     lat, lng = geo["lat"], geo["lng"]
                     city, country, cc = geo["city"], geo["country"], geo["country_code"]
                     isp, asn = geo["isp"], geo["asn"]
+                    geo_status = "cached"
                 elif is_lan:
                     lan_idx += 1
                     angle = (lan_idx * 137.5 * 3.14159265) / 180.0
                     radius = 0.022 + (lan_idx % 4) * 0.008
-                    import math
                     lat = round(srv_lat + radius * math.cos(angle), 5)
                     lng = round(srv_lng + radius * math.sin(angle) * 1.4, 5)
                     city = "Red Local (LAN)"
@@ -395,8 +644,19 @@ def fetch_connections_geo_worker():
                     cc = srv_cc
                     isp = "Subred Privada / Enlace Directo"
                     asn = "LAN-LOCAL"
+                    geo_status = "lan"
                 else:
-                    continue
+                    pending_idx += 1
+                    angle = (pending_idx * 105.0 * 3.14159265) / 180.0
+                    radius = 0.35 + (pending_idx % 5) * 0.12
+                    lat = round(srv_lat + radius * math.cos(angle), 5)
+                    lng = round(srv_lng + radius * math.sin(angle) * 1.4, 5)
+                    city = "Resolviendo GeoIP..."
+                    country = ""
+                    cc = ""
+                    isp = "En cola del Worker GeoIP (ip-api.com)"
+                    asn = ""
+                    geo_status = "pending"
 
                 connections_out.append({
                     "id": f"sock_{s['direction']}_{r_ip}_{s['local_port']}_{s['remote_port']}",
@@ -415,11 +675,13 @@ def fetch_connections_geo_worker():
                     "country_code": cc,
                     "isp": isp,
                     "asn": asn,
-                    "is_lan": is_lan
+                    "is_lan": is_lan,
+                    "geo_status": geo_status
                 })
 
             for ep in resolved_outbound_hosts.values():
-                geo = GEOIP_CACHE.get(ep["ip"])
+                with GEOIP_LOCK:
+                    geo = GEOIP_CACHE.get(ep["ip"])
                 if not geo:
                     continue
                 if not any(c["remote_ip"] == ep["ip"] for c in connections_out):
@@ -440,12 +702,16 @@ def fetch_connections_geo_worker():
                         "country_code": geo["country_code"],
                         "isp": geo["isp"],
                         "asn": geo["asn"],
-                        "is_lan": False
+                        "is_lan": False,
+                        "geo_status": "cached"
                     })
 
             for b_item in f2b_banned[:25]:
                 b_ip = b_item.get("ip", "")
-                geo = GEOIP_CACHE.get(b_ip)
+                if not b_ip:
+                    continue
+                with GEOIP_LOCK:
+                    geo = GEOIP_CACHE.get(b_ip)
                 if not geo:
                     continue
                 if not any(c["remote_ip"] == b_ip and c["direction"] == "blocked" for c in connections_out):
@@ -466,12 +732,14 @@ def fetch_connections_geo_worker():
                         "country_code": geo["country_code"],
                         "isp": geo["isp"],
                         "asn": geo["asn"],
-                        "is_lan": False
+                        "is_lan": False,
+                        "geo_status": "cached"
                     })
 
             inc_cnt = sum(1 for c in connections_out if c["direction"] == "incoming")
             out_cnt = sum(1 for c in connections_out if c["direction"] == "outgoing")
             blk_cnt = sum(1 for c in connections_out if c["direction"] == "blocked")
+            worker_summary = get_geoip_worker_summary()
 
             with CONNECTIONS_MAP_LOCK:
                 CONNECTIONS_MAP_CACHE = {
@@ -491,11 +759,15 @@ def fetch_connections_geo_worker():
                         "outgoing": out_cnt,
                         "blocked": blk_cnt
                     },
-                    "connections": connections_out
+                    "connections": connections_out,
+                    "geoip_worker": worker_summary
                 }
+            save_geoip_disk_cache(force=False)
         except Exception:
             pass
-        time.sleep(8)
+        # Wait up to 6 seconds or wake immediately when new remote IPs are enqueued
+        GEOIP_WAKE_EVENT.wait(timeout=6.0)
+        GEOIP_WAKE_EVENT.clear()
 
 # Dynamic Hardware & OS Information (Queried directly from OS kernel at startup)
 def _detect_cpu_static_specs():
@@ -3634,6 +3906,15 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         auth = check_trust_status(self)
         clean_path = self.path.split('?')[0].rstrip('/') or '/'
         req_domain = resolve_request_domain(self)
+        c_ip = auth.get("client_ip", "")
+        if c_ip and c_ip not in ("127.0.0.1", "::1"):
+            RECENT_HTTP_CLIENTS[c_ip] = {
+                "ip": c_ip,
+                "port": 443,
+                "ts": time.time(),
+                "service": "Panel Recursos Web UI (HTTPS)"
+            }
+            enqueue_remote_ips_for_geoip([c_ip])
 
         # 1. API METRICS (Bloqueo 403 total si es externo no emparejado)
         if clean_path == "/api/metrics":
@@ -3861,6 +4142,31 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     pass
             results = search_logos_catalog(q_val)
             resp = json.dumps({"query": q_val, "results": results}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 2g. ESTADO DEL WORKER ASÍNCRONO Y CACHÉ GEOIP (ip-api.com)
+        elif clean_path == "/api/net/geoip":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            worker_info = get_geoip_worker_summary()
+            with GEOIP_LOCK:
+                cache_copy = dict(GEOIP_CACHE)
+                srv_geo_copy = dict(SERVER_SELF_GEO) if SERVER_SELF_GEO else {}
+            resp = json.dumps({
+                "status": "ok",
+                "worker": worker_info,
+                "server_node": srv_geo_copy,
+                "cache": cache_copy
+            }).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
@@ -4568,6 +4874,72 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 resp = json.dumps({"success": True, "key": target_key, "logos": logos}).encode('utf-8')
                 self.send_response(200)
 
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 9. Resolución GeoIP en Lote / Bajo Demanda (Web Worker -> Backend Cache -> ip-api.com)
+        elif self.path.split('?')[0] in ("/api/net/geoip/resolve", "/api/net/geoip"):
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 65536:
+                self.send_response(413)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            post_data = self.rfile.read(content_length).decode('utf-8', errors='ignore') if content_length > 0 else "{}"
+            try:
+                body = json.loads(post_data)
+                req_ips = body.get("ips", [])
+                force_sync = bool(body.get("force_sync", False))
+            except Exception:
+                req_ips = []
+                force_sync = False
+
+            if not isinstance(req_ips, list):
+                req_ips = []
+
+            resolved_map = {}
+            missing_ips = []
+            now = time.time()
+            with GEOIP_LOCK:
+                for raw_ip in req_ips[:100]:
+                    ip_s = str(raw_ip or "").strip().replace("::ffff:", "")
+                    if not ip_s or _is_private_ip(ip_s):
+                        continue
+                    cached_item = GEOIP_CACHE.get(ip_s)
+                    if cached_item and not force_sync:
+                        GEOIP_WORKER_STATS["cache_hits"] += 1
+                        resolved_map[ip_s] = cached_item
+                    elif now - GEOIP_NEGATIVE_CACHE.get(ip_s, 0) < GEOIP_NEG_TTL_SECONDS and not force_sync:
+                        continue
+                    else:
+                        GEOIP_WORKER_STATS["cache_misses"] += 1
+                        missing_ips.append(ip_s)
+
+            if missing_ips:
+                newly_resolved = resolve_geoip_batch_from_ip_api(missing_ips)
+                resolved_map.update(newly_resolved)
+                GEOIP_WAKE_EVENT.set()
+            elif force_sync:
+                GEOIP_WAKE_EVENT.set()
+
+            resp = json.dumps({
+                "success": True,
+                "results": resolved_map,
+                "worker": get_geoip_worker_summary()
+            }).encode('utf-8')
+            self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
             self.send_header('Content-Length', str(len(resp)))

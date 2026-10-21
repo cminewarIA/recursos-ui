@@ -291,19 +291,139 @@ interface GeoIpRecord {
   lat: number;
   lng: number;
   city: string;
+  region?: string;
   country: string;
   countryCode: string;
+  country_code?: string;
   isp: string;
   org: string;
   as: string;
+  asn?: string;
+  ts: number;
 }
+
+const GEOIP_DISK_CACHE_PATH = path.resolve(__dirname, 'geoip_cache.json');
+const GEOIP_TTL_MS = 7 * 86400 * 1000; // 7 days TTL
+const GEOIP_NEG_TTL_MS = 15 * 60 * 1000; // 15 min negative cache cooldown
+const GEOIP_MAX_ENTRIES = 2000;
 
 let serverSelfGeo: GeoIpRecord | null = null;
 const geoIpCache: Record<string, GeoIpRecord> = {};
+const geoIpNegativeCache = new Map<string, number>();
+const geoIpPendingQueue = new Set<string>();
 const recentHttpIncomingClients = new Map<string, { ip: string; port: number; ts: number; service: string }>();
 const resolvedOutboundEndpoints = new Map<string, { host: string; ip: string; port: number; protocol: string; service: string }>();
 let lastGeoSyncTs = 0;
 let geoSyncInFlight = false;
+let geoWorkerIntervalStarted = false;
+
+const geoIpWorkerStats = {
+  status: 'active' as 'active' | 'resolving' | 'throttled',
+  cacheHits: 0,
+  cacheMisses: 0,
+  apiBatchesSent: 0,
+  apiIpsResolved: 0,
+  rateLimitRemaining: 15,
+  rateLimitResetMs: 0,
+  lastSyncStr: '--',
+  dirtyDisk: false,
+  lastDiskSaveMs: 0,
+};
+
+function loadGeoIpDiskCache() {
+  try {
+    if (!fs.existsSync(GEOIP_DISK_CACHE_PATH)) return;
+    const raw = JSON.parse(fs.readFileSync(GEOIP_DISK_CACHE_PATH, 'utf-8'));
+    if (!raw || typeof raw !== 'object') return;
+    const nowSec = Date.now() / 1000;
+    const cutoffSec = nowSec - 7 * 86400;
+    const entries = raw.entries && typeof raw.entries === 'object' ? raw.entries : raw;
+    for (const [ipK, val] of Object.entries(entries as Record<string, Record<string, unknown>>)) {
+      if (val && typeof val.lat === 'number' && typeof val.lng === 'number') {
+        const tsRaw = Number(val.ts || nowSec);
+        const tsSec = tsRaw > 1e12 ? tsRaw / 1000 : tsRaw;
+        if (tsSec >= cutoffSec) {
+          geoIpCache[ipK] = {
+            ip: ipK,
+            lat: Number(val.lat),
+            lng: Number(val.lng),
+            city: String(val.city || 'Nodo Remoto'),
+            region: String(val.region || ''),
+            country: String(val.country || ''),
+            countryCode: String(val.countryCode || val.country_code || ''),
+            country_code: String(val.country_code || val.countryCode || ''),
+            isp: String(val.isp || ''),
+            org: String(val.org || val.isp || ''),
+            as: String(val.as || val.asn || ''),
+            asn: String(val.asn || val.as || ''),
+            ts: tsSec * 1000,
+          };
+        }
+      }
+    }
+    if (raw.server_self_geo && typeof raw.server_self_geo.lat === 'number') {
+      const sg = raw.server_self_geo;
+      serverSelfGeo = {
+        ip: String(sg.ip || ''),
+        lat: Number(sg.lat),
+        lng: Number(sg.lng),
+        city: String(sg.city || 'Nodo Servidor'),
+        country: String(sg.country || ''),
+        countryCode: String(sg.countryCode || sg.country_code || ''),
+        isp: String(sg.isp || sg.org || ''),
+        org: String(sg.org || sg.isp || os.hostname()),
+        as: String(sg.as || sg.asn || ''),
+        ts: Date.now(),
+      };
+    }
+  } catch {
+    // Ignore disk cache load errors
+  }
+}
+
+function saveGeoIpDiskCache(force = false) {
+  const now = Date.now();
+  if (!force && !geoIpWorkerStats.dirtyDisk) return;
+  if (!force && now - geoIpWorkerStats.lastDiskSaveMs < 15000) return;
+  try {
+    const keys = Object.keys(geoIpCache);
+    if (keys.length > GEOIP_MAX_ENTRIES) {
+      keys.sort((a, b) => (geoIpCache[b]?.ts || 0) - (geoIpCache[a]?.ts || 0));
+      for (const dropKey of keys.slice(GEOIP_MAX_ENTRIES)) {
+        delete geoIpCache[dropKey];
+      }
+    }
+    const payload = {
+      updated_at: Math.floor(now / 1000),
+      server_self_geo: serverSelfGeo,
+      entries: geoIpCache,
+    };
+    geoIpWorkerStats.dirtyDisk = false;
+    geoIpWorkerStats.lastDiskSaveMs = now;
+    fs.writeFileSync(GEOIP_DISK_CACHE_PATH, JSON.stringify(payload), 'utf-8');
+  } catch {
+    // Ignore disk write errors
+  }
+}
+
+loadGeoIpDiskCache();
+
+function getGeoIpWorkerSummary() {
+  const total = geoIpWorkerStats.cacheHits + geoIpWorkerStats.cacheMisses;
+  const hitRate = total > 0 ? Math.round((geoIpWorkerStats.cacheHits / total) * 1000) / 10 : 100.0;
+  return {
+    status: geoIpWorkerStats.status,
+    cached_ips: Object.keys(geoIpCache).length,
+    cache_hits: geoIpWorkerStats.cacheHits,
+    cache_misses: geoIpWorkerStats.cacheMisses,
+    hit_rate_pct: hitRate,
+    api_batches_sent: geoIpWorkerStats.apiBatchesSent,
+    api_ips_resolved: geoIpWorkerStats.apiIpsResolved,
+    pending_queue: geoIpPendingQueue.size,
+    rate_limit_remaining: geoIpWorkerStats.rateLimitRemaining,
+    last_sync: geoIpWorkerStats.lastSyncStr,
+  };
+}
 
 function decodeProcHexIp(hexIp: string): string {
   if (!hexIp || hexIp.length !== 8) return '';
@@ -316,10 +436,15 @@ function decodeProcHexIp(hexIp: string): string {
 
 function isPrivateOrLinkLocalIp(ip: string): boolean {
   if (!ip) return true;
-  if (ip.startsWith('127.') || ip === '0.0.0.0' || ip === '::1') return true;
-  if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('169.254.')) return true;
-  if (ip.startsWith('172.')) {
-    const second = parseInt(ip.split('.')[1] || '0', 10);
+  const clean = ip.trim().replace('::ffff:', '');
+  if (clean.startsWith('127.') || clean === '0.0.0.0' || clean === '::1') return true;
+  if (clean.startsWith('10.') || clean.startsWith('192.168.') || clean.startsWith('169.254.')) return true;
+  if (clean.startsWith('100.')) {
+    const second = parseInt(clean.split('.')[1] || '0', 10);
+    if (second >= 64 && second <= 127) return true; // Carrier-Grade NAT / Tailscale RFC6598
+  }
+  if (clean.startsWith('172.')) {
+    const second = parseInt(clean.split('.')[1] || '0', 10);
     if (second >= 16 && second <= 31) return true;
   }
   return false;
@@ -462,25 +587,32 @@ function httpGetJson(url: string): Promise<unknown> {
   });
 }
 
-function httpPostBatchGeo(ips: string[]): Promise<unknown> {
+function httpPostBatchGeo(ips: string[]): Promise<{ items: unknown; rlRemaining?: number; rlTtl?: number } | null> {
   return new Promise((resolve) => {
     const payload = JSON.stringify(ips.slice(0, 80));
     const req = http.request(
-      'http://ip-api.com/batch?fields=status,country,countryCode,city,lat,lon,isp,org,as,query',
+      'http://ip-api.com/batch?fields=status,message,country,countryCode,regionName,city,lat,lon,isp,org,as,query',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
+          'User-Agent': 'RecursosDashboard-GeoIPWorker/4.4',
         },
-        timeout: 3000,
+        timeout: 3500,
       },
       (res) => {
         let data = '';
+        const rlRem = res.headers['x-rl'] ? parseInt(String(res.headers['x-rl']), 10) : undefined;
+        const rlTtl = res.headers['x-ttl'] ? parseInt(String(res.headers['x-ttl']), 10) : undefined;
         res.on('data', (chunk) => (data += chunk));
         res.on('end', () => {
+          if (res.statusCode === 429) {
+            resolve({ items: null, rlRemaining: 0, rlTtl: rlTtl || 60 });
+            return;
+          }
           try {
-            resolve(JSON.parse(data));
+            resolve({ items: JSON.parse(data), rlRemaining: rlRem, rlTtl });
           } catch {
             resolve(null);
           }
@@ -497,17 +629,126 @@ function httpPostBatchGeo(ips: string[]): Promise<unknown> {
   });
 }
 
-async function triggerAsyncGeoSync() {
+async function resolveGeoIpBatchFromIpApi(ipsToResolve: string[]): Promise<Record<string, GeoIpRecord>> {
   const now = Date.now();
-  if (geoSyncInFlight || (serverSelfGeo && now - lastGeoSyncTs < 15000)) return;
+  if (now < geoIpWorkerStats.rateLimitResetMs && geoIpWorkerStats.rateLimitRemaining <= 1) {
+    geoIpWorkerStats.status = 'throttled';
+    return {};
+  }
+
+  const cleanIps: string[] = [];
+  for (const rawIp of ipsToResolve) {
+    const ip = String(rawIp || '').trim().replace('::ffff:', '');
+    if (!ip || isPrivateOrLinkLocalIp(ip)) continue;
+    if (geoIpCache[ip] && now - geoIpCache[ip].ts < GEOIP_TTL_MS) continue;
+    const negTs = geoIpNegativeCache.get(ip) || 0;
+    if (now - negTs < GEOIP_NEG_TTL_MS) continue;
+    if (!cleanIps.includes(ip)) cleanIps.push(ip);
+  }
+
+  if (cleanIps.length === 0) return {};
+
+  const batchSlice = cleanIps.slice(0, 80);
+  const resolvedNow: Record<string, GeoIpRecord> = {};
+  geoIpWorkerStats.status = 'resolving';
+
+  try {
+    const batchResp = await httpPostBatchGeo(batchSlice);
+    if (batchResp) {
+      geoIpWorkerStats.apiBatchesSent++;
+      geoIpWorkerStats.lastSyncStr = new Date().toLocaleTimeString('es-ES');
+      if (typeof batchResp.rlRemaining === 'number' && !isNaN(batchResp.rlRemaining)) {
+        geoIpWorkerStats.rateLimitRemaining = batchResp.rlRemaining;
+      }
+      if (typeof batchResp.rlTtl === 'number' && !isNaN(batchResp.rlTtl) && geoIpWorkerStats.rateLimitRemaining <= 2) {
+        geoIpWorkerStats.rateLimitResetMs = Date.now() + (batchResp.rlTtl + 1) * 1000;
+      }
+
+      if (Array.isArray(batchResp.items)) {
+        const seenQueries = new Set<string>();
+        for (const item of batchResp.items as Record<string, unknown>[]) {
+          if (!item || typeof item !== 'object') continue;
+          const qIp = String(item.query || '').trim();
+          if (!qIp) continue;
+          seenQueries.add(qIp);
+          geoIpPendingQueue.delete(qIp);
+
+          if (item.status === 'success' && typeof item.lat === 'number' && typeof item.lon === 'number') {
+            const record: GeoIpRecord = {
+              ip: qIp,
+              lat: Number(item.lat),
+              lng: Number(item.lon),
+              city: String(item.city || 'Nodo Remoto'),
+              region: String(item.regionName || ''),
+              country: String(item.country || ''),
+              countryCode: String(item.countryCode || ''),
+              country_code: String(item.countryCode || ''),
+              isp: String(item.isp || item.org || ''),
+              org: String(item.org || item.isp || ''),
+              as: String(item.as || ''),
+              asn: String(item.as || ''),
+              ts: Date.now(),
+            };
+            geoIpCache[qIp] = record;
+            geoIpNegativeCache.delete(qIp);
+            resolvedNow[qIp] = record;
+            geoIpWorkerStats.apiIpsResolved++;
+            geoIpWorkerStats.dirtyDisk = true;
+          } else {
+            geoIpNegativeCache.set(qIp, Date.now());
+          }
+        }
+        for (const reqIp of batchSlice) {
+          if (!seenQueries.has(reqIp)) {
+            geoIpPendingQueue.delete(reqIp);
+            geoIpNegativeCache.set(reqIp, Date.now());
+          }
+        }
+      }
+    }
+  } catch {
+    // Non-blocking error handling
+  } finally {
+    geoIpWorkerStats.status = 'active';
+  }
+
+  if (Object.keys(resolvedNow).length > 0) {
+    saveGeoIpDiskCache(false);
+  }
+  return resolvedNow;
+}
+
+function enqueueRemoteIpsForGeoIp(ips: string[]) {
+  const now = Date.now();
+  let added = false;
+  for (const rawIp of ips) {
+    const ip = String(rawIp || '').trim().replace('::ffff:', '');
+    if (!ip || isPrivateOrLinkLocalIp(ip)) continue;
+    if (geoIpCache[ip] && now - geoIpCache[ip].ts < GEOIP_TTL_MS) continue;
+    const negTs = geoIpNegativeCache.get(ip) || 0;
+    if (now - negTs < GEOIP_NEG_TTL_MS) continue;
+    if (!geoIpPendingQueue.has(ip)) {
+      geoIpPendingQueue.add(ip);
+      added = true;
+    }
+  }
+  if (added) {
+    void triggerAsyncGeoSync(true);
+  }
+}
+
+async function triggerAsyncGeoSync(immediate = false) {
+  const now = Date.now();
+  if (geoSyncInFlight) return;
+  if (!immediate && serverSelfGeo && geoIpPendingQueue.size === 0 && now - lastGeoSyncTs < 8000) return;
   geoSyncInFlight = true;
   lastGeoSyncTs = now;
 
   try {
     // 1. Resolve Server's own Public WAN IP & Coordinates
-    if (!serverSelfGeo) {
+    if (!serverSelfGeo || now - serverSelfGeo.ts > 30 * 60 * 1000) {
       const selfData = (await httpGetJson(
-        'http://ip-api.com/json/?fields=status,country,countryCode,city,lat,lon,isp,org,as,query'
+        'http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,lat,lon,isp,org,as,query'
       )) as Record<string, unknown> | null;
       if (selfData && selfData.status === 'success' && typeof selfData.lat === 'number') {
         serverSelfGeo = {
@@ -520,7 +761,9 @@ async function triggerAsyncGeoSync() {
           isp: String(selfData.isp || ''),
           org: String(selfData.org || os.hostname()),
           as: String(selfData.as || ''),
+          ts: Date.now(),
         };
+        geoIpWorkerStats.dirtyDisk = true;
       }
     }
 
@@ -552,50 +795,62 @@ async function triggerAsyncGeoSync() {
       }
     }
 
-    // 3. Collect all public IPs that need GeoIP coordinates
-    const sockets = parseProcNetSockets();
-    const candidateIps = new Set<string>();
-    for (const s of sockets) {
-      if (!isPrivateOrLinkLocalIp(s.remoteIp) && !geoIpCache[s.remoteIp]) {
-        candidateIps.add(s.remoteIp);
+    // 3. Prune expired GeoIP cache entries (>7 days) & negative cache (>15 min)
+    for (const [kIp, entry] of Object.entries(geoIpCache)) {
+      if (now - entry.ts > GEOIP_TTL_MS) {
+        delete geoIpCache[kIp];
       }
     }
-    for (const ep of resolvedOutboundEndpoints.values()) {
-      if (!isPrivateOrLinkLocalIp(ep.ip) && !geoIpCache[ep.ip]) {
-        candidateIps.add(ep.ip);
-      }
-    }
-    for (const client of recentHttpIncomingClients.values()) {
-      if (!isPrivateOrLinkLocalIp(client.ip) && !geoIpCache[client.ip]) {
-        candidateIps.add(client.ip);
+    for (const [kIp, negTs] of geoIpNegativeCache.entries()) {
+      if (now - negTs > GEOIP_NEG_TTL_MS) {
+        geoIpNegativeCache.delete(kIp);
       }
     }
 
-    if (candidateIps.size > 0) {
-      const batchResp = await httpPostBatchGeo(Array.from(candidateIps));
-      if (Array.isArray(batchResp)) {
-        for (const item of batchResp as Record<string, unknown>[]) {
-          if (item && item.status === 'success' && typeof item.lat === 'number' && item.query) {
-            const qIp = String(item.query);
-            geoIpCache[qIp] = {
-              ip: qIp,
-              lat: Number(item.lat),
-              lng: Number(item.lon),
-              city: String(item.city || 'Nodo Remoto'),
-              country: String(item.country || ''),
-              countryCode: String(item.countryCode || ''),
-              isp: String(item.isp || ''),
-              org: String(item.org || item.isp || ''),
-              as: String(item.as || ''),
-            };
-          }
-        }
+    // 4. Collect all detected remote public IPs from sockets, DNS targets, and HTTP clients
+    const sockets = parseProcNetSockets();
+    const detectedPublicIps = new Set<string>();
+    for (const s of sockets) {
+      if (!isPrivateOrLinkLocalIp(s.remoteIp)) detectedPublicIps.add(s.remoteIp);
+    }
+    for (const ep of resolvedOutboundEndpoints.values()) {
+      if (!isPrivateOrLinkLocalIp(ep.ip)) detectedPublicIps.add(ep.ip);
+    }
+    for (const client of recentHttpIncomingClients.values()) {
+      if (!isPrivateOrLinkLocalIp(client.ip)) detectedPublicIps.add(client.ip);
+    }
+
+    for (const qIp of detectedPublicIps) {
+      if (geoIpCache[qIp]) {
+        geoIpWorkerStats.cacheHits++;
+      } else if (now - (geoIpNegativeCache.get(qIp) || 0) < GEOIP_NEG_TTL_MS) {
+        continue;
+      } else {
+        geoIpWorkerStats.cacheMisses++;
+        geoIpPendingQueue.add(qIp);
       }
     }
+
+    if (geoIpPendingQueue.size > 0) {
+      await resolveGeoIpBatchFromIpApi(Array.from(geoIpPendingQueue));
+    }
+    saveGeoIpDiskCache(false);
   } catch {
     // Non-blocking background sync
   } finally {
     geoSyncInFlight = false;
+  }
+}
+
+function startGeoIpBackgroundWorker() {
+  if (geoWorkerIntervalStarted) return;
+  geoWorkerIntervalStarted = true;
+  void triggerAsyncGeoSync(true);
+  const timer = setInterval(() => {
+    void triggerAsyncGeoSync(false);
+  }, 6000);
+  if (typeof timer.unref === 'function') {
+    timer.unref();
   }
 }
 
@@ -623,10 +878,13 @@ function buildLiveConnectionsMap(localIp: string) {
     isp: string;
     asn: string;
     is_lan: boolean;
+    geo_status: 'cached' | 'lan' | 'pending';
   }[] = [];
 
   const rawSockets = parseProcNetSockets();
   let lanIndex = 0;
+  let pendingIndex = 0;
+  const uncachedPublicIps: string[] = [];
 
   // 1. Add active kernel sockets (/proc/net/tcp & /proc/net/udp)
   for (const s of rawSockets) {
@@ -637,8 +895,9 @@ function buildLiveConnectionsMap(localIp: string) {
     let city = geo?.city || (isLan ? 'Enlace Red Interna / Gateway' : 'Resolviendo GeoIP...');
     let country = geo?.country || (isLan ? srvCountry : '');
     const countryCode = geo?.countryCode || (isLan ? serverSelfGeo?.countryCode || '' : '');
-    const isp = geo?.org || geo?.isp || (isLan ? 'Subred Local / Tunel de Contenedor' : 'Red Externa');
+    const isp = geo?.org || geo?.isp || (isLan ? 'Subred Local / Tunel de Contenedor' : 'En cola del Worker GeoIP (ip-api.com)');
     const asn = geo?.as || (isLan ? 'LAN-KERNEL' : '');
+    let geoStatus: 'cached' | 'lan' | 'pending' = geo ? 'cached' : isLan ? 'lan' : 'pending';
 
     if (lat === undefined || lng === undefined) {
       if (isLan) {
@@ -648,7 +907,13 @@ function buildLiveConnectionsMap(localIp: string) {
         lat = Number((srvLat + radius * Math.cos(angle)).toFixed(5));
         lng = Number((srvLng + radius * Math.sin(angle) * 1.4).toFixed(5));
       } else {
-        continue;
+        uncachedPublicIps.push(s.remoteIp);
+        pendingIndex++;
+        const angle = (pendingIndex * 105.0 * Math.PI) / 180;
+        const radius = 0.35 + (pendingIndex % 5) * 0.12;
+        lat = Number((srvLat + radius * Math.cos(angle)).toFixed(5));
+        lng = Number((srvLng + radius * Math.sin(angle) * 1.4).toFixed(5));
+        geoStatus = 'pending';
       }
     }
 
@@ -670,6 +935,7 @@ function buildLiveConnectionsMap(localIp: string) {
       isp,
       asn,
       is_lan: isLan,
+      geo_status: geoStatus,
     });
   }
 
@@ -677,11 +943,13 @@ function buildLiveConnectionsMap(localIp: string) {
   for (const client of recentHttpIncomingClients.values()) {
     const isLan = isPrivateOrLinkLocalIp(client.ip);
     const geo = geoIpCache[client.ip];
-    if (!geo && !isLan) continue;
+    if (!geo && !isLan) {
+      uncachedPublicIps.push(client.ip);
+    }
     lanIndex++;
     const angle = (lanIndex * 95 * Math.PI) / 180;
-    const lat = geo ? geo.lat : Number((srvLat + 0.028 * Math.cos(angle)).toFixed(5));
-    const lng = geo ? geo.lng : Number((srvLng + 0.036 * Math.sin(angle)).toFixed(5));
+    const lat = geo ? geo.lat : Number((srvLat + (isLan ? 0.028 : 0.32) * Math.cos(angle)).toFixed(5));
+    const lng = geo ? geo.lng : Number((srvLng + (isLan ? 0.036 : 0.42) * Math.sin(angle)).toFixed(5));
 
     if (!connections.some((c) => c.remote_ip === client.ip && c.direction === 'incoming')) {
       connections.push({
@@ -696,12 +964,13 @@ function buildLiveConnectionsMap(localIp: string) {
         state: 'ESTABLISHED',
         lat,
         lng,
-        city: geo?.city || 'Cliente Web Activo',
-        country: geo?.country || srvCountry,
-        country_code: geo?.countryCode || serverSelfGeo?.countryCode || '',
-        isp: geo?.org || geo?.isp || 'Sesión Remota Autenticada',
+        city: geo?.city || (isLan ? 'Cliente Web Activo' : 'Resolviendo GeoIP...'),
+        country: geo?.country || (isLan ? srvCountry : ''),
+        country_code: geo?.countryCode || (isLan ? serverSelfGeo?.countryCode || '' : ''),
+        isp: geo?.org || geo?.isp || (isLan ? 'Sesión Remota Autenticada' : 'En cola del Worker GeoIP (ip-api.com)'),
         asn: geo?.as || '',
         is_lan: isLan,
+        geo_status: geo ? 'cached' : isLan ? 'lan' : 'pending',
       });
     }
   }
@@ -709,7 +978,10 @@ function buildLiveConnectionsMap(localIp: string) {
   // 3. Add active outbound telemetry/OTA/DNS endpoints resolved via real DNS + GeoIP
   for (const ep of resolvedOutboundEndpoints.values()) {
     const geo = geoIpCache[ep.ip];
-    if (!geo) continue;
+    if (!geo) {
+      uncachedPublicIps.push(ep.ip);
+      continue;
+    }
     if (!connections.some((c) => c.remote_ip === ep.ip)) {
       connections.push({
         id: `out_${ep.host}_${ep.ip}`,
@@ -729,8 +1001,13 @@ function buildLiveConnectionsMap(localIp: string) {
         isp: geo.org || geo.isp,
         asn: geo.as,
         is_lan: false,
+        geo_status: 'cached',
       });
     }
+  }
+
+  if (uncachedPublicIps.length > 0) {
+    enqueueRemoteIpsForGeoIp(uncachedPublicIps);
   }
 
   const incomingCount = connections.filter((c) => c.direction === 'incoming').length;
@@ -755,6 +1032,7 @@ function buildLiveConnectionsMap(localIp: string) {
       blocked: blockedCount,
     },
     connections,
+    geoip_worker: getGeoIpWorkerSummary(),
   };
 }
 
@@ -939,6 +1217,7 @@ function writeCustomLogos(logos: Record<string, string>) {
 
 function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
   sampleRealCpuUsage();
+  startGeoIpBackgroundWorker();
   return {
     name: 'real-os-telemetry-middleware',
     configureServer(server) {
@@ -954,6 +1233,73 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
             ts: Date.now(),
             service: 'Panel Recursos Web UI (HTTPS)',
           });
+          enqueueRemoteIpsForGeoIp([xff]);
+        }
+
+        if (url === '/api/net/geoip' && req.method === 'GET') {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              status: 'ok',
+              worker: getGeoIpWorkerSummary(),
+              server_node: serverSelfGeo,
+              cache: geoIpCache,
+            })
+          );
+          return;
+        }
+
+        if ((url === '/api/net/geoip/resolve' || url === '/api/net/geoip') && req.method === 'POST') {
+          let bodyStr = '';
+          req.on('data', (chunk) => {
+            bodyStr += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              const body = JSON.parse(bodyStr || '{}');
+              const reqIps: string[] = Array.isArray(body.ips) ? body.ips : [];
+              const forceSync = Boolean(body.force_sync);
+              const results: Record<string, GeoIpRecord> = {};
+              const missingIps: string[] = [];
+              const now = Date.now();
+
+              for (const rawIp of reqIps.slice(0, 100)) {
+                const ip = String(rawIp || '').trim().replace('::ffff:', '');
+                if (!ip || isPrivateOrLinkLocalIp(ip)) continue;
+                const cached = geoIpCache[ip];
+                if (cached && now - cached.ts < GEOIP_TTL_MS && !forceSync) {
+                  geoIpWorkerStats.cacheHits++;
+                  results[ip] = cached;
+                } else if (now - (geoIpNegativeCache.get(ip) || 0) < GEOIP_NEG_TTL_MS && !forceSync) {
+                  continue;
+                } else {
+                  geoIpWorkerStats.cacheMisses++;
+                  missingIps.push(ip);
+                }
+              }
+
+              if (missingIps.length > 0) {
+                const newlyResolved = await resolveGeoIpBatchFromIpApi(missingIps);
+                Object.assign(results, newlyResolved);
+              } else if (forceSync) {
+                await triggerAsyncGeoSync(true);
+              }
+
+              res.setHeader('Content-Type', 'application/json');
+              res.end(
+                JSON.stringify({
+                  success: true,
+                  results,
+                  worker: getGeoIpWorkerSummary(),
+                })
+              );
+            } catch {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Solicitud GeoIP inválida' }));
+            }
+          });
+          return;
         }
 
         if (url === '/api/custom-logos' && req.method === 'GET') {
@@ -1118,7 +1464,18 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
             disks,
             disk_io: { read_bytes_sec: 0, write_bytes_sec: 0, read_total_bytes: 0, write_total_bytes: 0 },
             net,
-            wifi_clients: (net.interfaces_list as { name: string; ip: string; mac: string; speed_mbps: number }[]).map((nic) => ({
+            wifi_clients: (
+              net.interfaces_list as {
+                name: string;
+                ip: string;
+                mac: string;
+                speed_mbps: number;
+                bytes_recv?: number;
+                bytes_sent?: number;
+                rx_bytes_sec?: number;
+                tx_bytes_sec?: number;
+              }[]
+            ).map((nic) => ({
               name: `${os.hostname()} (${nic.name})`,
               ip: nic.ip || '127.0.0.1',
               mac: nic.mac || 'INTERFAZ-ACTIVA',
@@ -1130,6 +1487,10 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
               auto_logo_url: osCatalogEntry.logo,
               rssi: null,
               tx_rate: nic.speed_mbps ? `${nic.speed_mbps} Mbps` : ' Enlace Activo',
+              tx_bytes: nic.bytes_recv || 0,
+              rx_bytes: nic.bytes_sent || 0,
+              speed_down: nic.rx_bytes_sec || 0,
+              speed_up: nic.tx_bytes_sec || 0,
               is_online: true,
             })),
             wifi_summary: {

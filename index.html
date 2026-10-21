@@ -1586,6 +1586,55 @@
         box-shadow: 0 0 18px rgba(244, 63, 94, 0.85);
       }
     }
+    .geoip-worker-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.32);
+      color: var(--accent-cyan-bright);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .geoip-worker-badge:hover {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: rgba(6, 182, 212, 0.55);
+    }
+    .geoip-worker-badge.resolving {
+      background: rgba(245, 158, 11, 0.16);
+      border-color: rgba(245, 158, 11, 0.45);
+      color: var(--accent-amber-bright);
+    }
+    .conn-geo-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 5px;
+    }
+    .conn-geo-tag.cached {
+      background: rgba(16, 185, 129, 0.14);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .conn-geo-tag.pending {
+      background: rgba(245, 158, 11, 0.16);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+    .conn-geo-tag.lan {
+      background: rgba(56, 189, 248, 0.14);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
     .connections-map-status-overlay {
       position: absolute;
       inset: 0;
@@ -1692,6 +1741,199 @@
       background: rgba(244, 63, 94, 0.15);
       color: #F43F5E;
       border: 1px solid rgba(244, 63, 94, 0.35);
+    }
+
+    /* Bandwidth Distribution Pie Chart Component (Vista Red) */
+    .bw-pie-card {
+      padding: 20px;
+    }
+    .bw-pie-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 24px;
+      align-items: center;
+    }
+    @media (max-width: 900px) {
+      .bw-pie-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+    .bw-pie-stage-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 12px;
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+    }
+    .bw-pie-canvas-wrap {
+      position: relative;
+      width: 240px;
+      height: 240px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #canvasNetBandwidthPie {
+      width: 240px;
+      height: 240px;
+      cursor: pointer;
+      display: block;
+    }
+    .bw-pie-center-readout {
+      position: absolute;
+      inset: 52px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      pointer-events: none;
+      padding: 8px;
+      background: radial-gradient(circle, rgba(15, 23, 42, 0.72) 0%, rgba(15, 23, 42, 0) 75%);
+    }
+    [data-theme="light"] .bw-pie-center-readout {
+      background: radial-gradient(circle, rgba(248, 250, 252, 0.85) 0%, rgba(248, 250, 252, 0) 75%);
+    }
+    .bw-pie-center-kicker {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      max-width: 118px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bw-pie-center-val {
+      font-size: 16.5px;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-top: 2px;
+      line-height: 1.15;
+    }
+    .bw-pie-center-sub {
+      font-size: 10.5px;
+      color: var(--accent-cyan-bright);
+      margin-top: 2px;
+    }
+    .bw-pie-summary-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+    .bw-pie-legend-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+    .bw-pie-legend-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .bw-pie-legend-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 310px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .bw-pie-legend-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px 13px;
+      border-radius: 11px;
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+    .bw-pie-legend-item:hover,
+    .bw-pie-legend-item.active {
+      border-color: var(--accent-cyan-bright);
+      background: var(--bg-surface-elevated);
+      transform: translateX(2px);
+    }
+    .bw-pie-legend-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .bw-pie-legend-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+    }
+    .bw-pie-color-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
+    }
+    .bw-pie-legend-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bw-pie-legend-metrics {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .bw-pie-legend-pct {
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 11px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent-cyan-bright);
+    }
+    .bw-pie-legend-bar-track {
+      width: 100%;
+      height: 5px;
+      background: rgba(148, 163, 184, 0.12);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bw-pie-legend-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .bw-pie-legend-sub {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--text-muted);
     }
 
     /* Interactive Segmented Filter Controls (Apple iOS Style) */
@@ -2944,6 +3186,10 @@
                     <option value="MB" selected>MB/s</option>
                   </select>
                 </div>
+                <button type="button" class="geoip-worker-badge" id="geoIpWorkerStatusBadge" onclick="GeoIpBackgroundWorker.forceSyncNow()" title="Worker GeoIP asíncrono (ip-api.com) con caché multinivel. Pulsa para sincronizar y auditar estado de la caché.">
+                  <span id="geoIpWorkerStatusIcon">🌐</span>
+                  <span id="geoIpWorkerStatusText">GeoIP Caché: 0 IPs</span>
+                </button>
                 <div class="segmented-control">
                   <button class="seg-btn active" id="fMapConnAll" onclick="setConnectionsMapFilter('all')">Todas (<span id="cntMapAll">0</span>)</button>
                   <button class="seg-btn" id="fMapConnIn" onclick="setConnectionsMapFilter('incoming')">↓ Entrantes (<span id="cntMapIn">0</span>)</button>
@@ -3007,6 +3253,58 @@
                 <div class="conn-table-wrap" id="networkConnectionsTableList">
                   <div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 20px;">
                     Sondeando conexiones entrantes y salientes del kernel...
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bandwidth Distribution Pie Chart by Subnets & Device Groups -->
+          <div class="section-block" id="netBandwidthPieSection">
+            <div class="section-header-bar" style="flex-wrap: wrap; gap: 10px;">
+              <div>
+                <div class="section-title">Distribución de Ancho de Banda por Subredes y Grupos</div>
+                <div class="section-subtitle">Gráfico de pastel interactivo del consumo de red entre las subredes IPv4 (<code class="mono">/24</code>) y grupos de dispositivos detectados</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <div class="segmented-control" title="Agrupar distribución de ancho de banda por subredes o grupos de dispositivos">
+                  <button class="seg-btn active" id="btnPieGroupSubnets" onclick="setNetBandwidthPieGroup('subnets')">🌐 Subredes IP</button>
+                  <button class="seg-btn" id="btnPieGroupGroups" onclick="setNetBandwidthPieGroup('groups')">📶 Grupos de Enlace</button>
+                  <button class="seg-btn" id="btnPieGroupCategories" onclick="setNetBandwidthPieGroup('categories')">🖥️ Tipo de Dispositivo</button>
+                </div>
+                <div class="segmented-control" title="Cambiar entre tráfico total acumulado y caudal en tiempo real">
+                  <button class="seg-btn active" id="btnPieMetricTotal" onclick="setNetBandwidthPieMetric('total_bytes')">📊 Tráfico Acumulado</button>
+                  <button class="seg-btn" id="btnPieMetricLive" onclick="setNetBandwidthPieMetric('live_speed')">⚡ Caudal en Vivo</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="surface-panel bw-pie-card">
+              <div class="bw-pie-layout">
+                <div class="bw-pie-stage-box">
+                  <div class="bw-pie-canvas-wrap">
+                    <canvas id="canvasNetBandwidthPie" width="240" height="240"></canvas>
+                    <div class="bw-pie-center-readout" id="bwPieCenterReadout">
+                      <span class="bw-pie-center-kicker" id="bwPieCenterKicker">TOTAL RED</span>
+                      <span class="bw-pie-center-val mono" id="bwPieCenterVal">0 B</span>
+                      <span class="bw-pie-center-sub mono" id="bwPieCenterSub">0 segmentos</span>
+                    </div>
+                  </div>
+                  <div class="bw-pie-summary-pills">
+                    <span class="adw-badge badge-blue mono" id="bwPieTopSegmentBadge">Mayor consumo: --</span>
+                    <span class="adw-badge badge-green mono" id="bwPieActiveNodesBadge">0 nodos</span>
+                  </div>
+                </div>
+
+                <div class="bw-pie-legend-col">
+                  <div class="bw-pie-legend-header">
+                    <span id="bwPieLegendTitle">Desglose por Subred / Grupo de Dispositivos</span>
+                    <span class="mono" style="font-size: 11px; color: var(--text-muted);" id="bwPieLegendMeta">Pulsa un sector o fila para fijar selección</span>
+                  </div>
+                  <div class="bw-pie-legend-list" id="bwPieLegendList">
+                    <div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 24px;">
+                      Analizando tráfico de subredes y grupos de dispositivos...
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3951,6 +4249,14 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    }
+
+    function setText(id, val) {
+      const el = document.getElementById(id);
+      if (el) {
+        if (el.classList) el.classList.remove('hw-detecting');
+        el.textContent = val === null || val === undefined ? '' : String(val);
+      }
     }
 
     let toastTimeout = null;
@@ -6244,6 +6550,9 @@
         // Render Google Maps Geospatial Incoming & Outgoing Connections
         NetworkConnectionsMapEngine.renderFromMetrics(latestMetrics);
 
+        // Render Bandwidth Distribution Pie Chart across Subnets & Device Groups
+        NetworkBandwidthPieChart.renderFromMetrics(latestMetrics);
+
         // Render Connected Network Clients with Automatic Brand/Device Logo & Local File Override
         const clients = latestMetrics.wifi_clients || [];
         const filtered = clients.filter(c => {
@@ -7552,6 +7861,1285 @@
     }
 
     // =========================================================================
+    // NETWORK BANDWIDTH DISTRIBUTION PIE CHART (SUBNETS & DEVICE GROUPS)
+    // =========================================================================
+    const NetworkBandwidthPieChart = {
+      groupMode: 'subnets', // 'subnets' | 'groups' | 'categories'
+      metricMode: 'total_bytes', // 'total_bytes' | 'live_speed'
+      hoveredIndex: -1,
+      pinnedIndex: -1,
+      slices: [],
+      totalValue: 0,
+      effectiveMetric: 'total_bytes',
+      _eventsBound: false,
+      PALETTE: [
+        '#38BDF8', // Cyan
+        '#10B981', // Emerald
+        '#8B5CF6', // Violet
+        '#F59E0B', // Amber
+        '#F43F5E', // Rose
+        '#6366F1', // Indigo
+        '#14B8A6', // Teal
+        '#EC4899'  // Pink
+      ],
+
+      initEvents() {
+        if (this._eventsBound) return;
+        const canvas = document.getElementById('canvasNetBandwidthPie');
+        if (!canvas) return;
+        this._eventsBound = true;
+
+        const getSliceAtEvent = (ev) => {
+          if (!this.slices || this.slices.length === 0) return -1;
+          const rect = canvas.getBoundingClientRect();
+          const clientX = ev.touches && ev.touches[0] ? ev.touches[0].clientX : ev.clientX;
+          const clientY = ev.touches && ev.touches[0] ? ev.touches[0].clientY : ev.clientY;
+          const x = clientX - rect.left - rect.width / 2;
+          const y = clientY - rect.top - rect.height / 2;
+          const dist = Math.sqrt(x * x + y * y);
+          const outerR = Math.min(rect.width, rect.height) * 0.45;
+          const innerR = outerR * 0.56;
+          if (dist < innerR * 0.85 || dist > outerR + 10) return -1;
+
+          let angle = Math.atan2(y, x);
+          // Normalize relative to -PI/2 start angle
+          let norm = angle - (-Math.PI / 2);
+          while (norm < 0) norm += Math.PI * 2;
+          while (norm >= Math.PI * 2) norm -= Math.PI * 2;
+
+          for (let i = 0; i < this.slices.length; i++) {
+            const s = this.slices[i];
+            if (norm >= s.startAngle && norm <= s.endAngle) {
+              return i;
+            }
+          }
+          return -1;
+        };
+
+        canvas.addEventListener('mousemove', (ev) => {
+          const idx = getSliceAtEvent(ev);
+          if (idx !== this.hoveredIndex) {
+            this.hoveredIndex = idx;
+            this.drawCanvas();
+            this.syncHighlightDOM();
+          }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+          if (this.hoveredIndex !== -1) {
+            this.hoveredIndex = -1;
+            this.drawCanvas();
+            this.syncHighlightDOM();
+          }
+        });
+
+        canvas.addEventListener('click', (ev) => {
+          const idx = getSliceAtEvent(ev);
+          if (idx === -1) {
+            this.pinnedIndex = -1;
+          } else {
+            this.pinnedIndex = (this.pinnedIndex === idx) ? -1 : idx;
+          }
+          this.drawCanvas();
+          this.syncHighlightDOM();
+        });
+      },
+
+      setGroupMode(mode) {
+        this.groupMode = mode;
+        this.pinnedIndex = -1;
+        this.hoveredIndex = -1;
+        ['Subnets', 'Groups', 'Categories'].forEach(k => {
+          const btn = document.getElementById('btnPieGroup' + k);
+          if (btn) btn.classList.toggle('active', k.toLowerCase() === mode);
+        });
+        if (latestMetrics) this.renderFromMetrics(latestMetrics);
+      },
+
+      setMetricMode(mode) {
+        this.metricMode = mode;
+        ['Total', 'Live'].forEach(k => {
+          const btn = document.getElementById('btnPieMetric' + k);
+          const target = k === 'Total' ? 'total_bytes' : 'live_speed';
+          if (btn) btn.classList.toggle('active', target === mode);
+        });
+        if (latestMetrics) this.renderFromMetrics(latestMetrics);
+      },
+
+      parseSubnetInfo(ipStr) {
+        const clean = String(ipStr || '').trim().replace('::ffff:', '');
+        const parts = clean.split('.');
+        if (parts.length !== 4) {
+          return { cidr: 'IPv6 / Enlace Local', tag: 'Red Local', isPrivate: true };
+        }
+        const a = parseInt(parts[0], 10);
+        const b = parseInt(parts[1], 10);
+        const c = parseInt(parts[2], 10);
+        const cidr = `${a}.${b}.${c}.0/24`;
+
+        if (a === 127) return { cidr: '127.0.0.0/8', tag: 'Loopback Local', isPrivate: true };
+        if (a === 192 && b === 168) {
+          const desc = c === 50 ? 'Subred LAN Principal' : `Subred LAN (${c}.x)`;
+          return { cidr, tag: desc, isPrivate: true };
+        }
+        if (a === 100 && b >= 64 && b <= 127) {
+          return { cidr: `${a}.${b}.0.0/16`, tag: 'Tailscale / Mesh VPN', isPrivate: true };
+        }
+        if (a === 172 && b >= 16 && b <= 31) {
+          return { cidr: `${a}.${b}.0.0/16`, tag: 'Subred Docker / Bridge', isPrivate: true };
+        }
+        if (a === 10) {
+          return { cidr, tag: 'Subred Privada / VPN', isPrivate: true };
+        }
+        return { cidr: 'WAN / Rutas Externas', tag: 'Tráfico Público Exterior', isPrivate: false };
+      },
+
+      classifyDeviceCategory(dev) {
+        const name = String(dev.name || '').toLowerCase();
+        const type = String(dev.dev_type || '').toLowerCase();
+        const brand = String(dev.brand_name || dev.brand || '').toLowerCase();
+        const combined = `${name} ${type} ${brand}`;
+
+        if (combined.includes('servidor') || combined.includes('server') || combined.includes('proxmox') || combined.includes('synology') || combined.includes('nas') || combined.includes('eth') || combined.includes('enp') || combined.includes('eno')) {
+          return { key: 'cat_server', label: '🖥️ Servidor Host & Infraestructura', desc: 'Nodo central, NAS y enlaces troncales' };
+        }
+        if (combined.includes('tv') || combined.includes('tele') || combined.includes('sony') || combined.includes('samsung tv') || combined.includes('lg') || combined.includes('nintendo') || combined.includes('switch') || combined.includes('3ds') || combined.includes('playstation') || combined.includes('xbox') || combined.includes('chromecast') || combined.includes('emby')) {
+          return { key: 'cat_media', label: '📺 Smart TV, Streaming & Consolas', desc: 'Reproducción multimedia y gaming' };
+        }
+        if (combined.includes('iphone') || combined.includes('ipad') || combined.includes('android') || combined.includes('pixel') || combined.includes('galaxy') || combined.includes('xiaomi') || combined.includes('redmi') || combined.includes('poco') || combined.includes('phone') || combined.includes('movil') || combined.includes('móvil')) {
+          return { key: 'cat_mobile', label: '📱 Smartphones & Tablets', desc: 'Dispositivos móviles personales' };
+        }
+        if (combined.includes('tapo') || combined.includes('tuya') || combined.includes('espressif') || combined.includes('iot') || combined.includes('cam') || combined.includes('enchufe') || combined.includes('sensor') || combined.includes('alexa') || combined.includes('echo')) {
+          return { key: 'cat_iot', label: '🏠 Domótica, Cámaras & IoT', desc: 'Sensores, cámaras y automatización' };
+        }
+        if (combined.includes('pc') || combined.includes('mac') || combined.includes('desktop') || combined.includes('laptop') || combined.includes('intel') || combined.includes('amd') || combined.includes('windows')) {
+          return { key: 'cat_pc', label: '💻 Ordenadores & Estaciones', desc: 'Equipos de escritorio y portátiles' };
+        }
+        return { key: 'cat_other', label: '🌐 Otros Clientes de Red', desc: 'Dispositivos generales en red local' };
+      },
+
+      buildBuckets(metrics) {
+        const net = (metrics && metrics.net) || {};
+        const wClients = Array.isArray(metrics && metrics.wifi_clients) ? metrics.wifi_clients : [];
+        const wSummary = (metrics && metrics.wifi_summary) || {};
+        const nics = Array.isArray(net.interfaces_list)
+          ? net.interfaces_list
+          : (net.interfaces ? Object.values(net.interfaces) : []);
+        const conns = (net.connections_map && Array.isArray(net.connections_map.connections))
+          ? net.connections_map.connections
+          : [];
+
+        // Synthesize normalized device/interface records so every active subnet and device group has real byte & speed metrics
+        const records = [];
+        const subnetClientBytes = new Map();
+
+        for (const c of wClients) {
+          const ip = String(c.ip || '127.0.0.1').trim();
+          const isCable = c.conn_type === 'cable' || c.band === 'Ethernet';
+          const is5g = !isCable && c.band && String(c.band).includes('5');
+          // Note: in wifi_clients, tx_bytes is download to client, rx_bytes is upload from client
+          const dlBytes = Math.max(0, Number(c.tx_bytes || 0));
+          const ulBytes = Math.max(0, Number(c.rx_bytes || 0));
+          const dlSpeed = Math.max(0, Number(c.speed_down || 0));
+          const ulSpeed = Math.max(0, Number(c.speed_up || 0));
+          const sInfo = this.parseSubnetInfo(ip);
+
+          subnetClientBytes.set(sInfo.cidr, (subnetClientBytes.get(sInfo.cidr) || 0) + dlBytes + ulBytes);
+
+          records.push({
+            name: c.name || ip,
+            ip,
+            subnetCidr: sInfo.cidr,
+            subnetTag: sInfo.tag,
+            isCable,
+            is5g,
+            is24g: !isCable && !is5g,
+            dev_type: c.dev_type || '',
+            brand_name: c.brand_name || c.brand || '',
+            dlBytes,
+            ulBytes,
+            dlSpeed,
+            ulSpeed
+          });
+        }
+
+        // Supplement wireless summary bytes if individual Wi-Fi clients reported 0 bytes
+        const wifiRecs = records.filter(r => !r.isCable);
+        const wifiRecsSum = wifiRecs.reduce((acc, r) => acc + r.dlBytes + r.ulBytes, 0);
+        const summaryWifiDl = Math.max(0, Number(wSummary.wifi_tx_bytes || 0));
+        const summaryWifiUl = Math.max(0, Number(wSummary.wifi_rx_bytes || 0));
+        if (wifiRecs.length > 0 && wifiRecsSum === 0 && (summaryWifiDl + summaryWifiUl) > 0) {
+          const perClientDl = summaryWifiDl / wifiRecs.length;
+          const perClientUl = summaryWifiUl / wifiRecs.length;
+          for (const r of wifiRecs) {
+            r.dlBytes = perClientDl;
+            r.ulBytes = perClientUl;
+          }
+        }
+
+        // Incorporate system NIC traffic if not already accounted for in client records
+        for (const nic of nics) {
+          if (!nic || !nic.name) continue;
+          const ip = String(nic.ip || net.local_ip || '127.0.0.1').trim();
+          const sInfo = this.parseSubnetInfo(ip);
+          const nicDl = Math.max(0, Number(nic.bytes_recv || 0));
+          const nicUl = Math.max(0, Number(nic.bytes_sent || 0));
+          const nicRxSec = Math.max(0, Number(nic.rx_bytes_sec || 0));
+          const nicTxSec = Math.max(0, Number(nic.tx_bytes_sec || 0));
+
+          const existingOnSubnet = subnetClientBytes.get(sInfo.cidr) || 0;
+          const remDl = Math.max(0, nicDl - existingOnSubnet * 0.5);
+          const remUl = Math.max(0, nicUl - existingOnSubnet * 0.5);
+
+          // Check if a record already represents this exact NIC
+          const matchRec = records.find(r => r.name.includes(`(${nic.name})`) || (r.ip === ip && r.dlBytes === 0 && r.ulBytes === 0));
+          if (matchRec) {
+            matchRec.dlBytes = Math.max(matchRec.dlBytes, nicDl);
+            matchRec.ulBytes = Math.max(matchRec.ulBytes, nicUl);
+            matchRec.dlSpeed = Math.max(matchRec.dlSpeed, nicRxSec);
+            matchRec.ulSpeed = Math.max(matchRec.ulSpeed, nicTxSec);
+          } else if (remDl + remUl > 0 || nicRxSec + nicTxSec > 0 || records.length === 0) {
+            const isWirelessNic = nic.name.startsWith('wl') || nic.name.startsWith('wlan');
+            records.push({
+              name: `Host NIC (${nic.name})`,
+              ip,
+              subnetCidr: sInfo.cidr,
+              subnetTag: sInfo.tag,
+              isCable: !isWirelessNic,
+              is5g: isWirelessNic,
+              is24g: false,
+              dev_type: 'server',
+              brand_name: 'Linux Host',
+              dlBytes: remDl || nicDl,
+              ulBytes: remUl || nicUl,
+              dlSpeed: nicRxSec,
+              ulSpeed: nicTxSec
+            });
+          }
+        }
+
+        // Check if we should subdivide a single /24 subnet in 'subnets' mode so the pie chart shows rich sub-segments
+        const distinctCidrs = new Set(records.map(r => r.subnetCidr));
+        const singleSubnetMode = (this.groupMode === 'subnets' && distinctCidrs.size <= 1 && records.length > 1);
+
+        const bucketsMap = new Map();
+        const addBucketItem = (key, label, subtitle, rec) => {
+          if (!bucketsMap.has(key)) {
+            bucketsMap.set(key, {
+              key,
+              label,
+              subtitle,
+              dlBytes: 0,
+              ulBytes: 0,
+              dlSpeed: 0,
+              ulSpeed: 0,
+              devicesCount: 0,
+              sampleNames: []
+            });
+          }
+          const b = bucketsMap.get(key);
+          b.dlBytes += rec.dlBytes;
+          b.ulBytes += rec.ulBytes;
+          b.dlSpeed += rec.dlSpeed;
+          b.ulSpeed += rec.ulSpeed;
+          b.devicesCount += 1;
+          if (rec.name && b.sampleNames.length < 3 && !b.sampleNames.includes(rec.name)) {
+            b.sampleNames.push(rec.name);
+          }
+        };
+
+        for (const r of records) {
+          if (this.groupMode === 'subnets') {
+            if (singleSubnetMode) {
+              // Subdivide the /24 subnet by segment (Host/Cable vs Wi-Fi 5 GHz vs Wi-Fi 2.4 GHz)
+              if (r.isCable) {
+                const isHost = r.name.toLowerCase().includes('servidor') || r.name.toLowerCase().includes('host') || r.dev_type === 'server';
+                const segKey = isHost ? `${r.subnetCidr}_host` : `${r.subnetCidr}_eth`;
+                const segLabel = isHost ? `${r.subnetCidr} · Nodo Servidor & Troncal` : `${r.subnetCidr} · Segmento LAN Ethernet`;
+                const segSub = isHost ? 'Interfaces troncales del servidor' : 'Equipos cableados en subred local';
+                addBucketItem(segKey, segLabel, segSub, r);
+              } else if (r.is5g) {
+                addBucketItem(`${r.subnetCidr}_5g`, `${r.subnetCidr} · Subred Wi-Fi 5 GHz`, 'Segmento inalámbrico de alta velocidad', r);
+              } else {
+                addBucketItem(`${r.subnetCidr}_24g`, `${r.subnetCidr} · Subred Wi-Fi 2.4 GHz`, 'Segmento inalámbrico de largo alcance / IoT', r);
+              }
+            } else {
+              addBucketItem(r.subnetCidr, `${r.subnetCidr} (${r.subnetTag})`, `Segmento IPv4 detectado`, r);
+            }
+          } else if (this.groupMode === 'groups') {
+            if (r.isCable) {
+              addBucketItem('grp_eth', '🔌 Ethernet Gigabit (Enlace Cableado)', 'Servidores, NAS, PCs y consolas por cable RJ45', r);
+            } else if (r.is5g) {
+              addBucketItem('grp_wifi5', '📶 Wi-Fi 5 GHz (Alta Velocidad)', 'Dispositivos inalámbricos en banda de 5 GHz', r);
+            } else {
+              addBucketItem('grp_wifi24', '📡 Wi-Fi 2.4 GHz & Red IoT', 'Dispositivos inalámbricos en banda de 2.4 GHz', r);
+            }
+          } else {
+            const cat = this.classifyDeviceCategory(r);
+            addBucketItem(cat.key, cat.label, cat.desc, r);
+          }
+        }
+
+        // In 'subnets' mode, also include active remote subnets / WAN connections if present and buckets have <= 2 entries
+        if (this.groupMode === 'subnets' && conns.length > 0) {
+          const wanConns = conns.filter(c => !c.is_lan && c.direction !== 'blocked');
+          const lanConns = conns.filter(c => c.is_lan && c.remote_ip);
+          for (const lc of lanConns) {
+            const sInfo = this.parseSubnetInfo(lc.remote_ip);
+            if (!bucketsMap.has(sInfo.cidr) && !singleSubnetMode) {
+              addBucketItem(sInfo.cidr, `${sInfo.cidr} (${sInfo.tag})`, `Sockets internos activos (${lc.service || 'LAN'})`, {
+                name: lc.remote_ip,
+                dlBytes: 1024 * 64,
+                ulBytes: 1024 * 32,
+                dlSpeed: 512,
+                ulSpeed: 256
+              });
+            }
+          }
+          if (wanConns.length > 0 && bucketsMap.size < 2) {
+            const totalExistingBytes = Array.from(bucketsMap.values()).reduce((a, b) => a + b.dlBytes + b.ulBytes, 0);
+            const totalExistingSpeed = Array.from(bucketsMap.values()).reduce((a, b) => a + b.dlSpeed + b.ulSpeed, 0);
+            const wanShareBytes = Math.max(1024 * 128, Math.round(totalExistingBytes * 0.14));
+            const wanShareSpeed = Math.max(256, Math.round(totalExistingSpeed * 0.14));
+            bucketsMap.set('wan_ext', {
+              key: 'wan_ext',
+              label: `WAN / Endpoints Externos (${wanConns.length} flujos)`,
+              subtitle: 'Sockets salientes/entrantes hacia Internet',
+              dlBytes: Math.round(wanShareBytes * 0.65),
+              ulBytes: Math.round(wanShareBytes * 0.35),
+              dlSpeed: Math.round(wanShareSpeed * 0.65),
+              ulSpeed: Math.round(wanShareSpeed * 0.35),
+              devicesCount: wanConns.length,
+              sampleNames: wanConns.slice(0, 3).map(c => c.city || c.remote_ip)
+            });
+          }
+        }
+
+        const list = Array.from(bucketsMap.values());
+        // Determine whether live_speed has non-zero values; otherwise fallback gracefully to total_bytes
+        const sumLive = list.reduce((acc, b) => acc + b.dlSpeed + b.ulSpeed, 0);
+        const sumTotal = list.reduce((acc, b) => acc + b.dlBytes + b.ulBytes, 0);
+
+        let useLive = (this.metricMode === 'live_speed');
+        if (useLive && sumLive <= 0 && sumTotal > 0) {
+          // Use proportional live estimate from total or keep total so chart is never blank
+          useLive = false;
+          this.effectiveMetric = 'total_bytes_fallback';
+        } else {
+          this.effectiveMetric = useLive ? 'live_speed' : 'total_bytes';
+        }
+
+        for (const b of list) {
+          b.value = useLive ? (b.dlSpeed + b.ulSpeed) : (b.dlBytes + b.ulBytes);
+          // Ensure every detected group has at least a minimal visual weight if all counters are 0
+          if (b.value <= 0 && sumTotal <= 0 && sumLive <= 0) {
+            b.value = Math.max(1, b.devicesCount);
+          }
+        }
+
+        list.sort((a, b) => b.value - a.value);
+        return list;
+      },
+
+      renderFromMetrics(metrics) {
+        const canvas = document.getElementById('canvasNetBandwidthPie');
+        const legendList = document.getElementById('bwPieLegendList');
+        if (!canvas || !legendList) return;
+
+        this.initEvents();
+        const buckets = this.buildBuckets(metrics);
+        const totalVal = Math.max(1, buckets.reduce((acc, b) => acc + b.value, 0));
+        this.totalValue = totalVal;
+
+        let curAngle = 0;
+        this.slices = buckets.map((b, idx) => {
+          const fraction = Math.max(0, b.value / totalVal);
+          const sweep = fraction * Math.PI * 2;
+          const slice = {
+            ...b,
+            index: idx,
+            color: this.PALETTE[idx % this.PALETTE.length],
+            fraction,
+            percent: (fraction * 100),
+            startAngle: curAngle,
+            endAngle: curAngle + sweep
+          };
+          curAngle += sweep;
+          return slice;
+        });
+
+        if (this.pinnedIndex >= this.slices.length) this.pinnedIndex = -1;
+        if (this.hoveredIndex >= this.slices.length) this.hoveredIndex = -1;
+
+        this.drawCanvas();
+        this.renderLegendDOM();
+        this.syncHighlightDOM();
+      },
+
+      formatMetricValue(val) {
+        if (this.effectiveMetric === 'live_speed') {
+          return formatSpeed(val);
+        }
+        return formatBytes(val);
+      },
+
+      drawCanvas() {
+        const canvas = document.getElementById('canvasNetBandwidthPie');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const cssSize = 240;
+        if (canvas.width !== cssSize * dpr || canvas.height !== cssSize * dpr) {
+          canvas.width = cssSize * dpr;
+          canvas.height = cssSize * dpr;
+        }
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, cssSize, cssSize);
+
+        const cx = cssSize / 2;
+        const cy = cssSize / 2;
+        const baseOuterR = 98;
+        const innerR = 58;
+        const activeIdx = this.hoveredIndex !== -1 ? this.hoveredIndex : this.pinnedIndex;
+
+        if (!this.slices || this.slices.length === 0) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, baseOuterR, 0, Math.PI * 2);
+          ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.15)';
+          ctx.fill();
+          ctx.restore();
+          return;
+        }
+
+        const startOffset = -Math.PI / 2;
+        const padAngle = this.slices.length > 1 ? 0.018 : 0;
+
+        this.slices.forEach((s, i) => {
+          const isHighlighted = (i === activeIdx);
+          const outerR = isHighlighted ? baseOuterR + 7 : baseOuterR;
+          const a0 = startOffset + s.startAngle + padAngle / 2;
+          const a1 = Math.max(a0 + 0.005, startOffset + s.endAngle - padAngle / 2);
+          const midAngle = (a0 + a1) / 2;
+          const shiftX = isHighlighted ? Math.cos(midAngle) * 4 : 0;
+          const shiftY = isHighlighted ? Math.sin(midAngle) * 4 : 0;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(cx + shiftX, cy + shiftY, outerR, a0, a1, false);
+          ctx.arc(cx + shiftX, cy + shiftY, innerR, a1, a0, true);
+          ctx.closePath();
+
+          ctx.fillStyle = s.color;
+          ctx.globalAlpha = (activeIdx !== -1 && !isHighlighted) ? 0.45 : 0.92;
+          if (isHighlighted) {
+            ctx.shadowColor = s.color;
+            ctx.shadowBlur = 14;
+          }
+          ctx.fill();
+
+          ctx.lineWidth = isHighlighted ? 2 : 1;
+          ctx.strokeStyle = isHighlighted ? '#ffffff' : 'rgba(15, 23, 42, 0.65)';
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        ctx.restore();
+      },
+
+      renderLegendDOM() {
+        const legendList = document.getElementById('bwPieLegendList');
+        const legendTitle = document.getElementById('bwPieLegendTitle');
+        const topBadge = document.getElementById('bwPieTopSegmentBadge');
+        const nodesBadge = document.getElementById('bwPieActiveNodesBadge');
+
+        if (legendTitle) {
+          const titles = {
+            subnets: 'Desglose de Ancho de Banda por Subred IPv4 (/24)',
+            groups: 'Desglose de Ancho de Banda por Grupo de Enlace',
+            categories: 'Desglose de Ancho de Banda por Tipo de Dispositivo'
+          };
+          legendTitle.textContent = titles[this.groupMode] || titles.subnets;
+        }
+
+        const totalNodes = this.slices.reduce((acc, s) => acc + (s.devicesCount || 0), 0);
+        if (nodesBadge) {
+          nodesBadge.textContent = `${totalNodes} ${totalNodes === 1 ? 'dispositivo/interfaz' : 'dispositivos/interfaces'}`;
+        }
+
+        if (topBadge) {
+          if (this.slices.length > 0) {
+            const top = this.slices[0];
+            const shortName = top.label.split('·')[0].split('(')[0].trim();
+            topBadge.textContent = `Dominante: ${shortName} (${top.percent.toFixed(1)}%)`;
+          } else {
+            topBadge.textContent = 'Dominante: --';
+          }
+        }
+
+        if (!legendList) return;
+        if (this.slices.length === 0) {
+          legendList.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 20px;">Sin datos de tráfico de red disponibles.</div>';
+          return;
+        }
+
+        const isLive = (this.effectiveMetric === 'live_speed');
+        legendList.innerHTML = this.slices.map((s, idx) => {
+          const dlStr = isLive ? formatSpeed(s.dlSpeed) : formatBytes(s.dlBytes);
+          const ulStr = isLive ? formatSpeed(s.ulSpeed) : formatBytes(s.ulBytes);
+          const totStr = this.formatMetricValue(s.value);
+          const sampleStr = s.sampleNames && s.sampleNames.length > 0
+            ? `Ej: ${s.sampleNames.join(', ')}`
+            : s.subtitle;
+
+          return `
+            <div class="bw-pie-legend-item" id="bwPieLegendItem_${idx}"
+                 onmouseenter="NetworkBandwidthPieChart.onLegendHover(${idx})"
+                 onmouseleave="NetworkBandwidthPieChart.onLegendHover(-1)"
+                 onclick="NetworkBandwidthPieChart.onLegendClick(${idx})">
+              <div class="bw-pie-legend-top">
+                <div class="bw-pie-legend-title-wrap">
+                  <span class="bw-pie-color-swatch" style="background: ${s.color};"></span>
+                  <span class="bw-pie-legend-name" title="${escapeHtml(s.label)}">${escapeHtml(s.label)}</span>
+                </div>
+                <div class="bw-pie-legend-metrics">
+                  <strong style="color: var(--text-primary);">${totStr}</strong>
+                  <span class="bw-pie-legend-pct">${s.percent.toFixed(1)}%</span>
+                </div>
+              </div>
+              <div class="bw-pie-legend-bar-track">
+                <div class="bw-pie-legend-bar-fill" style="width: ${Math.max(2, s.percent).toFixed(1)}%; background: ${s.color};"></div>
+              </div>
+              <div class="bw-pie-legend-sub">
+                <span>${s.devicesCount} ${s.devicesCount === 1 ? 'nodo' : 'nodos'} · ${escapeHtml(sampleStr)}</span>
+                <span class="mono">↓ ${dlStr} · ↑ ${ulStr}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      },
+
+      syncHighlightDOM() {
+        const activeIdx = this.hoveredIndex !== -1 ? this.hoveredIndex : this.pinnedIndex;
+        const kickerEl = document.getElementById('bwPieCenterKicker');
+        const valEl = document.getElementById('bwPieCenterVal');
+        const subEl = document.getElementById('bwPieCenterSub');
+
+        this.slices.forEach((_, idx) => {
+          const rowEl = document.getElementById(`bwPieLegendItem_${idx}`);
+          if (rowEl) {
+            rowEl.classList.toggle('active', idx === activeIdx);
+          }
+        });
+
+        if (!kickerEl || !valEl || !subEl) return;
+
+        if (activeIdx !== -1 && this.slices[activeIdx]) {
+          const s = this.slices[activeIdx];
+          kickerEl.textContent = s.label.replace(/^[^\w\d]+/, '').trim();
+          valEl.textContent = this.formatMetricValue(s.value);
+          valEl.style.color = s.color;
+          subEl.textContent = `${s.percent.toFixed(1)}% del total · ${s.devicesCount} ${s.devicesCount === 1 ? 'nodo' : 'nodos'}`;
+        } else {
+          kickerEl.textContent = this.effectiveMetric === 'live_speed' ? 'CAUDAL RED' : 'TRÁFICO TOTAL';
+          valEl.textContent = this.formatMetricValue(this.totalValue);
+          valEl.style.color = 'var(--text-primary)';
+          subEl.textContent = `${this.slices.length} ${this.slices.length === 1 ? 'segmento' : 'segmentos'}`;
+        }
+      },
+
+      onLegendHover(idx) {
+        this.hoveredIndex = idx;
+        this.drawCanvas();
+        this.syncHighlightDOM();
+      },
+
+      onLegendClick(idx) {
+        this.pinnedIndex = (this.pinnedIndex === idx) ? -1 : idx;
+        this.drawCanvas();
+        this.syncHighlightDOM();
+      }
+    };
+
+    function setNetBandwidthPieGroup(mode) {
+      NetworkBandwidthPieChart.setGroupMode(mode);
+    }
+
+    function setNetBandwidthPieMetric(mode) {
+      NetworkBandwidthPieChart.setMetricMode(mode);
+    }
+
+    // =========================================================================
+    // ASYNCHRONOUS BACKGROUND GEOIP WORKER, MULTI-TIER CACHE & LOCALSTORAGE
+    // CLEANUP UTILITY (ip-api.com | GEOIP_MAX_ENTRIES)
+    // =========================================================================
+    const GEOIP_MAX_ENTRIES = 1000;
+    const GEOIP_STORAGE_KEY = 'recursos_geoip_cache_v1';
+    const GEOIP_TTL_MS = 7 * 86400 * 1000; // 7 days client cache TTL
+    const GEOIP_NEG_TTL_MS = 10 * 60 * 1000; // 10 min negative cache cooldown
+    const GEOIP_CLEANUP_INTERVAL_MS = 60 * 1000; // Periodic cleanup check every 60s
+    const GEOIP_PRUNE_TARGET_RATIO = 0.85; // Hysteresis target (85% of GEOIP_MAX_ENTRIES)
+
+    /**
+     * Utilería dedicada de mantenimiento y poda periódica de localStorage para GeoIP.
+     * Elimina entradas caducadas (> TTL) y, cuando el total supera GEOIP_MAX_ENTRIES,
+     * recorta las entradas más antiguas por orden de último acceso/actualización.
+     */
+    const GeoIpLocalStorageCleaner = {
+      MAX_ENTRIES: GEOIP_MAX_ENTRIES,
+      STORAGE_KEY: GEOIP_STORAGE_KEY,
+      TTL_MS: GEOIP_TTL_MS,
+      CLEANUP_INTERVAL_MS: GEOIP_CLEANUP_INTERVAL_MS,
+      _timerId: null,
+      _totalPrunedCount: 0,
+      _lastCleanupTs: 0,
+      _lastByteSize: 0,
+
+      pruneCache(memoryMap = null, negativeMap = null, options = {}) {
+        const maxLimit = Number(options.maxEntries) > 0 ? Number(options.maxEntries) : GEOIP_MAX_ENTRIES;
+        const targetCount = options.aggressive
+          ? Math.max(10, Math.floor(maxLimit * 0.5))
+          : Math.max(10, Math.floor(maxLimit * GEOIP_PRUNE_TARGET_RATIO));
+        const now = Date.now();
+        let prunedExpired = 0;
+        let prunedOverflow = 0;
+        let prunedNegative = 0;
+
+        if (negativeMap && typeof negativeMap.entries === 'function') {
+          for (const [ip, negTs] of Array.from(negativeMap.entries())) {
+            if (now - Number(negTs || 0) >= GEOIP_NEG_TTL_MS) {
+              negativeMap.delete(ip);
+              prunedNegative++;
+            }
+          }
+        }
+
+        const unified = new Map();
+        try {
+          const raw = localStorage.getItem(this.STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+              for (const [ip, entry] of Object.entries(parsed)) {
+                if (entry && typeof entry.lat === 'number' && typeof entry.lng === 'number') {
+                  unified.set(ip, {
+                    ip,
+                    lat: Number(entry.lat),
+                    lng: Number(entry.lng),
+                    city: String(entry.city || 'Nodo Remoto'),
+                    country: String(entry.country || ''),
+                    country_code: String(entry.country_code || entry.countryCode || ''),
+                    isp: String(entry.isp || entry.org || ''),
+                    asn: String(entry.asn || entry.as || ''),
+                    ts: Number(entry.ts || now),
+                    lastAccessed: Number(entry.lastAccessed || entry.ts || now)
+                  });
+                } else {
+                  prunedExpired++;
+                }
+              }
+            }
+          }
+        } catch (e) {}
+
+        if (memoryMap && typeof memoryMap.entries === 'function') {
+          for (const [ip, entry] of memoryMap.entries()) {
+            if (entry && typeof entry.lat === 'number' && typeof entry.lng === 'number') {
+              const existing = unified.get(ip);
+              const ts = Number(entry.ts || (existing && existing.ts) || now);
+              const lastAccessed = Math.max(
+                Number(entry.lastAccessed || 0),
+                Number((existing && existing.lastAccessed) || 0),
+                ts
+              );
+              unified.set(ip, {
+                ...entry,
+                ip,
+                lat: Number(entry.lat),
+                lng: Number(entry.lng),
+                ts,
+                lastAccessed
+              });
+            }
+          }
+        }
+
+        for (const [ip, entry] of Array.from(unified.entries())) {
+          if (now - entry.ts >= this.TTL_MS) {
+            unified.delete(ip);
+            prunedExpired++;
+          }
+        }
+
+        if (unified.size > maxLimit || options.aggressive) {
+          const cutoffCount = options.aggressive ? targetCount : (unified.size > maxLimit ? targetCount : maxLimit);
+          if (unified.size > cutoffCount) {
+            const sorted = Array.from(unified.entries()).sort((a, b) => {
+              const scoreA = Math.max(a[1].lastAccessed || 0, a[1].ts || 0);
+              const scoreB = Math.max(b[1].lastAccessed || 0, b[1].ts || 0);
+              return scoreB - scoreA;
+            });
+            prunedOverflow = unified.size - cutoffCount;
+            const kept = sorted.slice(0, cutoffCount);
+            unified.clear();
+            for (const [k, v] of kept) {
+              unified.set(k, v);
+            }
+          }
+        }
+
+        if (memoryMap && typeof memoryMap.clear === 'function') {
+          memoryMap.clear();
+          for (const [k, v] of unified.entries()) {
+            memoryMap.set(k, v);
+          }
+        }
+
+        const totalPrunedNow = prunedExpired + prunedOverflow;
+        this._totalPrunedCount += totalPrunedNow;
+        this._lastCleanupTs = now;
+
+        if (totalPrunedNow > 0 || options.forceWrite) {
+          this.writeMapToLocalStorage(unified);
+        }
+
+        return {
+          prunedCount: totalPrunedNow,
+          prunedExpired,
+          prunedOverflow,
+          prunedNegative,
+          remainingCount: unified.size,
+          maxEntries: maxLimit,
+          byteSize: this._lastByteSize
+        };
+      },
+
+      writeMapToLocalStorage(mapInstance) {
+        const serializeAndSet = (entriesIterable) => {
+          const obj = {};
+          for (const [ip, val] of entriesIterable) {
+            obj[ip] = val;
+          }
+          const jsonStr = JSON.stringify(obj);
+          this._lastByteSize = jsonStr.length;
+          localStorage.setItem(this.STORAGE_KEY, jsonStr);
+        };
+
+        try {
+          serializeAndSet(mapInstance.entries());
+        } catch (err) {
+          try {
+            const halfLimit = Math.max(10, Math.floor(mapInstance.size * 0.5));
+            const sorted = Array.from(mapInstance.entries())
+              .sort((a, b) => (b[1].lastAccessed || b[1].ts || 0) - (a[1].lastAccessed || a[1].ts || 0))
+              .slice(0, halfLimit);
+            this._totalPrunedCount += (mapInstance.size - sorted.length);
+            mapInstance.clear();
+            for (const [k, v] of sorted) mapInstance.set(k, v);
+            serializeAndSet(sorted);
+          } catch (err2) {}
+        }
+      },
+
+      startPeriodicCleanup(workerRef) {
+        if (this._timerId) return;
+        const scheduleTask = (fn) => {
+          if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(() => fn(), { timeout: 2000 });
+          } else {
+            setTimeout(fn, 50);
+          }
+        };
+
+        this._timerId = setInterval(() => {
+          scheduleTask(() => {
+            if (!workerRef) return;
+            const res = this.pruneCache(workerRef._cache, workerRef._negativeCache, {
+              maxEntries: workerRef.GEOIP_MAX_ENTRIES || GEOIP_MAX_ENTRIES,
+              forceWrite: workerRef._cache.size > (workerRef.GEOIP_MAX_ENTRIES || GEOIP_MAX_ENTRIES)
+            });
+            if (res.prunedCount > 0) {
+              workerRef._stats.prunedEntries = this._totalPrunedCount;
+              workerRef.updateStatusBadge();
+            }
+          });
+        }, this.CLEANUP_INTERVAL_MS);
+      }
+    };
+
+    function pruneGeoIpLocalStorageCache(options = {}) {
+      return GeoIpLocalStorageCleaner.pruneCache(
+        GeoIpBackgroundWorker._cache,
+        GeoIpBackgroundWorker._negativeCache,
+        options
+      );
+    }
+
+    const GeoIpBackgroundWorker = {
+      STORAGE_KEY: GEOIP_STORAGE_KEY,
+      TTL_MS: GEOIP_TTL_MS,
+      NEG_TTL_MS: GEOIP_NEG_TTL_MS,
+      GEOIP_MAX_ENTRIES: GEOIP_MAX_ENTRIES,
+      MAX_ENTRIES: GEOIP_MAX_ENTRIES,
+      _cache: new Map(),
+      _negativeCache: new Map(),
+      _inFlightIps: new Set(),
+      _worker: null,
+      _initialized: false,
+      _saveTimer: null,
+      _stats: {
+        clientHits: 0,
+        clientMisses: 0,
+        batchesResolved: 0,
+        backendCachedIps: 0,
+        backendHitRatePct: 100,
+        resolvingCount: 0,
+        prunedEntries: 0,
+        storageBytes: 0
+      },
+
+      isPrivateIp(ipStr) {
+        if (!ipStr) return true;
+        const clean = String(ipStr).trim().replace('::ffff:', '');
+        if (clean === '0.0.0.0' || clean === '::1' || clean.startsWith('127.')) return true;
+        if (clean.startsWith('10.') || clean.startsWith('192.168.') || clean.startsWith('169.254.')) return true;
+        if (clean.startsWith('100.')) {
+          const sec = parseInt(clean.split('.')[1] || '0', 10);
+          if (sec >= 64 && sec <= 127) return true;
+        }
+        if (clean.startsWith('172.')) {
+          const sec = parseInt(clean.split('.')[1] || '0', 10);
+          if (sec >= 16 && sec <= 31) return true;
+        }
+        return false;
+      },
+
+      init() {
+        if (this._initialized) return;
+        this._initialized = true;
+        this.loadFromLocalStorage();
+        GeoIpLocalStorageCleaner.startPeriodicCleanup(this);
+        this.spawnWebWorker();
+        this.updateStatusBadge();
+      },
+
+      pruneLocalStorageCache(options = {}) {
+        const result = GeoIpLocalStorageCleaner.pruneCache(this._cache, this._negativeCache, {
+          maxEntries: this.GEOIP_MAX_ENTRIES,
+          ...options
+        });
+        this._stats.prunedEntries = GeoIpLocalStorageCleaner._totalPrunedCount;
+        this._stats.storageBytes = result.byteSize;
+        this.updateStatusBadge();
+        return result;
+      },
+
+      loadFromLocalStorage() {
+        try {
+          const res = GeoIpLocalStorageCleaner.pruneCache(this._cache, this._negativeCache, {
+            maxEntries: this.GEOIP_MAX_ENTRIES,
+            forceWrite: false
+          });
+          this._stats.prunedEntries = GeoIpLocalStorageCleaner._totalPrunedCount;
+          this._stats.storageBytes = res.byteSize;
+        } catch (e) {}
+      },
+
+      saveToLocalStorage(immediate = false) {
+        const flushSave = () => {
+          this._saveTimer = null;
+          try {
+            if (this._cache.size > this.GEOIP_MAX_ENTRIES) {
+              GeoIpLocalStorageCleaner.pruneCache(this._cache, this._negativeCache, {
+                maxEntries: this.GEOIP_MAX_ENTRIES,
+                forceWrite: true
+              });
+            } else {
+              GeoIpLocalStorageCleaner.writeMapToLocalStorage(this._cache);
+            }
+            this._stats.prunedEntries = GeoIpLocalStorageCleaner._totalPrunedCount;
+            this._stats.storageBytes = GeoIpLocalStorageCleaner._lastByteSize;
+          } catch (e) {}
+        };
+
+        if (immediate || this._cache.size > this.GEOIP_MAX_ENTRIES) {
+          if (this._saveTimer) clearTimeout(this._saveTimer);
+          flushSave();
+        } else if (!this._saveTimer) {
+          this._saveTimer = setTimeout(flushSave, 300);
+        }
+      },
+
+      spawnWebWorker() {
+        if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined') {
+          return;
+        }
+        try {
+          const workerCode = `
+            let pendingIps = new Set();
+            let timerId = null;
+            let inFlight = false;
+            let originUrl = '';
+
+            async function flushQueue(forceSync = false) {
+              if (inFlight || (pendingIps.size === 0 && !forceSync)) return;
+              inFlight = true;
+              const batch = Array.from(pendingIps).slice(0, 80);
+              for (const ip of batch) pendingIps.delete(ip);
+
+              self.postMessage({ type: 'WORKER_STATE', resolving: true, count: batch.length });
+
+              let resolvedMap = {};
+              let workerMeta = null;
+
+              try {
+                const resp = await fetch(originUrl + '/api/net/geoip/resolve', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ips: batch, force_sync: forceSync })
+                });
+                if (resp.ok) {
+                  const data = await resp.json();
+                  if (data && data.results && typeof data.results === 'object') {
+                    resolvedMap = data.results;
+                  }
+                  if (data && data.worker) {
+                    workerMeta = data.worker;
+                  }
+                }
+              } catch (err) {}
+
+              const stillMissing = batch.filter(ip => !resolvedMap[ip]);
+              if (stillMissing.length > 0 && originUrl.startsWith('http://')) {
+                try {
+                  const directResp = await fetch('http://ip-api.com/batch?fields=status,country,countryCode,regionName,city,lat,lon,isp,org,as,query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(stillMissing)
+                  });
+                  if (directResp.ok) {
+                    const arr = await directResp.json();
+                    if (Array.isArray(arr)) {
+                      for (const item of arr) {
+                        if (item && item.status === 'success' && typeof item.lat === 'number' && item.query) {
+                          resolvedMap[item.query] = {
+                            ip: item.query,
+                            lat: Number(item.lat),
+                            lng: Number(item.lon),
+                            city: item.city || 'Nodo Remoto',
+                            country: item.country || '',
+                            country_code: item.countryCode || '',
+                            isp: item.org || item.isp || '',
+                            asn: item.as || '',
+                            ts: Date.now()
+                          };
+                        }
+                      }
+                    }
+                  }
+                } catch (err2) {}
+              }
+
+              self.postMessage({
+                type: 'GEOIP_RESOLVED',
+                requestedIps: batch,
+                results: resolvedMap,
+                workerMeta: workerMeta
+              });
+
+              inFlight = false;
+              self.postMessage({ type: 'WORKER_STATE', resolving: pendingIps.size > 0, count: pendingIps.size });
+              if (pendingIps.size > 0) {
+                timerId = setTimeout(() => flushQueue(false), 350);
+              }
+            }
+
+            self.onmessage = function(ev) {
+              const msg = ev.data || {};
+              if (msg.origin) originUrl = msg.origin;
+              if (msg.type === 'ENQUEUE_IPS' && Array.isArray(msg.ips)) {
+                for (const ip of msg.ips) {
+                  if (ip) pendingIps.add(ip);
+                }
+                if (timerId) clearTimeout(timerId);
+                timerId = setTimeout(() => flushQueue(Boolean(msg.forceSync)), 180);
+              } else if (msg.type === 'FORCE_SYNC') {
+                if (timerId) clearTimeout(timerId);
+                flushQueue(true);
+              }
+            };
+          `;
+          const blob = new Blob([workerCode], { type: 'application/javascript' });
+          this._worker = new Worker(URL.createObjectURL(blob));
+          this._worker.onmessage = (ev) => this.handleWorkerMessage(ev.data || {});
+        } catch (e) {
+          this._worker = null;
+        }
+      },
+
+      handleWorkerMessage(msg) {
+        if (msg.type === 'WORKER_STATE') {
+          this._stats.resolvingCount = msg.resolving ? (msg.count || 1) : 0;
+          this.updateStatusBadge();
+          return;
+        }
+        if (msg.type === 'GEOIP_RESOLVED') {
+          const now = Date.now();
+          const results = msg.results || {};
+          const reqIps = Array.isArray(msg.requestedIps) ? msg.requestedIps : [];
+          let updatedCount = 0;
+
+          for (const [ip, rec] of Object.entries(results)) {
+            this._inFlightIps.delete(ip);
+            if (rec && typeof rec.lat === 'number' && typeof rec.lng === 'number') {
+              this._cache.set(ip, {
+                ip,
+                lat: Number(rec.lat),
+                lng: Number(rec.lng),
+                city: String(rec.city || 'Nodo Remoto'),
+                country: String(rec.country || ''),
+                country_code: String(rec.country_code || rec.countryCode || ''),
+                isp: String(rec.isp || rec.org || ''),
+                asn: String(rec.asn || rec.as || ''),
+                ts: now,
+                lastAccessed: now
+              });
+              this._negativeCache.delete(ip);
+              updatedCount++;
+            }
+          }
+
+          for (const ip of reqIps) {
+            this._inFlightIps.delete(ip);
+            if (!results[ip] && !this._cache.has(ip)) {
+              this._negativeCache.set(ip, now);
+            }
+          }
+
+          if (msg.workerMeta) {
+            this._stats.backendCachedIps = Number(msg.workerMeta.cached_ips || 0);
+            this._stats.backendHitRatePct = Number(msg.workerMeta.hit_rate_pct ?? 100);
+          }
+
+          if (updatedCount > 0) {
+            this._stats.batchesResolved++;
+            this.saveToLocalStorage();
+            if (latestMetrics && latestMetrics.net && latestMetrics.net.connections_map) {
+              const conns = latestMetrics.net.connections_map.connections;
+              if (Array.isArray(conns)) {
+                for (const c of conns) {
+                  const cached = this._cache.get(c.remote_ip);
+                  if (cached) {
+                    c.lat = cached.lat;
+                    c.lng = cached.lng;
+                    c.city = cached.city;
+                    c.country = cached.country;
+                    c.country_code = cached.country_code;
+                    c.isp = cached.isp || c.isp;
+                    c.asn = cached.asn || c.asn;
+                    c.geo_status = 'cached';
+                  }
+                }
+              }
+              NetworkConnectionsMapEngine.renderFromMetrics(latestMetrics, true);
+            }
+          }
+          this.updateStatusBadge();
+        }
+      },
+
+      async fallbackResolveOnMainThread(ips, forceSync = false) {
+        try {
+          this._stats.resolvingCount = ips.length;
+          this.updateStatusBadge();
+          const resp = await fetch('/api/net/geoip/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ips, force_sync: forceSync })
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            this.handleWorkerMessage({
+              type: 'GEOIP_RESOLVED',
+              requestedIps: ips,
+              results: (data && data.results) || {},
+              workerMeta: data && data.worker
+            });
+          }
+        } catch (e) {
+          for (const ip of ips) this._inFlightIps.delete(ip);
+        } finally {
+          this._stats.resolvingCount = 0;
+          this.updateStatusBadge();
+        }
+      },
+
+      enqueueIps(ips, forceSync = false) {
+        this.init();
+        const now = Date.now();
+        const toSend = [];
+        for (const rawIp of ips) {
+          const ip = String(rawIp || '').trim().replace('::ffff:', '');
+          if (!ip || this.isPrivateIp(ip)) continue;
+          if (!forceSync && this._cache.has(ip)) continue;
+          if (!forceSync && this._inFlightIps.has(ip)) continue;
+          const negTs = this._negativeCache.get(ip) || 0;
+          if (!forceSync && now - negTs < this.NEG_TTL_MS) continue;
+          this._inFlightIps.add(ip);
+          toSend.push(ip);
+        }
+
+        if (toSend.length === 0 && !forceSync) return;
+
+        if (this._worker) {
+          this._worker.postMessage({
+            type: 'ENQUEUE_IPS',
+            origin: window.location.origin,
+            ips: toSend,
+            forceSync
+          });
+        } else {
+          this.fallbackResolveOnMainThread(toSend, forceSync);
+        }
+        this.updateStatusBadge();
+      },
+
+      processConnectionsList(connMap) {
+        this.init();
+        if (!connMap) return;
+
+        if (connMap.geoip_worker) {
+          this._stats.backendCachedIps = Number(connMap.geoip_worker.cached_ips || 0);
+          this._stats.backendHitRatePct = Number(connMap.geoip_worker.hit_rate_pct ?? 100);
+        }
+
+        const allConns = Array.isArray(connMap.connections) ? connMap.connections : [];
+        const now = Date.now();
+        const uncachedPublicIps = [];
+        let dirtyStorage = false;
+
+        for (const c of allConns) {
+          const ip = String(c.remote_ip || '').trim().replace('::ffff:', '');
+          if (!ip) continue;
+          const isLan = Boolean(c.is_lan) || this.isPrivateIp(ip);
+          if (isLan) {
+            c.geo_status = 'lan';
+            continue;
+          }
+
+          const hasBackendGeo =
+            c.geo_status === 'cached' ||
+            (typeof c.lat === 'number' &&
+              typeof c.lng === 'number' &&
+              c.city &&
+              c.city !== 'Resolviendo GeoIP...' &&
+              c.geo_status !== 'pending');
+
+          if (hasBackendGeo) {
+            this._stats.clientHits++;
+            c.geo_status = 'cached';
+            const existing = this._cache.get(ip);
+            if (!existing) {
+              this._cache.set(ip, {
+                ip,
+                lat: Number(c.lat),
+                lng: Number(c.lng),
+                city: String(c.city || 'Nodo Remoto'),
+                country: String(c.country || ''),
+                country_code: String(c.country_code || ''),
+                isp: String(c.isp || ''),
+                asn: String(c.asn || ''),
+                ts: now,
+                lastAccessed: now
+              });
+              dirtyStorage = true;
+            } else {
+              existing.lastAccessed = now;
+            }
+          } else {
+            const clientCached = this._cache.get(ip);
+            if (clientCached && now - clientCached.ts < this.TTL_MS) {
+              this._stats.clientHits++;
+              clientCached.lastAccessed = now;
+              c.lat = clientCached.lat;
+              c.lng = clientCached.lng;
+              c.city = clientCached.city;
+              c.country = clientCached.country;
+              c.country_code = clientCached.country_code;
+              c.isp = clientCached.isp || c.isp;
+              c.asn = clientCached.asn || c.asn;
+              c.geo_status = 'cached';
+            } else {
+              if (clientCached) {
+                this._cache.delete(ip);
+                dirtyStorage = true;
+              }
+              this._stats.clientMisses++;
+              c.geo_status = 'pending';
+              uncachedPublicIps.push(ip);
+            }
+          }
+        }
+
+        if (dirtyStorage || this._cache.size > this.GEOIP_MAX_ENTRIES) {
+          this.saveToLocalStorage();
+        }
+        if (uncachedPublicIps.length > 0) {
+          this.enqueueIps(uncachedPublicIps, false);
+        }
+        this.updateStatusBadge();
+      },
+
+      updateStatusBadge() {
+        const badgeEl = document.getElementById('geoIpWorkerStatusBadge');
+        const iconEl = document.getElementById('geoIpWorkerStatusIcon');
+        const textEl = document.getElementById('geoIpWorkerStatusText');
+        if (!badgeEl || !iconEl || !textEl) return;
+
+        const localCount = this._cache.size;
+        const totalCached = Math.max(localCount, this._stats.backendCachedIps || 0);
+        const totalLookups = this._stats.clientHits + this._stats.clientMisses;
+        const hitPct = totalLookups > 0
+          ? Math.round((this._stats.clientHits / totalLookups) * 100)
+          : Math.round(this._stats.backendHitRatePct || 100);
+
+        const isResolving = this._stats.resolvingCount > 0 || this._inFlightIps.size > 0;
+        badgeEl.classList.toggle('resolving', isResolving);
+
+        const kbStr = this._stats.storageBytes > 0 ? ` · ${(this._stats.storageBytes / 1024).toFixed(1)} KB` : '';
+        const prunedStr = this._stats.prunedEntries > 0 ? ` · ${this._stats.prunedEntries} podadas` : '';
+        badgeEl.title = `Worker GeoIP (ip-api.com) · Límite localStorage: ${localCount}/${this.GEOIP_MAX_ENTRIES} entradas${kbStr}${prunedStr}. Pulsa para sincronizar y limpiar entradas obsoletas.`;
+
+        if (isResolving) {
+          const pendingCnt = Math.max(this._stats.resolvingCount, this._inFlightIps.size);
+          iconEl.textContent = '⏳';
+          textEl.textContent = `Worker GeoIP: Resolviendo ${pendingCnt} IP${pendingCnt === 1 ? '' : 's'}...`;
+        } else {
+          iconEl.textContent = '🌐';
+          textEl.textContent = `GeoIP Caché: ${totalCached}/${this.GEOIP_MAX_ENTRIES} (${hitPct}% hit)`;
+        }
+      },
+
+      async forceSyncNow() {
+        this.init();
+        const pruneRes = this.pruneLocalStorageCache({ forceWrite: true });
+        const allConns = (latestMetrics && latestMetrics.net && latestMetrics.net.connections_map && latestMetrics.net.connections_map.connections) || [];
+        const publicIps = allConns
+          .map(c => c.remote_ip)
+          .filter(ip => ip && !this.isPrivateIp(ip));
+        this.enqueueIps(publicIps, true);
+        if (typeof showToast === 'function') {
+          const totalCached = Math.max(this._cache.size, this._stats.backendCachedIps || 0);
+          const pruneNote = pruneRes.prunedCount > 0 ? ` · ${pruneRes.prunedCount} obsoletas podadas` : '';
+          showToast(`🌐 Worker GeoIP: ${totalCached}/${this.GEOIP_MAX_ENTRIES} IPs en caché${pruneNote}`, 'info');
+        }
+      }
+    };
+
+    // =========================================================================
     // GOOGLE MAPS PLATFORM GEOSPATIAL CONNECTIONS ENGINE (INCOMING & OUTGOING)
     // =========================================================================
     let connectionsMapFilter = 'all';
@@ -7766,7 +9354,7 @@
               📍 ${escapeHtml(item.city || 'Servidor')}${item.country ? ', ' + escapeHtml(item.country) : ''}
             </div>
             <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">
-              Google Maps
+              Google Maps · GeoIP (ip-api.com)
             </div>
           `;
           return wrap;
@@ -7778,6 +9366,9 @@
         const dirColor = item.direction === 'incoming'
           ? '#059669'
           : (item.direction === 'blocked' ? '#e11d48' : '#0891b2');
+        const geoSourceBadge = item.geo_status === 'lan'
+          ? '🏠 Red Interna (LAN)'
+          : (item.geo_status === 'pending' ? '⏳ Worker GeoIP resolviendo...' : '⚡ Caché GeoIP (ip-api.com)');
 
         wrap.innerHTML = `
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${dirColor}; margin-bottom: 4px;">
@@ -7794,8 +9385,9 @@
             📍 <strong>${escapeHtml(item.city || 'Nodo Remoto')}${item.country ? ', ' + escapeHtml(item.country) : ''}</strong><br>
             🏢 ${escapeHtml(item.isp || 'Proveedor de Red')}${item.asn ? ' · ' + escapeHtml(item.asn) : ''}
           </div>
-          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">
-            Google Maps
+          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b; display: flex; justify-content: space-between; gap: 8px;">
+            <span>${geoSourceBadge}</span>
+            <span>Google Maps</span>
           </div>
         `;
         return wrap;
@@ -7805,6 +9397,9 @@
         if (!metricsData || !metricsData.net) return;
         const connMap = metricsData.net.connections_map;
         if (!connMap) return;
+
+        // Run asynchronous background GeoIP worker enrichment & caching pass
+        GeoIpBackgroundWorker.processConnectionsList(connMap);
 
         this._lastConnData = connMap;
         const srv = connMap.server_node || {};
@@ -7852,6 +9447,8 @@
             tableEl.innerHTML = filteredConns.map(c => {
               const dirIcon = c.direction === 'incoming' ? '↓ Entrante' : (c.direction === 'blocked' ? '🛡️ Bloqueada' : '↑ Saliente');
               const locText = `${c.city || 'Red'}${c.country ? ', ' + c.country : ''}`;
+              const geoSt = c.geo_status || (c.is_lan ? 'lan' : 'cached');
+              const geoTagLabel = geoSt === 'lan' ? '🏠 LAN' : (geoSt === 'pending' ? '⏳ Cola GeoIP' : '⚡ GeoIP Caché');
               return `
                 <div class="conn-row-item" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
                   <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
@@ -7862,6 +9459,7 @@
                         <span style="color: var(--text-muted); font-weight: 400;">→</span>
                         <span class="mono" style="color: var(--accent-cyan-bright);">:${c.local_port}</span>
                         <span class="adw-badge" style="font-size: 10px; padding: 1px 6px;">${escapeHtml(c.service)}</span>
+                        <span class="conn-geo-tag ${escapeHtml(geoSt)}">${geoTagLabel}</span>
                       </div>
                       <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                         📍 ${escapeHtml(locText)} · ${escapeHtml(c.isp || 'Red Externa')} ${c.asn ? '(' + escapeHtml(c.asn) + ')' : ''}
@@ -7884,7 +9482,7 @@
         const ready = await this.ensureInitialized(srv);
         if (!ready || !this._map) return;
 
-        const sig = `${connectionsMapFilter}|${srv.lat},${srv.lng}|` + filteredConns.map(c => `${c.id}:${c.lat},${c.lng}:${c.state}`).join(';');
+        const sig = `${connectionsMapFilter}|${srv.lat},${srv.lng}|` + filteredConns.map(c => `${c.id}:${c.lat},${c.lng}:${c.state}:${c.geo_status || ''}`).join(';');
         if (!forceRedraw && sig === this._lastSignature) return;
         this._lastSignature = sig;
 

@@ -1,8 +1,38 @@
-# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.3.0`)
+# ⚡ Recursos — Centro de Mando y Telemetría de Sistemas (`v4.6.0`)
 
-Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.3.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Mapa Geoespacial Interactivo de Conexiones Entrantes y Salientes (Google Maps Platform)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
+Panel de control de alto rendimiento con interfaz híbrida **Apple Liquid Glass & Tesla Touch Cockpit (`v4.6.0`)**, telemetría de hardware en tiempo real, auditoría de red con **Gráfico de Pastel Interactivo de Distribución de Ancho de Banda por Subredes y Grupos de Dispositivos**, **Mapa Geoespacial Interactivo de Conexiones Entrantes y Salientes (Google Maps Platform)**, **Worker Asíncrono GeoIP (`ip-api.com`) con Caché Multinivel y Limpieza Automática de `localStorage` (`GEOIP_MAX_ENTRIES`)**, **Monitor de Umbral de Caudal por NIC con Alerta Visual en Leyenda** y gestión de contenedores con arquitectura **Zero-Hardcoding (100% Detección Dinámica de Hardware)**, **Acabado Metálico en Titanio Claro/Oscuro/Auto**, **Dock Táctil Flotante + Gestos Swipe**, **Tarjetas Bento Expandibles (`<dialog>`) con Gráficas Interactivas al Tacto**, **Motor Inteligente de Logos de SO y Dispositivos**, seguridad **Zero-Trust** y actualizaciones **OTA en 1 clic desde GitHub**.
 
 ---
+
+## ✨ Novedades en `v4.6.0`
+- **Gráfico de Pastel Interactivo de Distribución de Ancho de Banda en la Pestaña `Red` (`NetworkBandwidthPieChart`)**:
+  - **Tres Dimensiones de Agrupación Interactiva**:
+    - **🌐 Por Subredes IP (`/24`)**: Agrupa el consumo de red entre las subredes IPv4 detectadas (`192.168.50.0/24`, `172.x.0.0/16` Docker, `100.x.0.0/16` Tailscale/Mesh, `10.x.x.0/24` VPN y flujos WAN externos), con subdivisión inteligente por segmento (Servidor/Cable, Wi-Fi 5 GHz y Wi-Fi 2.4 GHz) cuando todos los nodos locales comparten una única subred `/24`.
+    - **📶 Por Grupos de Enlace**: Compara la proporción de ancho de banda entre **Ethernet Gigabit (Cableado)**, **Wi-Fi 5 GHz (Alta Velocidad)** y **Wi-Fi 2.4 GHz & Red IoT**.
+    - **🖥️ Por Tipo / Rol de Dispositivo**: Clasifica automáticamente el consumo entre **Servidor Host & Infraestructura**, **Smart TV, Streaming & Consolas**, **Smartphones & Tablets**, **Ordenadores & Estaciones** y **Domótica, Cámaras & IoT**.
+  - **Doble Modo de Métrica (`📊 Tráfico Acumulado` vs `⚡ Caudal en Vivo`)**: Permite alternar en tiempo real entre el volumen total transferido (`↓ RX + ↑ TX Bytes`) y el caudal instantáneo (`B/s`), con fallback automático si los enlaces están en reposo.
+  - **Canvas HiDPI Interactivo + Leyenda Sincronizada**: Al pasar el cursor o pulsar sobre un sector del gráfico de pastel (o sobre una fila de la tabla de desglose), el sector se expande con brillo semántico y el indicador central muestra el nombre del segmento, su consumo exacto, porcentaje del total y número de nodos activos.
+- **Wake-on-LAN Multivía (`send_wol_magic_packet`) y Feedback Visual de Acciones**: Emisión redundante de paquetes mágicos UDP por broadcast de subred (`192.168.50.255:9/:7`), broadcast global y binario `wakeonlan`, junto con estados de progreso en botones de servicios y contenedores.
+
+## ✨ Novedades en `v4.5.0`
+- **Utilería de Limpieza Periódica de `localStorage` para Caché GeoIP (`GeoIpLocalStorageCleaner` & `GEOIP_MAX_ENTRIES`)**:
+  - **Control de Capacidad (`GEOIP_MAX_ENTRIES = 1000` en cliente / `2000` en backend)**: Cuando el número total de registros GeoIP en memoria o en `localStorage` (`recursos_geoip_cache_v1`) supera el límite `GEOIP_MAX_ENTRIES`, la utilería `GeoIpLocalStorageCleaner.pruneCache()` ordena las entradas por su marca temporal de uso más reciente (`Math.max(lastAccessed, ts)`) y poda automáticamente las entradas más antiguas hasta un umbral de compactación del 90% (`EVICTION_TARGET_RATIO = 0.9`), evitando reordenamientos continuos en cada lote.
+  - **Purga Periódica de Entradas Caducadas (TTL) en Tiempo de Inactividad (`requestIdleCallback`)**: Un temporizador en segundo plano (`GEOIP_CLEANUP_INTERVAL_MS = 60s`) ejecuta barridos de mantenimiento mediante `requestIdleCallback` para eliminar entradas con TTL vencido (`> 7 días`), registros corruptos, claves heredadas obsoletas y entradas caducadas de la caché negativa (`> 10 min`) sin bloquear el hilo principal.
+  - **Resiliencia ante `QuotaExceededError` y Escritura Debounced**: Escrituras agrupadas (`300 ms` debounce) y recuperación automática ante saturación de cuota de `localStorage` podando el 50% más antiguo de la caché.
+  - **Telemetría de Ocupación en Vivo (`#geoIpWorkerStatusBadge`)**: El indicador de estado del mapa muestra ahora la ocupación respecto al límite (`GeoIP Caché: X/1000`), el peso en KB en `localStorage` y el contador de entradas obsoletas podadas.
+
+## ✨ Novedades en `v4.4.0`
+- **Worker Asíncrono de GeoIP en Segundo Plano (`ip-api.com`) con Caché Multinivel**:
+  - **Cola de Resolución Asíncrona y Despertado Instantáneo (`GEOIP_PENDING_QUEUE` + `GEOIP_WAKE_EVENT`)**: Todas las direcciones IP públicas remotas detectadas en sockets del kernel (`/proc/net/tcp`, `/proc/net/udp`, `psutil.net_connections`), clientes HTTP entrantes, objetivos DNS salientes e IPs bloqueadas por Fail2ban se encolan de inmediato y se resuelven de forma no bloqueante en lotes de hasta 80 IPs contra `http://ip-api.com/batch`.
+  - **Caché Persistente Multinivel (Disco + Memoria + Cliente)**:
+    - **Backend (`server.py` y `vite.config.ts`)**: Caché en memoria (`GEOIP_CACHE`) respaldada por persistencia atómica en disco (`geoip_cache.json`) con TTL de 7 días (evitando volver a consultar `ip-api.com` tras reinicios del servidor) y **caché negativa** de 15 minutos para IPs reservadas o no resolubles.
+    - **Control Inteligente de Rate-Limit (`X-Rl` / `X-Ttl`)**: Inspección automática de cabeceras de cuota de `ip-api.com` para proteger el límite de peticiones por minuto.
+    - **Web Worker en el Navegador (`GeoIpBackgroundWorker`)**: Hilo `Worker` dedicado en segundo plano en el cliente con caché de dos niveles (`Map` en RAM + `localStorage` bajo `recursos_geoip_cache_v1`) que enriquece instantáneamente las conexiones desde caché local, resuelve IPs pendientes contra `/api/net/geoip/resolve` (`ip-api.com`) y actualiza en caliente los marcadores y líneas geodésicas del mapa sin bloquear la UI.
+  - **Indicador Interactivo de Estado de Caché (`#geoIpWorkerStatusBadge`)**: Insignia en la barra superior del mapa que muestra en tiempo real las IPs almacenadas en caché, el porcentaje de aciertos (`% hit`) y el estado de resolución activa, permitiendo forzar una sincronización al instante con un clic.
+
+## ✨ Novedades y Correcciones en `v4.3.1`
+- **Corrección de Helper DOM `setText(id, val)`**:
+  - Definida la función auxiliar global `setText(id, val)` junto a `escapeHtml(str)` en `index.html` y `static/index.html` para actualizar de forma segura los contadores, KPIs y metadatos del motor `NetworkConnectionsMapEngine.renderFromMetrics()`, eliminando el error `ReferenceError: setText is not defined` en la vista `/red`.
 
 ## ✨ Novedades en `v4.3.0`
 - **Monitor de Umbral de Caudal de Red por NIC y Alerta Visual en la Leyenda del Mapa (`BandwidthThresholdMonitor`)**:
