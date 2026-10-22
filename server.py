@@ -1627,8 +1627,18 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
                     "total_devices": int(s_row["total_devices"] or 0)
                 }
 
-            # 2. Catálogo de servicios agregados
-            cur.execute("""
+            # 2. Catálogo de servicios agregados (filtrado por dispositivo/tiempo si aplica)
+            svc_where = []
+            svc_params = []
+            if cutoff_ts > 0:
+                svc_where.append("last_seen >= ?")
+                svc_params.append(cutoff_ts)
+            if device_filter and str(device_filter).strip().lower() not in ("", "all", "todos"):
+                svc_where.append("local_ip = ?")
+                svc_params.append(str(device_filter).strip())
+            svc_where_sql = ("WHERE " + " AND ".join(svc_where)) if svc_where else ""
+
+            cur.execute(f"""
                 SELECT
                     service,
                     COUNT(*) AS connections_count,
@@ -1640,10 +1650,11 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
                     MIN(first_seen) AS first_seen,
                     MAX(last_seen) AS last_seen
                 FROM connection_history
+                {svc_where_sql}
                 GROUP BY service
                 ORDER BY last_seen DESC, total_hits DESC
                 LIMIT 120
-            """)
+            """, svc_params)
             for r in cur.fetchall():
                 countries_list = [x.strip() for x in str(r["countries_csv"] or "").split(",") if x.strip()][:5]
                 domains_list = [x.strip() for x in str(r["domains_csv"] or "").split(",") if x.strip()][:4]
