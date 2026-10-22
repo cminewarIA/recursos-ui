@@ -15,6 +15,7 @@ import hmac
 import psutil
 import sqlite3
 import socket
+import requests
 
 # ==============================================================================
 # Global Caches, Concurrency Locks & Configuration
@@ -270,6 +271,571 @@ def clear_geoip_worker_errors():
         GEOIP_ERROR_HISTORY.clear()
         GEOIP_WORKER_STATS["errors_total"] = 0
         return cleared
+
+# ==============================================================================
+# BOT DE TELEGRAM INTEGRADO: GESTOR DE TORRENTS Y VIGILANCIA LAN (100% NATIVO)
+# ==============================================================================
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8813089508:AAF68Ti_JfZQqPVfAOqgk6mMoPtzL6arLzo")
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+TELEGRAM_FILE_URL = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}"
+
+QBIT_API_URL = os.environ.get("QBIT_API_URL", "http://127.0.0.1:8082/api/v2")
+QBIT_SAVE_PATH = os.environ.get("QBIT_SAVE_PATH", "/mnt/almacenamiento/descargas")
+
+def _resolve_tg_data_file(filename, fallback_dir="/home/servidor/scripts"):
+    """Resuelve rutas de persistencia buscando primero relativa al proyecto y luego en fallback."""
+    rel_path = os.path.join(BASE_DIR, filename)
+    if os.path.exists(rel_path):
+        return rel_path
+    abs_path = os.path.join(fallback_dir, filename)
+    if os.path.exists(abs_path):
+        return abs_path
+    if os.path.isdir(fallback_dir):
+        return abs_path
+    return rel_path
+
+TELEGRAM_WHITELIST_FILE = _resolve_tg_data_file("telegram_bot_allowed_users.json")
+TELEGRAM_NOTIFIED_FILE = _resolve_tg_data_file("telegram_notified_torrents.json")
+TELEGRAM_NET_MONITOR_FILE = _resolve_tg_data_file("network_monitor_devices.json")
+TELEGRAM_FRIENDLY_NAMES_FILE = _resolve_tg_data_file("device_friendly_names.json")
+
+TELEGRAM_BOT_CACHE = {
+    "enabled": True,
+    "running": True,
+    "polling_active": False,
+    "allowed_users_count": 0,
+    "allowed_users": [],
+    "notified_torrents_count": 0,
+    "last_poll_ts": 0,
+    "last_poll_str": "--",
+    "last_message_ts": 0,
+    "last_message_str": "--",
+    "messages_processed": 0,
+    "last_action": "Inicializando módulo...",
+    "qbit_connected": False
+}
+TELEGRAM_BOT_LOCK = threading.Lock()
+
+def load_tg_whitelist():
+    """Carga el conjunto de IDs de usuarios autorizados en Telegram."""
+    if os.path.exists(TELEGRAM_WHITELIST_FILE):
+        try:
+            with open(TELEGRAM_WHITELIST_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                users = set(data.get("allowed_users", []))
+                with TELEGRAM_BOT_LOCK:
+                    TELEGRAM_BOT_CACHE["allowed_users_count"] = len(users)
+                    TELEGRAM_BOT_CACHE["allowed_users"] = list(users)
+                return users
+        except Exception as e:
+            print(f"[TG AUTH ERROR] Error leyendo {TELEGRAM_WHITELIST_FILE}: {e}")
+    return set()
+
+def save_tg_whitelist(users_set):
+    """Guarda el conjunto de usuarios autorizados en el archivo JSON."""
+    try:
+        os.makedirs(os.path.dirname(TELEGRAM_WHITELIST_FILE), exist_ok=True)
+        with open(TELEGRAM_WHITELIST_FILE, "w", encoding="utf-8") as f:
+            json.dump({"allowed_users": list(users_set)}, f, indent=2)
+        with TELEGRAM_BOT_LOCK:
+            TELEGRAM_BOT_CACHE["allowed_users_count"] = len(users_set)
+            TELEGRAM_BOT_CACHE["allowed_users"] = list(users_set)
+    except Exception as e:
+        print(f"[TG AUTH SAVE ERROR] {e}")
+
+def is_tg_user_allowed(user_id):
+    """Verifica si un usuario de Telegram está autorizado. El primero se registra automáticamente como admin."""
+    wl = load_tg_whitelist()
+    if not wl:
+        wl.add(user_id)
+        save_tg_whitelist(wl)
+        print(f"[TG AUTH] Primer usuario registrado automáticamente como admin: {user_id}")
+        return True
+    return user_id in wl
+
+def tg_format_size(bytes_val):
+    if not bytes_val:
+        return "0 B"
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
+        if bytes_val < 1024.0:
+            return f"{bytes_val:.2f} {unit}"
+        bytes_val /= 1024.0
+    return f"{bytes_val:.2f} PB"
+
+def tg_format_eta(seconds):
+    if seconds <= 0 or seconds >= 8640000:
+        return "∞"
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    d, h = divmod(h, 24)
+    if d > 0:
+        return f"{d}d {h}h"
+    if h > 0:
+        return f"{h}h {m}m"
+    return f"{m}m {s}s"
+
+def tg_send_message(chat_id, text, reply_to_message_id=None, parse_mode="Markdown"):
+    """Envía un mensaje mediante la API oficial de Telegram."""
+    url = f"{TELEGRAM_API_URL}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": parse_mode
+    }
+    if reply_to_message_id:
+        payload["reply_to_message_id"] = reply_to_message_id
+    try:
+        r = requests.post(url, json=payload, timeout=20)
+        res = r.json()
+        if not res.get("ok") and parse_mode:
+            payload.pop("parse_mode", None)
+            requests.post(url, json=payload, timeout=20)
+        return True
+    except Exception as e:
+        print(f"[TG ERROR] Error enviando mensaje a {chat_id}: {e}")
+        return False
+
+def broadcast_to_tg_whitelist(text, parse_mode="Markdown"):
+    """Difunde un mensaje a todos los administradores en la lista blanca."""
+    users = load_tg_whitelist()
+    sent_any = False
+    for uid in users:
+        ok = tg_send_message(uid, text, parse_mode=parse_mode)
+        if ok:
+            sent_any = True
+    return sent_any
+
+def qbit_add_torrent_file(filename, file_bytes):
+    """Añade un archivo .torrent a qBittorrent."""
+    try:
+        files = {
+            "torrents": (filename, file_bytes, "application/x-bittorrent")
+        }
+        data = {
+            "savepath": QBIT_SAVE_PATH,
+            "autoTMM": "false"
+        }
+        res = requests.post(f"{QBIT_API_URL}/torrents/add", files=files, data=data, timeout=15)
+        if res.status_code == 200:
+            return True, "Torrent añadido con éxito a la cola de descargas."
+        elif res.status_code == 409:
+            return True, "El torrent ya estaba en qBittorrent."
+        else:
+            return False, f"Error {res.status_code}: {res.text}"
+    except Exception as e:
+        return False, f"Error de conexión con qBittorrent: {e}"
+
+def qbit_add_magnet(magnet_url):
+    """Añade un enlace magnet o URL a qBittorrent."""
+    try:
+        data = {
+            "urls": magnet_url,
+            "savepath": QBIT_SAVE_PATH,
+            "autoTMM": "false"
+        }
+        res = requests.post(f"{QBIT_API_URL}/torrents/add", data=data, timeout=15)
+        if res.status_code == 200:
+            return True, "Enlace añadido con éxito a qBittorrent."
+        elif res.status_code == 409:
+            return True, "El enlace ya estaba en qBittorrent."
+        else:
+            return False, f"Error {res.status_code}: {res.text}"
+    except Exception as e:
+        return False, f"Error de conexión con qBittorrent: {e}"
+
+def qbit_get_torrents_for_bot():
+    """Obtiene la lista en vivo de torrents desde qBittorrent."""
+    try:
+        res = requests.get(f"{QBIT_API_URL}/torrents/info", timeout=10)
+        if res.status_code == 200:
+            with TELEGRAM_BOT_LOCK:
+                TELEGRAM_BOT_CACHE["qbit_connected"] = True
+            return res.json()
+    except Exception:
+        with TELEGRAM_BOT_LOCK:
+            TELEGRAM_BOT_CACHE["qbit_connected"] = False
+    return []
+
+def load_tg_notified_hashes():
+    """Carga los hashes de torrents que ya han sido notificados como completados."""
+    if os.path.exists(TELEGRAM_NOTIFIED_FILE):
+        try:
+            with open(TELEGRAM_NOTIFIED_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                hashes = set(data.get("notified", []))
+                with TELEGRAM_BOT_LOCK:
+                    TELEGRAM_BOT_CACHE["notified_torrents_count"] = len(hashes)
+                return hashes
+        except Exception:
+            return set()
+    return set()
+
+def save_tg_notified_hashes(hashes_set):
+    """Guarda los hashes de torrents ya notificados."""
+    try:
+        os.makedirs(os.path.dirname(TELEGRAM_NOTIFIED_FILE), exist_ok=True)
+        with open(TELEGRAM_NOTIFIED_FILE, "w", encoding="utf-8") as f:
+            json.dump({"notified": list(hashes_set)}, f, indent=2)
+        with TELEGRAM_BOT_LOCK:
+            TELEGRAM_BOT_CACHE["notified_torrents_count"] = len(hashes_set)
+    except Exception as e:
+        print(f"[SAVE NOTIFIED ERROR] {e}")
+
+# Pre-cargar listas persistentes al arrancar el módulo
+try:
+    load_tg_whitelist()
+    load_tg_notified_hashes()
+except Exception:
+    pass
+
+def telegram_bot_monitor_worker():
+    """Hilo en segundo plano integrado que vigila el estado de las descargas en qBittorrent y avisa a Telegram al terminar."""
+    print("[TG BOT] Monitor de descargas qBittorrent integrado iniciado.")
+    notified_hashes = load_tg_notified_hashes()
+    is_initial_run = not os.path.exists(TELEGRAM_NOTIFIED_FILE)
+
+    if is_initial_run:
+        initial_torrents = qbit_get_torrents_for_bot()
+        for t in initial_torrents:
+            progress = t.get("progress", 0)
+            amount_left = t.get("amount_left", 1)
+            state = t.get("state", "")
+            if progress >= 1.0 or amount_left == 0 or state in ["uploading", "pausedUP", "stalledUP"]:
+                notified_hashes.add(t.get("hash"))
+        save_tg_notified_hashes(notified_hashes)
+
+    while True:
+        try:
+            torrents = qbit_get_torrents_for_bot()
+            updated = False
+            for t in torrents:
+                t_hash = t.get("hash")
+                t_name = t.get("name", "Torrent")
+                progress = t.get("progress", 0)
+                amount_left = t.get("amount_left", 1)
+                size = t.get("total_size", t.get("size", 0))
+                state = t.get("state", "")
+
+                is_completed = (progress >= 1.0 or amount_left == 0 or state in ["uploading", "pausedUP", "stalledUP"])
+
+                if is_completed and t_hash not in notified_hashes:
+                    notified_hashes.add(t_hash)
+                    updated = True
+                    size_str = tg_format_size(size)
+                    now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+                    alert_msg = (
+                        "🎉 *¡Descarga completada!*\n\n"
+                        f"📁 *Nombre:* `{t_name}`\n"
+                        f"💾 *Tamaño:* {size_str}\n"
+                        f"📂 *Guardado en:* `NAS Video / torrent`\n"
+                        f"⏱️ *Hora:* {now_str}"
+                    )
+                    print(f"[TG BOT] Torrent completado: {t_name}. Notificando a Telegram...")
+                    broadcast_to_tg_whitelist(alert_msg)
+
+            if updated:
+                save_tg_notified_hashes(notified_hashes)
+
+        except Exception as e:
+            print(f"[TG MONITOR ERROR] {e}")
+
+        time.sleep(10)
+
+def telegram_bot_polling_worker():
+    """Hilo principal de Telegram (long polling getUpdates) integrado en server.py."""
+    print("[TG BOT] Long-polling de Telegram integrado iniciado.")
+    offset = 0
+    with TELEGRAM_BOT_LOCK:
+        TELEGRAM_BOT_CACHE["polling_active"] = True
+        TELEGRAM_BOT_CACHE["last_action"] = "Sondeando api.telegram.org..."
+
+    while True:
+        try:
+            with TELEGRAM_BOT_LOCK:
+                TELEGRAM_BOT_CACHE["polling_active"] = True
+                TELEGRAM_BOT_CACHE["last_poll_ts"] = time.time()
+                TELEGRAM_BOT_CACHE["last_poll_str"] = datetime.now().strftime("%H:%M:%S")
+
+            url = f"{TELEGRAM_API_URL}/getUpdates?offset={offset}&timeout=25"
+            r = requests.get(url, timeout=30)
+            data = r.json()
+
+            if not data.get("ok"):
+                time.sleep(2)
+                continue
+
+            updates = data.get("result", [])
+            for update in updates:
+                offset = update["update_id"] + 1
+
+                message = update.get("message")
+                if not message:
+                    continue
+
+                user = message.get("from", {})
+                user_id = user.get("id")
+                first_name = user.get("first_name", "Amigo")
+                chat_id = message["chat"]["id"]
+                msg_id = message["message_id"]
+
+                with TELEGRAM_BOT_LOCK:
+                    TELEGRAM_BOT_CACHE["messages_processed"] += 1
+                    TELEGRAM_BOT_CACHE["last_message_ts"] = time.time()
+                    TELEGRAM_BOT_CACHE["last_message_str"] = datetime.now().strftime("%H:%M:%S")
+
+                # Comprobación de seguridad
+                if not is_tg_user_allowed(user_id):
+                    print(f"[TG AUTH DENIED] Usuario no autorizado: {user_id} ({first_name})")
+                    tg_send_message(chat_id, "⛔ *Acceso no autorizado.* Este bot es privado para descargas de torrents en el NAS.")
+                    continue
+
+                # 1. Documento .torrent
+                document = message.get("document")
+                if document:
+                    file_name = document.get("file_name", "archivo.torrent")
+                    if file_name.lower().endswith(".torrent"):
+                        tg_send_message(chat_id, f"📥 *Descargando archivo torrent:* `{file_name}`...", reply_to_message_id=msg_id)
+                        file_id = document["file_id"]
+                        f_info = requests.get(f"{TELEGRAM_API_URL}/getFile?file_id={file_id}", timeout=20).json()
+                        if f_info.get("ok"):
+                            f_path = f_info["result"]["file_path"]
+                            dl_url = f"{TELEGRAM_FILE_URL}/{f_path}"
+                            f_bytes = requests.get(dl_url, timeout=30).content
+                            ok, resp_msg = qbit_add_torrent_file(file_name, f_bytes)
+                            if ok:
+                                tg_send_message(
+                                    chat_id,
+                                    f"✅ *Torrent añadido a qBittorrent:*\n`{file_name}`\n\n⏳ Descargando... Te avisaré en cuanto termine.",
+                                    reply_to_message_id=msg_id
+                                )
+                            else:
+                                tg_send_message(chat_id, f"❌ *Error al añadir torrent:* {resp_msg}", reply_to_message_id=msg_id)
+                        else:
+                            tg_send_message(chat_id, "❌ Error al descargar el archivo desde Telegram.", reply_to_message_id=msg_id)
+                        continue
+                    else:
+                        tg_send_message(chat_id, "ℹ️ Por favor, envía un archivo que termine en `.torrent`.", reply_to_message_id=msg_id)
+                        continue
+
+                # 2. Mensajes de texto
+                text = (message.get("text") or "").strip()
+                if not text:
+                    continue
+
+                # Comandos de bienvenida / ayuda
+                if text in ["/start", "/help", "ayuda", "start"]:
+                    help_msg = (
+                        f"👋 *¡Hola {first_name}! Panel del Servidor Home NAS.*\n\n"
+                        "📥 *Descargas (qBittorrent):*\n"
+                        "• Envíame cualquier `.torrent` o enlace `magnet:` para descargarlo.\n"
+                        "• `/status` o `/lista` — Ver descargas en curso.\n\n"
+                        "🌐 *Red Local (Vigilancia LAN):*\n"
+                        "• `/red` o `/dispositivos` — Ver equipos conectados y desconectados en tiempo real.\n"
+                        "• `/actualizar_red` — Sincronizar nombres con Pi-hole, ADB y Google Home."
+                    )
+                    tg_send_message(chat_id, help_msg, reply_to_message_id=msg_id)
+                    continue
+
+                # Comando /status o /lista
+                if text in ["/status", "/lista", "/descargas"]:
+                    torrents = qbit_get_torrents_for_bot()
+                    active = [t for t in torrents if t.get("progress", 0) < 1.0 and t.get("amount_left", 1) > 0]
+                    if not active:
+                        tg_send_message(chat_id, "🟢 *No hay descargas activas en este momento.* Todas están completadas o en espera.", reply_to_message_id=msg_id)
+                    else:
+                        msg_lines = [f"📊 *Descargas en curso ({len(active)}):*\n"]
+                        for idx, t in enumerate(active[:8], 1):
+                            name = t.get("name", "Torrent")
+                            pct = t.get("progress", 0) * 100
+                            size_str = tg_format_size(t.get("total_size", t.get("size", 0)))
+                            speed_str = tg_format_size(t.get("dlspeed", 0)) + "/s"
+                            eta_str = tg_format_eta(t.get("eta", 0))
+                            msg_lines.append(
+                                f"*{idx}. {name}*\n"
+                                f"   ├ Progreso: *{pct:.1f}%* de {size_str}\n"
+                                f"   └ Velocidad: {speed_str} | Restante: {eta_str}\n"
+                            )
+                        if len(active) > 8:
+                            msg_lines.append(f"_... y {len(active) - 8} más._")
+                        tg_send_message(chat_id, "\n".join(msg_lines), reply_to_message_id=msg_id)
+                    continue
+
+                # Comando /actualizar_red o /sync_red
+                if text in ["/actualizar_red", "/sync_red", "/sync"]:
+                    tg_send_message(chat_id, "🔄 *Sincronizando dispositivos de red con Pi-hole...*", reply_to_message_id=msg_id)
+                    sync_script = "/home/servidor/scripts/sync_pihole_devices.py"
+                    if os.path.exists(sync_script):
+                        try:
+                            res = subprocess.run(["python3", sync_script], capture_output=True, text=True, timeout=25)
+                            if res.returncode == 0:
+                                tg_send_message(chat_id, "✅ *Sincronización completada con éxito.*\nSe han actualizado los nombres de Pi-hole utilizando datos de ADB y Google Home.", reply_to_message_id=msg_id)
+                            else:
+                                tg_send_message(chat_id, f"⚠️ Sincronización finalizada con avisos:\n`{res.stderr[:300]}`", reply_to_message_id=msg_id)
+                        except Exception as e:
+                            tg_send_message(chat_id, f"❌ Error ejecutando sincronización: {e}", reply_to_message_id=msg_id)
+                    else:
+                        tg_send_message(chat_id, "ℹ️ Script de sincronización de Pi-hole no disponible en este entorno.", reply_to_message_id=msg_id)
+                    continue
+
+                # Comando /red o /dispositivos
+                if text in ["/red", "/dispositivos", "/equipos", "red", "dispositivos"]:
+                    devs = {}
+                    if os.path.exists(TELEGRAM_NET_MONITOR_FILE):
+                        try:
+                            with open(TELEGRAM_NET_MONITOR_FILE, "r", encoding="utf-8") as f:
+                                devs = json.load(f)
+                        except Exception:
+                            devs = {}
+
+                    pihole_names = {}
+                    if os.path.exists(TELEGRAM_FRIENDLY_NAMES_FILE):
+                        try:
+                            with open(TELEGRAM_FRIENDLY_NAMES_FILE, "r", encoding="utf-8") as fn_f:
+                                fn_data = json.load(fn_f)
+                                for f_ip, f_info in fn_data.items():
+                                    pihole_names[f_ip] = f_info.get("friendly") or f_info.get("name")
+                        except Exception:
+                            pass
+
+                    if os.path.exists("/etc/pihole/custom.list"):
+                        try:
+                            with open("/etc/pihole/custom.list", "r", encoding="utf-8") as pl_f:
+                                for line in pl_f:
+                                    p = line.strip().split()
+                                    if len(p) >= 2 and not p[1].endswith(".duckdns.org"):
+                                        if p[0] not in pihole_names:
+                                            pihole_names[p[0]] = p[1]
+                        except Exception:
+                            pass
+
+                    online_list = []
+                    offline_list = []
+                    now_dt = datetime.now()
+
+                    if devs:
+                        for mac, d in devs.items():
+                            status = d.get("status", "offline")
+                            ip = d.get("ip", "N/A")
+                            name = pihole_names.get(ip) or d.get("name", "Desconocido")
+                            vendor = d.get("vendor", "")
+
+                            if status == "online":
+                                conn_time = d.get("last_connected")
+                                time_str = ""
+                                if conn_time:
+                                    try:
+                                        c_dt = datetime.fromisoformat(conn_time)
+                                        diff = int((now_dt - c_dt).total_seconds())
+                                        if diff < 60:
+                                            time_str = f"hace {diff}s"
+                                        elif diff < 3600:
+                                            time_str = f"hace {diff // 60}m"
+                                        else:
+                                            time_str = f"hace {diff // 3600}h {(diff % 3600) // 60}m"
+                                    except Exception:
+                                        pass
+                                line = f"🟢 `{name}`\n   ├ IP: `{ip}` ({vendor})\n   └ Conectado: {time_str if time_str else 'Activo'}"
+                                online_list.append((ip, line))
+                            else:
+                                disc_time = d.get("last_disconnected")
+                                time_str = ""
+                                if disc_time:
+                                    try:
+                                        d_dt = datetime.fromisoformat(disc_time)
+                                        diff = int((now_dt - d_dt).total_seconds())
+                                        if diff < 60:
+                                            time_str = f"hace {diff}s"
+                                        elif diff < 3600:
+                                            time_str = f"hace {diff // 60}m"
+                                        else:
+                                            time_str = f"hace {diff // 3600}h {(diff % 3600) // 60}m"
+                                    except Exception:
+                                        pass
+                                line = f"⚪ `{name}`\n   ├ Última IP: `{ip}`\n   └ Desconectado: {time_str if time_str else 'Inactivo'}"
+                                offline_list.append((ip, line))
+                    else:
+                        with WIFI_LOCK:
+                            clients_copy = list(WIFI_CACHE.get("clients", []))
+                        for cl in clients_copy:
+                            ip = cl.get("ip", "N/A")
+                            name = cl.get("name") or pihole_names.get(ip) or ip
+                            vendor = cl.get("vendor", "")
+                            line = f"🟢 `{name}`\n   ├ IP: `{ip}` ({vendor})\n   └ Conectado: Activo"
+                            online_list.append((ip, line))
+
+                    def ip_sort_key(item):
+                        try:
+                            return [int(x) for x in item[0].split(".")]
+                        except Exception:
+                            return [999, 999, 999, 999]
+
+                    online_list.sort(key=ip_sort_key)
+                    offline_list.sort(key=ip_sort_key)
+
+                    lines = [f"📡 *ESTADO DE LA RED LOCAL (LAN)*\n\n🟢 *Conectados ahora mismo ({len(online_list)}):*"]
+                    for _, l in online_list:
+                        lines.append(l)
+
+                    if offline_list:
+                        lines.append(f"\n⚪ *Desconectados recientemente ({len(offline_list)}):*")
+                        for _, l in offline_list[:8]:
+                            lines.append(l)
+                        if len(offline_list) > 8:
+                            lines.append(f"_... y {len(offline_list) - 8} dispositivos más._")
+
+                    tg_send_message(chat_id, "\n".join(lines), reply_to_message_id=msg_id)
+                    continue
+
+                # Detección de enlaces Magnet
+                magnet_matches = re.findall(r"magnet:\?[^\s]+", text)
+                if magnet_matches:
+                    for mag in magnet_matches:
+                        ok, resp_msg = qbit_add_magnet(mag)
+                        if ok:
+                            tg_send_message(
+                                chat_id,
+                                "🧲 *Enlace Magnet añadido a qBittorrent.*\n\n⏳ Descargando... Te avisaré en cuanto termine.",
+                                reply_to_message_id=msg_id
+                            )
+                        else:
+                            tg_send_message(chat_id, f"❌ *Error al añadir magnet:* {resp_msg}", reply_to_message_id=msg_id)
+                    continue
+
+                # Detección de URL .torrent directa
+                url_torrent_matches = re.findall(r"https?://[^\s]+\.torrent[^\s]*", text)
+                if url_torrent_matches:
+                    for u in url_torrent_matches:
+                        ok, resp_msg = qbit_add_magnet(u)
+                        if ok:
+                            tg_send_message(
+                                chat_id,
+                                f"🌐 *URL de torrent añadida:*\n`{u}`\n\n⏳ Descargando... Te avisaré en cuanto termine.",
+                                reply_to_message_id=msg_id
+                            )
+                        else:
+                            tg_send_message(chat_id, f"❌ *Error al añadir URL torrent:* {resp_msg}", reply_to_message_id=msg_id)
+                    continue
+
+                # Texto no reconocido
+                tg_send_message(
+                    chat_id,
+                    "ℹ️ Envíame un archivo `.torrent`, un enlace `magnet:?xt=...` o escribe `/status` para ver las descargas en curso.",
+                    reply_to_message_id=msg_id
+                )
+
+        except requests.exceptions.Timeout:
+            with TELEGRAM_BOT_LOCK:
+                TELEGRAM_BOT_CACHE["polling_active"] = True
+                TELEGRAM_BOT_CACHE["last_poll_ts"] = time.time()
+                TELEGRAM_BOT_CACHE["last_poll_str"] = datetime.now().strftime("%H:%M:%S")
+            continue
+        except requests.exceptions.ConnectionError as ce:
+            print(f"[TG BOT CONN WARN] Reintentando conexión con api.telegram.org: {ce}")
+            time.sleep(5)
+        except Exception as e:
+            print(f"[TG BOT LOOP ERROR] {e}")
+            time.sleep(3)
 
 # ==============================================================================
 # RECOLECTOR UNIFICADO DE FALLOS Y ERRORES DEL SISTEMA (APPS, SERVICIOS, KERNEL)
@@ -4589,6 +5155,9 @@ def background_collector():
                 emby_act = dict(EXTRAS_CACHE.get("emby", {}))
                 parental_acts = dict(EXTRAS_CACHE.get("parental", {}))
 
+            with TELEGRAM_BOT_LOCK:
+                telegram_bot_act = dict(TELEGRAM_BOT_CACHE)
+
             payload = {
                 "system": sys_info,
                 "cpu": cpu_info,
@@ -4607,7 +5176,8 @@ def background_collector():
                 "wifi_clients": wifi_data.get("clients", []),
                 "wifi_summary": wifi_data.get("summary", {}),
                 "security": security_data,
-                "history": HISTORY
+                "history": HISTORY,
+                "telegram_bot": telegram_bot_act
             }
             
             serialized = json.dumps(payload).encode('utf-8')
@@ -4849,6 +5419,27 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 logs_payload['logs'] = filtered_logs
 
             resp = json.dumps(logs_payload).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 1d. ESTADO Y TELEMETRÍA DEL BOT DE TELEGRAM INTEGRADO
+        elif clean_path == "/api/telegram_bot":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            with TELEGRAM_BOT_LOCK:
+                bot_data = dict(TELEGRAM_BOT_CACHE)
+            resp = json.dumps(bot_data).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
@@ -5620,6 +6211,37 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # Test ping para Bot de Telegram integrado
+        elif clean_path in ("/api/telegram_bot/test", "/api/telegram_bot/ping"):
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            test_msg = (
+                f"🧪 *Prueba de Conexión del Bot Integrado*\n\n"
+                f"🟢 *Panel de Control:* Dashboard Recursos\n"
+                f"⏱️ *Hora:* `{now_str}`\n"
+                f"🤖 *Motor:* Bot nativo integrado en server.py\n"
+                f"📡 *Estado:* Operativo y respondiendo a comandos."
+            )
+            success = broadcast_to_tg_whitelist(test_msg)
+            if success:
+                resp = json.dumps({"success": True, "message": "Mensaje de prueba emitido con éxito a Telegram"}).encode('utf-8')
+            else:
+                resp = json.dumps({"success": False, "error": "No se pudo emitir mensaje o no hay usuarios autorizados en la lista blanca"}).encode('utf-8')
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # Gestión de Contenedores Docker y Servicios Systemd (Iniciar / Reiniciar)
         elif clean_path in ("/api/service/action", "/api/service/restart"):
             auth = check_trust_status(self)
@@ -5909,10 +6531,12 @@ def run_server(port=8085):
     threading.Thread(target=fetch_security_worker, daemon=True).start()
     threading.Thread(target=fetch_connections_geo_worker, daemon=True).start()
     threading.Thread(target=background_collector, daemon=True).start()
+    threading.Thread(target=telegram_bot_polling_worker, daemon=True, name="TelegramBotPolling").start()
+    threading.Thread(target=telegram_bot_monitor_worker, daemon=True, name="TelegramBotMonitor").start()
     
     server_address = ('127.0.0.1', port)
     httpd = ThreadingHTTPServer(server_address, DashboardHTTPHandler)
-    print(f"[+] Monitor de Sistema iniciado en http://127.0.0.1:{port} con Zero-Trust Pairing y Monitor Wi-Fi")
+    print(f"[+] Monitor de Sistema iniciado en http://127.0.0.1:{port} con Zero-Trust Pairing, Monitor Wi-Fi y Bot de Telegram Integrado")
     httpd.serve_forever()
 
 if __name__ == '__main__':

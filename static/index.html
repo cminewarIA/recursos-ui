@@ -3776,6 +3776,53 @@
              7. VISTA APLICACIONES (DOCKER & SYSTEMD - RUTA /aplicaciones)
              ================================================================== -->
         <div class="view-page" id="viewApps" style="display: none;">
+          <!-- BOT DE TELEGRAM INTEGRADO (SERVICIO NATIVO) -->
+          <div class="section-block" id="secTelegramBot">
+            <div class="section-header-bar">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">🤖</span>
+                <div>
+                  <div class="section-title">Bot de Telegram Integrado (qBittorrent & Vigilancia LAN)</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">Servicio nativo 24/7 ejecutándose dentro del backend de Recursos</div>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="adw-badge badge-green" id="tgBotStatusBadge">🟢 En Ejecución</span>
+                <button class="action-btn" id="btnTgSendPing" onclick="sendTelegramTestPing(this)" style="font-size: 11px; padding: 4px 10px;">
+                  📨 Enviar Ping de Prueba
+                </button>
+              </div>
+            </div>
+            <div class="surface-panel" style="padding: 16px;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
+                <div class="hw-spec-cell">
+                  <span class="hw-spec-label">Long-Polling Telegram</span>
+                  <span class="hw-spec-value" style="font-size: 16px; color: var(--accent-cyan-bright);" id="tgBotPollingState">Activo</span>
+                  <span style="font-size: 11px; color: var(--text-muted);" id="tgBotLastPoll">Último sondeo: --</span>
+                </div>
+                <div class="hw-spec-cell">
+                  <span class="hw-spec-label">Usuarios Autorizados</span>
+                  <span class="hw-spec-value" style="font-size: 16px;" id="tgBotAllowedCount">0 admins</span>
+                  <span style="font-size: 11px; color: var(--text-muted);">Lista blanca activa</span>
+                </div>
+                <div class="hw-spec-cell">
+                  <span class="hw-spec-label">Torrents Notificados</span>
+                  <span class="hw-spec-value" style="font-size: 16px; color: var(--accent-emerald-bright);" id="tgBotNotifiedCount">0 completados</span>
+                  <span style="font-size: 11px; color: var(--text-muted);">Avisos de finalización</span>
+                </div>
+                <div class="hw-spec-cell">
+                  <span class="hw-spec-label">qBittorrent API</span>
+                  <span class="hw-spec-value" style="font-size: 16px; color: var(--accent-violet-bright);" id="tgBotQbitStatus">Conectado (8082)</span>
+                  <span style="font-size: 11px; color: var(--text-muted);">Gestor P2P enlazado</span>
+                </div>
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+                <span>💬 Mensajes procesados por el bot: <strong id="tgBotMsgCount">0</strong></span>
+                <span id="tgBotPingStatus" style="font-size: 11.5px; color: var(--text-muted);"></span>
+              </div>
+            </div>
+          </div>
+
           <div class="section-block">
             <div class="section-title">Servicios Nativos del Sistema (systemd)</div>
             <div class="surface-panel" id="systemdAppsList">
@@ -6927,6 +6974,21 @@
       } else if (activeView === 'torrents') {
         renderTorrentsView(q);
       } else if (activeView === 'apps') {
+        // Render Bot de Telegram Integrado
+        const tgBot = latestMetrics.telegram_bot || {};
+        const tgBadge = document.getElementById('tgBotStatusBadge');
+        if (tgBadge) {
+          const isTgRunning = tgBot.running !== false && tgBot.polling_active;
+          tgBadge.className = `adw-badge ${isTgRunning ? 'badge-green' : 'badge-amber'}`;
+          tgBadge.textContent = isTgRunning ? '🟢 En Ejecución' : '🟡 Inicializando';
+        }
+        setText('tgBotPollingState', tgBot.polling_active ? 'Activo' : 'En espera');
+        setText('tgBotLastPoll', `Último sondeo: ${tgBot.last_poll_str || '--'}`);
+        setText('tgBotAllowedCount', `${tgBot.allowed_users_count ?? 1} admins`);
+        setText('tgBotNotifiedCount', `${tgBot.notified_torrents_count ?? 0} completados`);
+        setText('tgBotQbitStatus', tgBot.qbit_connected ? 'Conectado (8082)' : 'En espera');
+        setText('tgBotMsgCount', tgBot.messages_processed ?? 0);
+
         const sysd = latestMetrics.systemd_services || [];
         const sysdBox = document.getElementById('systemdAppsList');
         if (sysdBox) {
@@ -7988,6 +8050,52 @@
           }, 2400);
         }
       });
+    }
+
+    async function sendTelegramTestPing(btn) {
+      if (!btn) return;
+      const statusEl = document.getElementById('tgBotPingStatus');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Enviando...';
+      if (statusEl) {
+        statusEl.style.color = 'var(--text-muted)';
+        statusEl.textContent = 'Enviando ping de prueba a Telegram...';
+      }
+      try {
+        const res = await fetch('/api/telegram_bot/test', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (statusEl) {
+            statusEl.style.color = 'var(--accent-emerald-bright)';
+            statusEl.textContent = '✅ Mensaje emitido con éxito a Telegram';
+          }
+          showToast('📨 Mensaje de prueba enviado a Telegram con éxito', 'success');
+        } else {
+          if (statusEl) {
+            statusEl.style.color = 'var(--accent-rose-bright)';
+            statusEl.textContent = `❌ ${data.error || 'Error al emitir mensaje'}`;
+          }
+          showToast(data.error || 'No se pudo enviar el mensaje a Telegram', 'error');
+        }
+      } catch (err) {
+        if (statusEl) {
+          statusEl.style.color = 'var(--accent-rose-bright)';
+          statusEl.textContent = `❌ Error de conexión: ${err.message}`;
+        }
+        showToast('Error de conexión al comunicar con Telegram', 'error');
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = origText;
+          if (statusEl) {
+            setTimeout(() => { statusEl.textContent = ''; }, 6000);
+          }
+        }, 800);
+      }
     }
 
     // =========================================================================

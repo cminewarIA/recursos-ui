@@ -3,7 +3,7 @@
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
 ### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v4.17.1-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v4.18.0-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
 [![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white)](#-filosof%C3%ADa-de-dise%C3%B1o)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
 [![Rendimiento](https://img.shields.io/badge/Rendimiento-60_FPS_HiDPI_Retina-FF9F0A?style=for-the-badge&logo=speedtest&logoColor=white)](#-rendimiento-y-motor-desacoplado)
@@ -20,7 +20,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v4.17.1 ║
+║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v4.18.0 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                              ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
@@ -298,6 +298,7 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v4.18.0`** | `MINOR` | **Bot de Telegram Integrado 100% Nativo en Backend**: Integración completa del bot de descargas qBittorrent y vigilancia LAN directamente dentro del servidor web (`server.py`) sin intermediarios ni scripts delegados; soporte completo para recepción de archivos `.torrent` (descarga binaria e inyección directa en el cliente P2P), enlaces magnet y URLs; monitor continuo de finalización de descargas en qBittorrent con alertas push automáticas a la lista blanca; comandos interactivos `/status`, `/red`, `/actualizar_red` y `/help`; endpoints REST `/api/telegram_bot` y `/api/telegram_bot/test`; tarjeta visual en el panel de control con estado de long-polling, administradores registrados y botón de ping de prueba; desactivación de `telegram-comic-bot.service` para eliminar colisiones de API. |
 | **`v4.17.1`** | `PATCH` | **Mapa de conexiones: leyenda y desglose por dispositivo**: la leyenda inferior izquierda (Nodo Host, Entrante/Saliente, IP Bloqueada, Umbral NIC, OpenStreetMap) vuelve a mostrarse por encima de las capas de Leaflet (contexto de apilamiento aislado + `z-index` 1050); el filtro `📱 Dispositivos` ahora desglosa dispositivo por dispositivo (cabecera con icono, nombre, IP/MAC, nº de conexiones y destinos, caudal y totales reales de `wifi_clients`), con chips para enfocar un único dispositivo en el mapa y marcadores que indican el dispositivo origen. |
 | **`v4.17.0`** | `MINOR` | **Distribución de Ancho de Banda con Dispositivos y Consumos Reales**: Incorporación del modo de agrupación `📱 Dispositivos` en el gráfico interactivo D3 de distribución de ancho de banda; cálculo basado en los consumos reales medidos de cada dispositivo (`tx_bytes`, `rx_bytes`, caudal de subida/bajada en vivo); segregación inteligente de contadores de hardware acumulados de interfaces troncales; desglose detallado en leyenda con iconos y métricas de dispositivos por segmento. |
 | **`v4.16.0`** | `MINOR` | **Centro Unificado de Registro de Fallos (Apps, Servicios & Kernel)**: Agregador de diagnósticos en tiempo real que recolecta fallos de contenedores Docker (Immich, Postgres, Nextcloud, Collabora), servicios Systemd y eventos críticos del kernel en una sola vista unificada; decodificación resiliente de buffers binarios en streams de contenedores; categorización 100% dinámica sin nombres fijos; nuevo endpoint REST `/api/system/logs` con filtrado por categoría y nivel de severidad; visor Bento colapsable en Vista General y modal a pantalla completa. |
