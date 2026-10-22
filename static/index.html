@@ -5475,8 +5475,9 @@
           <button type="button" class="seg-btn" id="btnModalSysCatService" onclick="SystemLogsCenter.setCategory('service')">⚙️ Servicios</button>
           <button type="button" class="seg-btn" id="btnModalSysCatKernel" onclick="SystemLogsCenter.setCategory('kernel')">🐧 Kernel</button>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <button type="button" class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.refreshLive()">🔄 Actualizar</button>
+        <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 320px; min-width: 180px;">
+          <input type="text" id="modalSysLogsSearchInput" placeholder="🔍 Filtrar logs..." style="width: 100%; height: 28px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0 10px; font-size: 11px; color: var(--text-primary); outline: none;" oninput="SystemLogsCenter.setFilterQuery(this.value)">
+          <button type="button" class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px; flex-shrink: 0;" onclick="SystemLogsCenter.refreshLive()">🔄 Actualizar</button>
         </div>
       </div>
       <div class="system-logs-viewport" id="modalSystemLogsViewport" role="log" style="max-height: 60vh; min-height: 250px;">
@@ -12206,9 +12207,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         if (isHidden) {
           card.style.display = 'block';
           this._isVisible = true;
-          if (!this._logs || this._logs.length === 0) {
-            this.fetchLogs(false);
-          }
+          this.fetchLogs(false);
           try {
             card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           } catch (e) {}
@@ -12226,11 +12225,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         } else {
           modal.style.display = 'block';
         }
-        if (!this._logs || this._logs.length === 0) {
-          this.fetchLogs(false);
-        } else {
-          this.render();
-        }
+        this.fetchLogs(false);
       },
 
       closeModal() {
@@ -12280,6 +12275,10 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
       setFilterQuery(query) {
         this._searchQuery = String(query || '').trim().toLowerCase();
+        const inp1 = document.getElementById('sysLogsSearchInput');
+        const inp2 = document.getElementById('modalSysLogsSearchInput');
+        if (inp1 && inp1.value !== query) inp1.value = query;
+        if (inp2 && inp2.value !== query) inp2.value = query;
         this.render();
       },
 
@@ -12372,12 +12371,13 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           const res = await fetch(url, { headers: authHeaders() });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          this._logs = data.entries || [];
+          this._logs = data.logs || data.entries || [];
           this._failedUnits = data.failed_units || [];
           if (data.counts_by_category) {
             const counts = data.counts_by_category;
+            const totalCount = data.total_errors ?? counts.total ?? this._logs.length;
             const cAll = document.getElementById('cntSysErrAll');
-            if (cAll) cAll.textContent = counts.total || this._logs.length;
+            if (cAll) cAll.textContent = totalCount;
             const cDocker = document.getElementById('cntSysErrDocker');
             if (cDocker) cDocker.textContent = counts.docker || 0;
             const cService = document.getElementById('cntSysErrService');
@@ -12474,7 +12474,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           else if (entryCat === 'kernel') { catIcon = '🐧'; catClass = 'kernel'; catTitle = 'Kernel'; }
 
           const srcName = entry.container || entry.unit || entry.source || 'sistema';
-          const dateStr = entry.date_str ? entry.date_str.split(' ')[1] || entry.date_str : '';
+          const dateStr = entry.time_str || (entry.date_str ? entry.date_str.split(' ')[1] || entry.date_str : entry.time_iso || '');
 
           return `
             <div class="system-log-row cat-${catClass}">

@@ -1198,7 +1198,10 @@ def fetch_system_logs(priority_max=3, limit=80, force=False):
                     "ts": ts_ms,
                     "time_str": time_str,
                     "time_iso": time_iso,
+                    "date_str": time_str,
                     "unit": unit_name,
+                    "source": unit_name,
+                    "container": unit_name if category == "docker" else "",
                     "category": category,
                     "level": prio_label,
                     "priority": prio_num,
@@ -1211,6 +1214,7 @@ def fetch_system_logs(priority_max=3, limit=80, force=False):
 
     # Invertir para mostrar primero los más recientes
     logs.reverse()
+    category_counts["total"] = len(logs)
 
     result = {
         "success": True,
@@ -1219,6 +1223,7 @@ def fetch_system_logs(priority_max=3, limit=80, force=False):
         "failed_units": failed_units,
         "counts_by_category": category_counts,
         "logs": logs,
+        "entries": logs,
         "fetched_at": datetime.now().strftime("%H:%M:%S")
     }
 
@@ -6244,6 +6249,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 filtered_logs = [entry for entry in logs_payload.get('logs', []) if entry.get('category') == cat]
                 logs_payload = dict(logs_payload)
                 logs_payload['logs'] = filtered_logs
+                logs_payload['entries'] = filtered_logs
+                logs_payload['total_errors'] = len(filtered_logs)
 
             resp = json.dumps(logs_payload).encode('utf-8')
             self.send_response(200)
