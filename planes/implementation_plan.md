@@ -1,27 +1,23 @@
-# Plan de Implementación — Detección Dinámica de Entorno (Web vs Móvil / Nativo) y Proyección USB (v6.2.0)
+# Plan de Implementación — v6.3.0: Historial SQLite por Servicios, Geolocalización de Alta Precisión y HUD Adaptativo a Pantalla Completa en el Mapa
 
 ## 1. Objetivo
-Implementar una lógica de detección de entorno en tiempo de ejecución en toda la plataforma (`index.html`, `static/index.html`, `desktop_app/recursos_app.py` y `server.py`) de modo que:
-1. **Entorno Móvil o Nativo (`mobile` / `native`)**:
-   - Se oculta automáticamente la pestaña `'Dispositivo'` (y cualquier otra pestaña no web).
-   - Se renderiza en su lugar una pantalla de espera optimizada para la proyección por cable USB (**Samsung DeX / Modo Escritorio de Android**).
-2. **Versión Web (`web`)**:
-   - Se garantiza que la pestaña `'Dispositivo'` no esté presente en ninguna barra de navegación (sidebar, dock táctil inferior, puntos de paginación swipe ni tabla de rutas).
+Dotar al Mapa Geoespacial de Red de:
+1. **Capa de Persistencia SQLite (`geoip_history.db`) en `server.py`**:
+   - Tabla `geoip_locations`: almacena las ubicaciones exactas de cada IP pública resuelta (`lat`, `lng`, `city`, `region`, `postal`, `country`, `country_code`, `isp`, `asn`, `accuracy_source`, `updated_at`).
+   - Tabla `connection_history`: persiste el historial de todas las conexiones públicas geolocalizadas catalogadas por el **servicio** al que se conectaron (`service`, `conn_key`, `direction`, `protocol`, `local_ip`, `local_hostname`, `remote_ip`, `remote_port`, `domain`, `hit_count`, `first_seen`, `last_seen`, coordenadas y metadatos de precisión).
+2. **Geolocalización Dual de Mayor Exactitud (`ip-api.com` + `ipwho.is`)**:
+   - Solicitar código postal (`zip`) y región (`regionName`) en lotes de `ip-api.com`.
+   - Enriquecer y refinar coordenadas sub-urbanas/locales con `ipwho.is` (`_enrich_ip_precision_with_ipwhois`) cuando faltan datos postales o como respaldo automático, registrando la fuente en `accuracy_source`.
+3. **HUD Adaptativo Integrado en el Propio Mapa y Modo Pantalla Completa (`index.html` y `static/index.html`)**:
+   - Integrar dentro de `#networkConnectionsMapStageWrap` la barra flotante `.connections-map-adaptive-hud` con:
+     - Conmutador de modo `🟢 En Vivo` vs `📚 Historial por Servicios`.
+     - Controles de filtrado (`Todas`, `↓ Entrantes`, `↑ Salientes`, `📱 Dispositivos`, `🛡️ Bloqueadas`).
+     - Barra adaptativa de chips de dispositivos LAN (`#mapHudDeviceFilterBar`) directamente sobre el mapa.
+     - Cajón interactivo del catálogo histórico de servicios (`#mapHudServiceCatalogDrawer`) con buscador en tiempo real y vaciado de base de datos con confirmación inline.
+     - Botón `⛶ Pantalla Completa` (`toggleConnectionsMapFullscreen()`) con soporte para Fullscreen API nativa y fallback CSS `.is-fullscreen` + redimensionado automático de Leaflet (`invalidateSize()`).
 
-## 2. Arquitectura Implementada
-
-### A. Motor `EnvironmentDetector` en Frontend (`index.html` & `static/index.html`)
-- **Detección Dinámica Sin Hardcoding (`EnvironmentDetector.detect()`)**:
-  - Evalúa parámetros de entorno (`?env=native`, `?env=mobile`, `?env=web`, `?mode=dex`), puente nativo (`window.__RECURSOS_NATIVE__`), cabeceras/firmas de contenedor nativo (`RecursosNative`, `Electron`, `WebKitGTK`, `pywebview`, `; wv)`) y señales de entorno móvil (`navigator.userAgentData.mobile` y User-Agent móvil/DeX).
-- **Política Estricta de Navegación (`EnvironmentDetector.enforceNavigationPolicy()`)**:
-  - Asegura que en la versión web no exista ningún enlace ni pestaña `'Dispositivo'` (`#navDex`, `#dockDex`, `#navDevice`, `#dockDevice`, `[data-view="dex"]`, `[data-view="device"]`, `[data-non-web-tab]`) y purga cualquier ruta residual del diccionario de navegación.
-- **Pantalla de Espera Optimizada para Proyección USB (`#usbProjectionWaitScreen`)**:
-  - Cuando `EnvironmentDetector.applyEnvironmentLayout()` detecta un entorno móvil o nativo, oculta cualquier pestaña no web y muestra `#usbProjectionWaitScreen` con estado en vivo del puerto USB (`GET /api/dex/status`), opción de inicio automático al conectar el cable USB y botón de proyección en 1 clic (`POST /api/dex/start`).
-
-### B. Detección de Entorno en Aplicación Nativa GTK 3 (`desktop_app/recursos_app.py`)
-- **`detect_runtime_environment()`**:
-  - Detecta la ejecución nativa o móvil y configura `RecursosNativeWindow` para ocultar automáticamente `Gtk.StackSwitcher` y cualquier pestaña `'Dispositivo'`, mostrando directamente la pantalla de espera de proyección por USB (`usb_wait_screen`) para Samsung DeX / Android Desktop.
-
-### C. Endpoints REST de Estado y Control USB (`server.py`)
-- `GET /api/dex/status`: Devuelve el entorno detectado, estado de herramientas (`adb`, `scrcpy`), sesión activa y lista de dispositivos conectados exclusivamente por USB (`usb_only=True`).
-- `POST /api/dex/start` y `POST /api/dex/stop`: Inician o detienen la proyección de vídeo por USB con `DexController`.
+## 2. Archivos Modificados
+- `server.py`: Inicialización SQLite WAL (`init_geoip_history_db`), enriquecimiento dual GeoIP (`_enrich_ip_precision_with_ipwhois`), persistencia por lotes (`save_geoip_locations_to_sqlite`, `record_connections_to_sqlite`), consulta agregada por servicios (`query_connection_history_from_sqlite`) y endpoints `GET /api/net/history` y `POST /api/net/history/clear`.
+- `index.html` y `static/index.html`: Estilos y estructura del HUD adaptativo dentro del mapa, modo Pantalla Completa y motor de catálogo histórico por servicios en `NetworkConnectionsMapEngine`.
+- `VERSION` y `package.json`: Incremento `MINOR` a `6.3.0`.
+- `README.md` y `planes/walkthrough.md`: Documentación actualizada.

@@ -1367,74 +1367,503 @@ def _is_private_ip(ip_str):
         return True
     return False
 
-def load_geoip_disk_cache():
-    """Carga la caché persistente de GeoIP desde disco al iniciar el worker."""
-    global GEOIP_CACHE, SERVER_SELF_GEO
-    if not os.path.exists(GEOIP_CACHE_FILE):
+GEOIP_HISTORY_DB_FILE = os.path.join(BASE_DIR, "geoip_history.db")
+GEOIP_HISTORY_DB_LOCK = threading.Lock()
+
+def init_geoip_history_db():
+    """Inicializa la base de datos SQLite para persistir ubicaciones GeoIP de alta precisión y el historial de conexiones catalogado por servicios."""
+    with GEOIP_HISTORY_DB_LOCK:
+        try:
+            conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS geoip_locations (
+                    ip TEXT PRIMARY KEY,
+                    lat REAL NOT NULL,
+                    lng REAL NOT NULL,
+                    city TEXT DEFAULT '',
+                    region TEXT DEFAULT '',
+                    postal TEXT DEFAULT '',
+                    country TEXT DEFAULT '',
+                    country_code TEXT DEFAULT '',
+                    isp TEXT DEFAULT '',
+                    asn TEXT DEFAULT '',
+                    accuracy_source TEXT DEFAULT 'ip-api',
+                    updated_at REAL NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS connection_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    conn_key TEXT UNIQUE NOT NULL,
+                    direction TEXT NOT NULL,
+                    protocol TEXT DEFAULT 'TCP',
+                    local_ip TEXT DEFAULT '',
+                    local_hostname TEXT DEFAULT '',
+                    local_port INTEGER DEFAULT 0,
+                    remote_ip TEXT NOT NULL,
+                    remote_port INTEGER DEFAULT 0,
+                    domain TEXT DEFAULT '',
+                    service TEXT NOT NULL,
+                    process TEXT DEFAULT '',
+                    jail TEXT DEFAULT '',
+                    lat REAL NOT NULL,
+                    lng REAL NOT NULL,
+                    city TEXT DEFAULT '',
+                    region TEXT DEFAULT '',
+                    postal TEXT DEFAULT '',
+                    country TEXT DEFAULT '',
+                    country_code TEXT DEFAULT '',
+                    isp TEXT DEFAULT '',
+                    asn TEXT DEFAULT '',
+                    accuracy_source TEXT DEFAULT 'ip-api',
+                    first_seen REAL NOT NULL,
+                    last_seen REAL NOT NULL,
+                    hit_count INTEGER DEFAULT 1
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conn_hist_service ON connection_history(service);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conn_hist_local_ip ON connection_history(local_ip);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conn_hist_direction ON connection_history(direction);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conn_hist_last_seen ON connection_history(last_seen DESC);")
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[-] Error inicializando SQLite geoip_history.db: {e}")
+
+def save_geoip_locations_to_sqlite(entries_dict):
+    """Persiste un lote de ubicaciones GeoIP resueltas en la tabla SQLite geoip_locations."""
+    if not entries_dict:
         return
+    rows = []
+    now = time.time()
+    for ip_k, val in entries_dict.items():
+        if not isinstance(val, dict) or not isinstance(val.get("lat"), (int, float)) or not isinstance(val.get("lng"), (int, float)):
+            continue
+        rows.append((
+            str(ip_k),
+            float(val["lat"]),
+            float(val["lng"]),
+            str(val.get("city") or ""),
+            str(val.get("region") or ""),
+            str(val.get("postal") or ""),
+            str(val.get("country") or ""),
+            str(val.get("country_code") or ""),
+            str(val.get("isp") or ""),
+            str(val.get("asn") or ""),
+            str(val.get("accuracy_source") or "ip-api"),
+            float(val.get("ts") or now)
+        ))
+    if not rows:
+        return
+    with GEOIP_HISTORY_DB_LOCK:
+        try:
+            conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
+            conn.executemany("""
+                INSERT INTO geoip_locations (
+                    ip, lat, lng, city, region, postal, country, country_code, isp, asn, accuracy_source, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(ip) DO UPDATE SET
+                    lat=excluded.lat,
+                    lng=excluded.lng,
+                    city=excluded.city,
+                    region=excluded.region,
+                    postal=excluded.postal,
+                    country=excluded.country,
+                    country_code=excluded.country_code,
+                    isp=excluded.isp,
+                    asn=excluded.asn,
+                    accuracy_source=excluded.accuracy_source,
+                    updated_at=excluded.updated_at
+            """, rows)
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+def record_connections_to_sqlite(connections_list):
+    """Registra y actualiza en SQLite todas las conexiones públicas geolocalizadas catalogadas por servicio."""
+    if not connections_list:
+        return
+    now = time.time()
+    rows = []
+    for c in connections_list:
+        if not isinstance(c, dict) or c.get("is_lan"):
+            continue
+        lat = c.get("lat")
+        lng = c.get("lng")
+        if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+            continue
+        if c.get("geo_status") == "pending":
+            continue
+        remote_ip = str(c.get("remote_ip") or "").strip()
+        if not remote_ip or _is_private_ip(remote_ip):
+            continue
+        direction = str(c.get("direction") or "outgoing").strip()
+        local_ip = str(c.get("local_ip") or "").strip()
+        raw_service = str(c.get("service") or "").strip()
+        if not raw_service:
+            rport = int(c.get("remote_port") or 0)
+            proto = str(c.get("protocol") or "TCP").upper()
+            raw_service = f"{proto}/{rport}" if rport else proto
+        # Normalize service catalog label (strip dynamic domain suffix after ' · ' if present so services group cleanly)
+        service_catalog = raw_service.split(" · ")[0].strip() or raw_service
+        conn_key = f"{remote_ip}|{service_catalog}|{local_ip}|{direction}"
+        rows.append((
+            conn_key,
+            direction,
+            str(c.get("protocol") or "TCP"),
+            local_ip,
+            str(c.get("local_hostname") or ""),
+            int(c.get("local_port") or 0),
+            remote_ip,
+            int(c.get("remote_port") or 0),
+            str(c.get("domain") or ""),
+            service_catalog,
+            str(c.get("process") or ""),
+            str(c.get("jail") or ""),
+            float(lat),
+            float(lng),
+            str(c.get("city") or ""),
+            str(c.get("region") or ""),
+            str(c.get("postal") or ""),
+            str(c.get("country") or ""),
+            str(c.get("country_code") or ""),
+            str(c.get("isp") or ""),
+            str(c.get("asn") or ""),
+            str(c.get("accuracy_source") or "ip-api"),
+            now,
+            now
+        ))
+    if not rows:
+        return
+    with GEOIP_HISTORY_DB_LOCK:
+        try:
+            conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
+            conn.executemany("""
+                INSERT INTO connection_history (
+                    conn_key, direction, protocol, local_ip, local_hostname, local_port,
+                    remote_ip, remote_port, domain, service, process, jail,
+                    lat, lng, city, region, postal, country, country_code, isp, asn, accuracy_source,
+                    first_seen, last_seen, hit_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                ON CONFLICT(conn_key) DO UPDATE SET
+                    last_seen=excluded.last_seen,
+                    hit_count=connection_history.hit_count + 1,
+                    lat=excluded.lat,
+                    lng=excluded.lng,
+                    city=CASE WHEN excluded.city != '' THEN excluded.city ELSE connection_history.city END,
+                    region=CASE WHEN excluded.region != '' THEN excluded.region ELSE connection_history.region END,
+                    postal=CASE WHEN excluded.postal != '' THEN excluded.postal ELSE connection_history.postal END,
+                    country=CASE WHEN excluded.country != '' THEN excluded.country ELSE connection_history.country END,
+                    country_code=CASE WHEN excluded.country_code != '' THEN excluded.country_code ELSE connection_history.country_code END,
+                    isp=CASE WHEN excluded.isp != '' THEN excluded.isp ELSE connection_history.isp END,
+                    asn=CASE WHEN excluded.asn != '' THEN excluded.asn ELSE connection_history.asn END,
+                    accuracy_source=excluded.accuracy_source,
+                    domain=CASE WHEN excluded.domain != '' THEN excluded.domain ELSE connection_history.domain END,
+                    local_hostname=CASE WHEN excluded.local_hostname != '' THEN excluded.local_hostname ELSE connection_history.local_hostname END,
+                    process=CASE WHEN excluded.process != '' THEN excluded.process ELSE connection_history.process END
+            """, rows)
+            # Mantener base de datos acotada a los 5000 flujos más recientes
+            conn.execute("""
+                DELETE FROM connection_history
+                WHERE id NOT IN (
+                    SELECT id FROM connection_history ORDER BY last_seen DESC LIMIT 5000
+                )
+            """)
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[-] Error guardando historial de conexiones en SQLite: {e}")
+
+def query_connection_history_from_sqlite(service_filter=None, device_filter=None, direction_filter=None, search_query=None, limit=300):
+    """Consulta el historial de conexiones geolocalizadas y el catálogo agrupado por servicios desde SQLite."""
+    init_geoip_history_db()
+    services_catalog = []
+    devices_catalog = []
+    connections = []
+    summary = {
+        "total_records": 0,
+        "total_services": 0,
+        "total_unique_ips": 0,
+        "total_devices": 0
+    }
     try:
-        with open(GEOIP_CACHE_FILE, "r", encoding="utf-8", errors="ignore") as f:
-            raw = json.load(f)
-        if not isinstance(raw, dict):
-            return
-        now = time.time()
-        cutoff = now - GEOIP_TTL_SECONDS
-        entries = raw.get("entries", raw) if isinstance(raw.get("entries"), dict) else raw
-        loaded = {}
-        for ip_k, val in entries.items():
-            if isinstance(val, dict) and isinstance(val.get("lat"), (int, float)) and isinstance(val.get("lng"), (int, float)):
-                ts = float(val.get("ts", now))
-                if ts >= cutoff:
-                    loaded[str(ip_k)] = {
-                        "ip": str(ip_k),
-                        "lat": float(val["lat"]),
-                        "lng": float(val["lng"]),
-                        "city": str(val.get("city") or "Nodo Remoto"),
-                        "region": str(val.get("region") or ""),
-                        "country": str(val.get("country") or ""),
-                        "country_code": str(val.get("country_code") or ""),
-                        "isp": str(val.get("isp") or ""),
-                        "asn": str(val.get("asn") or ""),
-                        "ts": ts
-                    }
-        with GEOIP_LOCK:
-            GEOIP_CACHE.update(loaded)
-            if isinstance(raw.get("server_self_geo"), dict) and isinstance(raw["server_self_geo"].get("lat"), (int, float)):
-                SERVER_SELF_GEO = dict(raw["server_self_geo"])
-            else:
-                SERVER_SELF_GEO = {}
-            # Ubicación fijada en el centro geográfico de Gran Canaria
-            SERVER_SELF_GEO["lat"] = float(os.environ.get("SERVER_GEO_LAT", 27.9600))
-            SERVER_SELF_GEO["lng"] = float(os.environ.get("SERVER_GEO_LNG", -15.5800))
-            SERVER_SELF_GEO["city"] = os.environ.get("SERVER_GEO_CITY", "Gran Canaria (Centro)")
-            SERVER_SELF_GEO["country"] = os.environ.get("SERVER_GEO_COUNTRY", "España")
-            SERVER_SELF_GEO["country_code"] = "ES"
+        limit_val = max(10, min(int(limit or 300), 1000))
     except Exception:
-        pass
+        limit_val = 300
+
+    with GEOIP_HISTORY_DB_LOCK:
+        try:
+            conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+
+            # 1. Resumen global
+            cur.execute("""
+                SELECT
+                    COUNT(*) AS total_records,
+                    COUNT(DISTINCT service) AS total_services,
+                    COUNT(DISTINCT remote_ip) AS total_unique_ips,
+                    COUNT(DISTINCT local_ip) AS total_devices
+                FROM connection_history
+            """)
+            s_row = cur.fetchone()
+            if s_row:
+                summary = {
+                    "total_records": int(s_row["total_records"] or 0),
+                    "total_services": int(s_row["total_services"] or 0),
+                    "total_unique_ips": int(s_row["total_unique_ips"] or 0),
+                    "total_devices": int(s_row["total_devices"] or 0)
+                }
+
+            # 2. Catálogo de servicios agregados
+            cur.execute("""
+                SELECT
+                    service,
+                    COUNT(*) AS connections_count,
+                    SUM(hit_count) AS total_hits,
+                    COUNT(DISTINCT remote_ip) AS unique_ips,
+                    COUNT(DISTINCT local_ip) AS unique_devices,
+                    GROUP_CONCAT(DISTINCT CASE WHEN country != '' THEN country ELSE NULL END) AS countries_csv,
+                    GROUP_CONCAT(DISTINCT CASE WHEN domain != '' THEN domain ELSE NULL END) AS domains_csv,
+                    MIN(first_seen) AS first_seen,
+                    MAX(last_seen) AS last_seen
+                FROM connection_history
+                GROUP BY service
+                ORDER BY last_seen DESC, total_hits DESC
+                LIMIT 120
+            """)
+            for r in cur.fetchall():
+                countries_list = [x.strip() for x in str(r["countries_csv"] or "").split(",") if x.strip()][:5]
+                domains_list = [x.strip() for x in str(r["domains_csv"] or "").split(",") if x.strip()][:4]
+                services_catalog.append({
+                    "service": str(r["service"] or "Desconocido"),
+                    "connections_count": int(r["connections_count"] or 0),
+                    "total_hits": int(r["total_hits"] or 0),
+                    "unique_ips": int(r["unique_ips"] or 0),
+                    "unique_devices": int(r["unique_devices"] or 0),
+                    "countries": countries_list,
+                    "sample_domains": domains_list,
+                    "first_seen": float(r["first_seen"] or 0),
+                    "last_seen": float(r["last_seen"] or 0)
+                })
+
+            # 3. Catálogo de dispositivos locales en el historial
+            cur.execute("""
+                SELECT
+                    local_ip,
+                    MAX(local_hostname) AS local_hostname,
+                    COUNT(*) AS connections_count,
+                    COUNT(DISTINCT service) AS services_count,
+                    MAX(last_seen) AS last_seen
+                FROM connection_history
+                WHERE local_ip != ''
+                GROUP BY local_ip
+                ORDER BY connections_count DESC, last_seen DESC
+                LIMIT 60
+            """)
+            for r in cur.fetchall():
+                devices_catalog.append({
+                    "ip": str(r["local_ip"] or ""),
+                    "name": str(r["local_hostname"] or r["local_ip"] or ""),
+                    "connections_count": int(r["connections_count"] or 0),
+                    "services_count": int(r["services_count"] or 0),
+                    "last_seen": float(r["last_seen"] or 0)
+                })
+
+            # 4. Consulta filtrada de conexiones históricas
+            where_clauses = []
+            params = []
+            if service_filter and str(service_filter).strip().lower() not in ("", "all", "todos"):
+                where_clauses.append("service = ?")
+                params.append(str(service_filter).strip())
+            if device_filter and str(device_filter).strip().lower() not in ("", "all", "todos"):
+                where_clauses.append("local_ip = ?")
+                params.append(str(device_filter).strip())
+            if direction_filter and str(direction_filter).strip().lower() not in ("", "all", "todas"):
+                if direction_filter == "devices":
+                    where_clauses.append("local_ip NOT IN (?, '127.0.0.1', '::1')")
+                    params.append(SERVER_LOCAL_IP)
+                else:
+                    where_clauses.append("direction = ?")
+                    params.append(str(direction_filter).strip())
+            if search_query and str(search_query).strip():
+                q_like = f"%{str(search_query).strip()}%"
+                where_clauses.append("(service LIKE ? OR domain LIKE ? OR remote_ip LIKE ? OR city LIKE ? OR country LIKE ? OR isp LIKE ? OR local_hostname LIKE ?)")
+                params.extend([q_like] * 7)
+
+            where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+            cur.execute(f"""
+                SELECT *
+                FROM connection_history
+                {where_sql}
+                ORDER BY last_seen DESC
+                LIMIT ?
+            """, params + [limit_val])
+
+            for r in cur.fetchall():
+                loc_parts = [p for p in (r["city"], r["region"], r["postal"]) if p]
+                precise_city = f"{r['city']} ({r['region']}{' · CP ' + r['postal'] if r['postal'] else ''})" if (r["region"] or r["postal"]) and r["city"] else (r["city"] or "Nodo Remoto")
+                connections.append({
+                    "id": f"hist_{r['id']}",
+                    "direction": str(r["direction"] or "outgoing"),
+                    "protocol": str(r["protocol"] or "TCP"),
+                    "local_ip": str(r["local_ip"] or SERVER_LOCAL_IP),
+                    "local_hostname": str(r["local_hostname"] or "Servidor"),
+                    "local_port": int(r["local_port"] or 0),
+                    "remote_ip": str(r["remote_ip"] or ""),
+                    "remote_port": int(r["remote_port"] or 0),
+                    "domain": str(r["domain"] or ""),
+                    "service": str(r["service"] or "Servicio"),
+                    "process": str(r["process"] or ""),
+                    "jail": str(r["jail"] or "caddy-scan"),
+                    "state": f"HISTORIAL ({int(r['hit_count'] or 1)}x)",
+                    "details": f"Servicio: {r['service']} · Registrado {int(r['hit_count'] or 1)} veces · Precisión: {r['accuracy_source'] or 'ip-api'}",
+                    "lat": float(r["lat"]),
+                    "lng": float(r["lng"]),
+                    "city": precise_city,
+                    "raw_city": str(r["city"] or ""),
+                    "region": str(r["region"] or ""),
+                    "postal": str(r["postal"] or ""),
+                    "country": str(r["country"] or ""),
+                    "country_code": str(r["country_code"] or ""),
+                    "isp": str(r["isp"] or ""),
+                    "asn": str(r["asn"] or ""),
+                    "accuracy_source": str(r["accuracy_source"] or "ip-api"),
+                    "first_seen": float(r["first_seen"] or 0),
+                    "last_seen": float(r["last_seen"] or 0),
+                    "hit_count": int(r["hit_count"] or 1),
+                    "is_lan": False,
+                    "is_history": True,
+                    "geo_status": "cached"
+                })
+            conn.close()
+        except Exception as e:
+            print(f"[-] Error consultando historial SQLite: {e}")
+
+    return {
+        "status": "ok",
+        "summary": summary,
+        "services_catalog": services_catalog,
+        "devices_catalog": devices_catalog,
+        "connections": connections
+    }
+
+def clear_connection_history_sqlite():
+    """Vacía el historial de conexiones en SQLite manteniendo la caché de ubicaciones GeoIP."""
+    init_geoip_history_db()
+    with GEOIP_HISTORY_DB_LOCK:
+        try:
+            conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
+            conn.execute("DELETE FROM connection_history;")
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+def load_geoip_disk_cache():
+    """Carga la caché persistente de GeoIP desde SQLite y disco al iniciar el worker."""
+    global GEOIP_CACHE, SERVER_SELF_GEO
+    init_geoip_history_db()
+    now = time.time()
+    cutoff = now - GEOIP_TTL_SECONDS
+    loaded = {}
+
+    # 1. Cargar ubicaciones exactas desde SQLite geoip_locations
+    with GEOIP_HISTORY_DB_LOCK:
+        try:
+            conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM geoip_locations WHERE updated_at >= ?", (cutoff,))
+            for r in cur.fetchall():
+                ip_k = str(r["ip"] or "").strip()
+                if ip_k:
+                    loaded[ip_k] = {
+                        "ip": ip_k,
+                        "lat": float(r["lat"]),
+                        "lng": float(r["lng"]),
+                        "city": str(r["city"] or "Nodo Remoto"),
+                        "region": str(r["region"] or ""),
+                        "postal": str(r["postal"] or ""),
+                        "country": str(r["country"] or ""),
+                        "country_code": str(r["country_code"] or ""),
+                        "isp": str(r["isp"] or ""),
+                        "asn": str(r["asn"] or ""),
+                        "accuracy_source": str(r["accuracy_source"] or "ip-api"),
+                        "ts": float(r["updated_at"] or now)
+                    }
+            conn.close()
+        except Exception:
+            pass
+
+    # 2. Complementar con archivo JSON si existe
+    if os.path.exists(GEOIP_CACHE_FILE):
+        try:
+            with open(GEOIP_CACHE_FILE, "r", encoding="utf-8", errors="ignore") as f:
+                raw = json.load(f)
+            if isinstance(raw, dict):
+                entries = raw.get("entries", raw) if isinstance(raw.get("entries"), dict) else raw
+                for ip_k, val in entries.items():
+                    if str(ip_k) not in loaded and isinstance(val, dict) and isinstance(val.get("lat"), (int, float)) and isinstance(val.get("lng"), (int, float)):
+                        ts = float(val.get("ts", now))
+                        if ts >= cutoff:
+                            loaded[str(ip_k)] = {
+                                "ip": str(ip_k),
+                                "lat": float(val["lat"]),
+                                "lng": float(val["lng"]),
+                                "city": str(val.get("city") or "Nodo Remoto"),
+                                "region": str(val.get("region") or ""),
+                                "postal": str(val.get("postal") or ""),
+                                "country": str(val.get("country") or ""),
+                                "country_code": str(val.get("country_code") or ""),
+                                "isp": str(val.get("isp") or ""),
+                                "asn": str(val.get("asn") or ""),
+                                "accuracy_source": str(val.get("accuracy_source") or "ip-api"),
+                                "ts": ts
+                            }
+        except Exception:
+            pass
+
+    with GEOIP_LOCK:
+        GEOIP_CACHE.update(loaded)
+        SERVER_SELF_GEO = {}
+        SERVER_SELF_GEO["lat"] = float(os.environ.get("SERVER_GEO_LAT", 27.9600))
+        SERVER_SELF_GEO["lng"] = float(os.environ.get("SERVER_GEO_LNG", -15.5800))
+        SERVER_SELF_GEO["city"] = os.environ.get("SERVER_GEO_CITY", "Gran Canaria (Centro)")
+        SERVER_SELF_GEO["country"] = os.environ.get("SERVER_GEO_COUNTRY", "España")
+        SERVER_SELF_GEO["country_code"] = "ES"
+
+    if loaded:
+        save_geoip_locations_to_sqlite(loaded)
 
 def save_geoip_disk_cache(force=False):
-    """Persiste de forma atómica la caché GeoIP en disco para reducir carga sobre ip-api.com tras reinicios."""
+    """Persiste de forma atómica la caché GeoIP en disco y SQLite para reducir carga sobre ip-api.com tras reinicios."""
     now = time.time()
     with GEOIP_LOCK:
         if not force and not GEOIP_WORKER_STATS["dirty_disk"]:
             return
         if not force and (now - GEOIP_WORKER_STATS["last_disk_save_ts"] < 15.0):
             return
-        # Prune oldest if over max limit
         if len(GEOIP_CACHE) > GEOIP_MAX_CACHE_ENTRIES:
             sorted_keys = sorted(GEOIP_CACHE.keys(), key=lambda k: GEOIP_CACHE[k].get("ts", 0), reverse=True)
             keep_keys = set(sorted_keys[:GEOIP_MAX_CACHE_ENTRIES])
             for k in list(GEOIP_CACHE.keys()):
                 if k not in keep_keys:
                     del GEOIP_CACHE[k]
+        entries_copy = dict(GEOIP_CACHE)
         snapshot = {
             "updated_at": now,
             "server_self_geo": dict(SERVER_SELF_GEO) if SERVER_SELF_GEO else {},
-            "entries": dict(GEOIP_CACHE)
+            "entries": entries_copy
         }
         GEOIP_WORKER_STATS["dirty_disk"] = False
         GEOIP_WORKER_STATS["last_disk_save_ts"] = now
 
+    save_geoip_locations_to_sqlite(entries_copy)
     try:
         tmp_path = GEOIP_CACHE_FILE + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
@@ -1484,8 +1913,58 @@ def enqueue_remote_ips_for_geoip(ips_iterable):
     if added:
         GEOIP_WAKE_EVENT.set()
 
+def _enrich_ip_precision_with_ipwhois(ip_s, base_entry=None):
+    """Refina las coordenadas y localidad de una IP usando ipwho.is como segundo proveedor de alta precisión."""
+    try:
+        req = urllib.request.Request(
+            f"https://ipwho.is/{ip_s}",
+            headers={"User-Agent": "RecursosDashboard-GeoIPWorker/6.3"},
+            method="GET"
+        )
+        with urllib.request.urlopen(req, timeout=2.2) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+        if not isinstance(data, dict) or not data.get("success", False):
+            return base_entry
+        lat = data.get("latitude")
+        lng = data.get("longitude")
+        if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
+            return base_entry
+        conn_info = data.get("connection") if isinstance(data.get("connection"), dict) else {}
+        city = str(data.get("city") or (base_entry or {}).get("city") or "Nodo Remoto")
+        region = str(data.get("region") or (base_entry or {}).get("region") or "")
+        postal = str(data.get("postal") or (base_entry or {}).get("postal") or "")
+        country = str(data.get("country") or (base_entry or {}).get("country") or "")
+        country_code = str(data.get("country_code") or (base_entry or {}).get("country_code") or "")
+        isp = str(conn_info.get("org") or conn_info.get("isp") or (base_entry or {}).get("isp") or "")
+        asn_num = conn_info.get("asn")
+        asn = f"AS{asn_num}" if asn_num else str((base_entry or {}).get("asn") or "")
+        # Promediar coordenadas si ambos proveedores coinciden en país para mayor exactitud sub-urbana, o usar ipwho.is si base_entry no tenía postal
+        if base_entry and isinstance(base_entry.get("lat"), (int, float)) and isinstance(base_entry.get("lng"), (int, float)):
+            if abs(float(base_entry["lat"]) - float(lat)) < 1.5 and abs(float(base_entry["lng"]) - float(lng)) < 1.5:
+                lat = round((float(base_entry["lat"]) + float(lat)) / 2.0, 5)
+                lng = round((float(base_entry["lng"]) + float(lng)) / 2.0, 5)
+            acc_src = "ip-api+ipwho.is"
+        else:
+            acc_src = "ipwho.is"
+        return {
+            "ip": ip_s,
+            "lat": float(lat),
+            "lng": float(lng),
+            "city": city,
+            "region": region,
+            "postal": postal,
+            "country": country,
+            "country_code": country_code,
+            "isp": isp,
+            "asn": asn,
+            "accuracy_source": acc_src,
+            "ts": time.time()
+        }
+    except Exception:
+        return base_entry
+
 def resolve_geoip_batch_from_ip_api(ip_list):
-    """Consulta ip-api.com en lote (o individual si es 1 IP) respetando límites de tasa y actualizando GEOIP_CACHE."""
+    """Consulta ip-api.com en lote (con código postal y región) y refina con ipwho.is para ubicaciones más exactas, persistiendo en SQLite."""
     now = time.time()
     clean_ips = []
     with GEOIP_LOCK:
@@ -1511,9 +1990,9 @@ def resolve_geoip_batch_from_ip_api(ip_list):
             GEOIP_WORKER_STATS["status"] = "resolving"
         batch_payload = json.dumps(batch_slice).encode("utf-8")
         req = urllib.request.Request(
-            "http://ip-api.com/batch?fields=status,message,country,countryCode,regionName,city,lat,lon,isp,org,as,query",
+            "http://ip-api.com/batch?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,isp,org,as,query",
             data=batch_payload,
-            headers={"Content-Type": "application/json", "User-Agent": "RecursosDashboard-GeoIPWorker/4.4"},
+            headers={"Content-Type": "application/json", "User-Agent": "RecursosDashboard-GeoIPWorker/6.3"},
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=4.0) as resp:
@@ -1521,6 +2000,8 @@ def resolve_geoip_batch_from_ip_api(ip_list):
             rl_ttl = resp.headers.get("X-Ttl")
             b_res = json.loads(resp.read().decode("utf-8", errors="ignore"))
 
+            preliminary_entries = {}
+            failed_ips = []
             with GEOIP_LOCK:
                 GEOIP_WORKER_STATS["api_batches_sent"] += 1
                 GEOIP_WORKER_STATS["last_sync_ts"] = time.time()
@@ -1547,27 +2028,51 @@ def resolve_geoip_batch_from_ip_api(ip_list):
                                 "lng": float(item["lon"]),
                                 "city": str(item.get("city") or "Nodo Remoto"),
                                 "region": str(item.get("regionName") or ""),
+                                "postal": str(item.get("zip") or ""),
                                 "country": str(item.get("country") or ""),
                                 "country_code": str(item.get("countryCode") or ""),
                                 "isp": str(item.get("org") or item.get("isp") or ""),
                                 "asn": str(item.get("as") or ""),
+                                "accuracy_source": "ip-api",
                                 "ts": time.time()
                             }
-                            GEOIP_CACHE[q_ip] = entry
-                            GEOIP_NEGATIVE_CACHE.pop(q_ip, None)
-                            resolved_now[q_ip] = entry
-                            GEOIP_WORKER_STATS["api_ips_resolved"] += 1
-                            GEOIP_WORKER_STATS["dirty_disk"] = True
+                            preliminary_entries[q_ip] = entry
                         else:
-                            GEOIP_NEGATIVE_CACHE[q_ip] = time.time()
-                            fail_msg = str(item.get("message") or "IP no resoluble por ip-api.com")
-                            record_geoip_worker_error("GEOIP_WORKER", "ip-api.com/batch", q_ip, "GEOIP_FAIL", f"Fallo al geolocalizar IP {q_ip}: {fail_msg}")
+                            failed_ips.append((q_ip, str(item.get("message") or "IP no resoluble por ip-api.com")))
 
                     for req_ip in batch_slice:
                         if req_ip not in seen_queries:
                             GEOIP_PENDING_QUEUE.discard(req_ip)
-                            GEOIP_NEGATIVE_CACHE[req_ip] = time.time()
-                            record_geoip_worker_error("GEOIP_WORKER", "ip-api.com/batch", req_ip, "NO_RESPONSE", f"Sin respuesta en lote GeoIP para {req_ip}")
+                            failed_ips.append((req_ip, "Sin respuesta en lote GeoIP"))
+
+            # Refinar precisión en hasta 4 IPs por ciclo (cuando falta código postal o ciudad exacta) y recuperar fallos con ipwho.is
+            refinement_budget = 4
+            for q_ip, entry in preliminary_entries.items():
+                if refinement_budget > 0 and (not entry.get("postal") or entry.get("city") in ("", "Nodo Remoto")):
+                    refinement_budget -= 1
+                    entry = _enrich_ip_precision_with_ipwhois(q_ip, entry) or entry
+                with GEOIP_LOCK:
+                    GEOIP_CACHE[q_ip] = entry
+                    GEOIP_NEGATIVE_CACHE.pop(q_ip, None)
+                    resolved_now[q_ip] = entry
+                    GEOIP_WORKER_STATS["api_ips_resolved"] += 1
+                    GEOIP_WORKER_STATS["dirty_disk"] = True
+
+            for f_ip, fail_msg in failed_ips:
+                fallback_entry = None
+                if refinement_budget > 0:
+                    refinement_budget -= 1
+                    fallback_entry = _enrich_ip_precision_with_ipwhois(f_ip, None)
+                with GEOIP_LOCK:
+                    if fallback_entry:
+                        GEOIP_CACHE[f_ip] = fallback_entry
+                        GEOIP_NEGATIVE_CACHE.pop(f_ip, None)
+                        resolved_now[f_ip] = fallback_entry
+                        GEOIP_WORKER_STATS["api_ips_resolved"] += 1
+                        GEOIP_WORKER_STATS["dirty_disk"] = True
+                    else:
+                        GEOIP_NEGATIVE_CACHE[f_ip] = time.time()
+                        record_geoip_worker_error("GEOIP_WORKER", "ip-api.com/batch", f_ip, "GEOIP_FAIL", f"Fallo al geolocalizar IP {f_ip}: {fail_msg}")
     except urllib.error.HTTPError as he:
         with GEOIP_LOCK:
             if he.code == 429:
@@ -1593,6 +2098,7 @@ def resolve_geoip_batch_from_ip_api(ip_list):
             GEOIP_WORKER_STATS["status"] = "active"
 
     if resolved_now:
+        save_geoip_locations_to_sqlite(resolved_now)
         save_geoip_disk_cache(force=False)
     return resolved_now
 
@@ -2195,8 +2701,13 @@ def fetch_connections_geo_worker():
                     geo = GEOIP_CACHE.get(r_ip)
                 if geo:
                     lat, lng = geo["lat"], geo["lng"]
-                    city, country, cc = geo["city"], geo["country"], geo["country_code"]
+                    raw_city = geo.get("city", "Nodo Remoto")
+                    region = geo.get("region", "")
+                    postal = geo.get("postal", "")
+                    city = f"{raw_city} ({region}{' · CP ' + postal if postal else ''})" if (region or postal) and raw_city else raw_city
+                    country, cc = geo["country"], geo["country_code"]
                     isp, asn = geo["isp"], geo["asn"]
+                    acc_src = geo.get("accuracy_source", "ip-api")
                     geo_status = "cached"
                 else:
                     if r_ip in pending_coords_map:
@@ -2209,10 +2720,14 @@ def fetch_connections_geo_worker():
                         lng = round(srv_lng + radius * math.sin(angle) * 1.4, 5)
                         pending_coords_map[r_ip] = (lat, lng)
                     city = "Resolviendo GeoIP..."
+                    raw_city = ""
+                    region = ""
+                    postal = ""
                     country = ""
                     cc = ""
                     isp = "En cola del Worker GeoIP (ip-api.com)"
                     asn = ""
+                    acc_src = "pending"
                     geo_status = "pending"
 
                 ext_domain = s.get("domain") or pihole_translator.translate_external(r_ip, rdns_budget)
@@ -2221,20 +2736,10 @@ def fetch_connections_geo_worker():
 
                 if ext_domain:
                     svc_title = f"{ext_domain} (:{s['remote_port']})"
-                elif geo and s["direction"] == "outgoing":
-                    isp_str = (geo.get("isp", "") + " " + geo.get("asn", "")).lower()
-                    if "telegram" in isp_str:
-                        svc_title = f"Telegram API / Bot (:{s['remote_port']})"
-                    elif "google" in isp_str:
-                        svc_title = f"Google Cloud / APIs (:{s['remote_port']})"
-                    elif "fastly" in isp_str or "github" in isp_str:
-                        svc_title = f"GitHub / CDN Fastly (:{s['remote_port']})"
-                    elif "cloudflare" in isp_str:
-                        svc_title = f"Cloudflare CDN / DNS (:{s['remote_port']})"
-                    elif "amazon" in isp_str or "aws" in isp_str:
-                        svc_title = f"AWS Cloud (:{s['remote_port']})"
-                    elif "microsoft" in isp_str or "azure" in isp_str:
-                        svc_title = f"Microsoft Azure (:{s['remote_port']})"
+                elif geo and s["direction"] == "outgoing" and geo.get("isp"):
+                    clean_isp = str(geo.get("isp")).split(",")[0].strip()
+                    if clean_isp and len(clean_isp) <= 36:
+                        svc_title = f"{clean_isp} (:{s['remote_port']})"
 
                 connections_out.append({
                     "id": f"sock_{s['direction']}_{r_ip}_{s['local_port']}_{s['remote_port']}",
@@ -2254,10 +2759,14 @@ def fetch_connections_geo_worker():
                     "lat": lat,
                     "lng": lng,
                     "city": city,
+                    "raw_city": raw_city,
+                    "region": region,
+                    "postal": postal,
                     "country": country,
                     "country_code": cc,
                     "isp": isp,
                     "asn": asn,
+                    "accuracy_source": acc_src,
                     "is_lan": False,
                     "geo_status": geo_status
                 })
@@ -2268,6 +2777,9 @@ def fetch_connections_geo_worker():
                 if not geo:
                     continue
                 if not any(c["remote_ip"] == ep["ip"] for c in connections_out):
+                    ep_reg = geo.get("region", "")
+                    ep_zip = geo.get("postal", "")
+                    ep_city = f"{geo['city']} ({ep_reg}{' · CP ' + ep_zip if ep_zip else ''})" if (ep_reg or ep_zip) and geo.get("city") else geo.get("city", "Nodo Remoto")
                     connections_out.append({
                         "id": f"out_{ep['host']}_{ep['ip']}",
                         "direction": "outgoing",
@@ -2285,11 +2797,15 @@ def fetch_connections_geo_worker():
                         "state": "ESTABLISHED",
                         "lat": geo["lat"],
                         "lng": geo["lng"],
-                        "city": geo["city"],
+                        "city": ep_city,
+                        "raw_city": geo.get("city", ""),
+                        "region": ep_reg,
+                        "postal": ep_zip,
                         "country": geo["country"],
                         "country_code": geo["country_code"],
                         "isp": geo["isp"],
                         "asn": geo["asn"],
+                        "accuracy_source": geo.get("accuracy_source", "ip-api"),
                         "is_lan": False,
                         "geo_status": "cached"
                     })
@@ -2305,6 +2821,9 @@ def fetch_connections_geo_worker():
                 if not any(c["remote_ip"] == b_ip and c["direction"] == "blocked" for c in connections_out):
                     b_jail = b_item.get("jail", "sshd")
                     b_domain = pihole_translator.translate_external(b_ip)
+                    b_reg = geo.get("region", "")
+                    b_zip = geo.get("postal", "")
+                    b_city = f"{geo['city']} ({b_reg}{' · CP ' + b_zip if b_zip else ''})" if (b_reg or b_zip) and geo.get("city") else geo.get("city", "Nodo Remoto")
                     connections_out.append({
                         "id": f"blk_{b_ip}",
                         "direction": "blocked",
@@ -2322,11 +2841,15 @@ def fetch_connections_geo_worker():
                         "state": "BANNED",
                         "lat": geo["lat"],
                         "lng": geo["lng"],
-                        "city": geo["city"],
+                        "city": b_city,
+                        "raw_city": geo.get("city", ""),
+                        "region": b_reg,
+                        "postal": b_zip,
                         "country": geo["country"],
                         "country_code": geo["country_code"],
                         "isp": geo["isp"],
                         "asn": geo["asn"],
+                        "accuracy_source": geo.get("accuracy_source", "ip-api"),
                         "is_lan": False,
                         "geo_status": "cached"
                     })
@@ -2359,6 +2882,7 @@ def fetch_connections_geo_worker():
                     "connections": connections_out,
                     "geoip_worker": worker_summary
                 }
+            record_connections_to_sqlite(connections_out)
             save_geoip_disk_cache(force=False)
         except Exception as e:
             import traceback
@@ -5935,6 +6459,46 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # 2g-bis. HISTORIAL DE CONEXIONES GEOLOCALIZADAS CATALOGADAS POR SERVICIOS (SQLite)
+        elif clean_path == "/api/net/history":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            svc_f = None
+            dev_f = None
+            dir_f = None
+            q_f = None
+            lim_f = 300
+            if "?" in self.path:
+                try:
+                    q_str = self.path.split("?", 1)[1]
+                    q_params = urllib.parse.parse_qs(q_str)
+                    svc_f = q_params.get("service", [None])[0]
+                    dev_f = q_params.get("device", [None])[0]
+                    dir_f = q_params.get("direction", [None])[0]
+                    q_f = q_params.get("q", [None])[0]
+                    if "limit" in q_params:
+                        lim_f = int(q_params["limit"][0])
+                except Exception:
+                    pass
+            hist_payload = query_connection_history_from_sqlite(
+                service_filter=svc_f,
+                device_filter=dev_f,
+                direction_filter=dir_f,
+                search_query=q_f,
+                limit=lim_f
+            )
+            resp = json.dumps(hist_payload).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # 2h. ESTADO EN TIEMPO REAL DEL CONTROLADOR USB (SAMSUNG DEX / ANDROID DESKTOP)
         elif clean_path in ("/api/dex/status", "/api/usb/status"):
             if not auth["is_trusted"]:
@@ -6845,6 +7409,24 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             )
 
             resp = json.dumps({"success": True, "message": "Historial de mensajes vaciado"}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Limpiar historial SQLite de conexiones geolocalizadas por servicios
+        elif clean_path == "/api/net/history/clear":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            ok = clear_connection_history_sqlite()
+            resp = json.dumps({"success": ok, "message": "Historial SQLite de conexiones por servicios vaciado"}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()

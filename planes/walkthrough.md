@@ -1,26 +1,27 @@
-# Walkthrough y Verificación — Detección de Entorno y Proyección USB (v6.2.0)
+# Walkthrough — v6.3.0: Historial SQLite por Servicios, Geolocalización Exacta y Mapa a Pantalla Completa con HUD Adaptativo
 
-## 1. Resumen de Cambios Realizados
+## 1. Resumen de Cambios Implementados
 
-### 1.1. Motor `EnvironmentDetector` y Pantalla de Espera USB (`index.html` y `static/index.html`)
-- **Versión Web (`env === 'web'`)**:
-  - La pestaña `'Dispositivo'` está completamente ausente del menú lateral (`#appSidebar`), del Floating Touch Dock (`#floatingTouchDock`), de la paginación táctil (`#swipePaginationDots`) y de los mapas de rutas (`VIEW_TO_PATH` / `PATH_TO_VIEW`).
-  - `EnvironmentDetector.enforceNavigationPolicy()` garantiza en tiempo de ejecución que cualquier selector de pestaña de dispositivo o no web permanezca oculto y deshabilitado.
-- **Entorno Móvil o Nativo (`env === 'mobile'` o `env === 'native'`)**:
-  - Oculta automáticamente cualquier pestaña `'Dispositivo'` o pestaña no web.
-  - Renderiza de forma automática la pantalla de espera optimizada `#usbProjectionWaitScreen` (*"Esperando que conectes un dispositivo por USB"*), diseñada para proyectar el vídeo en baja latencia con **Samsung DeX** o el **Modo Escritorio de Android**.
-  - Sondea en tiempo real `/api/dex/status` cada 2.5 segundos para detectar la conexión física del cable USB y lanzar la proyección automática o manual mediante `/api/dex/start`.
+### A. Capa de Almacenamiento SQLite (`geoip_history.db`) y Geolocalización Dual (`server.py`)
+- **Esquema SQLite en Modo WAL (`init_geoip_history_db`)**:
+  - `geoip_locations`: persiste `ip`, `lat`, `lng`, `city`, `region`, `postal`, `country`, `country_code`, `isp`, `asn`, `accuracy_source` y `updated_at`.
+  - `connection_history`: persiste cada flujo geolocalizado catalogado por servicio (`service`, `conn_key`, `direction`, `protocol`, `local_ip`, `local_hostname`, `remote_ip`, `remote_port`, `domain`, `process`, `jail`, `lat`, `lng`, `city`, `region`, `postal`, `country`, `isp`, `asn`, `accuracy_source`, `first_seen`, `last_seen`, `hit_count`) con índices en `service`, `local_ip`, `direction` y `last_seen DESC`.
+- **Mayor Precisión de Ubicaciones IP (`_enrich_ip_precision_with_ipwhois`)**:
+  - Se amplió la consulta por lotes de `ip-api.com` para incluir `zip` (código postal) y `regionName`.
+  - Se añadió refinamiento cruzado con `https://ipwho.is/<ip>` para obtener código postal, región y promediado de coordenadas sub-urbanas (`accuracy_source = "ip-api+ipwho.is"`).
+- **Nuevos Endpoints REST**:
+  - `GET /api/net/history`: devuelve `summary`, `services_catalog` (agrupado por servicio con conteo de conexiones, hits acumulados, IPs únicas, dispositivos únicos, países y marcas de tiempo), `devices_catalog` y `connections` filtrables por `service`, `device`, `direction` y búsqueda libre `q`.
+  - `POST /api/net/history/clear`: vacía el historial de conexiones bajo petición autenticada.
 
-### 1.2. Aplicación Nativa GTK 3 (`desktop_app/recursos_app.py`)
-- Se añadió la función `detect_runtime_environment()` que identifica el entorno nativo/móvil al iniciar la aplicación.
-- Cuando se ejecuta en entorno nativo o móvil, oculta automáticamente el conmutador de pestañas (`Gtk.StackSwitcher`) y cualquier pestaña `'Dispositivo'` o no web, renderizando directamente la pantalla de espera de conexión USB (`_build_device_connection_ui()`).
+### B. Controles Adaptativos Integrados en el Mapa y Pantalla Completa (`index.html` / `static/index.html`)
+- **HUD Adaptativo Dentro del Mapa (`#networkConnectionsMapAdaptiveHud`)**:
+  - Integrado directamente dentro de `#networkConnectionsMapStageWrap` (`z-index: 1060`) para que todos los controles permanezcan accesibles tanto en vista normal como en modo **Pantalla Completa**.
+  - Incluye selector de modo (`🟢 En Vivo` vs `📚 Historial por Servicios`), filtros de dirección/dispositivos (`Todas`, `↓ Entrantes`, `↑ Salientes`, `📱 Dispositivos`, `🛡️ Bloqueadas`), barra adaptativa de chips de dispositivos LAN (`#mapHudDeviceFilterBar`), cajón interactivo del catálogo de servicios (`#mapHudServiceCatalogDrawer`) y botón `⛶ Pantalla Completa`.
+- **Modo Pantalla Completa (`toggleConnectionsMapFullscreen`)**:
+  - Combina la API nativa `requestFullscreen()` con la clase `.is-fullscreen` (`100vw x 100vh`) y reajusta automáticamente el lienzo de Leaflet (`_leafletMap.invalidateSize()`).
 
-### 1.3. Backend (`server.py`) y Control de Versión (`v6.2.0`)
-- Nuevos endpoints `GET /api/dex/status`, `POST /api/dex/start` y `POST /api/dex/stop` integrados con `DexController` (`usb_only=True`).
-- Incremento de versión `MINOR` (`0.X.0` por adición de nueva funcionalidad de detección de entorno) de `6.1.0` a `6.2.0` en `./VERSION`, `./package.json`, `README.md` y paquete Debian `dist/recursos-cockpit_6.2.0_amd64.deb`.
-
-## 2. Pruebas y Verificación
-- Sincronización idéntica entre `index.html` y `static/index.html`.
-- Compilación sin errores de sintaxis en Python (`server.py`, `desktop_app/recursos_app.py`, `desktop_app/dex_controller.py`).
-- Validación en modo test (`python3 desktop_app/recursos_app.py --test-mode`) verificando `detect_runtime_environment()` y `DexController`.
-- Empaquetado `.deb` actualizado a `6.2.0` (`packaging/build_deb.sh`) y compilación limpia del proyecto (`compile_applet`).
+## 2. Verificación Realizada
+- Validación de sintaxis de Python (`python3 -m py_compile server.py`).
+- Prueba funcional de `init_geoip_history_db()`, `save_geoip_locations_to_sqlite()`, `record_connections_to_sqlite()` y `query_connection_history_from_sqlite()`.
+- Sincronización 100% idéntica entre `index.html` y `static/index.html`.
+- Empaquetado `.deb` actualizado a `6.3.0` y verificación de compilación con `compile_applet`.
