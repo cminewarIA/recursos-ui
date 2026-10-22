@@ -4300,15 +4300,15 @@
                 <div class="instrument-kicker">Integración de Sistema Operativo & Dispositivos Móviles</div>
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px;">
                   <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-primary);">Conexión de Dispositivo & App Nativa</h2>
-                  <span class="adw-badge badge-purple mono">v6.0.1</span>
+                  <span class="adw-badge badge-purple mono" id="debBadgeVersion">v6.0.2</span>
                   <span class="adw-badge badge-blue">Paquete Oficial .deb</span>
                   <span class="adw-badge badge-green">100% Nativo GTK 3</span>
                 </div>
               </div>
               <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <a href="/download/recursos-cockpit.deb" class="action-btn primary-cta" style="height: 38px; padding: 0 18px; font-size: 13px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                <a href="/download/recursos-cockpit_6.0.2_amd64.deb" id="btnDownloadDeb" class="action-btn primary-cta" style="height: 38px; padding: 0 18px; font-size: 13px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  <span>Descargar .deb (recursos-cockpit)</span>
+                  <span id="btnDownloadDebText">Descargar recursos-cockpit_6.0.2_amd64.deb</span>
                 </a>
                 <a href="https://github.com/cminewarIA/recursos-ui/actions" target="_blank" rel="noopener" class="action-btn" style="height: 38px; padding: 0 14px; font-size: 12.5px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
                   <span>⚡ GitHub Actions CI</span>
@@ -4395,13 +4395,13 @@
             </div>
             <div class="surface-panel" style="padding: 20px;">
               <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px;">
-                Puedes descargar e instalar el paquete <code class="mono">recursos-cockpit_6.0.1_amd64.deb</code> ejecutando en tu terminal:
+                Puedes descargar e instalar el paquete <code class="mono" id="debPkgNameDisplay">recursos-cockpit_6.0.2_amd64.deb</code> ejecutando en tu terminal:
               </p>
-              <pre class="terminal-box" style="margin: 0; font-size: 12.5px; line-height: 1.6;"># 1. Descargar el paquete deb directamente desde este servidor
-wget http://localhost:8085/download/recursos-cockpit.deb
+              <pre class="terminal-box" id="debTerminalCommands" style="margin: 0; font-size: 12.5px; line-height: 1.6;"># 1. Descargar el paquete deb directamente desde este servidor
+wget http://localhost:8085/download/recursos-cockpit_6.0.2_amd64.deb -O recursos-cockpit_6.0.2_amd64.deb
 
 # 2. Instalar el paquete y resolver automáticamente dependencias (GTK3, Scrcpy, ADB, Psutil)
-sudo apt-get update &amp;&amp; sudo apt-get install -y ./recursos-cockpit.deb
+sudo apt-get update &amp;&amp; sudo apt-get install -y ./recursos-cockpit_6.0.2_amd64.deb
 
 # 3. Iniciar la aplicación nativa desde la terminal o desde el lanzador de aplicaciones del escritorio
 recursos-cockpit</pre>
@@ -6660,6 +6660,38 @@ recursos-cockpit</pre>
       const detectedDomain = info.public_domain || getDetectedPublicDomain();
       const dnsEl = document.getElementById('dnsDetectedDomain');
       if (dnsEl && detectedDomain) dnsEl.innerText = detectedDomain;
+
+      // Sincronización reactiva del paquete oficial .deb de la app nativa con la versión canónica
+      const cleanVer = rawVer.replace(/^v/, '');
+      const debBadge = document.getElementById('debBadgeVersion');
+      if (debBadge && rawVer) debBadge.innerText = semVer;
+
+      const btnDeb = document.getElementById('btnDownloadDeb');
+      const btnDebText = document.getElementById('btnDownloadDebText');
+      if (btnDeb && cleanVer) {
+        btnDeb.href = `/download/recursos-cockpit_${cleanVer}_amd64.deb`;
+      }
+      if (btnDebText && cleanVer) {
+        btnDebText.innerText = `Descargar recursos-cockpit_${cleanVer}_amd64.deb`;
+      }
+
+      const debPkgDisplay = document.getElementById('debPkgNameDisplay');
+      if (debPkgDisplay && cleanVer) {
+        debPkgDisplay.innerText = `recursos-cockpit_${cleanVer}_amd64.deb`;
+      }
+
+      const debTermCmds = document.getElementById('debTerminalCommands');
+      if (debTermCmds && cleanVer) {
+        const originUrl = window.location.origin || 'http://localhost:8085';
+        debTermCmds.innerHTML = `# 1. Descargar el paquete deb directamente desde este servidor
+wget ${originUrl}/download/recursos-cockpit_${cleanVer}_amd64.deb -O recursos-cockpit_${cleanVer}_amd64.deb
+
+# 2. Instalar el paquete y resolver automáticamente dependencias (GTK3, Scrcpy, ADB, Psutil)
+sudo apt-get update &amp;&amp; sudo apt-get install -y ./recursos-cockpit_${cleanVer}_amd64.deb
+
+# 3. Iniciar la aplicación nativa desde la terminal o desde el lanzador de aplicaciones del escritorio
+recursos-cockpit`;
+      }
     }
 
     function triggerSystemUpdate() {

@@ -36,6 +36,28 @@ except ImportError:
     from desktop_app.dex_controller import DexController
 
 
+def get_native_app_version():
+    """Obtiene la versión canónica desde el archivo VERSION."""
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "VERSION"),
+        os.path.join(os.path.dirname(__file__), "..", "VERSION"),
+        "/usr/lib/recursos-cockpit/VERSION",
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            try:
+                with open(c, "r", encoding="utf-8") as f:
+                    v = f.read().strip()
+                    if v:
+                        return v
+            except Exception:
+                pass
+    return "6.0.2"
+
+
+APP_VERSION = get_native_app_version()
+
+
 class RecursosDesktopApp:
     def __init__(self):
         self.dex = DexController(log_callback=self.on_device_log)
@@ -80,7 +102,7 @@ class RecursosDesktopApp:
         self.header = Gtk.HeaderBar()
         self.header.set_show_close_button(True)
         self.header.set_title("Recursos Cockpit")
-        self.header.set_subtitle("Monitor Nativo del Silicio & Conexión de Dispositivo")
+        self.header.set_subtitle(f"v{APP_VERSION} · Monitor Nativo del Silicio & Conexión de Dispositivo")
         self.window.set_titlebar(self.header)
 
         # Selector de Vistas StackSwitcher
@@ -92,6 +114,12 @@ class RecursosDesktopApp:
         self.btn_fullscreen.set_tooltip_text("Pantalla Completa (F11)")
         self.btn_fullscreen.connect("clicked", self._toggle_fullscreen)
         self.header.pack_end(self.btn_fullscreen)
+
+        # Botón Acerca de
+        self.btn_about = Gtk.Button.new_from_icon_name("help-about-symbolic", Gtk.IconSize.BUTTON)
+        self.btn_about.set_tooltip_text(f"Acerca de Recursos Cockpit (v{APP_VERSION})")
+        self.btn_about.connect("clicked", self._show_about_dialog)
+        self.header.pack_end(self.btn_about)
 
         # 3. Stack Principal de Vistas Nativas
         self.stack = Gtk.Stack()
@@ -544,6 +572,18 @@ class RecursosDesktopApp:
         else:
             self.window.fullscreen()
             self._is_fullscreen = True
+
+    def _show_about_dialog(self, widget):
+        about = Gtk.AboutDialog(transient_for=self.window, modal=True)
+        about.set_program_name("Recursos Cockpit")
+        about.set_version(f"v{APP_VERSION}")
+        about.set_comments("Monitor Nativo de Silicio & Conexión de Dispositivos Móviles (Scrcpy + UHID)")
+        about.set_website("https://github.com/cminewarIA/recursos-ui")
+        about.set_website_label("GitHub cminewarIA/recursos-ui")
+        about.set_authors(["cminewarIA"])
+        about.set_license_type(Gtk.License.MIT_X11)
+        about.run()
+        about.destroy()
 
     def _on_key_press(self, widget, event):
         if event.keyval == Gdk.KEY_F11:

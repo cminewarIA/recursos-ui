@@ -19,15 +19,16 @@ echo "============================================================"
 echo "📦 Construyendo paquete Debian: ${PKG_NAME}_${VERSION}_${ARCH}.deb"
 echo "============================================================"
 
-# Limpiar compilaciones previas
+# Limpiar compilaciones previas y paquetes obsoletos
 rm -rf "$BUILD_DIR"
+mkdir -p "$OUTPUT_DIR"
+rm -f "$OUTPUT_DIR"/*.deb
 mkdir -p "$PKG_DIR/DEBIAN"
 mkdir -p "$PKG_DIR/usr/bin"
 mkdir -p "$PKG_DIR/usr/lib/$PKG_NAME"
 mkdir -p "$PKG_DIR/usr/lib/$PKG_NAME/assets"
 mkdir -p "$PKG_DIR/usr/share/applications"
 mkdir -p "$PKG_DIR/usr/share/icons/hicolor/scalable/apps"
-mkdir -p "$OUTPUT_DIR"
 
 # 1. Copiar metadatos de DEBIAN
 cp "$SCRIPT_DIR/debian/control" "$PKG_DIR/DEBIAN/control"
@@ -38,11 +39,13 @@ chmod 755 "$PKG_DIR/DEBIAN/postinst" "$PKG_DIR/DEBIAN/postrm"
 # Ajustar versión en DEBIAN/control
 sed -i "s/^Version:.*/Version: $VERSION/" "$PKG_DIR/DEBIAN/control"
 
-# 2. Copiar archivos de la aplicación
+# 2. Copiar archivos de la aplicación y punto único de verdad de versión
 cp "$PROJECT_ROOT/desktop_app/recursos_app.py" "$PKG_DIR/usr/lib/$PKG_NAME/recursos_app.py"
 cp "$PROJECT_ROOT/desktop_app/dex_controller.py" "$PKG_DIR/usr/lib/$PKG_NAME/dex_controller.py"
 cp "$PROJECT_ROOT/desktop_app/assets/recursos-cockpit.svg" "$PKG_DIR/usr/lib/$PKG_NAME/assets/recursos-cockpit.svg"
+cp "$PROJECT_ROOT/VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/VERSION"
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/*.py
+chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/VERSION
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/assets"/*
 
 # 3. Crear lanzador en /usr/bin/recursos-cockpit
@@ -66,13 +69,15 @@ chmod 644 "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/recursos-cockpit.svg"
 
 # 5. Generar paquete .deb
 dpkg-deb --build --root-owner-group "$PKG_DIR" "$OUTPUT_DIR/${PKG_NAME}_${VERSION}_${ARCH}.deb"
+cd "$OUTPUT_DIR"
+ln -sf "${PKG_NAME}_${VERSION}_${ARCH}.deb" "${PKG_NAME}.deb"
 
 # 6. Generar sumas de verificación SHA256
-cd "$OUTPUT_DIR"
 sha256sum "${PKG_NAME}_${VERSION}_${ARCH}.deb" > "SHA256SUMS.txt"
 
 echo "============================================================"
 echo "✅ Paquete generado exitosamente:"
 echo "   -> $OUTPUT_DIR/${PKG_NAME}_${VERSION}_${ARCH}.deb"
+echo "   -> $OUTPUT_DIR/${PKG_NAME}.deb (symlink canónico)"
 echo "   -> $OUTPUT_DIR/SHA256SUMS.txt"
 echo "============================================================"

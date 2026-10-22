@@ -6040,18 +6040,44 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 4b. DESCARGA DIRECTA DE LA APP NATIVA PARA LINUX (.deb)
-        elif clean_path in ["/download/recursos-cockpit.deb", "/download/app.deb", "/api/download/app_deb"]:
+        elif clean_path in ["/download/recursos-cockpit.deb", "/download/app.deb", "/api/download/app_deb"] or (
+            clean_path.startswith("/download/recursos-cockpit") and clean_path.endswith(".deb")
+        ):
             dist_dir = os.path.join(BASE_DIR, "dist")
-            deb_candidates = sorted(glob.glob(os.path.join(dist_dir, "recursos-cockpit_*.deb")), reverse=True)
-            deb_file = deb_candidates[0] if deb_candidates else None
-            
+            current_ver = get_app_version()
+            canonical_deb = os.path.join(dist_dir, f"recursos-cockpit_{current_ver}_amd64.deb")
+
+            # Si el paquete canónico para la versión activa no existe, compilarlo automáticamente
+            if not os.path.isfile(canonical_deb):
+                build_script = os.path.join(BASE_DIR, "packaging", "build_deb.sh")
+                if os.path.isfile(build_script):
+                    try:
+                        subprocess.run(["bash", build_script], cwd=BASE_DIR, check=True, timeout=30)
+                    except Exception as build_err:
+                        print(f"[AUTO-BUILD DEB ERROR] {build_err}")
+
+            requested_name = os.path.basename(clean_path)
+            deb_file = None
+            if requested_name in ["recursos-cockpit.deb", "app.deb", "app_deb"]:
+                if os.path.isfile(canonical_deb):
+                    deb_file = canonical_deb
+                else:
+                    candidates = sorted(glob.glob(os.path.join(dist_dir, "recursos-cockpit_*.deb")), reverse=True)
+                    deb_file = candidates[0] if candidates else None
+            else:
+                specific_file = os.path.join(dist_dir, requested_name)
+                if os.path.isfile(specific_file):
+                    deb_file = specific_file
+                elif os.path.isfile(canonical_deb):
+                    deb_file = canonical_deb
+
             if deb_file and os.path.isfile(deb_file):
                 try:
                     fsize = os.path.getsize(deb_file)
-                    fname = os.path.basename(deb_file)
+                    out_fname = f"recursos-cockpit_{current_ver}_amd64.deb" if requested_name in ["recursos-cockpit.deb", "app.deb", "app_deb"] else os.path.basename(deb_file)
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/vnd.debian.binary-package')
-                    self.send_header('Content-Disposition', f'attachment; filename="{fname}"')
+                    self.send_header('Content-Disposition', f'attachment; filename="{out_fname}"')
                     self.send_header('Content-Length', str(fsize))
                     self.send_security_headers()
                     self.end_headers()
@@ -6061,7 +6087,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     return
                 except Exception as e:
                     print(f"[DOWNLOAD DEB ERROR] {e}")
-            
+
             self.send_response(404)
             self.send_security_headers()
             self.end_headers()

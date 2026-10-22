@@ -1,5 +1,5 @@
 Package: recursos-cockpit
-Version: 6.0.1
+Version: 6.0.2
 Section: utils
 Priority: optional
 Architecture: amd64
