@@ -3820,6 +3820,124 @@
                 <span>💬 Mensajes procesados por el bot: <strong id="tgBotMsgCount">0</strong></span>
                 <span id="tgBotPingStatus" style="font-size: 11.5px; color: var(--text-muted);"></span>
               </div>
+
+              <!-- PESTAÑAS DE CONTROL DEL BOT (APPLE / ADWAITA SEGMENTED CONTROL) -->
+              <div style="display: flex; gap: 6px; padding: 4px; background: rgba(0,0,0,0.22); border-radius: 12px; margin-top: 16px; border: 1px solid var(--border-subtle); flex-wrap: wrap;">
+                <button type="button" class="action-btn tg-subtab-btn active" id="btnTgTabHistory" onclick="switchTgBotTab('history')" style="min-height: 32px; height: 32px; font-size: 11.5px; padding: 0 14px; border-radius: 9px; flex: 1; border: none; background: var(--bg-surface-active, rgba(255,255,255,0.12)); box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
+                  📋 Historial de Mensajes
+                </button>
+                <button type="button" class="action-btn tg-subtab-btn" id="btnTgTabSettings" onclick="switchTgBotTab('settings')" style="min-height: 32px; height: 32px; font-size: 11.5px; padding: 0 14px; border-radius: 9px; flex: 1; border: none; background: transparent; opacity: 0.75;">
+                  ⚙️ Ajustes & Admins
+                </button>
+                <button type="button" class="action-btn tg-subtab-btn" id="btnTgTabSend" onclick="switchTgBotTab('send')" style="min-height: 32px; height: 32px; font-size: 11.5px; padding: 0 14px; border-radius: 9px; flex: 1; border: none; background: transparent; opacity: 0.75;">
+                  📢 Enviar a Telegram
+                </button>
+              </div>
+
+              <!-- PANEL 1: HISTORIAL DE MENSAJES (LO QUE MANDA Y RECIBE) -->
+              <div id="tgPaneHistory" style="margin-top: 14px; display: block;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; background: rgba(0,0,0,0.12); padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-subtle);">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 11.5px; font-weight: 600; color: var(--text-secondary);">Filtrar mensajes:</span>
+                    <select id="tgActivityFilter" onchange="filterTelegramBotActivity()" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 4px 8px; font-size: 11.5px; cursor: pointer;">
+                      <option value="all">Todos los eventos</option>
+                      <option value="out">📤 Solo lo que manda el Bot (Salientes)</option>
+                      <option value="in">📥 Solo lo que recibe el Bot (Entrantes)</option>
+                    </select>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <button type="button" class="action-btn" onclick="fetchTelegramBotActivity(true)" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" title="Actualizar historial de mensajes">
+                      🔄 Actualizar
+                    </button>
+                    <button type="button" class="action-btn" onclick="clearTelegramBotActivity()" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px; border-color: rgba(239,68,68,0.3); color: var(--accent-rose-bright);" title="Vaciar registro de auditoría en memoria">
+                      🗑️ Vaciar
+                    </button>
+                  </div>
+                </div>
+
+                <div id="tgActivityLogContainer" style="max-height: 440px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px;">
+                  <div style="text-align: center; color: var(--text-muted); padding: 28px; font-size: 12px;">
+                    Cargando historial de mensajes del bot...
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANEL 2: AJUSTES & ADMINISTRADORES -->
+              <div id="tgPaneSettings" style="margin-top: 14px; display: none;">
+                <!-- Opciones de Notificación -->
+                <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+                  <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                    <span>🔔</span> Preferencias de Notificaciones Push
+                  </div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-top: 1px solid var(--border-subtle);">
+                    <div>
+                      <div style="font-size: 12.5px; font-weight: 600;">Alertas de Descargas Completadas (qBittorrent)</div>
+                      <div style="font-size: 11px; color: var(--text-muted);">El bot enviará un aviso inmediato a todos los administradores cuando finalice un torrent en el NAS.</div>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer; flex-shrink: 0;">
+                      <input type="checkbox" id="tgToggleTorrentsNotify" onchange="saveTelegramBotConfig()" style="opacity: 0; width: 0; height: 0;">
+                      <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.2); transition: .3s; border-radius: 24px;" id="tgToggleTorrentsNotifySlider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Gestión de Administradores Autorizados -->
+                <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                    <div>
+                      <div style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                        <span>👥</span> Administradores Autorizados (Lista Blanca)
+                      </div>
+                      <div style="font-size: 11px; color: var(--text-muted);">Solo estos Telegram Chat IDs tienen permiso para interactuar con el bot y recibir alertas.</div>
+                    </div>
+                  </div>
+
+                  <div id="tgAdminsListContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+                    <div style="text-align: center; color: var(--text-muted); padding: 12px; font-size: 11.5px;">
+                      Cargando lista de usuarios autorizados...
+                    </div>
+                  </div>
+
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+                    <input type="number" id="tgNewAdminUserId" placeholder="Chat ID (ej. 428380, consíguelo con @userinfobot)" style="flex: 1; min-width: 220px; height: 36px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 9px; padding: 0 12px; color: var(--text-primary); font-size: 12px;">
+                    <button type="button" class="action-btn primary-cta" onclick="addTelegramWhitelistUser()" style="min-height: 36px; height: 36px; font-size: 11.5px;">
+                      ➕ Autorizar Usuario
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANEL 3: ENVIAR MENSAJE A TELEGRAM (BROADCASTER) -->
+              <div id="tgPaneSend" style="margin-top: 14px; display: none;">
+                <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px;">
+                  <div style="font-size: 13px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+                    <span>📢</span> Emisor de Mensajes a Telegram
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">
+                    Redacta un aviso o notificación para difundirlo de inmediato a todos los administradores en Telegram.
+                  </div>
+
+                  <div style="margin-bottom: 10px;">
+                    <textarea id="tgCustomMessageText" rows="4" placeholder="Escribe aquí el texto del mensaje a enviar a Telegram..." style="width: 100%; box-sizing: border-box; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 9px; padding: 10px 12px; color: var(--text-primary); font-size: 12.5px; font-family: inherit; resize: vertical;"></textarea>
+                  </div>
+
+                  <!-- Plantillas Rápidas -->
+                  <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
+                    <span style="font-size: 11px; color: var(--text-muted);">Plantillas rápidas:</span>
+                    <button type="button" class="action-btn" onclick="applyTelegramTemplate('ping')" style="min-height: 26px; height: 26px; padding: 0 8px; font-size: 11px;">🧪 Prueba</button>
+                    <button type="button" class="action-btn" onclick="applyTelegramTemplate('maintenance')" style="min-height: 26px; height: 26px; padding: 0 8px; font-size: 11px;">⚙️ Mantenimiento</button>
+                    <button type="button" class="action-btn" onclick="applyTelegramTemplate('reboot')" style="min-height: 26px; height: 26px; padding: 0 8px; font-size: 11px;">🔄 Reinicio Servidor</button>
+                    <button type="button" class="action-btn" onclick="applyTelegramTemplate('clear')" style="min-height: 26px; height: 26px; padding: 0 8px; font-size: 11px; opacity: 0.6;">✕ Limpiar</button>
+                  </div>
+
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+                    <span id="tgCustomSendStatus" style="font-size: 11.5px; color: var(--text-muted);"></span>
+                    <button type="button" class="action-btn primary-cta" id="btnTgSubmitCustomMsg" onclick="sendTelegramCustomMessage(this)" style="min-height: 38px; height: 38px; padding: 0 16px; font-size: 12px;">
+                      🚀 Enviar a Telegram Ahora
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -7053,6 +7171,10 @@
         setText('tgBotQbitStatus', tgBot.qbit_connected ? 'Conectado (8082)' : 'En espera');
         setText('tgBotMsgCount', tgBot.messages_processed ?? 0);
 
+        if (Date.now() - lastTgActivityFetchTs > 4000) {
+          fetchTelegramBotActivity(false);
+        }
+
         const sysd = latestMetrics.systemd_services || [];
         const sysdBox = document.getElementById('systemdAppsList');
         if (sysdBox) {
@@ -8159,7 +8281,341 @@
           if (statusEl) {
             setTimeout(() => { statusEl.textContent = ''; }, 6000);
           }
+          fetchTelegramBotActivity(false);
         }, 800);
+      }
+    }
+
+    // =========================================================================
+    // BOT DE TELEGRAM INTEGRADO: HISTORIAL DE MENSAJES, AJUSTES Y EMISOR
+    // =========================================================================
+    let currentTgBotData = {
+      activity: [],
+      config: { notify_completed_torrents: true },
+      allowed_users: []
+    };
+    let activeTgBotTab = 'history';
+    let lastTgActivityFetchTs = 0;
+
+    function switchTgBotTab(tab) {
+      activeTgBotTab = tab;
+      const tabBtns = {
+        'history': document.getElementById('btnTgTabHistory'),
+        'settings': document.getElementById('btnTgTabSettings'),
+        'send': document.getElementById('btnTgTabSend')
+      };
+      const panes = {
+        'history': document.getElementById('tgPaneHistory'),
+        'settings': document.getElementById('tgPaneSettings'),
+        'send': document.getElementById('tgPaneSend')
+      };
+
+      Object.keys(panes).forEach(k => {
+        if (panes[k]) panes[k].style.display = (k === tab) ? 'block' : 'none';
+        if (tabBtns[k]) {
+          if (k === tab) {
+            tabBtns[k].style.background = 'var(--bg-surface-active, rgba(255,255,255,0.14))';
+            tabBtns[k].style.opacity = '1';
+            tabBtns[k].style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)';
+          } else {
+            tabBtns[k].style.background = 'transparent';
+            tabBtns[k].style.opacity = '0.75';
+            tabBtns[k].style.boxShadow = 'none';
+          }
+        }
+      });
+
+      if (tab === 'history' || tab === 'settings') {
+        fetchTelegramBotActivity(false);
+      }
+    }
+
+    async function fetchTelegramBotActivity(showFeedback = false) {
+      lastTgActivityFetchTs = Date.now();
+      try {
+        const res = await fetch('/api/telegram_bot/activity', {
+          headers: authHeaders()
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success) {
+          currentTgBotData = data;
+          filterTelegramBotActivity();
+          renderTelegramBotSettings(data.config || {}, data.allowed_users || []);
+          if (showFeedback) {
+            showToast('📋 Historial de mensajes de Telegram actualizado', 'info');
+          }
+        }
+      } catch (e) {
+        console.warn('[TG BOT] Error al cargar actividad:', e);
+      }
+    }
+
+    function filterTelegramBotActivity() {
+      const filter = document.getElementById('tgActivityFilter')?.value || 'all';
+      let list = currentTgBotData.activity || [];
+      if (filter === 'out') {
+        list = list.filter(item => item.direction === 'out');
+      } else if (filter === 'in') {
+        list = list.filter(item => item.direction === 'in');
+      }
+      renderTelegramBotActivity(list);
+    }
+
+    function renderTelegramBotActivity(activityList) {
+      const box = document.getElementById('tgActivityLogContainer');
+      if (!box) return;
+
+      if (!activityList || activityList.length === 0) {
+        box.innerHTML = `
+          <div style="text-align: center; color: var(--text-muted); padding: 32px 16px; font-size: 12px; background: rgba(0,0,0,0.1); border-radius: 10px; border: 1px dashed var(--border-subtle);">
+            💬 No hay mensajes en este filtro todavía.<br>
+            <span style="font-size: 11px; opacity: 0.8;">Cuando el bot envíe una alerta o responda a comandos, aparecerán aquí en vivo.</span>
+          </div>`;
+        return;
+      }
+
+      box.innerHTML = activityList.map(item => {
+        const isOut = item.direction === 'out';
+        const badgeBg = isOut ? 'background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald-bright); border: 1px solid rgba(16, 185, 129, 0.3);'
+                              : 'background: rgba(139, 92, 246, 0.15); color: var(--accent-violet-bright); border: 1px solid rgba(139, 92, 246, 0.3);';
+        const dirLabel = isOut ? '📤 Lo que manda el Bot' : '📥 Lo que recibe el Bot';
+        const statusBadge = (item.status === 'error' || item.status === 'denied') 
+          ? `<span class="adw-badge badge-red" style="font-size: 10px; padding: 2px 6px;">${item.status === 'denied' ? 'Acceso Bloqueado' : 'Fallo de Envío'}</span>` 
+          : '';
+
+        return `
+          <div style="background: rgba(0,0,0,0.18); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 6px; ${badgeBg}">
+                  ${dirLabel}
+                </span>
+                <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${escapeHtml(item.title || 'Mensaje')}</span>
+                ${statusBadge}
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono, monospace);">
+                ⏱️ ${escapeHtml(item.time_str || '--')}
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--text-secondary); flex-wrap: wrap;">
+              <span>👤 <strong>${isOut ? 'Destinatario' : 'Remitente'}:</strong> ${escapeHtml(item.user_name || item.target || 'N/A')}</span>
+              <span>🎯 <strong>Canal / Chat ID:</strong> <code>${escapeHtml(item.target || '--')}</code></span>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.28); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--text-primary); font-family: var(--font-mono, monospace); white-space: pre-wrap; word-break: break-word; line-height: 1.45;">
+${escapeHtml(item.content || '(Mensaje sin contenido)')}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function renderTelegramBotSettings(config, allowedUsers) {
+      // Toggle notificaciones
+      const toggle = document.getElementById('tgToggleTorrentsNotify');
+      const slider = document.getElementById('tgToggleTorrentsNotifySlider');
+      if (toggle) {
+        toggle.checked = config.notify_completed_torrents !== false;
+        if (slider) {
+          slider.style.backgroundColor = toggle.checked ? 'var(--accent-emerald)' : 'rgba(255,255,255,0.2)';
+        }
+      }
+
+      // Lista de administradores
+      const adminsBox = document.getElementById('tgAdminsListContainer');
+      if (adminsBox) {
+        if (!allowedUsers || allowedUsers.length === 0) {
+          adminsBox.innerHTML = '<div style="color: var(--text-muted); font-size: 11.5px; padding: 8px;">No hay administradores registrados aún. El primer usuario que escriba /start al bot será registrado automáticamente.</div>';
+        } else {
+          adminsBox.innerHTML = allowedUsers.map((uid, idx) => {
+            const isSingle = allowedUsers.length === 1;
+            return `
+              <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.18); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 8px 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 16px;">👤</span>
+                  <div>
+                    <div style="font-size: 12px; font-weight: 700; font-family: var(--font-mono, monospace);">Chat ID: ${escapeHtml(String(uid))}</div>
+                    <div style="font-size: 10.5px; color: var(--text-muted);">${idx === 0 ? '👑 Primer Administrador' : 'Administrador Autorizado'}</div>
+                  </div>
+                </div>
+                <div>
+                  ${isSingle ? '<span style="font-size: 10.5px; color: var(--text-muted); padding: 4px 8px; background: rgba(255,255,255,0.06); border-radius: 6px;">Admin Principal</span>' : `
+                    <button type="button" class="action-btn" onclick="removeTelegramWhitelistUser(${uid})" style="min-height: 26px; height: 26px; padding: 0 8px; font-size: 11px; border-color: rgba(239,68,68,0.3); color: var(--accent-rose-bright);" title="Eliminar de lista blanca">
+                      🗑️ Eliminar
+                    </button>
+                  `}
+                </div>
+              </div>`;
+          }).join('');
+        }
+      }
+    }
+
+    async function saveTelegramBotConfig() {
+      const toggle = document.getElementById('tgToggleTorrentsNotify');
+      const slider = document.getElementById('tgToggleTorrentsNotifySlider');
+      const isEnabled = toggle ? toggle.checked : true;
+      if (slider) {
+        slider.style.backgroundColor = isEnabled ? 'var(--accent-emerald)' : 'rgba(255,255,255,0.2)';
+      }
+      try {
+        const res = await fetch('/api/telegram_bot/config', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ notify_completed_torrents: isEnabled })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`🔔 Notificaciones de torrents: ${isEnabled ? 'Activadas' : 'Pausadas'}`, 'success');
+          fetchTelegramBotActivity(false);
+        }
+      } catch (e) {
+        showToast('Error guardando configuración del bot', 'error');
+      }
+    }
+
+    async function addTelegramWhitelistUser() {
+      const input = document.getElementById('tgNewAdminUserId');
+      if (!input) return;
+      const uidVal = input.value.trim();
+      const uid = parseInt(uidVal, 10);
+      if (isNaN(uid) || uid <= 0) {
+        showToast('Introduce un número de Chat ID válido', 'error');
+        return;
+      }
+      try {
+        const res = await fetch('/api/telegram_bot/whitelist/add', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ user_id: uid })
+        });
+        const data = await res.json();
+        if (data.success) {
+          input.value = '';
+          showToast(`✅ Chat ID ${uid} añadido a la lista blanca`, 'success');
+          fetchTelegramBotActivity(false);
+        } else {
+          showToast(data.error || 'Error al añadir usuario', 'error');
+        }
+      } catch (e) {
+        showToast('Error de conexión al añadir usuario', 'error');
+      }
+    }
+
+    async function removeTelegramWhitelistUser(uid) {
+      if (!confirm(`¿Deseas revocar los permisos al usuario con Chat ID ${uid}?`)) return;
+      try {
+        const res = await fetch('/api/telegram_bot/whitelist/remove', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ user_id: uid })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`🗑️ Usuario ${uid} eliminado de la lista blanca`, 'success');
+          fetchTelegramBotActivity(false);
+        } else {
+          showToast(data.error || 'Error al eliminar usuario', 'error');
+        }
+      } catch (e) {
+        showToast('Error de conexión al eliminar usuario', 'error');
+      }
+    }
+
+    function applyTelegramTemplate(type) {
+      const txt = document.getElementById('tgCustomMessageText');
+      if (!txt) return;
+      if (type === 'ping') {
+        txt.value = '🧪 Prueba de conexión manual desde el Panel Web de Recursos.\nEl servidor y los servicios operan con normalidad.';
+      } else if (type === 'maintenance') {
+        txt.value = '⚠️ *Aviso de Mantenimiento*\nEl servidor entrará en tareas de mantenimiento breve en unos minutos. Las descargas se reanudarán automáticamente.';
+      } else if (type === 'reboot') {
+        txt.value = '🔄 *Reinicio Programado*\nEl servidor Home NAS se reiniciará en breve para aplicar actualizaciones del kernel.';
+      } else if (type === 'clear') {
+        txt.value = '';
+      }
+      txt.focus();
+    }
+
+    async function sendTelegramCustomMessage(btn) {
+      const txt = document.getElementById('tgCustomMessageText');
+      const statusEl = document.getElementById('tgCustomSendStatus');
+      if (!txt) return;
+      const msg = txt.value.trim();
+      if (!msg) {
+        showToast('Por favor escribe un mensaje antes de enviar', 'error');
+        txt.focus();
+        return;
+      }
+
+      const origText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Enviando a Telegram...';
+      }
+      if (statusEl) {
+        statusEl.style.color = 'var(--text-muted)';
+        statusEl.textContent = 'Difundiendo mensaje a los administradores...';
+      }
+
+      try {
+        const res = await fetch('/api/telegram_bot/send', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+        if (data.success) {
+          txt.value = '';
+          if (statusEl) {
+            statusEl.style.color = 'var(--accent-emerald-bright)';
+            statusEl.textContent = '✅ Mensaje difundido con éxito a Telegram';
+          }
+          showToast('📢 Mensaje enviado a Telegram con éxito', 'success');
+          fetchTelegramBotActivity(false);
+          // Cambiar a la pestaña de historial para que el usuario vea su mensaje de inmediato
+          setTimeout(() => switchTgBotTab('history'), 500);
+        } else {
+          if (statusEl) {
+            statusEl.style.color = 'var(--accent-rose-bright)';
+            statusEl.textContent = `❌ ${data.error || 'Error al enviar'}`;
+          }
+          showToast(data.error || 'No se pudo enviar el mensaje a Telegram', 'error');
+        }
+      } catch (e) {
+        if (statusEl) {
+          statusEl.style.color = 'var(--accent-rose-bright)';
+          statusEl.textContent = `❌ Error: ${e.message}`;
+        }
+        showToast('Error de conexión al enviar mensaje', 'error');
+      } finally {
+        if (btn) {
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = origText;
+            if (statusEl) {
+              setTimeout(() => { statusEl.textContent = ''; }, 6000);
+            }
+          }, 800);
+        }
+      }
+    }
+
+    async function clearTelegramBotActivity() {
+      if (!confirm('¿Deseas vaciar el registro de mensajes y auditoría del bot en memoria?')) return;
+      try {
+        const res = await fetch('/api/telegram_bot/activity/clear', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('🗑️ Registro de mensajes del bot vaciado', 'info');
+          fetchTelegramBotActivity(false);
+        }
+      } catch (e) {
+        showToast('Error al vaciar registro', 'error');
       }
     }
 

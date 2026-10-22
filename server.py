@@ -16,6 +16,8 @@ import psutil
 import sqlite3
 import socket
 import requests
+import collections
+
 
 # ==============================================================================
 # Global Caches, Concurrency Locks & Configuration
@@ -314,6 +316,59 @@ TELEGRAM_WHITELIST_FILE = _resolve_tg_data_file("telegram_bot_allowed_users.json
 TELEGRAM_NOTIFIED_FILE = _resolve_tg_data_file("telegram_notified_torrents.json")
 TELEGRAM_NET_MONITOR_FILE = _resolve_tg_data_file("network_monitor_devices.json")
 TELEGRAM_FRIENDLY_NAMES_FILE = _resolve_tg_data_file("device_friendly_names.json")
+TELEGRAM_SETTINGS_FILE = _resolve_tg_data_file("telegram_bot_settings.json")
+
+TELEGRAM_ACTIVITY_LOG = collections.deque(maxlen=100)
+TELEGRAM_ACTIVITY_LOCK = threading.Lock()
+
+DEFAULT_TELEGRAM_CONFIG = {
+    "notify_completed_torrents": True,
+    "notify_network_changes": False
+}
+
+def load_tg_config():
+    """Carga las preferencias y ajustes del bot de Telegram."""
+    if os.path.exists(TELEGRAM_SETTINGS_FILE):
+        try:
+            with open(TELEGRAM_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                res = dict(DEFAULT_TELEGRAM_CONFIG)
+                res.update(cfg)
+                return res
+        except Exception as e:
+            print(f"[TG CONFIG ERROR] Error leyendo {TELEGRAM_SETTINGS_FILE}: {e}")
+    return dict(DEFAULT_TELEGRAM_CONFIG)
+
+def save_tg_config(cfg_dict):
+    """Guarda las preferencias del bot en su archivo JSON."""
+    try:
+        os.makedirs(os.path.dirname(TELEGRAM_SETTINGS_FILE), exist_ok=True)
+        current = load_tg_config()
+        current.update(cfg_dict)
+        with open(TELEGRAM_SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(current, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"[TG CONFIG SAVE ERROR] {e}")
+        return False
+
+def record_tg_activity(direction, msg_type, target, user_name, title, content, status="ok", details=None):
+    """Registra un evento de mensaje entrante o saliente del bot de Telegram."""
+    entry = {
+        "id": f"tg-{int(time.time()*1000)}-{os.urandom(3).hex()}",
+        "ts": time.time(),
+        "time_str": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "direction": direction,  # "out" (lo que manda el bot) | "in" (lo que recibe de usuarios)
+        "type": msg_type,        # "torrent_completed", "command_reply", "command_received", "magnet_received", "torrent_file_received", "custom_broadcast", "ping_test", "auth_denied"
+        "target": str(target) if target else "Todos (Broadcast)",
+        "user_name": str(user_name or "Usuario"),
+        "title": str(title or ""),
+        "content": str(content or ""),
+        "status": status,        # "ok", "error", "sent", "received", "denied"
+        "details": details or {}
+    }
+    with TELEGRAM_ACTIVITY_LOCK:
+        TELEGRAM_ACTIVITY_LOG.appendleft(entry)
 
 TELEGRAM_BOT_CACHE = {
     "enabled": True,
@@ -390,8 +445,8 @@ def tg_format_eta(seconds):
         return f"{h}h {m}m"
     return f"{m}m {s}s"
 
-def tg_send_message(chat_id, text, reply_to_message_id=None, parse_mode="Markdown"):
-    """Envía un mensaje mediante la API oficial de Telegram."""
+def tg_send_message(chat_id, text, reply_to_message_id=None, parse_mode="Markdown", log_activity=True, log_title=None, log_type="command_reply"):
+    """Envía un mensaje mediante la API oficial de Telegram y registra la actividad saliente."""
     url = f"{TELEGRAM_API_URL}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -400,26 +455,57 @@ def tg_send_message(chat_id, text, reply_to_message_id=None, parse_mode="Markdow
     }
     if reply_to_message_id:
         payload["reply_to_message_id"] = reply_to_message_id
+    success = False
+    err_str = ""
     try:
         r = requests.post(url, json=payload, timeout=20)
         res = r.json()
         if not res.get("ok") and parse_mode:
             payload.pop("parse_mode", None)
-            requests.post(url, json=payload, timeout=20)
-        return True
+            r2 = requests.post(url, json=payload, timeout=20)
+            res = r2.json()
+        if res.get("ok"):
+            success = True
+        else:
+            err_str = str(res.get("description", "Error de Telegram"))
     except Exception as e:
+        err_str = str(e)
         print(f"[TG ERROR] Error enviando mensaje a {chat_id}: {e}")
-        return False
 
-def broadcast_to_tg_whitelist(text, parse_mode="Markdown"):
-    """Difunde un mensaje a todos los administradores en la lista blanca."""
+    if log_activity:
+        record_tg_activity(
+            direction="out",
+            msg_type=log_type,
+            target=str(chat_id),
+            user_name=f"Chat {chat_id}",
+            title=log_title or "Mensaje emitido por el Bot",
+            content=text,
+            status="ok" if success else "error",
+            details={"error": err_str} if not success else {}
+        )
+    return success
+
+def broadcast_to_tg_whitelist(text, parse_mode="Markdown", log_title=None, log_type="broadcast"):
+    """Difunde un mensaje a todos los administradores en la lista blanca y audita el envío."""
     users = load_tg_whitelist()
     sent_any = False
     for uid in users:
-        ok = tg_send_message(uid, text, parse_mode=parse_mode)
+        ok = tg_send_message(uid, text, parse_mode=parse_mode, log_activity=False)
         if ok:
             sent_any = True
+
+    record_tg_activity(
+        direction="out",
+        msg_type=log_type,
+        target=f"{len(users)} administradores",
+        user_name="Administradores",
+        title=log_title or "Difusión a lista blanca",
+        content=text,
+        status="ok" if sent_any else "error",
+        details={"admin_count": len(users), "users": list(users)}
+    )
     return sent_any
+
 
 def qbit_add_torrent_file(filename, file_bytes):
     """Añade un archivo .torrent a qBittorrent."""
@@ -540,15 +626,33 @@ def telegram_bot_monitor_worker():
                     size_str = tg_format_size(size)
                     now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-                    alert_msg = (
-                        "🎉 *¡Descarga completada!*\n\n"
-                        f"📁 *Nombre:* `{t_name}`\n"
-                        f"💾 *Tamaño:* {size_str}\n"
-                        f"📂 *Guardado en:* `NAS Video / torrent`\n"
-                        f"⏱️ *Hora:* {now_str}"
-                    )
-                    print(f"[TG BOT] Torrent completado: {t_name}. Notificando a Telegram...")
-                    broadcast_to_tg_whitelist(alert_msg)
+                    cfg = load_tg_config()
+                    if cfg.get("notify_completed_torrents", True):
+                        alert_msg = (
+                            "🎉 *¡Descarga completada!*\n\n"
+                            f"📁 *Nombre:* `{t_name}`\n"
+                            f"💾 *Tamaño:* {size_str}\n"
+                            f"📂 *Guardado en:* `NAS Video / torrent`\n"
+                            f"⏱️ *Hora:* {now_str}"
+                        )
+                        print(f"[TG BOT] Torrent completado: {t_name}. Notificando a Telegram...")
+                        broadcast_to_tg_whitelist(
+                            alert_msg,
+                            log_title=f"🎉 Alerta: Descarga completada ({t_name})",
+                            log_type="torrent_completed"
+                        )
+                    else:
+                        print(f"[TG BOT] Torrent completado: {t_name}. Notificación omitida por ajustes.")
+                        record_tg_activity(
+                            direction="out",
+                            msg_type="torrent_completed_skipped",
+                            target="Nadie (Avisos en pausa)",
+                            user_name="Sistema",
+                            title=f"Descarga completada (avisos en pausa): {t_name}",
+                            content=f"El torrent '{t_name}' ({size_str}) ha finalizado, pero los avisos están desactivados en ajustes.",
+                            status="ok",
+                            details={"torrent": t_name, "size": size_str}
+                        )
 
             if updated:
                 save_tg_notified_hashes(notified_hashes)
@@ -603,7 +707,21 @@ def telegram_bot_polling_worker():
                 # Comprobación de seguridad
                 if not is_tg_user_allowed(user_id):
                     print(f"[TG AUTH DENIED] Usuario no autorizado: {user_id} ({first_name})")
-                    tg_send_message(chat_id, "⛔ *Acceso no autorizado.* Este bot es privado para descargas de torrents en el NAS.")
+                    record_tg_activity(
+                        direction="in",
+                        msg_type="auth_denied",
+                        target=str(chat_id),
+                        user_name=f"{first_name} (ID: {user_id})",
+                        title="⛔ Acceso no autorizado rechazado",
+                        content="Intento de interacción por un usuario fuera de la lista blanca.",
+                        status="denied"
+                    )
+                    tg_send_message(
+                        chat_id,
+                        "⛔ *Acceso no autorizado.* Este bot es privado para descargas de torrents en el NAS.",
+                        log_title="Respuesta: Acceso no autorizado",
+                        log_type="auth_denied"
+                    )
                     continue
 
                 # 1. Documento .torrent
@@ -611,7 +729,22 @@ def telegram_bot_polling_worker():
                 if document:
                     file_name = document.get("file_name", "archivo.torrent")
                     if file_name.lower().endswith(".torrent"):
-                        tg_send_message(chat_id, f"📥 *Descargando archivo torrent:* `{file_name}`...", reply_to_message_id=msg_id)
+                        record_tg_activity(
+                            direction="in",
+                            msg_type="torrent_file_received",
+                            target=str(chat_id),
+                            user_name=f"{first_name} (ID: {user_id})",
+                            title=f"📥 Archivo recibido: {file_name}",
+                            content=f"Documento .torrent enviado por {first_name}.",
+                            status="received",
+                            details={"file_name": file_name}
+                        )
+                        tg_send_message(
+                            chat_id,
+                            f"📥 *Descargando archivo torrent:* `{file_name}`...",
+                            reply_to_message_id=msg_id,
+                            log_title="Respuesta: Descargando archivo .torrent"
+                        )
                         file_id = document["file_id"]
                         f_info = requests.get(f"{TELEGRAM_API_URL}/getFile?file_id={file_id}", timeout=20).json()
                         if f_info.get("ok"):
@@ -623,21 +756,47 @@ def telegram_bot_polling_worker():
                                 tg_send_message(
                                     chat_id,
                                     f"✅ *Torrent añadido a qBittorrent:*\n`{file_name}`\n\n⏳ Descargando... Te avisaré en cuanto termine.",
-                                    reply_to_message_id=msg_id
+                                    reply_to_message_id=msg_id,
+                                    log_title="Respuesta: Torrent añadido a qBittorrent"
                                 )
                             else:
-                                tg_send_message(chat_id, f"❌ *Error al añadir torrent:* {resp_msg}", reply_to_message_id=msg_id)
+                                tg_send_message(
+                                    chat_id,
+                                    f"❌ *Error al añadir torrent:* {resp_msg}",
+                                    reply_to_message_id=msg_id,
+                                    log_title="Respuesta: Error al añadir torrent"
+                                )
                         else:
-                            tg_send_message(chat_id, "❌ Error al descargar el archivo desde Telegram.", reply_to_message_id=msg_id)
+                            tg_send_message(
+                                chat_id,
+                                "❌ Error al descargar el archivo desde Telegram.",
+                                reply_to_message_id=msg_id,
+                                log_title="Respuesta: Error al descargar archivo"
+                            )
                         continue
                     else:
-                        tg_send_message(chat_id, "ℹ️ Por favor, envía un archivo que termine en `.torrent`.", reply_to_message_id=msg_id)
+                        tg_send_message(
+                            chat_id,
+                            "ℹ️ Por favor, envía un archivo que termine en `.torrent`.",
+                            reply_to_message_id=msg_id,
+                            log_title="Respuesta: Tipo de archivo no admitido"
+                        )
                         continue
 
                 # 2. Mensajes de texto
                 text = (message.get("text") or "").strip()
                 if not text:
                     continue
+
+                record_tg_activity(
+                    direction="in",
+                    msg_type="command_received",
+                    target=str(chat_id),
+                    user_name=f"{first_name} (ID: {user_id})",
+                    title=f"💬 Mensaje/Comando: {text[:40]}",
+                    content=text,
+                    status="received"
+                )
 
                 # Comandos de bienvenida / ayuda
                 if text in ["/start", "/help", "ayuda", "start"]:
@@ -650,7 +809,12 @@ def telegram_bot_polling_worker():
                         "• `/red` o `/dispositivos` — Ver equipos conectados y desconectados en tiempo real.\n"
                         "• `/actualizar_red` — Sincronizar nombres con Pi-hole, ADB y Google Home."
                     )
-                    tg_send_message(chat_id, help_msg, reply_to_message_id=msg_id)
+                    tg_send_message(
+                        chat_id,
+                        help_msg,
+                        reply_to_message_id=msg_id,
+                        log_title="Respuesta: Menú de ayuda (/help)"
+                    )
                     continue
 
                 # Comando /status o /lista
@@ -658,7 +822,12 @@ def telegram_bot_polling_worker():
                     torrents = qbit_get_torrents_for_bot()
                     active = [t for t in torrents if t.get("progress", 0) < 1.0 and t.get("amount_left", 1) > 0]
                     if not active:
-                        tg_send_message(chat_id, "🟢 *No hay descargas activas en este momento.* Todas están completadas o en espera.", reply_to_message_id=msg_id)
+                        tg_send_message(
+                            chat_id,
+                            "🟢 *No hay descargas activas en este momento.* Todas están completadas o en espera.",
+                            reply_to_message_id=msg_id,
+                            log_title="Respuesta: Descargas inactivas (/status)"
+                        )
                     else:
                         msg_lines = [f"📊 *Descargas en curso ({len(active)}):*\n"]
                         for idx, t in enumerate(active[:8], 1):
@@ -674,24 +843,54 @@ def telegram_bot_polling_worker():
                             )
                         if len(active) > 8:
                             msg_lines.append(f"_... y {len(active) - 8} más._")
-                        tg_send_message(chat_id, "\n".join(msg_lines), reply_to_message_id=msg_id)
+                        tg_send_message(
+                            chat_id,
+                            "\n".join(msg_lines),
+                            reply_to_message_id=msg_id,
+                            log_title=f"Respuesta: Estado de descargas ({len(active)} activas)"
+                        )
                     continue
 
                 # Comando /actualizar_red o /sync_red
                 if text in ["/actualizar_red", "/sync_red", "/sync"]:
-                    tg_send_message(chat_id, "🔄 *Sincronizando dispositivos de red con Pi-hole...*", reply_to_message_id=msg_id)
+                    tg_send_message(
+                        chat_id,
+                        "🔄 *Sincronizando dispositivos de red con Pi-hole...*",
+                        reply_to_message_id=msg_id,
+                        log_title="Respuesta: Sincronizando dispositivos LAN"
+                    )
                     sync_script = "/home/servidor/scripts/sync_pihole_devices.py"
                     if os.path.exists(sync_script):
                         try:
                             res = subprocess.run(["python3", sync_script], capture_output=True, text=True, timeout=25)
                             if res.returncode == 0:
-                                tg_send_message(chat_id, "✅ *Sincronización completada con éxito.*\nSe han actualizado los nombres de Pi-hole utilizando datos de ADB y Google Home.", reply_to_message_id=msg_id)
+                                tg_send_message(
+                                    chat_id,
+                                    "✅ *Sincronización completada con éxito.*\nSe han actualizado los nombres de Pi-hole utilizando datos de ADB y Google Home.",
+                                    reply_to_message_id=msg_id,
+                                    log_title="Respuesta: Sincronización exitosa con Pi-hole"
+                                )
                             else:
-                                tg_send_message(chat_id, f"⚠️ Sincronización finalizada con avisos:\n`{res.stderr[:300]}`", reply_to_message_id=msg_id)
+                                tg_send_message(
+                                    chat_id,
+                                    f"⚠️ Sincronización finalizada con avisos:\n`{res.stderr[:300]}`",
+                                    reply_to_message_id=msg_id,
+                                    log_title="Respuesta: Sincronización con avisos"
+                                )
                         except Exception as e:
-                            tg_send_message(chat_id, f"❌ Error ejecutando sincronización: {e}", reply_to_message_id=msg_id)
+                            tg_send_message(
+                                chat_id,
+                                f"❌ Error ejecutando sincronización: {e}",
+                                reply_to_message_id=msg_id,
+                                log_title="Respuesta: Error en sincronización LAN"
+                            )
                     else:
-                        tg_send_message(chat_id, "ℹ️ Script de sincronización de Pi-hole no disponible en este entorno.", reply_to_message_id=msg_id)
+                        tg_send_message(
+                            chat_id,
+                            "ℹ️ Script de sincronización de Pi-hole no disponible en este entorno.",
+                            reply_to_message_id=msg_id,
+                            log_title="Respuesta: Script sync no disponible"
+                        )
                     continue
 
                 # Comando /red o /dispositivos
@@ -800,7 +999,12 @@ def telegram_bot_polling_worker():
                         if len(offline_list) > 8:
                             lines.append(f"_... y {len(offline_list) - 8} dispositivos más._")
 
-                    tg_send_message(chat_id, "\n".join(lines), reply_to_message_id=msg_id)
+                    tg_send_message(
+                        chat_id,
+                        "\n".join(lines),
+                        reply_to_message_id=msg_id,
+                        log_title=f"Respuesta: Estado de red LAN ({len(online_list)} online)"
+                    )
                     continue
 
                 # Detección de enlaces Magnet
@@ -812,10 +1016,16 @@ def telegram_bot_polling_worker():
                             tg_send_message(
                                 chat_id,
                                 "🧲 *Enlace Magnet añadido a qBittorrent.*\n\n⏳ Descargando... Te avisaré en cuanto termine.",
-                                reply_to_message_id=msg_id
+                                reply_to_message_id=msg_id,
+                                log_title="Respuesta: Enlace magnet añadido"
                             )
                         else:
-                            tg_send_message(chat_id, f"❌ *Error al añadir magnet:* {resp_msg}", reply_to_message_id=msg_id)
+                            tg_send_message(
+                                chat_id,
+                                f"❌ *Error al añadir magnet:* {resp_msg}",
+                                reply_to_message_id=msg_id,
+                                log_title="Respuesta: Error al añadir magnet"
+                            )
                     continue
 
                 # Detección de URL .torrent directa
@@ -827,17 +1037,24 @@ def telegram_bot_polling_worker():
                             tg_send_message(
                                 chat_id,
                                 f"🌐 *URL de torrent añadida:*\n`{u}`\n\n⏳ Descargando... Te avisaré en cuanto termine.",
-                                reply_to_message_id=msg_id
+                                reply_to_message_id=msg_id,
+                                log_title="Respuesta: URL torrent añadida"
                             )
                         else:
-                            tg_send_message(chat_id, f"❌ *Error al añadir URL torrent:* {resp_msg}", reply_to_message_id=msg_id)
+                            tg_send_message(
+                                chat_id,
+                                f"❌ *Error al añadir URL torrent:* {resp_msg}",
+                                reply_to_message_id=msg_id,
+                                log_title="Respuesta: Error al añadir URL torrent"
+                            )
                     continue
 
                 # Texto no reconocido
                 tg_send_message(
                     chat_id,
                     "ℹ️ Envíame un archivo `.torrent`, un enlace `magnet:?xt=...` o escribe `/status` para ver las descargas en curso.",
-                    reply_to_message_id=msg_id
+                    reply_to_message_id=msg_id,
+                    log_title="Respuesta: Texto o comando no reconocido"
                 )
 
         except requests.exceptions.Timeout:
@@ -5486,8 +5703,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 1d. ESTADO Y TELEMETRÍA DEL BOT DE TELEGRAM INTEGRADO
-        elif clean_path == "/api/telegram_bot":
+        # 1d. ESTADO, TELEMETRÍA Y REGISTRO DE MENSAJES DEL BOT DE TELEGRAM INTEGRADO
+        elif clean_path in ("/api/telegram_bot", "/api/telegram_bot/activity"):
             if not auth["is_trusted"]:
                 self.send_response(403)
                 self.send_security_headers()
@@ -5495,7 +5712,17 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 return
             with TELEGRAM_BOT_LOCK:
                 bot_data = dict(TELEGRAM_BOT_CACHE)
-            resp = json.dumps(bot_data).encode('utf-8')
+            with TELEGRAM_ACTIVITY_LOCK:
+                activity_list = list(TELEGRAM_ACTIVITY_LOG)
+            wl = list(load_tg_whitelist())
+            cfg = load_tg_config()
+            resp = json.dumps({
+                "success": True,
+                "bot_status": bot_data,
+                "activity": activity_list,
+                "allowed_users": wl,
+                "config": cfg
+            }).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
@@ -6284,12 +6511,238 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 f"🤖 *Motor:* Bot nativo integrado en server.py\n"
                 f"📡 *Estado:* Operativo y respondiendo a comandos."
             )
-            success = broadcast_to_tg_whitelist(test_msg)
+            success = broadcast_to_tg_whitelist(
+                test_msg,
+                log_title="🧪 Ping de prueba emitido",
+                log_type="ping_test"
+            )
             if success:
                 resp = json.dumps({"success": True, "message": "Mensaje de prueba emitido con éxito a Telegram"}).encode('utf-8')
             else:
                 resp = json.dumps({"success": False, "error": "No se pudo emitir mensaje o no hay usuarios autorizados en la lista blanca"}).encode('utf-8')
 
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Enviar mensaje / comunicado directo a Telegram desde la web
+        elif clean_path == "/api/telegram_bot/send":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            try:
+                body = json.loads(post_data)
+                raw_text = (body.get('message') or body.get('text') or '').strip()
+            except Exception:
+                raw_text = ''
+
+            if not raw_text:
+                resp = json.dumps({"success": False, "error": "El mensaje no puede estar vacío"}).encode('utf-8')
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.send_security_headers()
+                self.send_header('Content-Length', str(len(resp)))
+                self.end_headers()
+                self.wfile.write(resp)
+                return
+
+            now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            formatted_text = f"📢 *Aviso desde Panel Recursos Web:*\n\n{raw_text}\n\n⏱️ `{now_str}`"
+            success = broadcast_to_tg_whitelist(
+                formatted_text,
+                log_title="📢 Mensaje emitido desde el Panel Web",
+                log_type="custom_broadcast"
+            )
+
+            if success:
+                resp = json.dumps({"success": True, "message": "Mensaje emitido con éxito a Telegram"}).encode('utf-8')
+            else:
+                resp = json.dumps({"success": False, "error": "No se pudo emitir el mensaje o no hay administradores en la lista blanca"}).encode('utf-8')
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Añadir usuario a la lista blanca de Telegram
+        elif clean_path == "/api/telegram_bot/whitelist/add":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            try:
+                body = json.loads(post_data)
+                user_id = int(str(body.get('user_id', '')).strip())
+            except Exception:
+                user_id = 0
+
+            if user_id <= 0:
+                resp = json.dumps({"success": False, "error": "El ID de usuario/chat debe ser un número entero válido"}).encode('utf-8')
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.send_security_headers()
+                self.send_header('Content-Length', str(len(resp)))
+                self.end_headers()
+                self.wfile.write(resp)
+                return
+
+            wl = load_tg_whitelist()
+            wl.add(user_id)
+            save_tg_whitelist(wl)
+
+            record_tg_activity(
+                direction="out",
+                msg_type="whitelist_update",
+                target=user_id,
+                user_name="Ajustes Dashboard",
+                title="Usuario añadido a lista blanca",
+                content=f"Se ha autorizado al usuario con Chat ID {user_id} para acceder al bot de Telegram.",
+                status="ok"
+            )
+
+            resp = json.dumps({"success": True, "message": f"Usuario {user_id} añadido a la lista blanca", "allowed_users": list(wl)}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Eliminar usuario de la lista blanca de Telegram
+        elif clean_path == "/api/telegram_bot/whitelist/remove":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            try:
+                body = json.loads(post_data)
+                user_id = int(str(body.get('user_id', '')).strip())
+            except Exception:
+                user_id = 0
+
+            wl = load_tg_whitelist()
+            if user_id in wl:
+                if len(wl) <= 1:
+                    resp = json.dumps({"success": False, "error": "No puedes eliminar el único administrador registrado"}).encode('utf-8')
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_security_headers()
+                    self.send_header('Content-Length', str(len(resp)))
+                    self.end_headers()
+                    self.wfile.write(resp)
+                    return
+                wl.remove(user_id)
+                save_tg_whitelist(wl)
+                record_tg_activity(
+                    direction="out",
+                    msg_type="whitelist_update",
+                    target=user_id,
+                    user_name="Ajustes Dashboard",
+                    title="Usuario revocado de lista blanca",
+                    content=f"Se han revocado los permisos al usuario con Chat ID {user_id}.",
+                    status="ok"
+                )
+                resp = json.dumps({"success": True, "message": f"Usuario {user_id} eliminado de la lista blanca", "allowed_users": list(wl)}).encode('utf-8')
+            else:
+                resp = json.dumps({"success": False, "error": f"El usuario {user_id} no está en la lista blanca"}).encode('utf-8')
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Guardar configuración y preferencias del Bot de Telegram
+        elif clean_path == "/api/telegram_bot/config":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            try:
+                body = json.loads(post_data)
+            except Exception:
+                body = {}
+
+            cfg = load_tg_config()
+            if "notify_completed_torrents" in body:
+                cfg["notify_completed_torrents"] = bool(body["notify_completed_torrents"])
+            if "notify_network_changes" in body:
+                cfg["notify_network_changes"] = bool(body["notify_network_changes"])
+
+            save_tg_config(cfg)
+            record_tg_activity(
+                direction="out",
+                msg_type="config_update",
+                target="Sistema",
+                user_name="Ajustes Dashboard",
+                title="Configuración de notificaciones actualizada",
+                content=f"Avisos de descargas completadas: {'Activados' if cfg.get('notify_completed_torrents') else 'Pausados'}.",
+                status="ok"
+            )
+
+            resp = json.dumps({"success": True, "config": cfg}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Limpiar el historial de actividad en memoria
+        elif clean_path == "/api/telegram_bot/activity/clear":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            with TELEGRAM_ACTIVITY_LOCK:
+                TELEGRAM_ACTIVITY_LOG.clear()
+
+            record_tg_activity(
+                direction="out",
+                msg_type="log_cleared",
+                target="Registro",
+                user_name="Ajustes Dashboard",
+                title="Historial de mensajes vaciado",
+                content="Se ha limpiado el buffer de auditoría en memoria del bot.",
+                status="ok"
+            )
+
+            resp = json.dumps({"success": True, "message": "Historial de mensajes vaciado"}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
