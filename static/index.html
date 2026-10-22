@@ -2318,40 +2318,99 @@
       filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(92%);
     }
     .conn-table-wrap {
-      max-height: 360px;
+      max-height: 480px;
       overflow-y: auto;
       border: 1px solid var(--border-subtle);
-      border-radius: 10px;
+      border-radius: 11px;
       background: var(--bg-surface-inset);
       scrollbar-width: thin;
+      padding: 9px;
     }
-    .conn-row-item {
+    .conn-capsules-grid {
       display: grid;
-      grid-template-columns: auto minmax(145px, 1.15fr) minmax(175px, 1.45fr) minmax(160px, 1.25fr) auto;
-      align-items: center;
-      gap: 10px;
-      padding: 6px 11px;
-      min-height: 38px;
-      border-bottom: 1px solid var(--border-subtle);
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 8px;
+      align-items: stretch;
+    }
+    .conn-capsule {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 8px 10px;
+      border-radius: 9px;
+      background: rgba(15, 23, 42, 0.48);
+      border: 1px solid var(--border-subtle);
       cursor: pointer;
-      transition: background 0.14s ease;
+      transition: all 0.15s ease;
       font-variant-numeric: tabular-nums;
+      min-height: 98px;
     }
-    @media (max-width: 960px) {
-      .conn-row-item {
-        grid-template-columns: auto 1fr auto;
-        row-gap: 4px;
-        padding: 8px 10px;
-      }
-      .conn-col-loc {
-        grid-column: 1 / -1;
-      }
+    [data-theme="light"] .conn-capsule {
+      background: rgba(255, 255, 255, 0.90);
+      border-color: rgba(15, 23, 42, 0.11);
     }
-    .conn-row-item:last-child {
-      border-bottom: none;
+    .conn-capsule:hover {
+      background: var(--bg-surface-elevated);
+      border-color: var(--accent-cyan-bright);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+      transform: translateY(-1px);
     }
-    .conn-row-item:hover {
-      background: rgba(56, 189, 248, 0.08);
+    .conn-capsule-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .conn-capsule-mid {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .conn-capsule-dest {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .conn-capsule-origin {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .conn-capsule-geo {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+      font-size: 9.5px;
+      color: var(--text-muted);
+      border-top: 1px dashed rgba(255, 255, 255, 0.08);
+      padding-top: 4px;
+      margin-top: 2px;
+    }
+    [data-theme="light"] .conn-capsule-geo {
+      border-top-color: rgba(15, 23, 42, 0.08);
+    }
+    .conn-capsule-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      margin-top: 3px;
+    }
+    .conn-grid-inline-drawer-cell {
+      grid-column: 1 / -1;
+      width: 100%;
     }
     .conn-dir-pill {
       display: inline-flex;
@@ -2589,13 +2648,13 @@
     .bw-pie-legend-item {
       display: flex;
       flex-direction: column;
-      gap: 7px;
-      padding: 11px 13px;
-      border-radius: 11px;
+      gap: 6px;
+      padding: 9px 12px;
+      border-radius: 10px;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       cursor: pointer;
-      transition: border-color 0.15s ease, background 0.15s ease;
+      transition: all 0.15s ease;
     }
     .bw-pie-legend-item:hover,
     .bw-pie-legend-item.active {
@@ -2606,23 +2665,24 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
     .bw-pie-legend-title-wrap {
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 8px;
       min-width: 0;
+      flex: 1;
     }
     .bw-pie-color-swatch {
-      width: 12px;
-      height: 12px;
-      border-radius: 4px;
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
       flex-shrink: 0;
-      box-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.25);
     }
     .bw-pie-legend-name {
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 700;
       color: var(--text-primary);
       overflow: hidden;
@@ -2632,23 +2692,47 @@
     .bw-pie-legend-metrics {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 6px;
       flex-shrink: 0;
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11.5px;
       font-variant-numeric: tabular-nums;
     }
     .bw-pie-legend-pct {
       font-weight: 800;
-      padding: 2px 7px;
-      border-radius: 6px;
-      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-size: 10.5px;
       background: rgba(56, 189, 248, 0.12);
       color: var(--accent-cyan-bright);
     }
+    .bw-pie-expand-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      background: rgba(56, 189, 248, 0.10);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: var(--accent-cyan-bright);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .bw-pie-expand-btn:hover {
+      background: rgba(56, 189, 248, 0.20);
+      border-color: #38bdf8;
+    }
+    .bw-pie-expand-btn.open {
+      background: rgba(168, 85, 247, 0.16);
+      border-color: rgba(168, 85, 247, 0.40);
+      color: #c084fc;
+    }
     .bw-pie-legend-bar-track {
       width: 100%;
-      height: 5px;
+      height: 4px;
       background: rgba(148, 163, 184, 0.12);
       border-radius: 999px;
       overflow: hidden;
@@ -2664,26 +2748,37 @@
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
-      font-size: 11px;
+      font-size: 10.5px;
       color: var(--text-muted);
+    }
+    .bw-pie-devices-breakdown-host {
+      overflow: hidden;
+      transition: max-height 0.25s ease, opacity 0.2s ease;
+    }
+    .bw-pie-devices-breakdown-host.collapsed {
+      display: none;
     }
     .bw-pie-devices-breakdown {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
       margin-top: 4px;
-      padding-top: 7px;
+      padding-top: 6px;
       border-top: 1px solid var(--border-subtle);
+      max-height: 240px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      padding-right: 2px;
     }
     .bw-pie-dev-row {
       display: grid;
-      grid-template-columns: minmax(135px, 1.3fr) minmax(70px, 0.8fr) auto;
+      grid-template-columns: minmax(115px, 1.2fr) minmax(65px, 0.8fr) auto;
       align-items: center;
-      gap: 8px;
-      padding: 4px 7px;
-      border-radius: 6px;
+      gap: 6px;
+      padding: 3px 6px;
+      border-radius: 5px;
       background: rgba(15, 23, 42, 0.32);
-      font-size: 11px;
+      font-size: 10.5px;
       font-variant-numeric: tabular-nums;
     }
     [data-theme="light"] .bw-pie-dev-row {
@@ -2692,9 +2787,6 @@
     @media (max-width: 640px) {
       .bw-pie-dev-row {
         grid-template-columns: 1fr auto;
-      }
-      .bw-pie-dev-mini-bar {
-        display: none;
       }
     }
 
@@ -10085,11 +10177,24 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         this._eventsBound = true;
       },
 
+      expandedGroupKeys: new Set(),
+
+      toggleGroupExpand(key) {
+        if (!key) return;
+        if (this.expandedGroupKeys.has(key)) {
+          this.expandedGroupKeys.delete(key);
+        } else {
+          this.expandedGroupKeys.add(key);
+        }
+        this.renderLegendDOM();
+      },
+
       setGroupMode(mode) {
         if (this.groupMode === mode) return;
         this.groupMode = mode;
         this.pinnedIndex = -1;
         this.hoveredIndex = -1;
+        this.expandedGroupKeys.clear();
         this._pendingModeTransition = true;
         this._lastDataSignature = '';
         ['Subnets', 'Groups', 'Categories', 'Devices'].forEach(k => {
@@ -10811,10 +10916,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             }
             return s.subtitle;
           }
-          if (s.devices && s.devices.length > 0) {
-            return `${s.devicesCount} ${s.devicesCount === 1 ? 'dispositivo activo' : 'dispositivos activos en esta categoría'} · ${s.subtitle || ''}`;
-          }
-          return s.subtitle;
+          const cnt = s.devicesCount || (s.devices ? s.devices.length : 0);
+          return `${cnt} ${cnt === 1 ? 'dispositivo' : 'dispositivos'} en este grupo · Pulsa para desplegar`;
         };
 
         const buildDevicesBreakdownHtml = (s) => {
@@ -10842,10 +10945,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                       <span style="overflow: hidden; text-overflow: ellipsis;">${escapeHtml(d.name)}</span>
                     </div>
                     <span class="bw-pie-dev-meta">${escapeHtml(d.ip)} · ${mediumTag}</span>
-                    <div class="bw-pie-dev-bar-wrap" title="${devPctOfCat.toFixed(1)}% de la categoría">
-                      <div class="bw-pie-dev-bar-fill" style="width: ${devPctOfCat.toFixed(1)}%; background: ${s.color};"></div>
-                    </div>
-                    <span class="bw-pie-dev-io">↓ ${devDl} · ↑ ${devUl} · <strong style="color: var(--text-primary);">${devTotStr}</strong></span>
+                    <span class="bw-pie-dev-io mono" style="text-align: right;">↓ ${devDl} · ↑ ${devUl} · <strong style="color: var(--text-primary);">${devTotStr}</strong></span>
                   </div>
                 `;
               }).join('')}
@@ -10867,6 +10967,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             const dlStr = isLive ? formatSpeed(s.dlSpeed) : formatBytes(s.dlBytes);
             const ulStr = isLive ? formatSpeed(s.ulSpeed) : formatBytes(s.ulBytes);
             const totStr = this.formatMetricValue(s.value);
+            const isExpanded = this.expandedGroupKeys.has(s.key);
 
             const swatchEl = itemEl.querySelector('.bw-pie-color-swatch');
             if (swatchEl) swatchEl.style.background = s.color;
@@ -10883,8 +10984,16 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             if (subNodesEl) subNodesEl.textContent = formatItemSub(s);
             const subIoEl = itemEl.querySelector('.bw-pie-legend-sub-io');
             if (subIoEl) subIoEl.textContent = `↓ ${dlStr} · ↑ ${ulStr}`;
+            const expandBtnEl = itemEl.querySelector('.bw-pie-expand-btn');
+            if (expandBtnEl) {
+              expandBtnEl.className = `bw-pie-expand-btn ${isExpanded ? 'open' : ''}`;
+              expandBtnEl.innerHTML = `<span>${isExpanded ? '▲ Plegar' : '▼ Desglose (' + (s.devices ? s.devices.length : 0) + ')'}</span>`;
+            }
             const breakdownWrapEl = itemEl.querySelector('.bw-pie-devices-breakdown-host');
-            if (breakdownWrapEl) breakdownWrapEl.innerHTML = buildDevicesBreakdownHtml(s);
+            if (breakdownWrapEl) {
+              breakdownWrapEl.className = `bw-pie-devices-breakdown-host ${isExpanded ? '' : 'collapsed'}`;
+              breakdownWrapEl.innerHTML = isExpanded ? buildDevicesBreakdownHtml(s) : '';
+            }
           });
           return;
         }
@@ -10894,15 +11003,21 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           const ulStr = isLive ? formatSpeed(s.ulSpeed) : formatBytes(s.ulBytes);
           const totStr = this.formatMetricValue(s.value);
           const subText = formatItemSub(s);
+          const isExpanded = this.expandedGroupKeys.has(s.key);
           const iconEmoji = (this.groupMode === 'devices' && s.iconEmoji)
             ? `<span style="font-size: 13px; margin-right: 4px;">${s.iconEmoji}</span>`
+            : '';
+          const expandBtnHtml = (s.devices && s.devices.length > 0)
+            ? `<button type="button" class="bw-pie-expand-btn ${isExpanded ? 'open' : ''}" onclick="event.stopPropagation(); NetworkBandwidthPieChart.toggleGroupExpand('${escapeHtml(s.key)}')" title="${isExpanded ? 'Plegar desglose de equipos' : 'Ver todos los equipos y consumos de este grupo'}">
+                <span>${isExpanded ? '▲ Plegar' : '▼ Desglose (' + s.devices.length + ')'}</span>
+              </button>`
             : '';
 
           return `
             <div class="bw-pie-legend-item" id="bwPieLegendItem_${idx}" data-slice-key="${escapeHtml(s.key)}"
                  onmouseenter="NetworkBandwidthPieChart.onLegendHover(${idx})"
                  onmouseleave="NetworkBandwidthPieChart.onLegendHover(-1)"
-                 onclick="NetworkBandwidthPieChart.onLegendClick(${idx})">
+                 onclick="NetworkBandwidthPieChart.onLegendClick(${idx}); NetworkBandwidthPieChart.toggleGroupExpand('${escapeHtml(s.key)}');">
               <div class="bw-pie-legend-top">
                 <div class="bw-pie-legend-title-wrap">
                   <span class="bw-pie-color-swatch" style="background: ${s.color};"></span>
@@ -10911,6 +11026,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                 <div class="bw-pie-legend-metrics">
                   <strong class="bw-pie-legend-tot-val" style="color: var(--text-primary);">${totStr}</strong>
                   <span class="bw-pie-legend-pct">${s.percent.toFixed(1)}%</span>
+                  ${expandBtnHtml}
                 </div>
               </div>
               <div class="bw-pie-legend-bar-track">
@@ -10920,7 +11036,9 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                 <span class="bw-pie-legend-sub-nodes">${escapeHtml(subText)}</span>
                 <span class="bw-pie-legend-sub-io mono">↓ ${dlStr} · ↑ ${ulStr}</span>
               </div>
-              <div class="bw-pie-devices-breakdown-host">${buildDevicesBreakdownHtml(s)}</div>
+              <div class="bw-pie-devices-breakdown-host ${isExpanded ? '' : 'collapsed'}">
+                ${isExpanded ? buildDevicesBreakdownHtml(s) : ''}
+              </div>
             </div>
           `;
         }).join('');
@@ -13881,7 +13999,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                   : `event.stopPropagation(); window.blockIpDirectly('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.jail || 'caddy-scan')}', '${escapeHtml(c.service)}')`;
                 const procInfo = c.process ? `<span class="mono" style="font-size: 9.5px; opacity: 0.75;">⚙️ ${escapeHtml(c.process)}</span>` : '';
                 const histBadge = c.is_history
-                  ? `<span class="adw-badge" style="font-size: 9.5px; padding: 1px 6px; background: rgba(168, 85, 247, 0.16); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35);">📚 ${c.hit_count || 1}x · ${formatHistoryTimestamp(c.last_seen)}</span>`
+                  ? `<span class="adw-badge" style="font-size: 9px; padding: 1px 5px; background: rgba(168, 85, 247, 0.16); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35);">📚 ${c.hit_count || 1}x</span>`
                   : '';
                 const isDevRow = c.local_ip && c.local_ip !== srvIp && c.local_ip !== '127.0.0.1';
                 const devIcon = isDevRow ? '📱' : '🖥️';
@@ -13898,41 +14016,47 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                 }
 
                 return `
-                  <div class="conn-row-item" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
-                    <span class="conn-dir-pill ${escapeHtml(c.direction)}" title="${c.direction === 'incoming' ? 'Conexión Entrante' : (c.direction === 'blocked' ? 'IP Bloqueada' : 'Conexión Saliente')}">${dirIcon}</span>
-
-                    <div class="conn-col-endpoint">
-                      <span class="conn-ip-port">${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
-                      ${c.domain ? `<span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #60a5fa; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Dominio DNS: ${escapeHtml(c.domain)}">🌐 ${escapeHtml(c.domain)}</span>` : ''}
-                      <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; cursor: pointer;" onclick="event.stopPropagation(); setConnectionsMapMode('history'); setConnectionsMapServiceFilter('${safeSvcClick}');" title="Filtrar historial del mapa por el servicio ${escapeHtml(c.service)}">${escapeHtml(c.service)}</span>
-                      ${histBadge}
-                      ${procInfo}
+                  <div class="conn-capsule" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
+                    <div class="conn-capsule-top">
+                      <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
+                        <span class="conn-dir-pill ${escapeHtml(c.direction)}" title="${c.direction === 'incoming' ? 'Conexión Entrante' : (c.direction === 'blocked' ? 'IP Bloqueada' : 'Conexión Saliente')}">${dirIcon}</span>
+                        <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; cursor: pointer; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="event.stopPropagation(); setConnectionsMapMode('history'); setConnectionsMapServiceFilter('${safeSvcClick}');" title="Filtrar historial del mapa por ${escapeHtml(c.service)}">${escapeHtml(c.service)}</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                        ${histBadge}
+                        <span class="mono" style="font-size: 9.5px; opacity: 0.8; font-weight: 700; color: var(--text-secondary);">${escapeHtml(c.protocol)}·${escapeHtml(c.state)}</span>
+                      </div>
                     </div>
 
-                    <div class="conn-col-device" onclick="event.stopPropagation(); setConnectionsMapDevice('${safeLocalIp}');" title="Pulsa para aislar ${escapeHtml(devDisplayName)} (${escapeHtml(c.local_ip || srvIp)}) en el mapa">
-                      <span style="color: ${devColor}; font-weight: 700; overflow: hidden; text-overflow: ellipsis;">${devIcon} ${escapeHtml(devDisplayName)}</span>
-                      <span style="opacity: 0.65;">:${c.local_port || '--'}</span>
+                    <div class="conn-capsule-mid">
+                      <div class="conn-capsule-dest">
+                        <span class="mono" style="font-size: 11.5px; color: var(--text-primary); font-weight: 700;">${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
+                        ${c.domain ? `<span class="adw-badge badge-blue" style="font-size: 9px; padding: 1px 5px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #60a5fa; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(c.domain)}">🌐 ${escapeHtml(c.domain)}</span>` : ''}
+                      </div>
+                      <div class="conn-capsule-origin" onclick="event.stopPropagation(); setConnectionsMapDevice('${safeLocalIp}');" title="Aislar ${escapeHtml(devDisplayName)} en el mapa">
+                        <span style="color: var(--text-muted);">←</span>
+                        <span style="color: ${devColor}; font-weight: 700;">${devIcon} ${escapeHtml(devDisplayName)}:${c.local_port || '--'}</span>
+                        ${procInfo}
+                      </div>
                     </div>
 
-                    <div class="conn-col-geo" title="📍 ${escapeHtml(locText)} · ${escapeHtml(c.isp || 'Red')} ${c.asn ? '(' + escapeHtml(c.asn) + ')' : ''} · ${Number(c.lat).toFixed(4)}°, ${Number(c.lng).toFixed(4)}°">
-                      <span style="overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--text-secondary);">📍 ${escapeHtml(locText)}</span>
-                      <span style="overflow: hidden; text-overflow: ellipsis; max-width: 150px;">· ${escapeHtml(c.isp || 'ISP')}</span>
+                    <div class="conn-capsule-geo" title="📍 ${escapeHtml(locText)} · ${escapeHtml(c.isp || 'Red')} ${c.asn ? '(' + escapeHtml(c.asn) + ')' : ''}">
+                      <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 175px;">📍 ${escapeHtml(locText)}</span>
                       <span class="conn-geo-tag ${escapeHtml(geoSt)}">${escapeHtml(geoTagLabel)}</span>
-                      <span class="mono" style="font-size: 9.5px; opacity: 0.75;">${escapeHtml(c.protocol)}·${escapeHtml(c.state)}</span>
                     </div>
 
-                    <div class="conn-col-actions">
+                    <div class="conn-capsule-actions">
                       <button type="button" class="conn-dev-history-btn ${isHistOpenForDev ? 'active' : ''}"
                         onclick="event.stopPropagation(); toggleDeviceHistoryInline('${safeLocalIp}', '${safeDevName}')"
-                        title="Ver historial de conexiones SQLite catalogado por servicios de ${escapeHtml(devDisplayName)}">
+                        title="Ver historial SQLite de ${escapeHtml(devDisplayName)}">
                         <span>📜 Historial</span>
                       </button>
-                      <button type="button" class="action-btn" style="height: 23px; padding: 0 8px; font-size: 10px; font-weight: 700; border-radius: 6px; cursor: pointer; ${blockBtnStyle}" onclick="${blockOnClick}">
+                      <button type="button" class="action-btn" style="height: 22px; padding: 0 7px; font-size: 9.5px; font-weight: 700; border-radius: 5px; cursor: pointer; ${blockBtnStyle}" onclick="${blockOnClick}">
                         ${blockBtnLabel}
                       </button>
                     </div>
                   </div>
-                  ${inlineDrawerHtml}
+                  ${inlineDrawerHtml ? `<div class="conn-grid-inline-drawer-cell">${inlineDrawerHtml}</div>` : ''}
                 `;
               };
 
@@ -13974,12 +14098,12 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                         </div>
                       </div>
                       ${buildInlineDeviceHistoryDrawerHtml(g.ip, g.name)}
-                      ${visibleConns.map(c => renderRow(c, true)).join('')}
+                      ${visibleConns.length > 0 ? `<div class="conn-capsules-grid" style="padding: 7px;">${visibleConns.map(c => renderRow(c, true)).join('')}</div>` : ''}
                     </div>`;
                 }).join('');
                 tableEl.innerHTML = groupsHtml;
               } else {
-                tableEl.innerHTML = filteredConns.map(c => renderRow(c, false)).join('');
+                tableEl.innerHTML = `<div class="conn-capsules-grid">${filteredConns.map(c => renderRow(c, false)).join('')}</div>`;
               }
             }
           }

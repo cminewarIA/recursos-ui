@@ -1,17 +1,14 @@
-# Plan de Implementación — v8.0.0
+# Plan de Implementación — v9.0.0
 
-## 1. Menú Lateral Izquierdo Desplegable y Adaptativo dentro del Mapa (`#mapSideDrawer`)
-- **Activador Compacto Superior Izquierdo (`#btnMapDrawerToggle`)**: Botón flotante con indicador de modo (`En Vivo` / `Historial SQLite`), resumen del filtro activo, contador de flujos visibles y chips rápidos (`#btnMapClearServiceQuick`, `#btnMapClearDeviceQuick`) para limpiar filtros activos con un solo clic sin abrir el cajón.
-- **Panel Lateral Retráctil (`#mapSideDrawer`)**: Cajón vertical adaptativo (`width: min(350px, calc(100% - 24px))`) con 4 secciones organizadas:
-  1. Conmutador de modo (`En Vivo` vs `Historial SQLite`).
-  2. Cuadrícula de filtros de dirección y tráfico (`Todas`, `Entrantes`, `Salientes`, `Dispositivos`, `Bloqueadas`).
-  3. Lista siempre accesible de equipos LAN detectados (`#mapHudDeviceFilterBar`).
-  4. Buscador instantáneo, selector de ventana temporal (`Todo`, `6h`, `24h`, `7d`), botón `Limpiar BD` y catálogo interactivo de servicios (`#mapHistServicesCatalogList`).
-- **Barra Unificada de Cámara y Pantalla Completa (`.map-camera-toolbar`)**: Anclada en la esquina superior derecha del mapa con controles de `Zoom +`, `Zoom −`, `Encuadrar`, `Host` y el único botón canónico de `Pantalla Completa`, eliminando los botones redundantes.
+## 1. Rediseño de Cuadrícula de Cápsulas para Flujos y Sockets Geolocalizados
+- **Rejilla Responsiva de Cápsulas (`.conn-capsules-grid`)**: Sustituir la lista vertical unicolumna por una cuadrícula adaptable (`repeat(auto-fill, minmax(290px, 1fr))`) para maximizar el aprovechamiento del ancho de pantalla y mostrar un mayor número de conexiones en el mismo espacio.
+- **Cápsula Compacta de Conexión (`.conn-capsule`)**:
+  - Encabezado: dirección de flujo (`↓ IN`, `↑ OUT`, `🛡️ BLK`), badge interactivo de servicio y protocolo/estado (`TCP · ESTAB`), más hits acumulados en modo historial.
+  - Centro: endpoint remoto (IP:puerto + dominio DNS Pi-hole) y dispositivo LAN de origen (`← 📱 Equipo:puerto`).
+  - Pie de cápsula: ciudad, país, ISP, etiqueta de exactitud GeoIP (`🎯 ip-api+ipwho.is`), botón `📜 Historial` por dispositivo y botón de bloqueo/desbloqueo directo.
+  - Al hacer clic en cualquier parte de la cápsula, se enfoca la coordenada geográfica en el mapa mundial.
+  - Celda de ancho completo (`grid-column: 1 / -1`) para el cajón de historial SQLite por dispositivo (`.conn-dev-history-drawer`) cuando se despliega.
 
-## 2. Tabla de Alta Densidad en "Detalle de Flujos y Sockets Geolocalizados" con Historial por Dispositivo
-- **Filas Tabulares de Alta Densidad (`.conn-row-item`)**: Distribución en 5 columnas compactas (Dirección, Destino Remoto + Dominio + Servicio, Equipo Local + Puerto, Ubicación + ISP + Precisión GeoIP + Protocolo/Estado, y Acciones).
-- **Historial SQLite Desplegable por Dispositivo (`toggleDeviceHistoryInline`)**: Botón `📜 Historial` en cada fila y cabecera de grupo que consulta `/api/net/history?device=<local_ip>` y despliega en línea (`.conn-dev-history-drawer`) los chips de servicios usados por ese dispositivo y sus conexiones históricas geolocalizadas.
-
-## 3. Desglose Completo de Todos los Dispositivos en "Distribución de Ancho de Banda por Subredes y Grupos"
-- **Lista Desglosada Siempre Visible (`.bw-pie-devices-breakdown`)**: En todos los modos (`Subredes`, `Grupos`, `Categorías` y `Dispositivos`), cada tarjeta de categoría muestra la lista completa de todos los dispositivos que la componen ordenados por consumo, con su icono, nombre, IP, tipo de enlace (`Eth` / `5G` / `2.4G`), barra de proporción, descarga (`↓`), subida (`↑`) y total.
+## 2. Grupos Compactos y Desglose Plegable en Distribución de Ancho de Banda
+- **Tarjetas de Grupo Compactas por Defecto**: En "Desglose de Ancho de Banda por...", cada categoría muestra una tarjeta minimalista (~58px de altura) con nombre, swatch de color, porcentaje, consumo total y barra de progreso.
+- **Desglose Desplegable al Hacer Clic (`toggleGroupExpand`)**: Al hacer clic en la tarjeta de grupo o en su botón `▼ Desglose (N)`, se despliega/pliega de forma interactiva la lista detallada de todos los dispositivos del grupo con su icono, nombre, IP, tipo de enlace (`Eth`/`5G`/`2.4G`) y consumo individual de descarga (`↓`) y subida (`↑`).
