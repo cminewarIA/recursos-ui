@@ -1577,7 +1577,7 @@ def record_connections_to_sqlite(connections_list):
         except Exception as e:
             print(f"[-] Error guardando historial de conexiones en SQLite: {e}")
 
-def query_connection_history_from_sqlite(service_filter=None, device_filter=None, direction_filter=None, search_query=None, limit=300):
+def query_connection_history_from_sqlite(service_filter=None, device_filter=None, direction_filter=None, search_query=None, hours_filter=None, limit=300):
     """Consulta el historial de conexiones geolocalizadas y el catálogo agrupado por servicios desde SQLite."""
     init_geoip_history_db()
     services_catalog = []
@@ -1593,6 +1593,15 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
         limit_val = max(10, min(int(limit or 300), 1000))
     except Exception:
         limit_val = 300
+
+    cutoff_ts = 0.0
+    if hours_filter is not None and str(hours_filter).strip() not in ("", "0", "all"):
+        try:
+            h_val = float(hours_filter)
+            if h_val > 0:
+                cutoff_ts = time.time() - (h_val * 3600.0)
+        except Exception:
+            cutoff_ts = 0.0
 
     with GEOIP_HISTORY_DB_LOCK:
         try:
@@ -1676,6 +1685,9 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
             # 4. Consulta filtrada de conexiones históricas
             where_clauses = []
             params = []
+            if cutoff_ts > 0:
+                where_clauses.append("last_seen >= ?")
+                params.append(cutoff_ts)
             if service_filter and str(service_filter).strip().lower() not in ("", "all", "todos"):
                 where_clauses.append("service = ?")
                 params.append(str(service_filter).strip())
@@ -1990,7 +2002,7 @@ def resolve_geoip_batch_from_ip_api(ip_list):
             GEOIP_WORKER_STATS["status"] = "resolving"
         batch_payload = json.dumps(batch_slice).encode("utf-8")
         req = urllib.request.Request(
-            "http://ip-api.com/batch?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,isp,org,as,query",
+            "http://ip-api.com/batch?fields=status,message,country,countryCode,regionName,city,district,zip,lat,lon,isp,org,as,query",
             data=batch_payload,
             headers={"Content-Type": "application/json", "User-Agent": "RecursosDashboard-GeoIPWorker/6.3"},
             method="POST"
@@ -2022,11 +2034,14 @@ def resolve_geoip_batch_from_ip_api(ip_list):
                         seen_queries.add(q_ip)
                         GEOIP_PENDING_QUEUE.discard(q_ip)
                         if item.get("status") == "success" and isinstance(item.get("lat"), (int, float)) and isinstance(item.get("lon"), (int, float)):
+                            raw_city = str(item.get("city") or "Nodo Remoto")
+                            district = str(item.get("district") or "").strip()
+                            city_with_district = f"{raw_city} · {district}" if (district and district.lower() not in raw_city.lower()) else raw_city
                             entry = {
                                 "ip": q_ip,
                                 "lat": float(item["lat"]),
                                 "lng": float(item["lon"]),
-                                "city": str(item.get("city") or "Nodo Remoto"),
+                                "city": city_with_district,
                                 "region": str(item.get("regionName") or ""),
                                 "postal": str(item.get("zip") or ""),
                                 "country": str(item.get("country") or ""),
@@ -6470,6 +6485,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             dev_f = None
             dir_f = None
             q_f = None
+            hours_f = None
             lim_f = 300
             if "?" in self.path:
                 try:
@@ -6479,6 +6495,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     dev_f = q_params.get("device", [None])[0]
                     dir_f = q_params.get("direction", [None])[0]
                     q_f = q_params.get("q", [None])[0]
+                    hours_f = q_params.get("hours", [None])[0]
                     if "limit" in q_params:
                         lim_f = int(q_params["limit"][0])
                 except Exception:
@@ -6488,6 +6505,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 device_filter=dev_f,
                 direction_filter=dir_f,
                 search_query=q_f,
+                hours_filter=hours_f,
                 limit=lim_f
             )
             resp = json.dumps(hist_payload).encode('utf-8')

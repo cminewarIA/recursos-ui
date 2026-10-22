@@ -3727,18 +3727,18 @@
                       <button type="button" class="map-hud-btn active" id="btnMapModeLive" onclick="setConnectionsMapMode('live')" title="Ver flujos activos en tiempo real">
                         <span>🟢</span><span>En Vivo</span>
                       </button>
-                      <button type="button" class="map-hud-btn mode-history" id="btnMapModeHistory" onclick="setConnectionsMapMode('history')" title="Explorar historial persistente en base de datos SQLite catalogado por servicios">
-                        <span>📚</span><span>Historial por Servicios (<span id="cntMapHistServices">0</span>)</span>
+                      <button type="button" class="map-hud-btn mode-history" id="btnMapModeHistory" onclick="setConnectionsMapMode('history', true)" title="Explorar historial persistente en base de datos SQLite catalogado por servicios (Pulsa de nuevo para desplegar/ocultar el panel)">
+                        <span>📚</span><span>Historial por Servicios (<span id="cntMapHistServices" style="font-variant-numeric: tabular-nums;">0</span>)</span><span id="iconMapHistDrawerCaret" style="font-size: 9px; opacity: 0.8; margin-left: 2px;">▼</span>
                       </button>
                     </div>
 
                     <!-- Filtros de Dirección y Dispositivos integrados en el Mapa -->
                     <div class="map-hud-group">
-                      <button type="button" class="map-hud-btn active" id="fMapConnAll" onclick="setConnectionsMapFilter('all')">Todas (<span id="cntMapAll">0</span>)</button>
-                      <button type="button" class="map-hud-btn" id="fMapConnIn" onclick="setConnectionsMapFilter('incoming')">↓ Entrantes (<span id="cntMapIn">0</span>)</button>
-                      <button type="button" class="map-hud-btn" id="fMapConnOut" onclick="setConnectionsMapFilter('outgoing')">↑ Salientes (<span id="cntMapOut">0</span>)</button>
-                      <button type="button" class="map-hud-btn" id="fMapConnDev" onclick="setConnectionsMapFilter('devices')">📱 Dispositivos (<span id="cntMapDev">0</span>)</button>
-                      <button type="button" class="map-hud-btn" id="fMapConnBlk" onclick="setConnectionsMapFilter('blocked')">🛡️ Bloqueadas (<span id="cntMapBlk">0</span>)</button>
+                      <button type="button" class="map-hud-btn active" id="fMapConnAll" onclick="setConnectionsMapFilter('all')">Todas (<span id="cntMapAll" style="font-variant-numeric: tabular-nums;">0</span>)</button>
+                      <button type="button" class="map-hud-btn" id="fMapConnIn" onclick="setConnectionsMapFilter('incoming')">↓ Entrantes (<span id="cntMapIn" style="font-variant-numeric: tabular-nums;">0</span>)</button>
+                      <button type="button" class="map-hud-btn" id="fMapConnOut" onclick="setConnectionsMapFilter('outgoing')">↑ Salientes (<span id="cntMapOut" style="font-variant-numeric: tabular-nums;">0</span>)</button>
+                      <button type="button" class="map-hud-btn" id="fMapConnDev" onclick="setConnectionsMapFilter('devices')">📱 Dispositivos (<span id="cntMapDev" style="font-variant-numeric: tabular-nums;">0</span>)</button>
+                      <button type="button" class="map-hud-btn" id="fMapConnBlk" onclick="setConnectionsMapFilter('blocked')">🛡️ Bloqueadas (<span id="cntMapBlk" style="font-variant-numeric: tabular-nums;">0</span>)</button>
                     </div>
 
                     <!-- Controles de Cámara y Pantalla Completa -->
@@ -3760,12 +3760,19 @@
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
                       <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                         <span style="font-size: 11.5px; font-weight: 800; color: #c084fc; text-transform: uppercase; letter-spacing: 0.04em;">📚 Catálogo Histórico por Servicios (SQLite)</span>
-                        <span class="mono" style="font-size: 10.5px; color: var(--text-muted);" id="mapHistSummaryText">Cargando base de datos...</span>
+                        <span class="mono" style="font-size: 10.5px; color: var(--text-muted); font-variant-numeric: tabular-nums;" id="mapHistSummaryText">Cargando base de datos...</span>
                       </div>
                       <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                        <input type="text" id="mapHistSearchInput" placeholder="Buscar servicio, dominio, IP o ciudad..." oninput="onMapHistorySearchInput(this.value)" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 7px; padding: 4px 9px; font-size: 11px; color: #f8fafc; min-width: 210px; outline: none;">
+                        <select id="mapHistHoursSelect" onchange="onMapHistoryHoursChange(this.value)" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 7px; padding: 4px 8px; font-size: 11px; color: #f8fafc; outline: none; cursor: pointer;" title="Filtrar ventana temporal del historial SQLite">
+                          <option value="0">Todo el historial</option>
+                          <option value="6">Últimas 6 horas</option>
+                          <option value="24">Últimas 24 horas</option>
+                          <option value="168">Últimos 7 días</option>
+                        </select>
+                        <input type="text" id="mapHistSearchInput" placeholder="Buscar servicio, dominio, IP o ciudad..." oninput="onMapHistorySearchInput(this.value)" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 7px; padding: 4px 9px; font-size: 11px; color: #f8fafc; min-width: 195px; outline: none;">
                         <button type="button" class="map-hud-btn" onclick="NetworkConnectionsMapEngine.fetchHistoryData(true)" title="Recargar historial desde SQLite">🔄 Actualizar</button>
                         <button type="button" class="map-hud-btn" id="btnClearMapHistorySql" onclick="clearMapConnectionHistorySql()" style="color: #fda4af; border-color: rgba(244, 63, 94, 0.35);" title="Vaciar el historial de conexiones en SQLite">🗑️ Limpiar BD</button>
+                        <button type="button" class="map-hud-btn" onclick="toggleMapServiceCatalogDrawer(false)" title="Ocultar panel desplegable manteniendo el modo historial activo">▲ Ocultar</button>
                       </div>
                     </div>
                     <div class="map-hud-services-grid" id="mapHistServicesCatalogList">
@@ -11774,6 +11781,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
     let connectionsMapDeviceSel = null;
     let connectionsMapServiceSel = null;
     let connectionsMapHistorySearch = '';
+    let connectionsMapHistoryHours = '0';
+    let connectionsMapServiceDrawerOpen = false;
     let _clearMapHistoryConfirmTimer = null;
 
     function formatHistoryTimestamp(tsSec) {
@@ -11787,15 +11796,31 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
-    function setConnectionsMapMode(mode) {
+    function toggleMapServiceCatalogDrawer(forceOpen) {
+      const drawer = document.getElementById('mapHudServiceCatalogDrawer');
+      const caret = document.getElementById('iconMapHistDrawerCaret');
+      if (!drawer) return;
+      if (typeof forceOpen === 'boolean') {
+        connectionsMapServiceDrawerOpen = forceOpen;
+      } else {
+        connectionsMapServiceDrawerOpen = !connectionsMapServiceDrawerOpen;
+      }
+      drawer.style.display = (connectionsMapMode === 'history' && connectionsMapServiceDrawerOpen) ? 'flex' : 'none';
+      if (caret) caret.textContent = (connectionsMapMode === 'history' && connectionsMapServiceDrawerOpen) ? '▲' : '▼';
+    }
+
+    function setConnectionsMapMode(mode, allowToggleDrawer = false) {
       const nextMode = mode === 'history' ? 'history' : 'live';
+      if (allowToggleDrawer && connectionsMapMode === 'history' && nextMode === 'history') {
+        toggleMapServiceCatalogDrawer();
+        return;
+      }
       connectionsMapMode = nextMode;
       const btnLive = document.getElementById('btnMapModeLive');
       const btnHist = document.getElementById('btnMapModeHistory');
-      const drawer = document.getElementById('mapHudServiceCatalogDrawer');
       if (btnLive) btnLive.classList.toggle('active', nextMode === 'live');
       if (btnHist) btnHist.classList.toggle('active', nextMode === 'history');
-      if (drawer) drawer.style.display = nextMode === 'history' ? 'flex' : 'none';
+      toggleMapServiceCatalogDrawer(nextMode === 'history');
 
       if (nextMode === 'history') {
         NetworkConnectionsMapEngine.fetchHistoryData(true);
@@ -11822,6 +11847,11 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       connectionsMapHistorySearch = String(val || '').trim();
       NetworkConnectionsMapEngine.renderHistoryCatalogDrawer();
       NetworkConnectionsMapEngine.renderActiveDataset(true);
+    }
+
+    function onMapHistoryHoursChange(val) {
+      connectionsMapHistoryHours = String(val || '0');
+      NetworkConnectionsMapEngine.fetchHistoryData(true);
     }
 
     async function clearMapConnectionHistorySql() {
@@ -12011,7 +12041,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         if (this._isFetchingHistory) return;
         this._isFetchingHistory = true;
         try {
-          const res = await fetch('/api/net/history?limit=400');
+          const hoursParam = connectionsMapHistoryHours && connectionsMapHistoryHours !== '0' ? `&hours=${encodeURIComponent(connectionsMapHistoryHours)}` : '';
+          const res = await fetch(`/api/net/history?limit=400${hoursParam}`);
           if (res.ok) {
             const data = await res.json();
             if (data && data.status === 'ok') {
@@ -12059,9 +12090,9 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           <div class="map-service-cat-card ${!connectionsMapServiceSel ? 'active' : ''}" onclick="setConnectionsMapServiceFilter(null)">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
               <span style="font-size: 11.5px; font-weight: 800; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🌐 Todos los Servicios</span>
-              <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px;">${summary.total_records || 0}</span>
+              <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; font-variant-numeric: tabular-nums;">${summary.total_records || 0}</span>
             </div>
-            <div style="font-size: 10px; color: #94a3b8; font-family: var(--font-mono);">
+            <div style="font-size: 10px; color: #94a3b8; font-family: var(--font-mono); font-variant-numeric: tabular-nums;">
               ${summary.total_unique_ips || 0} IPs · ${summary.total_devices || 0} disp.
             </div>
           </div>
@@ -12072,12 +12103,12 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           const safeSvc = escapeHtml(s.service).replace(/'/g, "\\'");
           const countriesTxt = Array.isArray(s.countries) && s.countries.length > 0 ? s.countries.slice(0, 2).join(', ') : 'Global';
           return `
-            <div class="map-service-cat-card ${isSel ? 'active' : ''}" onclick="setConnectionsMapServiceFilter('${safeSvc}')" title="${escapeHtml(s.service)} · Última vez: ${formatHistoryTimestamp(s.last_seen)}">
+            <div class="map-service-cat-card ${isSel ? 'active' : ''}" onclick="setConnectionsMapServiceFilter('${safeSvc}')" title="${escapeHtml(s.service)} · Total conexiones: ${s.total_hits || s.connections_count} · Última vez: ${formatHistoryTimestamp(s.last_seen)}">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                 <span style="font-size: 11px; font-weight: 800; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(s.service)}</span>
-                <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; flex-shrink: 0;">${s.connections_count}</span>
+                <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; flex-shrink: 0; font-variant-numeric: tabular-nums;" title="Contador total de conexiones registradas">${s.total_hits || s.connections_count}x</span>
               </div>
-              <div style="font-size: 9.5px; color: var(--text-muted); font-family: var(--font-mono); display: flex; justify-content: space-between; gap: 4px;">
+              <div style="font-size: 9.5px; color: var(--text-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 4px;">
                 <span>🎯 ${s.unique_ips} IPs · 📱 ${s.unique_devices}</span>
                 <span>${formatHistoryTimestamp(s.last_seen)}</span>
               </div>
