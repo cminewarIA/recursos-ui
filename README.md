@@ -3,10 +3,10 @@
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
 ### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v6.0.3-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v6.2.0-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
 [![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white)](#-filosof%C3%ADa-de-dise%C3%B1o)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
-[![App Nativa](https://img.shields.io/badge/App_Nativa-Linux_.deb_%7C_GTK3_Puro-AF52DE?style=for-the-badge&logo=debian&logoColor=white)](#-app-nativa-linux-deb--conexión-de-dispositivos)
+[![App Nativa](https://img.shields.io/badge/App_Nativa-Linux_.deb_%7C_GTK3_Puro-AF52DE?style=for-the-badge&logo=debian&logoColor=white)](#-app-nativa-linux-deb--proyecci%C3%B3n-usb-dex--modo-escritorio-android)
 [![Compilación](https://img.shields.io/badge/CI%2FCD-GitHub_Actions_Node24-5856D6?style=for-the-badge&logo=githubactions&logoColor=white)](#-compilación-continua-en-github-actions)
 [![Rendimiento](https://img.shields.io/badge/Rendimiento-60_FPS_HiDPI_Retina-FF9F0A?style=for-the-badge&logo=speedtest&logoColor=white)](#-rendimiento-y-motor-desacoplado)
 [![Ciberseguridad](https://img.shields.io/badge/Ciberdefensa-Fail2ban_IPS_%2B_Pi--hole_DNS-FF453A?style=for-the-badge&logo=shield&logoColor=white)](#-ciberdefensa-activa-ips-y-seguridad-zero-trust)
@@ -22,7 +22,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v6.0.3 ║
+║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v6.2.0 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                              ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
@@ -36,7 +36,6 @@
 ║                                                                                                              ║
 ║           ╔══════════════════════════════════════════════════════════════════════════════════════╗           ║
 ║           ║  🏠 Cockpit   🧠 CPU   💾 RAM   🎮 GPU   💿 Discos   🌐 Red   🛡️ IPS   🐳 Docker ║           ║
-║           ║               📱 Dispositivo (Esperando en versión nativa .deb)                      ║           ║
 ║           ╚══════════════════════════════════════════════════════════════════════════════════════╝           ║
 ║                                     ▲ FLOATING TOUCH DOCK (TESLA UI)                                         ║
 ╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
@@ -56,9 +55,9 @@
    - [Analítica de Ancho de Banda con D3.js](#5-analítica-de-ancho-de-banda-con-d3js)
    - [Ecosistema Multimedia y Docker](#6-ecosistema-multimedia-y-docker)
    - [Centro Unificado de Registro de Fallos del Sistema (Apps, Servicios & Kernel)](#7-centro-unificado-de-registro-de-fallos-del-sistema-apps-servicios--kernel)
-   - [App Nativa Linux (.deb) & Modo Samsung DeX](#8-app-nativa-linux-deb--modo-samsung-dex)
+   - [App Nativa Linux (.deb) & Proyección USB DeX / Modo Escritorio Android](#8-app-nativa-linux-deb--proyección-usb-dex--modo-escritorio-android)
 4. [Principio Estricto 100% Zero-Hardcoding](#-principio-estricto-100-zero-hardcoding)
-5. [Mapa de Vistas SPA (13 Pantallas)](#-mapa-de-vistas-spa-13-pantallas)
+5. [Mapa de Vistas SPA (12 Pantallas Web)](#-mapa-de-vistas-spa-12-pantallas-web)
 6. [Referencia de la API REST](#-referencia-de-la-api-rest)
 7. [Guía de Instalación y Despliegue](#-guía-de-instalación-y-despliegue)
 8. [Historial de Versiones](#-historial-de-versiones)
@@ -175,12 +174,11 @@ System Cockpit rompe con la estética tradicional de paneles de administración 
   - Tarjeta Bento colapsable (`#systemLogsCenterCard`) con filtros por categoría (`🐳 Apps & Docker`, `⚙️ Servicios`, `🐧 Kernel`), búsqueda en vivo y cambio de severidad.
   - Visor nativo HTML5 `<dialog>` a pantalla completa para auditorías exhaustivas.
 
-### 8. App Nativa Linux (.deb) & Conexión de Dispositivos
-* **Exclusividad de Hardware**: La conexión interactiva y el control por periféricos residen **estrictamente en la App Nativa para Linux (`recursos-cockpit`)**. Por diseño de seguridad del kernel, el acceso a `/dev/uhid`, la captura por hardware, el paso directo de eventos táctiles/ratón y la conexión por sockets UNIX a `adb` no pueden ejecutarse dentro de un navegador web sandbox.
+### 8. App Nativa Linux (.deb) & Proyección USB DeX / Modo Escritorio Android
+* **Separación Estricta Web vs. Nativa**: La pestaña de **Dispositivo** NO aparece en la versión web (ni en el menú lateral, ni en la cabecera, ni en la Vista General, ni en el Touch Dock). Existe **exclusivamente en la App Nativa para Linux (`recursos-cockpit`)**.
+* **Interfaz de Espera y Proyección Directa por USB**: En la aplicación nativa GTK 3, la pestaña **📱 Dispositivo (USB DeX)** presenta una interfaz limpia y enfocada que permanece esperando la conexión por cable USB de un teléfono móvil compatible con **Samsung DeX** o el **Modo Escritorio de Android**, iniciando automáticamente (o con 1 clic) la proyección de vídeo e interfaz de escritorio por USB mediante `scrcpy` y periféricos físicos `/dev/uhid`.
 * **Rendimiento 100% Nativo (GTK3 Puro)**: Construida sobre la pila nativa del sistema en Python y GNOME con widgets nativos reales (sin WebKit ni navegadores embebidos), pesando **~11 KB** empaquetada en formato Debian y consumiendo **< 30 MB de RAM**.
-* **Proyección Scrcpy & Pantallas Virtuales**: Integra soporte para detección en caliente por Udev de terminales Android y Samsung Galaxy, configuración automática de ADB sobre TCP/IP (`adb tcpip 5555`), creación de pantallas secundarias virtuales y conmutación fluida mediante atajos (`F11` para Pantalla Completa, `Ctrl+R` para Refrescar).
 * **Compilación CI/CD en GitHub**: Infraestructura de empaquetado reproducible en `packaging/debian/` y workflow automatizado en `.github/workflows/build-deb.yml` para compilar paquetes `.deb` auditados y publicarlos como artefactos en cada release.
-* **Distribución Integrada**: El propio servidor web sirve el paquete Debian oficial a través del endpoint `/download/recursos-cockpit.deb`.
 
 ---
 
@@ -194,13 +192,13 @@ System Cockpit se rige por una regla arquitectónica absoluta: **cero valores es
 
 ---
 
-## 📱 Mapa de Vistas SPA (13 Pantallas)
+## 📱 Mapa de Vistas SPA (12 Pantallas Web)
 
 El frontend opera como una Single Page Application (SPA) desacoplada con animaciones mediante **View Transitions API**:
 
 | Ruta | Nombre de Vista | Descripción Operativa |
 | :--- | :--- | :--- |
-| `/` | **Vista General** | Cockpit panorámico con los pilares de hardware, bento grid de 11 tarjetas y accesos rápidos. |
+| `/` | **Vista General** | Cockpit panorámico con los pilares de hardware, bento grid de 10 tarjetas y accesos rápidos. |
 | `/procesador` | **CPU & Frecuencias** | Monitor detallado por hilo lógico, frecuencias dinámicas y termografía del procesador. |
 | `/memoria` | **RAM & ZRAM** | Desglose de memoria física, swap, búferes y compresión ZRAM en tiempo real. |
 | `/grafica` | **GPU & Aceleración** | Carga de GPU, reloj de núcleo, temperatura y consumo de memoria VRAM. |
@@ -213,7 +211,6 @@ El frontend opera como una Single Page Application (SPA) desacoplada con animaci
 | `/descargas` | **Multimedia & Torrents**| Panel unificado para descargas qBittorrent, streaming y gestor del bot de Telegram. |
 | `/dns` | **DNS & Tráfico por IP** | Sincronización DuckDNS, resolución por clientes de la red y tabla de tráfico DNS. |
 | `/version` | **Control de Versión** | Información de versión canónica, hash de Git y actualización OTA en 1 clic. |
-| `/dex` o `/app`| **Conexión de Dispositivo**| *Esperando dispositivo para conectarse en su versión nativa*; descarga y guía del paquete `.deb`. |
 
 ---
 
@@ -234,6 +231,9 @@ El servidor expone una API REST ligera en formato JSON:
 | `POST` | `/api/auth/unlock` | Desbloqueo remoto de cliente WAN mediante clave maestra HMAC. | Protegido contra fuerza bruta |
 | `GET` | `/api/trust/status` | Comprueba el estado de confianza y emparejamiento del cliente. | Público |
 | `POST` | `/api/custom-logos` | Actualiza o restablece logos personalizados de servicios/equipos. | Requiere sesión de confianza |
+| `GET` | `/api/dex/status` | Estado en tiempo real del puerto USB y dispositivos conectados para proyección Samsung DeX / Android Desktop. | Requiere sesión de confianza |
+| `POST` | `/api/dex/start` | Inicia la proyección de vídeo por USB en baja latencia (`scrcpy` + UHID). | Requiere sesión de confianza |
+| `POST` | `/api/dex/stop` | Detiene la sesión activa de proyección de vídeo por USB. | Requiere sesión de confianza |
 
 ---
 
@@ -312,6 +312,8 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v6.2.0`** | `MINOR` | **Motor Dinámico de Detección de Entorno (Web vs Móvil / Nativo) y Pantalla de Espera de Proyección USB**: (1) **`EnvironmentDetector` en Frontend (`index.html` / `static/index.html`)**: Detección automática en tiempo de ejecución del entorno activo (`web`, `mobile`, `native`); en la versión **Web** garantiza que la pestaña `'Dispositivo'` (y cualquier pestaña no web) esté ausente de toda la navegación (sidebar, dock táctil, paginación swipe y tabla de rutas); en entorno **Móvil o Nativo** oculta automáticamente cualquier pestaña `'Dispositivo'` o no web y renderiza en su lugar la pantalla de espera optimizada para proyección por USB (`#usbProjectionWaitScreen` — Samsung DeX / Android Desktop) con sondeo en vivo cada 2.5s; (2) **`detect_runtime_environment()` en App Nativa GTK 3 (`desktop_app/recursos_app.py`)**: Oculta automáticamente el conmutador de pestañas (`Gtk.StackSwitcher`) y cualquier pestaña `'Dispositivo'` al detectar ejecución nativa/móvil, renderizando directamente la interfaz de espera de conexión por cable USB para proyectar vídeo; (3) **Nuevos Endpoints Backend (`server.py`)**: Adición de `GET /api/dex/status`, `POST /api/dex/start` y `POST /api/dex/stop` conectados a `DexController` (`usb_only=True`). |
+| **`v6.1.0`** | `MINOR` | **Retiro Total de la Pestaña de Dispositivo en Web, Proyección USB (Samsung DeX / Modo Escritorio Android) en App Nativa y Auditoría Integral de Errores**: (1) **Eliminación Completa de la Pestaña de Dispositivo en la Versión Web**: Retiro total de `#navDex`, botón de cabecera `#btnHeaderNativeApp`, tarjeta Bento #11, vista `#viewDex`, icono `#dockDex` del Floating Touch Dock, punto de paginación y rutas `/dex`, `/app`, `/dispositivo` tanto en `index.html` / `static/index.html` como en `VALID_WEB_ROUTES` de `server.py`; (2) **Interfaz de Espera USB en App Nativa GTK 3 (`desktop_app/`)**: Rediseño de la pestaña de Dispositivo en `recursos_app.py` y `dex_controller.py` para mostrar exclusivamente una pantalla limpia esperando la conexión por cable USB de un móvil para proyectar vídeo con **Samsung DeX** o **Modo Escritorio de Android** mediante `scrcpy` + UHID, con auto-lanzamiento configurable, soporte de argumentos CLI (`--dex`, `--test-mode`) y lectura 100% dinámica de `VERSION`; (3) **Auditoría y Corrección de Errores de Código**: Unificación de firmas entre `recursos_app.py` y `dex_controller.py` (`list_connected_devices`, `start_dex_session`), adición de variables CSS `--accent-purple`, `--accent-purple-bright` y `--glass-shadow`, reemplazo de `window.confirm` bloqueante por `showConfirmModal` asíncrono, inclusión de cabeceras `X-Device-Token` en `GeoIpBackgroundWorker` y `SystemLogsCenter`, verificación de confianza en `POST /api/net/geoip/resolve`, normalización de `clean_path` en `do_POST` y eliminación de IPs hardcodeadas residuales (`192.168.50.2`). |
 | **`v6.0.3`** | `PATCH` | **Corrección de Comentarios HTML Anidados (`parse5 nested-comment`) y Placeholders 100% Zero-Hardcoding**: (1) **Solución al Error de Parseo HTML en Vite (`parse5 error code nested-comment`)**: Eliminación de la apertura de comentario HTML duplicada (`<!-- ===...`) en la sección 12 (`#viewDex`) tanto en `index.html` como en `static/index.html`; (2) **Zero-Hardcoding en Placeholders Iniciales**: Sustitución de referencias estáticas iniciales en el DOM (`v...`, `/download/recursos-cockpit.deb`, `recursos-cockpit.deb`) para que sean hidratadas de forma 100% dinámica por `applyVersionToUI()` desde `/api/version` y `/api/metrics`; (3) **Sincronización Canónica**: Actualización de `./VERSION`, `package.json` y `packaging/debian/control` a `6.0.3`. |
 | **`v6.0.2`** | `PATCH` | **Sincronización Estricta de Versión del Paquete .deb, Build Limpio y Frontend Reactivo**: (1) **Sincronización Canónica**: El paquete Debian compilado `recursos-cockpit_${VERSION}_amd64.deb`, su archivo de control y metadatos internos coinciden estrictamente con `./VERSION` (`6.0.2`); (2) **Limpieza Automática en Build**: `packaging/build_deb.sh` purga archivos `.deb` obsoletos acumulados en `dist/` antes de compilar, empaqueta el punto de verdad en `/usr/lib/recursos-cockpit/VERSION` y genera el symlink canónico `recursos-cockpit.deb`; (3) **Servidor con Auto-Build y Endpoints Específicos**: `server.py` sirve dinámicamente tanto `/download/recursos-cockpit.deb` (con Content-Disposition apuntando a `recursos-cockpit_6.0.2_amd64.deb`) como URLs versionadas `/download/recursos-cockpit_6.0.2_amd64.deb`, ejecutando el empaquetado al vuelo si el binario no existiese; (4) **Frontend Reactivo Zero-Hardcoding**: `static/index.html` e `index.html` actualizan de forma reactiva mediante `/api/version` el botón de descarga, badges de versión y comandos de terminal `wget`; (5) **App Nativa GTK 3**: `desktop_app/recursos_app.py` detecta dinámicamente la versión canónica desde `VERSION`, la expone en el subtítulo del HeaderBar e incorpora un diálogo estándar 'Acerca de' (`Gtk.AboutDialog`). |
 | **`v6.0.1`** | `PATCH` | **Modernización y Corrección de CI/CD en GitHub Actions (Node.js 24 & Ubuntu 24.04)**: Actualización del workflow `.github/workflows/build-deb.yml`: (1) Migración a versiones nativas con Node.js 24 (`actions/checkout@v7`, `actions/upload-artifact@v7`, `softprops/action-gh-release@v3`), erradicando las advertencias de Node.js 20 deprecated; (2) Fijación de runner estable en `ubuntu-24.04` eliminando las alertas de migración de la etiqueta `ubuntu-latest`; (3) Recompilación del paquete `.deb` a la versión `6.0.1`. |

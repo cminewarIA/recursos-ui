@@ -860,8 +860,12 @@ def telegram_bot_polling_worker():
                         reply_to_message_id=msg_id,
                         log_title="Respuesta: Sincronizando dispositivos LAN"
                     )
-                    sync_script = "/home/servidor/scripts/sync_pihole_devices.py"
-                    if os.path.exists(sync_script):
+                    sync_script = next((p for p in [
+                        os.path.join(BASE_DIR, "sync_pihole_devices.py"),
+                        os.path.join(BASE_DIR, "scripts", "sync_pihole_devices.py"),
+                        "/home/servidor/scripts/sync_pihole_devices.py"
+                    ] if os.path.exists(p)), None)
+                    if sync_script:
                         try:
                             res = subprocess.run(["python3", sync_script], capture_output=True, text=True, timeout=25)
                             if res.returncode == 0:
@@ -5482,12 +5486,8 @@ VALID_WEB_ROUTES = {
     "/procesos",
     "/sistema",
     "/version",
-    "/dispositivos",
-    "/dispositivo",
     "/dns",
-    "/duckdns",
-    "/dex",
-    "/app"
+    "/duckdns"
 }
 
 def send_wol_magic_packet(mac_str):
@@ -5935,6 +5935,47 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # 2h. ESTADO EN TIEMPO REAL DEL CONTROLADOR USB (SAMSUNG DEX / ANDROID DESKTOP)
+        elif clean_path in ("/api/dex/status", "/api/usb/status"):
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            ua_str = (self.headers.get('User-Agent') or '').lower()
+            env_hdr = (self.headers.get('X-Recursos-Env') or '').strip().lower()
+            is_mobile_ua = any(k in ua_str for k in ('android', 'iphone', 'ipad', 'ipod', 'mobile', 'samsungbrowser', 'dex'))
+            is_native_ua = any(k in ua_str for k in ('recursosnative', 'electron', 'webkitgtk', 'pywebview', '; wv)'))
+            detected_env = env_hdr if env_hdr in ('native', 'mobile', 'web') else ('native' if is_native_ua else ('mobile' if is_mobile_ua else 'web'))
+            dex_payload = {
+                "success": True,
+                "detected_env": detected_env,
+                "is_native_or_mobile": detected_env in ("native", "mobile"),
+                "hide_device_tab": True,
+                "usb_listening": True,
+                "session_running": False,
+                "devices": [],
+                "dependencies": {"adb": False, "scrcpy": False, "ready": False}
+            }
+            try:
+                from desktop_app.dex_controller import DexController
+                if not hasattr(DashboardHTTPHandler, "_shared_dex_ctrl"):
+                    DashboardHTTPHandler._shared_dex_ctrl = DexController()
+                ctrl = DashboardHTTPHandler._shared_dex_ctrl
+                dex_payload["dependencies"] = ctrl.check_dependencies()
+                dex_payload["devices"] = ctrl.list_connected_devices(usb_only=True)
+                dex_payload["session_running"] = ctrl.is_session_running()
+            except Exception as dex_err:
+                dex_payload["error"] = str(dex_err)
+            resp = json.dumps(dex_payload).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # 3. RUTAS WEB LIMPIAS MULTIPÁGINA (History API + Acceso Directo)
         elif clean_path in VALID_WEB_ROUTES:
             if not auth["is_trusted"]:
@@ -5951,6 +5992,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 return
 
             index_path = os.path.join(STATIC_DIR, "index.html")
+            if not os.path.isfile(index_path):
+                index_path = os.path.join(BASE_DIR, "index.html")
             try:
                 with open(index_path, 'r', encoding='utf-8') as f:
                     content_str = f.read()
@@ -6183,7 +6226,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 2. Revocación individual de dispositivo
-        elif self.path == "/api/auth/revoke":
+        elif clean_path == "/api/auth/revoke":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -6233,7 +6276,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 2b. Revocación de todos los demás dispositivos (Pánico / Reset)
-        elif self.path == "/api/auth/revoke_all_others":
+        elif clean_path == "/api/auth/revoke_all_others":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -6264,7 +6307,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 3. Fail2ban: Desbloqueo de IP
-        elif self.path.split('?')[0] == "/api/fail2ban/unban":
+        elif clean_path == "/api/fail2ban/unban":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -6327,7 +6370,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 4. Fail2ban: Baneo manual de IP
-        elif self.path.split('?')[0] == "/api/fail2ban/ban":
+        elif clean_path == "/api/fail2ban/ban":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -6363,7 +6406,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(resp)
                 return
 
-            if target_ip in ["127.0.0.1", "::1", "192.168.50.2", SERVER_LOCAL_IP]:
+            if target_ip in ["127.0.0.1", "::1", SERVER_LOCAL_IP]:
                 resp = json.dumps({"success": False, "error": "No se puede bloquear la IP local o del servidor"}).encode('utf-8')
                 self.send_response(400)
                 self.send_header('Content-Type', 'application/json')
@@ -6416,7 +6459,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 5. Fail2ban: Importación masiva de IPs (Synology Blocklist / Archivo TXT o CSV)
-        elif self.path == "/api/fail2ban/import":
+        elif clean_path == "/api/fail2ban/import":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -6925,7 +6968,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 7. Forzar actualización de DuckDNS en vivo
-        elif self.path in ("/api/dns/duckdns/update", "/api/duckdns/update"):
+        elif clean_path in ("/api/dns/duckdns/update", "/api/duckdns/update"):
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -6943,7 +6986,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 8. Guardar / Restablecer Logo Personalizado (Archivo Local DataURL o URL Web)
-        elif self.path.split('?')[0] == "/api/custom-logos":
+        elif clean_path == "/api/custom-logos":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -6988,8 +7031,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 9. Resolución GeoIP en Lote / Bajo Demanda (Web Worker -> Backend Cache -> ip-api.com)
-        elif self.path.split('?')[0] in ("/api/net/geoip/resolve", "/api/net/geoip"):
+        elif clean_path in ("/api/net/geoip/resolve", "/api/net/geoip"):
             auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
 
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length > 65536:
@@ -7049,7 +7097,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         # 9b. Limpiar historial de errores del Worker GeoIP en el nodo principal
-        elif self.path.split('?')[0] == "/api/net/geoip/clear-errors":
+        elif clean_path == "/api/net/geoip/clear-errors":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -7073,6 +7121,50 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         # 10. Configuración del Motor de Mapas (Modo Libre Fijo)
         elif clean_path == "/api/maps/config":
             resp = json.dumps({"success": True, "engine": "leaflet", "provider": "OpenStreetMap"}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 11. Control de Proyección USB (Samsung DeX / Android Desktop) para Entorno Nativo/Móvil
+        elif clean_path in ("/api/dex/start", "/api/dex/stop"):
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length).decode('utf-8', errors='ignore') if content_length > 0 else "{}"
+            try:
+                body = json.loads(post_data)
+            except Exception:
+                body = {}
+            try:
+                from desktop_app.dex_controller import DexController
+                if not hasattr(DashboardHTTPHandler, "_shared_dex_ctrl"):
+                    DashboardHTTPHandler._shared_dex_ctrl = DexController()
+                ctrl = DashboardHTTPHandler._shared_dex_ctrl
+                if clean_path == "/api/dex/stop":
+                    ok = ctrl.stop_dex_session()
+                    resp = json.dumps({"success": bool(ok), "session_running": ctrl.is_session_running()}).encode('utf-8')
+                else:
+                    serial = str(body.get("serial") or body.get("device_id") or "").strip()
+                    res_str = str(body.get("resolution") or "1920x1080").strip()
+                    ok = ctrl.start_dex_session(
+                        device_id=serial or None,
+                        resolution=res_str,
+                        fullscreen=bool(body.get("fullscreen", False)),
+                        max_fps=int(body.get("max_fps", 60)),
+                        use_uhid=True,
+                        turn_screen_off=False
+                    )
+                    resp = json.dumps({"success": bool(ok), "session_running": ctrl.is_session_running()}).encode('utf-8')
+            except Exception as e:
+                resp = json.dumps({"success": False, "error": str(e)}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()

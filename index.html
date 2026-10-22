@@ -62,6 +62,9 @@
       --accent-violet: #BF5AF2;
       --accent-violet-bright: #DA8FFF;
       --accent-violet-soft: rgba(191, 90, 242, 0.15);
+      --accent-purple: var(--accent-violet);
+      --accent-purple-bright: var(--accent-violet-bright);
+      --glass-shadow: var(--card-shadow);
 
       --accent-emerald: #30D158;
       --accent-emerald-bright: #30D158;
@@ -123,6 +126,9 @@
       --accent-violet: #8944AB;
       --accent-violet-bright: #9333EA;
       --accent-violet-soft: rgba(147, 51, 234, 0.11);
+      --accent-purple: var(--accent-violet);
+      --accent-purple-bright: var(--accent-violet-bright);
+      --glass-shadow: var(--card-shadow);
 
       --accent-emerald: #1D9E41;
       --accent-emerald-bright: #16A34A;
@@ -2767,15 +2773,6 @@
                 <span class="nav-counter" id="badgeNavVersion">...</span>
               </a>
             </li>
-            <li>
-              <a href="/dex" class="nav-link" id="navDex" onclick="return navigateTo(event, 'dex')">
-                <div class="nav-link-left">
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><rect x="6" y="7" width="5" height="6" rx="1"/></svg>
-                  <span>Conexión de Dispositivo</span>
-                </div>
-                <span class="nav-counter" style="background: rgba(168, 85, 247, 0.2); color: var(--accent-purple-bright); font-weight: 600;">.deb</span>
-              </a>
-            </li>
           </ul>
         </div>
       </nav>
@@ -2851,11 +2848,6 @@
           <a href="/version" class="action-btn" id="btnHeaderVersion" onclick="return navigateTo(event, 'version')" title="Estado de versión y sincronización OTA con GitHub">
             <span class="live-dot" id="dotVersionHeader"></span>
             <span id="lblVersionHeader" class="mono">Sincronizando...</span>
-          </a>
-
-          <a href="/dex" class="action-btn" id="btnHeaderNativeApp" onclick="return navigateTo(event, 'dex')" title="App Nativa Linux (.deb) · Conexión de Dispositivos">
-            <span>🐧</span>
-            <span style="font-size: 11.5px; font-weight: 600;">App Linux</span>
           </a>
 
           <button class="action-btn" onclick="openTrustDialog()" title="Seguridad Zero-Trust y Dispositivos Confiables">
@@ -3179,25 +3171,6 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <span class="adw-badge badge-green" id="ovVersionBadge">Comprobando...</span>
                 <span class="adw-badge badge-purple" id="ovBadgeGitVersion">OTA 1-Clic</span>
-              </div>
-            </a>
-
-            <!-- 11. CONEXIÓN DE DISPOSITIVO & APP NATIVA LINUX -->
-            <a href="/dex" class="module-card" onclick="return navigateTo(event, 'dex')">
-              <div class="module-header">
-                <div class="module-title-group">
-                  <span style="color: var(--accent-purple-bright);">📱</span>
-                  <span>Conexión de Dispositivo & App Nativa</span>
-                </div>
-                <span class="module-arrow">→</span>
-              </div>
-              <div>
-                <div class="mono" style="font-size: 16px; font-weight: 700; color: #f59e0b;">Esperando dispositivo para conectarse en su versión nativa</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Control interactivo por hardware exclusivo de la aplicación nativa para Linux</div>
-              </div>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <span class="adw-badge badge-purple">App Nativa GTK3</span>
-                <span class="adw-badge badge-blue">Paquete .deb</span>
               </div>
             </a>
 
@@ -4289,154 +4262,45 @@
           </div>
         </div>
 
-        <!-- ==================================================================
-             12. VISTA CONEXIÓN DE DISPOSITIVO & APP NATIVA (RUTA /dex, /app)
-             ================================================================== -->
-        <div class="view-page" id="viewDex" style="display: none;">
-          <div class="hero-instrument-card">
-            <div class="instrument-header">
-              <div>
-                <div class="instrument-kicker">Integración de Sistema Operativo & Dispositivos Móviles</div>
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px;">
-                  <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-primary);">Conexión de Dispositivo & App Nativa</h2>
-                  <span class="adw-badge badge-purple mono" id="debBadgeVersion">v...</span>
-                  <span class="adw-badge badge-blue">Paquete Oficial .deb</span>
-                  <span class="adw-badge badge-green">100% Nativo GTK 3</span>
-                </div>
-              </div>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <a href="/download/recursos-cockpit.deb" id="btnDownloadDeb" class="action-btn primary-cta" style="height: 38px; padding: 0 18px; font-size: 13px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  <span id="btnDownloadDebText">Descargar recursos-cockpit.deb</span>
-                </a>
-                <a href="https://github.com/cminewarIA/recursos-ui/actions" target="_blank" rel="noopener" class="action-btn" style="height: 38px; padding: 0 14px; font-size: 12.5px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-                  <span>⚡ GitHub Actions CI</span>
-                </a>
-              </div>
+        <!-- PANTALLA DE ESPERA OPTIMIZADA PARA PROYECCIÓN USB (SAMSUNG DEX / ANDROID DESKTOP) EN ENTORNO MÓVIL O NATIVO -->
+        <div class="view-page" id="usbProjectionWaitScreen" data-non-web-view="true" style="display: none; min-height: calc(100vh - 150px); align-items: center; justify-content: center; padding: 24px 16px;">
+          <div class="surface-panel" style="max-width: 680px; width: 100%; padding: 36px 28px; text-align: center; border: 1px solid var(--border-highlight); box-shadow: var(--card-shadow), var(--specular-inset); border-radius: var(--radius-xl); display: flex; flex-direction: column; align-items: center; gap: 18px;">
+            <div style="display: inline-flex; align-items: center; gap: 12px; font-size: 38px; line-height: 1; padding: 16px 24px; border-radius: 22px; background: var(--accent-cyan-soft); border: 1px solid var(--border-highlight);">
+              <span>🔌</span>
+              <span>📱</span>
+              <span style="font-size: 22px; color: var(--accent-cyan-bright);">➔</span>
+              <span>🖥️</span>
             </div>
 
-            <!-- Banner Prominente de Estado Solicitado -->
-            <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: var(--radius-lg); padding: 20px 24px; margin-top: 14px; display: flex; align-items: center; gap: 18px;">
-              <div style="font-size: 32px; flex-shrink: 0;">📡</div>
-              <div>
-                <div style="font-size: 17px; font-weight: 800; color: #f59e0b;" id="lblDeviceWaitingStatus">Esperando dispositivo para conectarse en su versión nativa</div>
-                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px; line-height: 1.5;">
-                  La versión web se mantiene a la escucha. Para proyectar la pantalla, interactuar mediante aceleración por hardware e inyectar teclado y ratón USB/Wi-Fi sin latencia, abre o instala la <strong>aplicación nativa de Linux</strong> en tu equipo.
-                </div>
-              </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;">
+              <span class="adw-badge badge-blue mono" id="usbWaitEnvBadge">Entorno Nativo / Móvil Detectado</span>
+              <span class="adw-badge badge-green mono" id="usbWaitProtocolBadge">USB Video Projection · 60 FPS</span>
             </div>
 
-            <!-- Bento Status Cells -->
-            <div class="hw-spec-grid" style="margin-top: 18px;">
-              <div class="hw-spec-cell">
-                <span class="hw-spec-label">Tecnología de la App</span>
-                <span class="hw-spec-value" style="color: var(--accent-cyan-bright);">GTK 3.0 Puro Nativo</span>
-                <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Sin WebKit ni Electron · Consumo &lt; 30 MB RAM</span>
-              </div>
-              <div class="hw-spec-cell">
-                <span class="hw-spec-label">Motor de Proyección</span>
-                <span class="hw-spec-value" style="color: var(--accent-purple-bright);">Scrcpy + UHID Nativo</span>
-                <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Control directo por hardware USB y Wi-Fi (ADB TCP/IP 5555)</span>
-              </div>
-              <div class="hw-spec-cell">
-                <span class="hw-spec-label">Dispositivos Compatibles</span>
-                <span class="hw-spec-value" style="color: var(--accent-emerald-bright);">Teléfonos &amp; Tablets Android</span>
-                <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Detección en caliente por Udev y switch de resolución virtual</span>
-              </div>
-            </div>
-          </div>
+            <h2 id="usbWaitTitle" style="font-family: var(--font-display); font-size: 24px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; margin: 0;">
+              Esperando que conectes un dispositivo por USB
+            </h2>
 
-          <!-- Section 1: Exclusividad y Funcionamiento -->
-          <div class="section-block">
-            <div class="section-header-bar">
-              <div>
-                <div class="section-title">¿Por qué la conexión interactiva requiere la App Nativa?</div>
-                <div class="section-subtitle">Explicación técnica de arquitectura del sistema operativo</div>
-              </div>
-            </div>
-            <div class="surface-panel" style="padding: 20px; line-height: 1.6; font-size: 13px; color: var(--text-secondary);">
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-                <div style="background: var(--bg-surface-inset); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
-                  <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
-                    <span>⚡</span> <span>Acceso de Hardware UHID</span>
-                  </div>
-                  <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">
-                    El protocolo UHID del kernel Linux (<code class="mono">/dev/uhid</code>) permite simular pulsaciones físicas de teclado y movimientos relativos de ratón como dispositivo USB real. Los navegadores web estándar bloquean este acceso por sandboxing de seguridad.
-                  </p>
-                </div>
-                <div style="background: var(--bg-surface-inset); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
-                  <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
-                    <span>🚀</span> <span>Scrcpy a 60 FPS con Latencia Cero</span>
-                  </div>
-                  <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">
-                    La app nativa se conecta directamente al demonio <code class="mono">adb</code> local mediante sockets UNIX de alta velocidad y decodifica la transmisión de vídeo H.264/H.265 por aceleración VA-API de la GPU, logrando una respuesta táctil instantánea.
-                  </p>
-                </div>
-                <div style="background: var(--bg-surface-inset); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
-                  <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
-                    <span>🖥️</span> <span>Aplicación 100% Nativa GTK3</span>
-                  </div>
-                  <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">
-                    Construida con widgets nativos puros de GNOME (sin navegadores ni iframes web internos). Ofrece monitoreo en tiempo real del silicio, soporte de pantalla completa en tecla <kbd class="mono" style="background: var(--border-subtle); padding: 2px 6px; border-radius: 4px;">F11</kbd> e integración en el menú del sistema Linux.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+            <p id="usbWaitDesc" style="font-size: 14px; color: var(--text-secondary); max-width: 540px; line-height: 1.6; margin: 0;">
+              Conecta tu teléfono móvil mediante cable USB para proyectar el vídeo en baja latencia con <strong>Samsung DeX</strong> o el <strong>Modo Escritorio de Android</strong>.
+            </p>
 
-          <!-- Section 2: Guía de Instalación del paquete .deb -->
-          <div class="section-block">
-            <div class="section-header-bar">
-              <div>
-                <div class="section-title">Instalación Rápida en Linux (Debian, Ubuntu, Mint, Pop!_OS)</div>
-                <div class="section-subtitle">Comandos para instalar el paquete oficial descargado</div>
-              </div>
+            <div id="usbWaitLiveStatusPill" style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 999px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 12px; color: var(--accent-cyan-bright);">
+              <span class="live-dot" id="usbWaitPulseDot"></span>
+              <span id="usbWaitLiveStatusText">Escuchando puerto USB en tiempo real (Samsung DeX / Android Desktop)...</span>
             </div>
-            <div class="surface-panel" style="padding: 20px;">
-              <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px;">
-                Puedes descargar e instalar el paquete <code class="mono" id="debPkgNameDisplay">recursos-cockpit.deb</code> ejecutando en tu terminal:
-              </p>
-              <pre class="terminal-box" id="debTerminalCommands" style="margin: 0; font-size: 12.5px; line-height: 1.6;"># 1. Descargar el paquete deb directamente desde este servidor
-wget http://localhost:8085/download/recursos-cockpit.deb -O recursos-cockpit.deb
 
-# 2. Instalar el paquete y resolver automáticamente dependencias (GTK3, Scrcpy, ADB, Psutil)
-sudo apt-get update &amp;&amp; sudo apt-get install -y ./recursos-cockpit.deb
+            <div id="usbWaitDeviceActionContainer" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 4px;"></div>
 
-# 3. Iniciar la aplicación nativa desde la terminal o desde el lanzador de aplicaciones del escritorio
-recursos-cockpit</pre>
-            </div>
-          </div>
+            <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer; user-select: none; margin-top: 4px;">
+              <input type="checkbox" id="chkUsbAutoProject" checked style="accent-color: var(--accent-cyan-bright); width: 15px; height: 15px;">
+              <span>Iniciar proyección de vídeo automáticamente al detectar conexión USB</span>
+            </label>
 
-          <!-- Section 3: Compilación con GitHub Actions -->
-          <div class="section-block">
-            <div class="section-header-bar">
-              <div>
-                <div class="section-title">Compilación Continua en GitHub Actions</div>
-                <div class="section-subtitle">Pipeline automatizado para generar y auditar paquetes .deb reproducibles</div>
-              </div>
-            </div>
-            <div class="surface-panel" style="padding: 20px;">
-              <div class="data-row">
-                <div>
-                  <div class="row-label">Workflow de GitHub Actions</div>
-                  <div class="row-sublabel">Ubicación: <code class="mono">.github/workflows/build-deb.yml</code> · Disparado en cada push, tag o manualmente</div>
-                </div>
-                <span class="adw-badge badge-green">Automatizado CI/CD</span>
-              </div>
-              <div class="data-row">
-                <div>
-                  <div class="row-label">Script Local de Empaquetado</div>
-                  <div class="row-sublabel">Ubicación: <code class="mono">packaging/build_deb.sh</code> · Permite compilar el paquete localmente en segundos</div>
-                </div>
-                <button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11.5px;" onclick="navigator.clipboard.writeText('./packaging/build_deb.sh'); if (typeof showToast === 'function') showToast('Comando copiado al portapapeles');">Copiar comando</button>
-              </div>
-              <div class="data-row">
-                <div>
-                  <div class="row-label">Suma de Verificación Criptográfica (SHA256)</div>
-                  <div class="row-sublabel">Garantía de integridad de binarios empaquetados en <code class="mono">dist/SHA256SUMS.txt</code></div>
-                </div>
-                <span class="adw-badge badge-purple mono">SHA-256 Validado</span>
-              </div>
+            <div id="usbWaitWebFallbackRow" style="display: none; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--border-subtle); width: 100%; justify-content: center; gap: 10px; flex-wrap: wrap;">
+              <button type="button" class="action-btn" onclick="EnvironmentDetector.dismissUsbWaitScreenToWeb()">
+                📊 Ver Telemetría del Servidor
+              </button>
             </div>
           </div>
         </div>
@@ -4468,7 +4332,6 @@ recursos-cockpit</pre>
       <span class="swipe-dot" data-view="processes" onclick="navigateTo(event, 'processes')"></span>
       <span class="swipe-dot" data-view="dns" onclick="navigateTo(event, 'dns')"></span>
       <span class="swipe-dot" data-view="version" onclick="navigateTo(event, 'version')"></span>
-      <span class="swipe-dot" data-view="dex" onclick="navigateTo(event, 'dex')"></span>
     </div>
 
     <nav class="floating-dock" id="floatingTouchDock" aria-label="Dock táctil principal">
@@ -4531,11 +4394,6 @@ recursos-cockpit</pre>
       <a href="/version" class="dock-item" id="dockVersion" data-view="version" onclick="return navigateTo(event, 'version')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
         <span class="dock-label">OTA Git</span>
-        <span class="dock-dot"></span>
-      </a>
-      <a href="/dex" class="dock-item" id="dockDex" data-view="dex" onclick="return navigateTo(event, 'dex')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><rect x="6" y="7" width="5" height="6" rx="1"/></svg>
-        <span class="dock-label">Dispositivo</span>
         <span class="dock-dot"></span>
       </a>
     </nav>
@@ -4848,8 +4706,7 @@ recursos-cockpit</pre>
       torrents: '/descargas',
       processes: '/procesos',
       dns: '/dns',
-      version: '/version',
-      dex: '/dex'
+      version: '/version'
     };
 
     const PATH_TO_VIEW = {
@@ -4884,12 +4741,7 @@ recursos-cockpit</pre>
       '/duckdns': 'dns',
       '/sistema': 'version',
       '/version': 'version',
-      '/github': 'version',
-      '/dex': 'dex',
-      '/samsung-dex': 'dex',
-      '/desktop-app': 'dex',
-      '/app': 'dex',
-      '/dispositivo': 'dex'
+      '/github': 'version'
     };
 
     const VIEW_TITLES = {
@@ -4904,8 +4756,7 @@ recursos-cockpit</pre>
       torrents: 'Descargas & Videoteca',
       processes: 'Monitor de Procesos',
       dns: 'DNS, DuckDNS & Tráfico por IP',
-      version: 'Versión & GitHub OTA',
-      dex: 'Conexión de Dispositivo & App Nativa'
+      version: 'Versión & GitHub OTA'
     };
 
     function escapeHtml(str) {
@@ -5047,6 +4898,15 @@ recursos-cockpit</pre>
     function performSwitchViewDOM(viewName, pushState = true, fromHistoryBtn = false) {
       const allViews = Object.keys(VIEW_TO_PATH);
       const targetPath = VIEW_TO_PATH[viewName] || '/';
+
+      const waitScreen = document.getElementById('usbProjectionWaitScreen');
+      if (waitScreen) {
+        waitScreen.style.display = 'none';
+      }
+      if (typeof EnvironmentDetector !== 'undefined' && pushState) {
+        EnvironmentDetector._dismissedToWeb = true;
+        EnvironmentDetector.stopUsbPolling();
+      }
 
       updateHistoryButtonsState();
       activeView = viewName;
@@ -6659,38 +6519,6 @@ recursos-cockpit</pre>
       const detectedDomain = info.public_domain || getDetectedPublicDomain();
       const dnsEl = document.getElementById('dnsDetectedDomain');
       if (dnsEl && detectedDomain) dnsEl.innerText = detectedDomain;
-
-      // Sincronización reactiva del paquete oficial .deb de la app nativa con la versión canónica
-      const cleanVer = rawVer.replace(/^v/, '');
-      const debBadge = document.getElementById('debBadgeVersion');
-      if (debBadge && rawVer) debBadge.innerText = semVer;
-
-      const btnDeb = document.getElementById('btnDownloadDeb');
-      const btnDebText = document.getElementById('btnDownloadDebText');
-      if (btnDeb && cleanVer) {
-        btnDeb.href = `/download/recursos-cockpit_${cleanVer}_amd64.deb`;
-      }
-      if (btnDebText && cleanVer) {
-        btnDebText.innerText = `Descargar recursos-cockpit_${cleanVer}_amd64.deb`;
-      }
-
-      const debPkgDisplay = document.getElementById('debPkgNameDisplay');
-      if (debPkgDisplay && cleanVer) {
-        debPkgDisplay.innerText = `recursos-cockpit_${cleanVer}_amd64.deb`;
-      }
-
-      const debTermCmds = document.getElementById('debTerminalCommands');
-      if (debTermCmds && cleanVer) {
-        const originUrl = window.location.origin || 'http://localhost:8085';
-        debTermCmds.innerHTML = `# 1. Descargar el paquete deb directamente desde este servidor
-wget ${originUrl}/download/recursos-cockpit_${cleanVer}_amd64.deb -O recursos-cockpit_${cleanVer}_amd64.deb
-
-# 2. Instalar el paquete y resolver automáticamente dependencias (GTK3, Scrcpy, ADB, Psutil)
-sudo apt-get update &amp;&amp; sudo apt-get install -y ./recursos-cockpit_${cleanVer}_amd64.deb
-
-# 3. Iniciar la aplicación nativa desde la terminal o desde el lanzador de aplicaciones del escritorio
-recursos-cockpit`;
-      }
     }
 
     function triggerSystemUpdate() {
@@ -7791,59 +7619,68 @@ recursos-cockpit`;
     window.blockIpDirectly = function(ip, jail, serviceName) {
       if (!ip) return;
       const srv = (latestMetrics && latestMetrics.net && latestMetrics.net.connections_map && latestMetrics.net.connections_map.server_node) || {};
-      const hostIps = [srv.ip, srv.public_ip, '127.0.0.1', '::1', '192.168.50.2'].filter(Boolean);
+      const localHostIp = (latestMetrics && latestMetrics.system && latestMetrics.system.local_ip) || (latestMetrics && latestMetrics.net && latestMetrics.net.local_ip) || '';
+      const hostIps = [srv.ip, srv.public_ip, localHostIp, '127.0.0.1', '::1'].filter(Boolean);
       if (hostIps.includes(ip)) {
         showToast('No se puede bloquear la IP local o del servidor', 'error');
         return;
       }
       const targetJail = jail || 'caddy-scan';
       const svcMsg = serviceName ? ` (Servicio: ${serviceName})` : '';
-      if (!confirm(`¿Bloquear en el firewall (Fail2ban IPS) la dirección IP ${ip}${svcMsg}?\n\nJail seleccionada: ${targetJail}`)) {
-        return;
-      }
-      showToast(`Bloqueando IP ${ip} en jail ${targetJail}...`, 'info');
-      fetch('/api/fail2ban/ban', {
-        method: 'POST',
-        headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ ip, jail: targetJail })
-      })
-      .then(r => r.json())
-      .then(res => {
-        if (res.success) {
-          showToast(res.message || `IP ${ip} bloqueada en ${targetJail}`, 'success');
-          setTimeout(() => {
-            if (typeof updateMetrics === 'function') updateMetrics();
-          }, 600);
-        } else {
-          showToast(res.error || 'Error al bloquear IP en Fail2ban', 'error');
-        }
-      })
-      .catch(e => showToast('Error de red al bloquear IP en Fail2ban', 'error'));
+      showConfirmModal(
+        'Bloquear IP en Firewall (Fail2ban IPS)',
+        `¿Bloquear en el firewall (Fail2ban IPS) la dirección IP ${ip}${svcMsg}?\n\nJail seleccionada: ${targetJail}`,
+        () => {
+          showToast(`Bloqueando IP ${ip} en jail ${targetJail}...`, 'info');
+          fetch('/api/fail2ban/ban', {
+            method: 'POST',
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ ip, jail: targetJail })
+          })
+          .then(r => r.json())
+          .then(res => {
+            if (res.success) {
+              showToast(res.message || `IP ${ip} bloqueada en ${targetJail}`, 'success');
+              setTimeout(() => {
+                if (typeof updateMetrics === 'function') updateMetrics();
+              }, 600);
+            } else {
+              showToast(res.error || 'Error al bloquear IP en Fail2ban', 'error');
+            }
+          })
+          .catch(e => showToast('Error de red al bloquear IP en Fail2ban', 'error'));
+        },
+        true
+      );
     };
 
     window.unblockIpDirectly = function(ip, jail) {
       if (!ip) return;
-      if (!confirm(`¿Desbloquear la dirección IP ${ip} del firewall Fail2ban?`)) {
-        return;
-      }
-      showToast(`Desbloqueando IP ${ip}...`, 'info');
-      fetch('/api/fail2ban/unban', {
-        method: 'POST',
-        headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ ip, jail: jail || '' })
-      })
-      .then(r => r.json())
-      .then(res => {
-        if (res.success) {
-          showToast(res.message || `IP ${ip} desbloqueada`, 'success');
-          setTimeout(() => {
-            if (typeof updateMetrics === 'function') updateMetrics();
-          }, 600);
-        } else {
-          showToast(res.error || 'Error al desbloquear IP', 'error');
-        }
-      })
-      .catch(e => showToast('Error de red al desbloquear IP', 'error'));
+      showConfirmModal(
+        'Desbloquear IP en Firewall',
+        `¿Desbloquear la dirección IP ${ip} del firewall Fail2ban?`,
+        () => {
+          showToast(`Desbloqueando IP ${ip}...`, 'info');
+          fetch('/api/fail2ban/unban', {
+            method: 'POST',
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ ip, jail: jail || '' })
+          })
+          .then(r => r.json())
+          .then(res => {
+            if (res.success) {
+              showToast(res.message || `IP ${ip} desbloqueada`, 'success');
+              setTimeout(() => {
+                if (typeof updateMetrics === 'function') updateMetrics();
+              }, 600);
+            } else {
+              showToast(res.error || 'Error al desbloquear IP', 'error');
+            }
+          })
+          .catch(e => showToast('Error de red al desbloquear IP', 'error'));
+        },
+        false
+      );
     };
 
 
@@ -8733,24 +8570,30 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       }
     }
 
-    async function removeTelegramWhitelistUser(uid) {
-      if (!confirm(`¿Deseas revocar los permisos al usuario con Chat ID ${uid}?`)) return;
-      try {
-        const res = await fetch('/api/telegram_bot/whitelist/remove', {
-          method: 'POST',
-          headers: authHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ user_id: uid })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast(`🗑️ Usuario ${uid} eliminado de la lista blanca`, 'success');
-          fetchTelegramBotActivity(false);
-        } else {
-          showToast(data.error || 'Error al eliminar usuario', 'error');
-        }
-      } catch (e) {
-        showToast('Error de conexión al eliminar usuario', 'error');
-      }
+    function removeTelegramWhitelistUser(uid) {
+      showConfirmModal(
+        'Revocar permisos de administrador',
+        `¿Deseas revocar los permisos al usuario con Chat ID ${uid}?`,
+        async () => {
+          try {
+            const res = await fetch('/api/telegram_bot/whitelist/remove', {
+              method: 'POST',
+              headers: authHeaders({ 'Content-Type': 'application/json' }),
+              body: JSON.stringify({ user_id: uid })
+            });
+            const data = await res.json();
+            if (data.success) {
+              showToast(`🗑️ Usuario ${uid} eliminado de la lista blanca`, 'success');
+              fetchTelegramBotActivity(false);
+            } else {
+              showToast(data.error || 'Error al eliminar usuario', 'error');
+            }
+          } catch (e) {
+            showToast('Error de conexión al eliminar usuario', 'error');
+          }
+        },
+        true
+      );
     }
 
     function applyTelegramTemplate(type) {
@@ -8832,21 +8675,27 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       }
     }
 
-    async function clearTelegramBotActivity() {
-      if (!confirm('¿Deseas vaciar el registro de mensajes y auditoría del bot en memoria?')) return;
-      try {
-        const res = await fetch('/api/telegram_bot/activity/clear', {
-          method: 'POST',
-          headers: authHeaders({ 'Content-Type': 'application/json' })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast('🗑️ Registro de mensajes del bot vaciado', 'info');
-          fetchTelegramBotActivity(false);
-        }
-      } catch (e) {
-        showToast('Error al vaciar registro', 'error');
-      }
+    function clearTelegramBotActivity() {
+      showConfirmModal(
+        'Vaciar registro de actividad',
+        '¿Deseas vaciar el registro de mensajes y auditoría del bot en memoria?',
+        async () => {
+          try {
+            const res = await fetch('/api/telegram_bot/activity/clear', {
+              method: 'POST',
+              headers: authHeaders({ 'Content-Type': 'application/json' })
+            });
+            const data = await res.json();
+            if (data.success) {
+              showToast('🗑️ Registro de mensajes del bot vaciado', 'info');
+              fetchTelegramBotActivity(false);
+            }
+          } catch (e) {
+            showToast('Error al vaciar registro', 'error');
+          }
+        },
+        true
+      );
     }
 
     // =========================================================================
@@ -8863,7 +8712,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
       const SWIPE_VIEWS_ORDER = [
         'overview', 'processor', 'memory', 'gpu', 'drives',
-        'network', 'apps', 'security', 'torrents', 'processes', 'dns', 'version', 'dex'
+        'network', 'apps', 'security', 'torrents', 'processes', 'dns', 'version'
       ];
 
       container.addEventListener('touchstart', (e) => {
@@ -8899,6 +8748,260 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       }, { passive: true });
     }
 
+    // =========================================================================
+    // ENVIRONMENT DETECTION ENGINE (WEB vs MOBILE / NATIVE USB PROJECTION)
+    // =========================================================================
+    const EnvironmentDetector = {
+      _envType: 'web', // 'web' | 'mobile' | 'native'
+      _pollTimer: null,
+      _autoLaunchedSerials: new Set(),
+      _dismissedToWeb: false,
+
+      detect() {
+        const params = new URLSearchParams(window.location.search || '');
+        const envParam = (params.get('env') || params.get('mode') || '').trim().toLowerCase();
+        if (envParam === 'web') {
+          this._envType = 'web';
+          return this.getInfo();
+        }
+        if (envParam === 'native' || envParam === 'dex' || window.__RECURSOS_NATIVE__ === true) {
+          this._envType = 'native';
+          return this.getInfo();
+        }
+        if (envParam === 'mobile') {
+          this._envType = 'mobile';
+          return this.getInfo();
+        }
+
+        const ua = String(navigator.userAgent || '');
+        const isNativeShell = /RecursosNative|Electron|WebKitGTK|pywebview|; wv\)/i.test(ua);
+        if (isNativeShell) {
+          this._envType = 'native';
+          return this.getInfo();
+        }
+
+        const uaMobile = Boolean(navigator.userAgentData && navigator.userAgentData.mobile);
+        const isMobileUa = uaMobile || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|SamsungBrowser|DeX/i.test(ua);
+        if (isMobileUa) {
+          this._envType = 'mobile';
+          return this.getInfo();
+        }
+
+        this._envType = 'web';
+        return this.getInfo();
+      },
+
+      getInfo() {
+        const isNative = this._envType === 'native';
+        const isMobile = this._envType === 'mobile';
+        const isWeb = this._envType === 'web';
+        return {
+          env: this._envType,
+          isNative,
+          isMobile,
+          isWeb,
+          isNativeOrMobile: isNative || isMobile
+        };
+      },
+
+      enforceNavigationPolicy() {
+        // Garantizar que la pestaña 'Dispositivo' (o cualquier pestaña no web) no exista jamás en la navegación
+        const nonWebSelectors = [
+          '#navDex',
+          '#dockDex',
+          '#navDevice',
+          '#dockDevice',
+          '#navDispositivo',
+          '#dockDispositivo',
+          '#btnHeaderNativeApp',
+          '[data-view="dex"]',
+          '[data-view="device"]',
+          '[data-view="dispositivo"]',
+          '[data-non-web-tab="true"]'
+        ];
+        nonWebSelectors.forEach(sel => {
+          document.querySelectorAll(sel).forEach(el => {
+            el.style.display = 'none';
+            el.setAttribute('aria-hidden', 'true');
+            if (el.parentElement && el.parentElement.tagName === 'LI') {
+              el.parentElement.style.display = 'none';
+            }
+          });
+        });
+
+        delete VIEW_TO_PATH.dex;
+        delete VIEW_TO_PATH.device;
+        delete VIEW_TO_PATH.dispositivo;
+        delete PATH_TO_VIEW['/dex'];
+        delete PATH_TO_VIEW['/device'];
+        delete PATH_TO_VIEW['/dispositivo'];
+      },
+
+      applyEnvironmentLayout() {
+        const info = this.detect();
+        document.documentElement.setAttribute('data-runtime-env', info.env);
+        this.enforceNavigationPolicy();
+
+        const waitScreen = document.getElementById('usbProjectionWaitScreen');
+        const envBadge = document.getElementById('usbWaitEnvBadge');
+        const fallbackRow = document.getElementById('usbWaitWebFallbackRow');
+        const sidebar = document.getElementById('appSidebar');
+        const dockShell = document.getElementById('floatingDockShell');
+
+        if (info.isNativeOrMobile && !this._dismissedToWeb) {
+          if (envBadge) {
+            envBadge.textContent = info.isNative
+              ? 'Entorno Nativo Detectado · USB Directo'
+              : 'Entorno Móvil Detectado · Proyección USB';
+          }
+          if (fallbackRow) {
+            fallbackRow.style.display = info.isMobile ? 'flex' : 'none';
+          }
+          if (info.isNative) {
+            if (sidebar) sidebar.style.display = 'none';
+            if (dockShell) dockShell.style.display = 'none';
+          }
+          this.showUsbProjectionWaitScreen();
+          this.startUsbPolling();
+          return true;
+        } else {
+          if (waitScreen) waitScreen.style.display = 'none';
+          this.stopUsbPolling();
+          return false;
+        }
+      },
+
+      showUsbProjectionWaitScreen() {
+        const allViews = Object.keys(VIEW_TO_PATH);
+        allViews.forEach(v => {
+          const cap = v.charAt(0).toUpperCase() + v.slice(1);
+          const viewEl = document.getElementById('view' + cap);
+          if (viewEl) viewEl.style.display = 'none';
+        });
+        const waitScreen = document.getElementById('usbProjectionWaitScreen');
+        if (waitScreen) {
+          waitScreen.style.display = 'flex';
+        }
+        const titleEl = document.getElementById('currentViewTitle');
+        if (titleEl) titleEl.innerText = 'Proyección por USB (Samsung DeX / Android Desktop)';
+        const routeTagEl = document.getElementById('currentRouteBadge');
+        if (routeTagEl) routeTagEl.innerText = 'USB';
+      },
+
+      dismissUsbWaitScreenToWeb() {
+        this._dismissedToWeb = true;
+        this.stopUsbPolling();
+        const waitScreen = document.getElementById('usbProjectionWaitScreen');
+        if (waitScreen) waitScreen.style.display = 'none';
+        switchView('overview', false);
+      },
+
+      startUsbPolling() {
+        this.pollUsbStatusOnce();
+        if (!this._pollTimer) {
+          this._pollTimer = setInterval(() => this.pollUsbStatusOnce(), 2500);
+        }
+      },
+
+      stopUsbPolling() {
+        if (this._pollTimer) {
+          clearInterval(this._pollTimer);
+          this._pollTimer = null;
+        }
+      },
+
+      async pollUsbStatusOnce() {
+        try {
+          const res = await fetch('/api/dex/status', {
+            headers: authHeaders({ 'X-Recursos-Env': this._envType })
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          this.renderUsbStatus(data);
+        } catch (e) {}
+      },
+
+      renderUsbStatus(data) {
+        const titleEl = document.getElementById('usbWaitTitle');
+        const descEl = document.getElementById('usbWaitDesc');
+        const statusTxt = document.getElementById('usbWaitLiveStatusText');
+        const actionBox = document.getElementById('usbWaitDeviceActionContainer');
+        const autoChk = document.getElementById('chkUsbAutoProject');
+        if (!titleEl || !descEl || !statusTxt || !actionBox) return;
+
+        const devices = Array.isArray(data && data.devices) ? data.devices : [];
+        if (devices.length === 0) {
+          this._autoLaunchedSerials.clear();
+          titleEl.textContent = 'Esperando que conectes un dispositivo por USB';
+          descEl.innerHTML = 'Conecta tu teléfono móvil mediante cable USB para proyectar el vídeo en baja latencia con <strong>Samsung DeX</strong> o el <strong>Modo Escritorio de Android</strong>.';
+          statusTxt.textContent = 'Escuchando puerto USB en tiempo real (Samsung DeX / Android Desktop)...';
+          actionBox.innerHTML = '';
+          return;
+        }
+
+        const dev = devices[0];
+        const serial = dev.serial || dev.id || '';
+        const model = dev.model || 'Dispositivo Android';
+        const modeLabel = dev.desktop_mode_label || 'Samsung DeX / Modo Escritorio de Android';
+        const state = dev.state || 'unknown';
+
+        if (state === 'device') {
+          titleEl.textContent = `📱 ${model} conectado por USB`;
+          descEl.textContent = `Modo preparado: ${modeLabel} (Serie USB: ${serial})`;
+          statusTxt.textContent = `Dispositivo USB listo para proyectar vídeo (${modeLabel})`;
+          actionBox.innerHTML = `
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+              <button type="button" class="action-btn primary-cta" onclick="EnvironmentDetector.triggerUsbProjection('${escapeHtml(serial)}')">
+                🚀 Proyectar Vídeo por USB (${escapeHtml(modeLabel)})
+              </button>
+              ${data.session_running ? `
+                <button type="button" class="btn-revoke" onclick="EnvironmentDetector.stopUsbProjection()">
+                  ⏹ Detener Proyección
+                </button>
+              ` : ''}
+            </div>
+          `;
+          if (autoChk && autoChk.checked && serial && !this._autoLaunchedSerials.has(serial) && !data.session_running) {
+            this._autoLaunchedSerials.add(serial);
+            this.triggerUsbProjection(serial);
+          }
+        } else {
+          titleEl.textContent = `Autorización USB pendiente en ${model}`;
+          descEl.textContent = 'Desbloquea la pantalla de tu móvil y acepta el diálogo de Depuración USB para iniciar la proyección de vídeo.';
+          statusTxt.textContent = `Esperando confirmación en pantalla del móvil (${serial})...`;
+          actionBox.innerHTML = '';
+        }
+      },
+
+      async triggerUsbProjection(serial) {
+        try {
+          const res = await fetch('/api/dex/start', {
+            method: 'POST',
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ serial })
+          });
+          const data = await res.json();
+          if (data && data.success) {
+            showToast('Proyección de vídeo por USB iniciada', 'success');
+          }
+          this.pollUsbStatusOnce();
+        } catch (e) {
+          showToast('Error al iniciar la proyección por USB', 'error');
+        }
+      },
+
+      async stopUsbProjection() {
+        try {
+          await fetch('/api/dex/stop', {
+            method: 'POST',
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({})
+          });
+          this.pollUsbStatusOnce();
+        } catch (e) {}
+      }
+    };
+
     window.addEventListener('DOMContentLoaded', () => {
       NicBandwidthStorageManager.init();
       BandwidthThresholdMonitor.init();
@@ -8915,14 +9018,21 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         }, { passive: false });
       }
 
-      const initialView = resolveViewFromLocation();
-      navStack = [initialView];
-      navPointer = 0;
-      const canonicalPath = VIEW_TO_PATH[initialView] || '/';
-      try {
-        window.history.replaceState({ view: initialView, path: canonicalPath }, '', canonicalPath);
-      } catch (e) {}
-      switchView(initialView, false);
+      // Ejecutar detección de entorno:
+      // - En versión web: garantiza que la pestaña 'Dispositivo' no esté presente en la navegación.
+      // - En entorno móvil o nativo: oculta cualquier pestaña no web y muestra la pantalla de espera de proyección USB.
+      const isShowingUsbWaitScreen = EnvironmentDetector.applyEnvironmentLayout();
+
+      if (!isShowingUsbWaitScreen) {
+        const initialView = resolveViewFromLocation();
+        navStack = [initialView];
+        navPointer = 0;
+        const canonicalPath = VIEW_TO_PATH[initialView] || '/';
+        try {
+          window.history.replaceState({ view: initialView, path: canonicalPath }, '', canonicalPath);
+        } catch (e) {}
+        switchView(initialView, false);
+      }
 
       updateMetrics();
       setInterval(updateMetrics, 2000);
@@ -10385,6 +10495,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             let timerId = null;
             let inFlight = false;
             let originUrl = '';
+            let deviceToken = '';
 
             async function flushQueue(forceSync = false) {
               if (inFlight || (pendingIps.size === 0 && !forceSync)) return;
@@ -10398,10 +10509,12 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
               let workerMeta = null;
 
               try {
+                const reqHeaders = { 'Content-Type': 'application/json' };
+                if (deviceToken) reqHeaders['X-Device-Token'] = deviceToken;
                 const resp = await fetch(originUrl + '/api/net/geoip/resolve', {
                   method: 'POST',
                   credentials: 'include',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: reqHeaders,
                   body: JSON.stringify({ ips: batch, force_sync: forceSync })
                 });
                 if (resp.ok) {
@@ -10432,6 +10545,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             self.onmessage = function(ev) {
               const msg = ev.data || {};
               if (msg.origin) originUrl = msg.origin;
+              if (msg.token !== undefined) deviceToken = msg.token || '';
               if (msg.type === 'ENQUEUE_IPS' && Array.isArray(msg.ips)) {
                 for (const ip of msg.ips) {
                   if (ip) pendingIps.add(ip);
@@ -10558,7 +10672,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           this.updateStatusBadge();
           const resp = await fetch('/api/net/geoip/resolve', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ ips, force_sync: forceSync })
           });
           if (resp.ok) {
@@ -10611,9 +10725,12 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         if (toSend.length === 0 && !forceSync) return;
 
         if (this._worker) {
+          let token = '';
+          try { token = localStorage.getItem('sysmon_device_token') || ''; } catch (e) {}
           this._worker.postMessage({
             type: 'ENQUEUE_IPS',
             origin: window.location.origin,
+            token,
             ips: toSend,
             forceSync
           });
@@ -11251,7 +11368,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
         try {
           const url = `/api/system/logs?level=${encodeURIComponent(this._level)}&category=all&limit=80${force ? '&refresh=1' : ''}`;
-          const res = await fetch(url);
+          const res = await fetch(url, { headers: authHeaders() });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
           this._logs = data.entries || [];
@@ -11695,7 +11812,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           : '';
 
         const srv = (this._lastConnData && this._lastConnData.server_node) || {};
-        const hostIps = [srv.ip, srv.public_ip, '127.0.0.1', '::1', '192.168.50.2'].filter(Boolean);
+        const dynHostIp = (latestMetrics && latestMetrics.system && latestMetrics.system.local_ip) || (latestMetrics && latestMetrics.net && latestMetrics.net.local_ip) || '';
+        const hostIps = [srv.ip, srv.public_ip, dynHostIp, '127.0.0.1', '::1'].filter(Boolean);
         const isHostSelf = hostIps.includes(item.remote_ip);
 
         let actionBlockHtml = '';
@@ -11744,7 +11862,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           </div>
         ` : '';
 
-        const isDevice = item.local_ip && item.local_ip !== srv.ip && item.local_ip !== '192.168.50.2' && item.local_ip !== '127.0.0.1';
+        const isDevice = item.local_ip && item.local_ip !== srv.ip && item.local_ip !== dynHostIp && item.local_ip !== '127.0.0.1';
         const localIcon = isDevice ? '📱' : '🖥️';
         const localDisplay = item.local_hostname
           ? `${localIcon} <strong>${escapeHtml(item.local_hostname)}</strong> <span style="color: #64748b; font-size: 10px;">(${escapeHtml(item.local_ip)}:${item.local_port})</span>`
@@ -11829,7 +11947,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
               const arrow = isInc ? '↓' : (isBlk ? '🛡️' : '↑');
               const color = isInc ? '#059669' : (isBlk ? '#e11d48' : '#0891b2');
               const bg = isInc ? 'rgba(16, 185, 129, 0.08)' : (isBlk ? 'rgba(244, 63, 94, 0.08)' : 'rgba(6, 182, 212, 0.08)');
-              const isDev = c.local_ip && c.local_ip !== ((this._lastConnData?.server_node?.ip) || '192.168.50.2') && c.local_ip !== '127.0.0.1';
+              const srvHostIp = (this._lastConnData?.server_node?.ip) || (latestMetrics?.system?.local_ip) || '127.0.0.1';
+              const isDev = c.local_ip && c.local_ip !== srvHostIp && c.local_ip !== '127.0.0.1';
               const devIcon = isDev ? '📱' : '🖥️';
               return `
                 <div onclick="window.selectConnInGroupPopup('${groupKey}', '${escapeHtml(c.id)}')" style="display: flex; align-items: center; justify-content: space-between; background: ${bg}; border: 1px solid rgba(0,0,0,0.06); padding: 7px 9px; border-radius: 8px; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; gap: 8px;" onmouseenter="this.style.boxShadow='0 2px 6px rgba(0,0,0,0.12)'" onmouseleave="this.style.boxShadow='none'">
@@ -12169,7 +12288,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           blocked: allConns.filter(c => c.direction === 'blocked').length
         };
 
-        const srvIp = srv.ip || '192.168.50.2';
+        const srvIp = srv.ip || (metricsData.system && metricsData.system.local_ip) || metricsData.net.local_ip || '127.0.0.1';
         const devicesCount = summary.devices !== undefined
           ? summary.devices
           : allConns.filter(c => c.local_ip && c.local_ip !== srvIp && c.local_ip !== '127.0.0.1' && c.local_ip !== '::1').length;
