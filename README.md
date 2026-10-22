@@ -3,7 +3,7 @@
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
 ### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v4.16.0-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v4.17.0-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
 [![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white)](#-filosof%C3%ADa-de-dise%C3%B1o)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
 [![Rendimiento](https://img.shields.io/badge/Rendimiento-60_FPS_HiDPI_Retina-FF9F0A?style=for-the-badge&logo=speedtest&logoColor=white)](#-rendimiento-y-motor-desacoplado)
@@ -20,7 +20,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v4.16.0 ║
+║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v4.17.0 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                              ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
@@ -148,6 +148,11 @@ System Cockpit rompe con la estética tradicional de paneles de administración 
 
 ### 5. Analítica de Ancho de Banda con D3.js
 * **Gráfico de Anillo Animado con D3.js v7**: Renderizado vectorial fluido con interpolación cúbica suave (`d3.interpolate` + `attrTween`, 550ms cubic-out).
+* **Distribución Multidimensional**:
+  - `🌐 Subredes IP`: Visualización por segmento y rangos `/24`.
+  - `📶 Grupos de Enlace`: Desglose entre enlaces cableados Ethernet y bandas Wi-Fi 5 GHz / 2.4 GHz.
+  - `🖥️ Categorías`: Clasificación funcional (Servidores, Smart TVs, Smartphones, IoT, etc.).
+  - `📱 Dispositivos de Red`: Visualización directa de cada dispositivo cliente individual de la red con sus consumos reales medidos (`tx_bytes`, `rx_bytes`, caudal de subida/bajada en tiempo real), segregando de forma inteligente contadores de hardware acumulados de interfaces troncales para una lectura fidedigna.
 * **Alerta Visual por Umbral NIC**: Notificaciones visuales en tiempo real configurables cuando una interfaz de red sobrepasa un caudal de tráfico determinado (por ejemplo, `eth0 > 150 Mbps`).
 
 ### 6. Ecosistema Multimedia y Docker
@@ -293,6 +298,7 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v4.17.0`** | `MINOR` | **Distribución de Ancho de Banda con Dispositivos y Consumos Reales**: Incorporación del modo de agrupación `📱 Dispositivos` en el gráfico interactivo D3 de distribución de ancho de banda; cálculo basado en los consumos reales medidos de cada dispositivo (`tx_bytes`, `rx_bytes`, caudal de subida/bajada en vivo); segregación inteligente de contadores de hardware acumulados de interfaces troncales; desglose detallado en leyenda con iconos y métricas de dispositivos por segmento. |
 | **`v4.16.0`** | `MINOR` | **Centro Unificado de Registro de Fallos (Apps, Servicios & Kernel)**: Agregador de diagnósticos en tiempo real que recolecta fallos de contenedores Docker (Immich, Postgres, Nextcloud, Collabora), servicios Systemd y eventos críticos del kernel en una sola vista unificada; decodificación resiliente de buffers binarios en streams de contenedores; categorización 100% dinámica sin nombres fijos; nuevo endpoint REST `/api/system/logs` con filtrado por categoría y nivel de severidad; visor Bento colapsable en Vista General y modal a pantalla completa. |
 | **`v4.15.0`** | `MINOR` | **Corrección de Deadlock GeoIP & Limpieza de Interfaz**: Se reemplazó `GEOIP_LOCK` por un cerrojo reentrante (`threading.RLock()`) resolviendo el bloqueo que congelaba el servidor; se retiraron los volcados invasivos de logs y tarjetas de terminal de la Vista General y Red; se desactivó el interceptor global de fetch; se eliminó el fallback inseguro a ip-api.com desde el navegador; rediseño integral del README a nivel de ingeniería de producción. |
 | **`v4.14.0`** | `MINOR` | Adición del terminal de errores en tiempo real del nodo principal y endpoints de diagnóstico del worker. |

@@ -3533,10 +3533,11 @@
                 <div class="section-subtitle">Gráfico de pastel interactivo del consumo de red entre las subredes IPv4 (<code class="mono">/24</code>) y grupos de dispositivos detectados</div>
               </div>
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <div class="segmented-control" title="Agrupar distribución de ancho de banda por subredes o grupos de dispositivos">
+                <div class="segmented-control" title="Agrupar distribución de ancho de banda por subredes, grupos de enlace, categorías o dispositivos de red">
                   <button class="seg-btn active" id="btnPieGroupSubnets" onclick="setNetBandwidthPieGroup('subnets')">🌐 Subredes IP</button>
                   <button class="seg-btn" id="btnPieGroupGroups" onclick="setNetBandwidthPieGroup('groups')">📶 Grupos de Enlace</button>
-                  <button class="seg-btn" id="btnPieGroupCategories" onclick="setNetBandwidthPieGroup('categories')">🖥️ Tipo de Dispositivo</button>
+                  <button class="seg-btn" id="btnPieGroupCategories" onclick="setNetBandwidthPieGroup('categories')">🖥️ Categorías</button>
+                  <button class="seg-btn" id="btnPieGroupDevices" onclick="setNetBandwidthPieGroup('devices')">📱 Dispositivos</button>
                 </div>
                 <div class="segmented-control" title="Cambiar entre tráfico total acumulado y caudal en tiempo real">
                   <button class="seg-btn active" id="btnPieMetricTotal" onclick="setNetBandwidthPieMetric('total_bytes')">📊 Tráfico Acumulado</button>
@@ -8260,9 +8261,12 @@
         '#8B5CF6', // Violet
         '#F59E0B', // Amber
         '#F43F5E', // Rose
+        '#06B6D4', // Sky
         '#6366F1', // Indigo
         '#14B8A6', // Teal
-        '#EC4899'  // Pink
+        '#EC4899', // Pink
+        '#A855F7', // Purple
+        '#64748B'  // Slate
       ],
 
       hasD3() {
@@ -8311,7 +8315,7 @@
         this.hoveredIndex = -1;
         this._pendingModeTransition = true;
         this._lastDataSignature = '';
-        ['Subnets', 'Groups', 'Categories'].forEach(k => {
+        ['Subnets', 'Groups', 'Categories', 'Devices'].forEach(k => {
           const btn = document.getElementById('btnPieGroup' + k);
           if (btn) btn.classList.toggle('active', k.toLowerCase() === mode);
         });
@@ -8394,33 +8398,46 @@
           ? net.connections_map.connections
           : [];
 
-        // Synthesize normalized device/interface records so every active subnet and device group has real byte & speed metrics
+        // Synthesize normalized device/interface records with real byte & speed metrics
         const records = [];
         const subnetClientBytes = new Map();
 
         for (const c of wClients) {
           const ip = String(c.ip || '127.0.0.1').trim();
-          const isCable = c.conn_type === 'cable' || c.band === 'Ethernet';
+          const isCable = c.conn_type === 'cable' || c.band === 'Ethernet' || (c.band && c.band.includes('Cable'));
           const is5g = !isCable && c.band && String(c.band).includes('5');
-          // Note: in wifi_clients, tx_bytes is download to client, rx_bytes is upload from client
+          const is24g = !isCable && !is5g;
           const dlBytes = Math.max(0, Number(c.tx_bytes || 0));
           const ulBytes = Math.max(0, Number(c.rx_bytes || 0));
           const dlSpeed = Math.max(0, Number(c.speed_down || 0));
           const ulSpeed = Math.max(0, Number(c.speed_up || 0));
           const sInfo = this.parseSubnetInfo(ip);
 
-          subnetClientBytes.set(sInfo.cidr, (subnetClientBytes.get(sInfo.cidr) || 0) + dlBytes + ulBytes);
+          // Detect router infrastructure (Vodafone WAN Gateway and ASUS Repeater Switch backhaul)
+          const isNetworkInfra = (c.dev_type === 'network') ||
+            (c.name && (c.name.includes('Gateway') || c.name.includes('Switch & Wi-Fi') || c.name.includes('Router')));
+
+          if (!isNetworkInfra) {
+            subnetClientBytes.set(sInfo.cidr, (subnetClientBytes.get(sInfo.cidr) || 0) + dlBytes + ulBytes);
+          }
 
           records.push({
             name: c.name || ip,
             ip,
+            mac: c.mac || '',
+            dev_type: c.dev_type || '',
+            dev_icon: c.dev_icon || '',
+            brand: c.brand || '',
+            brand_name: c.brand_name || '',
+            vendor: c.vendor || '',
+            status: c.status || 'online',
             subnetCidr: sInfo.cidr,
             subnetTag: sInfo.tag,
             isCable,
             is5g,
-            is24g: !isCable && !is5g,
-            dev_type: c.dev_type || '',
-            brand_name: c.brand_name || c.brand || '',
+            is24g,
+            isNetworkInfra,
+            rawClient: c,
             dlBytes,
             ulBytes,
             dlSpeed,
@@ -8428,8 +8445,8 @@
           });
         }
 
-        // Supplement wireless summary bytes if individual Wi-Fi clients reported 0 bytes
-        const wifiRecs = records.filter(r => !r.isCable);
+        // Supplement wireless summary bytes only if individual Wi-Fi clients reported zero bytes
+        const wifiRecs = records.filter(r => !r.isCable && !r.isNetworkInfra);
         const wifiRecsSum = wifiRecs.reduce((acc, r) => acc + r.dlBytes + r.ulBytes, 0);
         const summaryWifiDl = Math.max(0, Number(wSummary.wifi_tx_bytes || 0));
         const summaryWifiUl = Math.max(0, Number(wSummary.wifi_rx_bytes || 0));
@@ -8442,50 +8459,25 @@
           }
         }
 
-        // Incorporate system NIC traffic if not already accounted for in client records
+        // Incorporate host server NIC traffic if server record not already present
         for (const nic of nics) {
           if (!nic || !nic.name) continue;
           const ip = String(nic.ip || net.local_ip || '127.0.0.1').trim();
-          const sInfo = this.parseSubnetInfo(ip);
           const nicDl = Math.max(0, Number(nic.bytes_recv || 0));
           const nicUl = Math.max(0, Number(nic.bytes_sent || 0));
           const nicRxSec = Math.max(0, Number(nic.rx_bytes_sec || 0));
           const nicTxSec = Math.max(0, Number(nic.tx_bytes_sec || 0));
 
-          const existingOnSubnet = subnetClientBytes.get(sInfo.cidr) || 0;
-          const remDl = Math.max(0, nicDl - existingOnSubnet * 0.5);
-          const remUl = Math.max(0, nicUl - existingOnSubnet * 0.5);
-
-          // Check if a record already represents this exact NIC
-          const matchRec = records.find(r => r.name.includes(`(${nic.name})`) || (r.ip === ip && r.dlBytes === 0 && r.ulBytes === 0));
+          const matchRec = records.find(r => r.name.toLowerCase().includes('servidor (este') || r.ip === ip);
           if (matchRec) {
-            matchRec.dlBytes = Math.max(matchRec.dlBytes, nicDl);
-            matchRec.ulBytes = Math.max(matchRec.ulBytes, nicUl);
-            matchRec.dlSpeed = Math.max(matchRec.dlSpeed, nicRxSec);
-            matchRec.ulSpeed = Math.max(matchRec.ulSpeed, nicTxSec);
-          } else if (remDl + remUl > 0 || nicRxSec + nicTxSec > 0 || records.length === 0) {
-            const isWirelessNic = nic.name.startsWith('wl') || nic.name.startsWith('wlan');
-            records.push({
-              name: `Host NIC (${nic.name})`,
-              ip,
-              subnetCidr: sInfo.cidr,
-              subnetTag: sInfo.tag,
-              isCable: !isWirelessNic,
-              is5g: isWirelessNic,
-              is24g: false,
-              dev_type: 'server',
-              brand_name: 'Linux Host',
-              dlBytes: remDl || nicDl,
-              ulBytes: remUl || nicUl,
-              dlSpeed: nicRxSec,
-              ulSpeed: nicTxSec
-            });
+            if (nicDl > 0 || nicUl > 0) {
+              matchRec.dlBytes = Math.max(matchRec.dlBytes, nicDl);
+              matchRec.ulBytes = Math.max(matchRec.ulBytes, nicUl);
+              matchRec.dlSpeed = Math.max(matchRec.dlSpeed, nicRxSec);
+              matchRec.ulSpeed = Math.max(matchRec.ulSpeed, nicTxSec);
+            }
           }
         }
-
-        // Check if we should subdivide a single /24 subnet in 'subnets' mode so the pie chart shows rich sub-segments
-        const distinctCidrs = new Set(records.map(r => r.subnetCidr));
-        const singleSubnetMode = (this.groupMode === 'subnets' && distinctCidrs.size <= 1 && records.length > 1);
 
         const bucketsMap = new Map();
         const addBucketItem = (key, label, subtitle, rec) => {
@@ -8499,7 +8491,12 @@
               dlSpeed: 0,
               ulSpeed: 0,
               devicesCount: 0,
-              sampleNames: []
+              devices: [],
+              sampleNames: [],
+              iconEmoji: getDeviceEmoji(rec.dev_icon || rec.dev_type),
+              rawClient: rec.rawClient || null,
+              brand: rec.brand || '',
+              ip: rec.ip || ''
             });
           }
           const b = bucketsMap.get(key);
@@ -8508,75 +8505,80 @@
           b.dlSpeed += rec.dlSpeed;
           b.ulSpeed += rec.ulSpeed;
           b.devicesCount += 1;
-          if (rec.name && b.sampleNames.length < 3 && !b.sampleNames.includes(rec.name)) {
+          b.devices.push(rec);
+          if (rec.name && b.sampleNames.length < 4 && !b.sampleNames.includes(rec.name)) {
             b.sampleNames.push(rec.name);
           }
         };
 
-        for (const r of records) {
-          if (this.groupMode === 'subnets') {
-            if (singleSubnetMode) {
-              // Subdivide the /24 subnet by segment (Host/Cable vs Wi-Fi 5 GHz vs Wi-Fi 2.4 GHz)
-              if (r.isCable) {
-                const isHost = r.name.toLowerCase().includes('servidor') || r.name.toLowerCase().includes('host') || r.dev_type === 'server';
-                const segKey = isHost ? `${r.subnetCidr}_host` : `${r.subnetCidr}_eth`;
-                const segLabel = isHost ? `${r.subnetCidr} · Nodo Servidor & Troncal` : `${r.subnetCidr} · Segmento LAN Ethernet`;
-                const segSub = isHost ? 'Interfaces troncales del servidor' : 'Equipos cableados en subred local';
-                addBucketItem(segKey, segLabel, segSub, r);
-              } else if (r.is5g) {
-                addBucketItem(`${r.subnetCidr}_5g`, `${r.subnetCidr} · Subred Wi-Fi 5 GHz`, 'Segmento inalámbrico de alta velocidad', r);
+        if (this.groupMode === 'devices') {
+          // Focus on real client devices of the home network
+          const clientRecs = records.filter(r => !r.isNetworkInfra);
+          const targetRecs = clientRecs.length > 0 ? clientRecs : records;
+
+          const isLiveMetric = (this.metricMode === 'live_speed');
+          targetRecs.forEach(r => {
+            r._sortVal = isLiveMetric ? (r.dlSpeed + r.ulSpeed) : (r.dlBytes + r.ulBytes);
+          });
+          targetRecs.sort((a, b) => b._sortVal - a._sortVal);
+
+          const TOP_LIMIT = 8;
+          const topDevices = targetRecs.slice(0, TOP_LIMIT);
+          const remainingDevices = targetRecs.slice(TOP_LIMIT);
+
+          for (const r of topDevices) {
+            const devKey = 'dev_' + (r.mac || r.ip || r.name).replace(/[^a-zA-Z0-9]/g, '_');
+            const connDesc = r.isCable ? 'Cable Gigabit' : (r.is5g ? 'Wi-Fi 5 GHz' : 'Wi-Fi 2.4 GHz');
+            const sub = `${r.ip} · ${connDesc}`;
+            addBucketItem(devKey, r.name, sub, r);
+          }
+
+          if (remainingDevices.length > 0) {
+            const otherKey = 'dev_others';
+            const otherNames = remainingDevices.slice(0, 3).map(d => d.name).join(', ');
+            const otherSub = `${remainingDevices.length} dispositivos restantes (${otherNames}...)`;
+            for (const r of remainingDevices) {
+              addBucketItem(otherKey, `🌐 Otros dispositivos (${remainingDevices.length})`, otherSub, r);
+            }
+          }
+        } else {
+          // Modes: subnets, groups, categories
+          // Filter out infrastructure trunk counters so device consumptions are proportional
+          const clientRecords = records.filter(r => !r.isNetworkInfra);
+          const targetRecords = clientRecords.length > 0 ? clientRecords : records;
+
+          const distinctCidrs = new Set(targetRecords.map(r => r.subnetCidr));
+          const singleSubnetMode = (this.groupMode === 'subnets' && distinctCidrs.size <= 1 && targetRecords.length > 1);
+
+          for (const r of targetRecords) {
+            if (this.groupMode === 'subnets') {
+              if (singleSubnetMode) {
+                if (r.isCable) {
+                  const isHost = r.name.toLowerCase().includes('servidor') || r.name.toLowerCase().includes('host') || r.dev_type === 'server';
+                  const segKey = isHost ? `${r.subnetCidr}_host` : `${r.subnetCidr}_eth`;
+                  const segLabel = isHost ? `${r.subnetCidr} · Servidor & Almacenamiento` : `${r.subnetCidr} · Segmento LAN Ethernet`;
+                  const segSub = isHost ? 'Servidor host y almacenamiento en red' : 'Equipos cableados en red local';
+                  addBucketItem(segKey, segLabel, segSub, r);
+                } else if (r.is5g) {
+                  addBucketItem(`${r.subnetCidr}_5g`, `${r.subnetCidr} · Subred Wi-Fi 5 GHz`, 'Segmento inalámbrico de alta velocidad', r);
+                } else {
+                  addBucketItem(`${r.subnetCidr}_24g`, `${r.subnetCidr} · Subred Wi-Fi 2.4 GHz`, 'Segmento inalámbrico de largo alcance / IoT', r);
+                }
               } else {
-                addBucketItem(`${r.subnetCidr}_24g`, `${r.subnetCidr} · Subred Wi-Fi 2.4 GHz`, 'Segmento inalámbrico de largo alcance / IoT', r);
+                addBucketItem(r.subnetCidr, `${r.subnetCidr} (${r.subnetTag})`, `Segmento IPv4 detectado`, r);
+              }
+            } else if (this.groupMode === 'groups') {
+              if (r.isCable) {
+                addBucketItem('grp_eth', '🔌 Ethernet Gigabit (Enlace Cableado)', 'Servidores, NAS, PCs y consolas por cable RJ45', r);
+              } else if (r.is5g) {
+                addBucketItem('grp_wifi5', '📶 Wi-Fi 5 GHz (Alta Velocidad)', 'Dispositivos inalámbricos en banda de 5 GHz', r);
+              } else {
+                addBucketItem('grp_wifi24', '📡 Wi-Fi 2.4 GHz & Red IoT', 'Dispositivos inalámbricos en banda de 2.4 GHz', r);
               }
             } else {
-              addBucketItem(r.subnetCidr, `${r.subnetCidr} (${r.subnetTag})`, `Segmento IPv4 detectado`, r);
+              const cat = this.classifyDeviceCategory(r);
+              addBucketItem(cat.key, cat.label, cat.desc, r);
             }
-          } else if (this.groupMode === 'groups') {
-            if (r.isCable) {
-              addBucketItem('grp_eth', '🔌 Ethernet Gigabit (Enlace Cableado)', 'Servidores, NAS, PCs y consolas por cable RJ45', r);
-            } else if (r.is5g) {
-              addBucketItem('grp_wifi5', '📶 Wi-Fi 5 GHz (Alta Velocidad)', 'Dispositivos inalámbricos en banda de 5 GHz', r);
-            } else {
-              addBucketItem('grp_wifi24', '📡 Wi-Fi 2.4 GHz & Red IoT', 'Dispositivos inalámbricos en banda de 2.4 GHz', r);
-            }
-          } else {
-            const cat = this.classifyDeviceCategory(r);
-            addBucketItem(cat.key, cat.label, cat.desc, r);
-          }
-        }
-
-        // In 'subnets' mode, also include active remote subnets / WAN connections if present and buckets have <= 2 entries
-        if (this.groupMode === 'subnets' && conns.length > 0) {
-          const wanConns = conns.filter(c => !c.is_lan && c.direction !== 'blocked');
-          const lanConns = conns.filter(c => c.is_lan && c.remote_ip);
-          for (const lc of lanConns) {
-            const sInfo = this.parseSubnetInfo(lc.remote_ip);
-            if (!bucketsMap.has(sInfo.cidr) && !singleSubnetMode) {
-              addBucketItem(sInfo.cidr, `${sInfo.cidr} (${sInfo.tag})`, `Sockets internos activos (${lc.service || 'LAN'})`, {
-                name: lc.remote_ip,
-                dlBytes: 1024 * 64,
-                ulBytes: 1024 * 32,
-                dlSpeed: 512,
-                ulSpeed: 256
-              });
-            }
-          }
-          if (wanConns.length > 0 && bucketsMap.size < 2) {
-            const totalExistingBytes = Array.from(bucketsMap.values()).reduce((a, b) => a + b.dlBytes + b.ulBytes, 0);
-            const totalExistingSpeed = Array.from(bucketsMap.values()).reduce((a, b) => a + b.dlSpeed + b.ulSpeed, 0);
-            const wanShareBytes = Math.max(1024 * 128, Math.round(totalExistingBytes * 0.14));
-            const wanShareSpeed = Math.max(256, Math.round(totalExistingSpeed * 0.14));
-            bucketsMap.set('wan_ext', {
-              key: 'wan_ext',
-              label: `WAN / Endpoints Externos (${wanConns.length} flujos)`,
-              subtitle: 'Sockets salientes/entrantes hacia Internet',
-              dlBytes: Math.round(wanShareBytes * 0.65),
-              ulBytes: Math.round(wanShareBytes * 0.35),
-              dlSpeed: Math.round(wanShareSpeed * 0.65),
-              ulSpeed: Math.round(wanShareSpeed * 0.35),
-              devicesCount: wanConns.length,
-              sampleNames: wanConns.slice(0, 3).map(c => c.city || c.remote_ip)
-            });
           }
         }
 
@@ -8587,7 +8589,6 @@
 
         let useLive = (this.metricMode === 'live_speed');
         if (useLive && sumLive <= 0 && sumTotal > 0) {
-          // Use proportional live estimate from total or keep total so chart is never blank
           useLive = false;
           this.effectiveMetric = 'total_bytes_fallback';
         } else {
@@ -8630,10 +8631,11 @@
           this.slices = pieArcs.map((arcDatum, idx) => {
             const b = arcDatum.data;
             const fraction = Math.max(0, b.value / totalVal);
+            const color = (b.key === 'dev_others') ? '#64748B' : this.PALETTE[idx % this.PALETTE.length];
             return {
               ...b,
               index: idx,
-              color: this.PALETTE[idx % this.PALETTE.length],
+              color,
               fraction,
               percent: fraction * 100,
               startAngle: arcDatum.startAngle,
@@ -8646,10 +8648,11 @@
           this.slices = buckets.map((b, idx) => {
             const fraction = Math.max(0, b.value / totalVal);
             const sweep = fraction * Math.PI * 2;
+            const color = (b.key === 'dev_others') ? '#64748B' : this.PALETTE[idx % this.PALETTE.length];
             const slice = {
               ...b,
               index: idx,
-              color: this.PALETTE[idx % this.PALETTE.length],
+              color,
               fraction,
               percent: fraction * 100,
               startAngle: curAngle,
@@ -9002,23 +9005,24 @@
           const titles = {
             subnets: 'Desglose de Ancho de Banda por Subred IPv4 (/24)',
             groups: 'Desglose de Ancho de Banda por Grupo de Enlace',
-            categories: 'Desglose de Ancho de Banda por Tipo de Dispositivo'
+            categories: 'Desglose de Ancho de Banda por Tipo de Dispositivo',
+            devices: 'Consumo Real por Dispositivo de Red'
           };
           legendTitle.textContent = titles[this.groupMode] || titles.subnets;
         }
 
         const totalNodes = this.slices.reduce((acc, s) => acc + (s.devicesCount || 0), 0);
         if (nodesBadge) {
-          nodesBadge.textContent = `${totalNodes} ${totalNodes === 1 ? 'dispositivo/interfaz' : 'dispositivos/interfaces'}`;
+          nodesBadge.textContent = `${totalNodes} ${totalNodes === 1 ? 'dispositivo' : 'dispositivos'}`;
         }
 
         if (topBadge) {
           if (this.slices.length > 0) {
             const top = this.slices[0];
             const shortName = top.label.split('·')[0].split('(')[0].trim();
-            topBadge.textContent = `Dominante: ${shortName} (${top.percent.toFixed(1)}%)`;
+            topBadge.textContent = `Mayor consumo: ${shortName} (${top.percent.toFixed(1)}%)`;
           } else {
-            topBadge.textContent = 'Dominante: --';
+            topBadge.textContent = 'Mayor consumo: --';
           }
         }
 
@@ -9029,6 +9033,31 @@
         }
 
         const isLive = (this.effectiveMetric === 'live_speed');
+
+        const formatItemSub = (s) => {
+          if (this.groupMode === 'devices') {
+            if (s.devices && s.devices.length === 1) {
+              const d = s.devices[0];
+              const conn = d.isCable ? 'Cable Gigabit' : (d.is5g ? 'Wi-Fi 5 GHz' : 'Wi-Fi 2.4 GHz');
+              return `IP: ${d.ip} · ${conn}${d.status === 'online' ? ' · En línea' : ''}`;
+            }
+            return s.subtitle;
+          }
+          if (s.devices && s.devices.length > 0) {
+            const sorted = [...s.devices].sort((a, b) => {
+              const vA = isLive ? (a.dlSpeed + a.ulSpeed) : (a.dlBytes + a.ulBytes);
+              const vB = isLive ? (b.dlSpeed + b.ulSpeed) : (b.dlBytes + b.ulBytes);
+              return vB - vA;
+            });
+            const topDevsStr = sorted.slice(0, 3).map(d => {
+              const devVal = isLive ? (d.dlSpeed + d.ulSpeed) : (d.dlBytes + d.ulBytes);
+              return `${d.name} (${this.formatMetricValue(devVal)})`;
+            }).join(', ');
+            return `${s.devicesCount} ${s.devicesCount === 1 ? 'dispositivo' : 'dispositivos'} · ${topDevsStr}${sorted.length > 3 ? '...' : ''}`;
+          }
+          return s.subtitle;
+        };
+
         const existingKeys = Array.from(legendList.querySelectorAll('.bw-pie-legend-item'))
           .map(el => el.getAttribute('data-slice-key'));
         const nextKeys = this.slices.map(s => s.key);
@@ -9043,9 +9072,6 @@
             const dlStr = isLive ? formatSpeed(s.dlSpeed) : formatBytes(s.dlBytes);
             const ulStr = isLive ? formatSpeed(s.ulSpeed) : formatBytes(s.ulBytes);
             const totStr = this.formatMetricValue(s.value);
-            const sampleStr = s.sampleNames && s.sampleNames.length > 0
-              ? `Ej: ${s.sampleNames.join(', ')}`
-              : s.subtitle;
 
             const swatchEl = itemEl.querySelector('.bw-pie-color-swatch');
             if (swatchEl) swatchEl.style.background = s.color;
@@ -9059,7 +9085,7 @@
               barEl.style.background = s.color;
             }
             const subNodesEl = itemEl.querySelector('.bw-pie-legend-sub-nodes');
-            if (subNodesEl) subNodesEl.textContent = `${s.devicesCount} ${s.devicesCount === 1 ? 'nodo' : 'nodos'} · ${sampleStr}`;
+            if (subNodesEl) subNodesEl.textContent = formatItemSub(s);
             const subIoEl = itemEl.querySelector('.bw-pie-legend-sub-io');
             if (subIoEl) subIoEl.textContent = `↓ ${dlStr} · ↑ ${ulStr}`;
           });
@@ -9070,9 +9096,10 @@
           const dlStr = isLive ? formatSpeed(s.dlSpeed) : formatBytes(s.dlBytes);
           const ulStr = isLive ? formatSpeed(s.ulSpeed) : formatBytes(s.ulBytes);
           const totStr = this.formatMetricValue(s.value);
-          const sampleStr = s.sampleNames && s.sampleNames.length > 0
-            ? `Ej: ${s.sampleNames.join(', ')}`
-            : s.subtitle;
+          const subText = formatItemSub(s);
+          const iconEmoji = (this.groupMode === 'devices' && s.iconEmoji)
+            ? `<span style="font-size: 13px; margin-right: 4px;">${s.iconEmoji}</span>`
+            : '';
 
           return `
             <div class="bw-pie-legend-item" id="bwPieLegendItem_${idx}" data-slice-key="${escapeHtml(s.key)}"
@@ -9082,7 +9109,7 @@
               <div class="bw-pie-legend-top">
                 <div class="bw-pie-legend-title-wrap">
                   <span class="bw-pie-color-swatch" style="background: ${s.color};"></span>
-                  <span class="bw-pie-legend-name" title="${escapeHtml(s.label)}">${escapeHtml(s.label)}</span>
+                  <span class="bw-pie-legend-name" title="${escapeHtml(s.label)}">${iconEmoji}${escapeHtml(s.label)}</span>
                 </div>
                 <div class="bw-pie-legend-metrics">
                   <strong class="bw-pie-legend-tot-val" style="color: var(--text-primary);">${totStr}</strong>
@@ -9093,7 +9120,7 @@
                 <div class="bw-pie-legend-bar-fill" style="width: ${Math.max(2, s.percent).toFixed(1)}%; background: ${s.color};"></div>
               </div>
               <div class="bw-pie-legend-sub">
-                <span class="bw-pie-legend-sub-nodes">${s.devicesCount} ${s.devicesCount === 1 ? 'nodo' : 'nodos'} · ${escapeHtml(sampleStr)}</span>
+                <span class="bw-pie-legend-sub-nodes">${escapeHtml(subText)}</span>
                 <span class="bw-pie-legend-sub-io mono">↓ ${dlStr} · ↑ ${ulStr}</span>
               </div>
             </div>
@@ -9117,16 +9144,25 @@
         if (!kickerEl || !valEl || !subEl) return;
 
         let targetVal = this.totalValue;
+        const totalNodes = this.slices.reduce((acc, s) => acc + (s.devicesCount || 0), 0);
         if (activeIdx !== -1 && this.slices[activeIdx]) {
           const s = this.slices[activeIdx];
           targetVal = s.value;
           kickerEl.textContent = s.label.replace(/^[^\w\d]+/, '').trim();
           valEl.style.color = s.color;
-          subEl.textContent = `${s.percent.toFixed(1)}% del total · ${s.devicesCount} ${s.devicesCount === 1 ? 'nodo' : 'nodos'}`;
+          if (this.groupMode === 'devices' && s.devices && s.devices.length === 1) {
+            subEl.textContent = `${s.percent.toFixed(1)}% del consumo · ${s.devices[0].ip || ''}`;
+          } else {
+            subEl.textContent = `${s.percent.toFixed(1)}% del total · ${s.devicesCount} ${s.devicesCount === 1 ? 'dispositivo' : 'dispositivos'}`;
+          }
         } else {
           kickerEl.textContent = this.effectiveMetric === 'live_speed' ? 'CAUDAL RED' : 'TRÁFICO TOTAL';
           valEl.style.color = 'var(--text-primary)';
-          subEl.textContent = `${this.slices.length} ${this.slices.length === 1 ? 'segmento' : 'segmentos'}`;
+          if (this.groupMode === 'devices') {
+            subEl.textContent = `${this.slices.length} sectores (${totalNodes} dispositivos)`;
+          } else {
+            subEl.textContent = `${this.slices.length} ${this.slices.length === 1 ? 'segmento' : 'segmentos'} (${totalNodes} dispositivos)`;
+          }
         }
 
         if (animateReadout && this.hasD3()) {
