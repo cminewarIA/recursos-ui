@@ -1,0 +1,11 @@
+Package: recursos-cockpit
+Version: 5.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: cminewarIA <https://github.com/cminewarIA/recursos-ui>
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1, scrcpy, adb
+Description: Recursos Cockpit - Centro de Telemetria 60 FPS y Samsung DeX Station
+ Aplicacion nativa de alto rendimiento para Linux que combina la suite de
+ monitorizacion y ciberdefensa de Recursos con la estacion de trabajo
+ interactiva Samsung DeX y Android Desktop.

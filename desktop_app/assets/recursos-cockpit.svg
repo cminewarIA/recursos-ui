@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Gradiente de Fondo Superficie Liquid Glass Titanio -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c1d21"/>
+      <stop offset="50%" stop-color="#0f1013"/>
+      <stop offset="100%" stop-color="#050507"/>
+    </linearGradient>
+
+    <!-- Gradiente de Borde Especular -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.35)"/>
+      <stop offset="40%" stop-color="rgba(255, 255, 255, 0.08)"/>
+      <stop offset="100%" stop-color="rgba(255, 255, 255, 0.02)"/>
+    </linearGradient>
+
+    <!-- Gradiente Primario Cyan-Azul Apple/Tesla -->
+    <linearGradient id="cyanBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00D2FF"/>
+      <stop offset="50%" stop-color="#0A84FF"/>
+      <stop offset="100%" stop-color="#5E5CE6"/>
+    </linearGradient>
+
+    <!-- Gradiente Acento Esmeralda / DeX -->
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#30D158"/>
+      <stop offset="100%" stop-color="#00C7BE"/>
+    </linearGradient>
+
+    <!-- Filtro de Sombra Suave -->
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Cuerpo Principal (Superellipse Squircle Apple) -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#bgGrad)" filter="url(#dropShadow)"/>
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="none" stroke="url(#borderGrad)" stroke-width="2.5"/>
+
+  <!-- Anillos de Telemetría Cockpit Central -->
+  <circle cx="256" cy="230" r="130" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="16"/>
+  <circle cx="256" cy="230" r="130" fill="none" stroke="url(#cyanBlueGrad)" stroke-width="16" stroke-dasharray="620" stroke-dashoffset="180" stroke-linecap="round" filter="url(#glow)"/>
+
+  <!-- Tacómetro / Dial Interno -->
+  <circle cx="256" cy="230" r="95" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="4" stroke-dasharray="4 8"/>
+
+  <!-- Icono de Servidor y CPU Cockpit Central -->
+  <path d="M196 180 h120 a12 12 0 0 1 12 12 v18 a12 12 0 0 1 -12 12 h-120 a12 12 0 0 1 -12 -12 v-18 a12 12 0 0 1 12 -12 z" fill="rgba(255,255,255,0.12)"/>
+  <circle cx="214" cy="201" r="5" fill="#30D158"/>
+  <circle cx="232" cy="201" r="5" fill="#0A84FF"/>
+  <rect x="250" y="198" width="56" height="6" rx="3" fill="rgba(255,255,255,0.25)"/>
+
+  <path d="M196 232 h120 a12 12 0 0 1 12 12 v18 a12 12 0 0 1 -12 12 h-120 a12 12 0 0 1 -12 -12 v-18 a12 12 0 0 1 12 -12 z" fill="rgba(255,255,255,0.12)"/>
+  <circle cx="214" cy="253" r="5" fill="#30D158"/>
+  <circle cx="232" cy="253" r="5" fill="#00D2FF"/>
+  <rect x="250" y="250" width="56" height="6" rx="3" fill="rgba(255,255,255,0.25)"/>
+
+  <!-- Placa Inferior Modo DeX / Dock Móvil -->
+  <rect x="110" y="375" width="292" height="54" rx="27" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+  
+  <!-- Icono Móvil + DeX en el Dock -->
+  <rect x="136" y="388" width="18" height="28" rx="4" fill="none" stroke="url(#cyanBlueGrad)" stroke-width="2.5"/>
+  <circle cx="145" cy="410" r="1.5" fill="#00D2FF"/>
+
+  <text x="170" y="409" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" fill="#FFFFFF" letter-spacing="1.5">RECURSOS COCKPIT</text>
+  <circle cx="376" cy="402" r="5" fill="#30D158" filter="url(#glow)"/>
+</svg>

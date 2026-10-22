@@ -29,3 +29,4 @@ geoip_cache.json
 .DS_Store
 *.swp
 *.swo
+build_deb/

@@ -1,0 +1,59 @@
+name: Compilación Automática de Paquete Linux (.deb)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    name: 📦 Compilar recursos-cockpit.deb
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Clonar Repositorio
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Instalar Dependencias de Compilación
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev binutils
+
+      - name: 🚀 Compilar y Empaquetar .deb
+        run: |
+          chmod +x packaging/build_deb.sh
+          bash packaging/build_deb.sh
+
+      - name: 📋 Extraer Información del Paquete
+        id: pkg_info
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "deb_path=dist/recursos-cockpit_${VERSION}_amd64.deb" >> $GITHUB_OUTPUT
+
+      - name: 📤 Subir Artefactos de Compilación
+        uses: actions/upload-artifact@v4
+        with:
+          name: recursos-cockpit-${{ steps.pkg_info.outputs.version }}-deb
+          path: |
+            dist/*.deb
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 🏷️ Publicar en GitHub Releases (Solo en Tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.deb
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
+          draft: false
+          prerelease: false

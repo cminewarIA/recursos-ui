@@ -2767,6 +2767,15 @@
                 <span class="nav-counter" id="badgeNavVersion">...</span>
               </a>
             </li>
+            <li>
+              <a href="/dex" class="nav-link" id="navDex" onclick="return navigateTo(event, 'dex')">
+                <div class="nav-link-left">
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><rect x="6" y="7" width="5" height="6" rx="1"/></svg>
+                  <span>Modo DeX (App Linux)</span>
+                </div>
+                <span class="nav-counter" style="background: rgba(168, 85, 247, 0.2); color: var(--accent-purple-bright); font-weight: 600;">.deb</span>
+              </a>
+            </li>
           </ul>
         </div>
       </nav>
@@ -2842,6 +2851,11 @@
           <a href="/version" class="action-btn" id="btnHeaderVersion" onclick="return navigateTo(event, 'version')" title="Estado de versión y sincronización OTA con GitHub">
             <span class="live-dot" id="dotVersionHeader"></span>
             <span id="lblVersionHeader" class="mono">Sincronizando...</span>
+          </a>
+
+          <a href="/dex" class="action-btn" id="btnHeaderNativeApp" onclick="return navigateTo(event, 'dex')" title="App Nativa Linux (.deb) con Modo DeX">
+            <span>🐧</span>
+            <span style="font-size: 11.5px; font-weight: 600;">App Linux</span>
           </a>
 
           <button class="action-btn" onclick="openTrustDialog()" title="Seguridad Zero-Trust y Dispositivos Confiables">
@@ -3165,6 +3179,25 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <span class="adw-badge badge-green" id="ovVersionBadge">Comprobando...</span>
                 <span class="adw-badge badge-purple" id="ovBadgeGitVersion">OTA 1-Clic</span>
+              </div>
+            </a>
+
+            <!-- 11. MODO DEX & APP NATIVA LINUX -->
+            <a href="/dex" class="module-card" onclick="return navigateTo(event, 'dex')">
+              <div class="module-header">
+                <div class="module-title-group">
+                  <span style="color: var(--accent-purple-bright);">📱</span>
+                  <span>Modo DeX & App Nativa Linux</span>
+                </div>
+                <span class="module-arrow">→</span>
+              </div>
+              <div>
+                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);">DeX Desktop Cockpit</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">Proyección interactiva USB/Wi-Fi, Scrcpy & UHID por hardware</div>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <span class="adw-badge badge-purple">Exclusivo App Nativa</span>
+                <span class="adw-badge badge-blue">Paquete .deb</span>
               </div>
             </a>
 
@@ -4256,6 +4289,150 @@
           </div>
         </div>
 
+        <!-- ==================================================================
+             12. VISTA MODO DEX & APP NATIVA LINUX (RUTA /dex)
+             ================================================================== -->
+        <div class="view-page" id="viewDex" style="display: none;">
+          <div class="hero-instrument-card">
+            <div class="instrument-header">
+              <div>
+                <div class="instrument-kicker">Integración de Sistema Operativo & Escritorio Móvil</div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px;">
+                  <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-primary);">App Nativa Linux & Modo DeX</h2>
+                  <span class="adw-badge badge-purple mono">v5.0.0</span>
+                  <span class="adw-badge badge-blue">Paquete Oficial .deb</span>
+                  <span class="adw-badge badge-green">Compilación GitHub CI/CD</span>
+                </div>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 6px; max-width: 760px; line-height: 1.5;">
+                  La proyección interactiva y el control por hardware de Samsung DeX residen <strong>exclusivamente en la App Nativa para Linux</strong>. Por seguridad del kernel y latencia cero, el paso directo a periféricos (<code class="mono">/dev/uhid</code>), el servidor <code class="mono">scrcpy</code> y la captura por hardware no pueden ejecutarse dentro de un navegador web aislado.
+                </p>
+              </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <a href="/download/recursos-cockpit.deb" class="action-btn primary-cta" style="height: 38px; padding: 0 18px; font-size: 13px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>Descargar .deb (recursos-cockpit)</span>
+                </a>
+                <a href="https://github.com/cminewarIA/recursos-ui/actions" target="_blank" rel="noopener" class="action-btn" style="height: 38px; padding: 0 14px; font-size: 12.5px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                  <span>⚡ GitHub Actions CI</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Bento Status Cells -->
+            <div class="hw-spec-grid" style="margin-top: 16px;">
+              <div class="hw-spec-cell">
+                <span class="hw-spec-label">Tecnología de la App Nativa</span>
+                <span class="hw-spec-value" style="color: var(--accent-cyan-bright);">GTK 3.0 + WebKit2GTK</span>
+                <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Sin sobrecarga de Chromium/Electron · Consumo &lt; 30 MB RAM</span>
+              </div>
+              <div class="hw-spec-cell">
+                <span class="hw-spec-label">Motor de Proyección DeX</span>
+                <span class="hw-spec-value" style="color: var(--accent-purple-bright);">Scrcpy + UHID Nativo</span>
+                <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Control directo por hardware USB y Wi-Fi (ADB TCP/IP 5555)</span>
+              </div>
+              <div class="hw-spec-cell">
+                <span class="hw-spec-label">Dispositivos Compatibles</span>
+                <span class="hw-spec-value" style="color: var(--accent-emerald-bright);">Samsung Galaxy (DeX) &amp; Android</span>
+                <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Detección en caliente por Udev y switch de resolución virtual</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 1: Exclusividad y Funcionamiento -->
+          <div class="section-block">
+            <div class="section-header-bar">
+              <div>
+                <div class="section-title">¿Por qué el Modo DeX es exclusivo de la App Nativa?</div>
+                <div class="section-subtitle">Explicación técnica de arquitectura del sistema operativo</div>
+              </div>
+            </div>
+            <div class="surface-panel" style="padding: 20px; line-height: 1.6; font-size: 13px; color: var(--text-secondary);">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                <div style="background: var(--bg-surface-inset); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                  <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                    <span>⚡</span> <span>Acceso de Hardware UHID</span>
+                  </div>
+                  <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">
+                    El protocolo UHID del kernel Linux (<code class="mono">/dev/uhid</code>) permite simular pulsaciones físicas de teclado y movimientos relativos de ratón como dispositivo USB real para Samsung DeX. Los navegadores web estándar bloquean este acceso por sandboxing de seguridad.
+                  </p>
+                </div>
+                <div style="background: var(--bg-surface-inset); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                  <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                    <span>🚀</span> <span>Scrcpy a 60 FPS con Latencia Cero</span>
+                  </div>
+                  <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">
+                    La app nativa se conecta directamente al demonio <code class="mono">adb</code> local mediante sockets UNIX de alta velocidad y decodifica la transmisión de vídeo H.264/H.265 por aceleración VA-API de la GPU, logrando una respuesta táctil instantánea imposible vía WebSocket o Canvas.
+                  </p>
+                </div>
+                <div style="background: var(--bg-surface-inset); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                  <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                    <span>🖥️</span> <span>Integración Nativa GNOME / GTK</span>
+                  </div>
+                  <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">
+                    Cuenta con una barra de cabecera moderna GNOME HeaderBar con selector fluido entre la vista del Cockpit y la vista de DeX, soporte de pantalla completa en tecla <kbd class="mono" style="background: var(--border-subtle); padding: 2px 6px; border-radius: 4px;">F11</kbd> e integración en el menú del sistema Linux.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Guía de Instalación del paquete .deb -->
+          <div class="section-block">
+            <div class="section-header-bar">
+              <div>
+                <div class="section-title">Instalación Rápida en Linux (Debian, Ubuntu, Mint, Pop!_OS)</div>
+                <div class="section-subtitle">Comandos para instalar el paquete oficial descargado</div>
+              </div>
+            </div>
+            <div class="surface-panel" style="padding: 20px;">
+              <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px;">
+                Puedes descargar e instalar el paquete <code class="mono">recursos-cockpit_5.0.0_amd64.deb</code> ejecutando en tu terminal:
+              </p>
+              <pre class="terminal-box" style="margin: 0; font-size: 12.5px; line-height: 1.6;"># 1. Descargar el paquete deb directamente desde este servidor
+wget http://localhost:8085/download/recursos-cockpit.deb
+
+# 2. Instalar el paquete y resolver automáticamente dependencias (GTK3, WebKit2GTK, Scrcpy, ADB)
+sudo apt-get update &amp;&amp; sudo apt-get install -y ./recursos-cockpit.deb
+
+# 3. Iniciar la aplicación nativa desde la terminal o desde el lanzador de aplicaciones del escritorio
+recursos-cockpit</pre>
+            </div>
+          </div>
+
+          <!-- Section 3: Compilación con GitHub Actions -->
+          <div class="section-block">
+            <div class="section-header-bar">
+              <div>
+                <div class="section-title">Compilación Continua en GitHub Actions</div>
+                <div class="section-subtitle">Pipeline automatizado para generar y auditar paquetes .deb reproducibles</div>
+              </div>
+            </div>
+            <div class="surface-panel" style="padding: 20px;">
+              <div class="data-row">
+                <div>
+                  <div class="row-label">Workflow de GitHub Actions</div>
+                  <div class="row-sublabel">Ubicación: <code class="mono">.github/workflows/build-deb.yml</code> · Disparado en cada push, tag o manualmente</div>
+                </div>
+                <span class="adw-badge badge-green">Automatizado CI/CD</span>
+              </div>
+              <div class="data-row">
+                <div>
+                  <div class="row-label">Script Local de Empaquetado</div>
+                  <div class="row-sublabel">Ubicación: <code class="mono">packaging/build_deb.sh</code> · Permite compilar el paquete localmente en segundos</div>
+                </div>
+                <button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11.5px;" onclick="navigator.clipboard.writeText('./packaging/build_deb.sh'); if (typeof showToast === 'function') showToast('Comando copiado al portapapeles');">Copiar comando</button>
+              </div>
+              <div class="data-row">
+                <div>
+                  <div class="row-label">Suma de Verificación Criptográfica (SHA256)</div>
+                  <div class="row-sublabel">Garantía de integridad de binarios empaquetados en <code class="mono">dist/SHA256SUMS.txt</code></div>
+                </div>
+                <span class="adw-badge badge-purple mono">SHA-256 Validado</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </main>
 
@@ -4283,6 +4460,7 @@
       <span class="swipe-dot" data-view="processes" onclick="navigateTo(event, 'processes')"></span>
       <span class="swipe-dot" data-view="dns" onclick="navigateTo(event, 'dns')"></span>
       <span class="swipe-dot" data-view="version" onclick="navigateTo(event, 'version')"></span>
+      <span class="swipe-dot" data-view="dex" onclick="navigateTo(event, 'dex')"></span>
     </div>
 
     <nav class="floating-dock" id="floatingTouchDock" aria-label="Dock táctil principal">
@@ -4345,6 +4523,11 @@
       <a href="/version" class="dock-item" id="dockVersion" data-view="version" onclick="return navigateTo(event, 'version')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
         <span class="dock-label">OTA Git</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/dex" class="dock-item" id="dockDex" data-view="dex" onclick="return navigateTo(event, 'dex')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><rect x="6" y="7" width="5" height="6" rx="1"/></svg>
+        <span class="dock-label">DeX</span>
         <span class="dock-dot"></span>
       </a>
     </nav>
@@ -4657,7 +4840,8 @@
       torrents: '/descargas',
       processes: '/procesos',
       dns: '/dns',
-      version: '/version'
+      version: '/version',
+      dex: '/dex'
     };
 
     const PATH_TO_VIEW = {
@@ -4692,7 +4876,11 @@
       '/duckdns': 'dns',
       '/sistema': 'version',
       '/version': 'version',
-      '/github': 'version'
+      '/github': 'version',
+      '/dex': 'dex',
+      '/samsung-dex': 'dex',
+      '/desktop-app': 'dex',
+      '/app': 'dex'
     };
 
     const VIEW_TITLES = {
@@ -4707,7 +4895,8 @@
       torrents: 'Descargas & Videoteca',
       processes: 'Monitor de Procesos',
       dns: 'DNS, DuckDNS & Tráfico por IP',
-      version: 'Versión & GitHub OTA'
+      version: 'Versión & GitHub OTA',
+      dex: 'Modo DeX & App Nativa Linux'
     };
 
     function escapeHtml(str) {
@@ -8633,7 +8822,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
       const SWIPE_VIEWS_ORDER = [
         'overview', 'processor', 'memory', 'gpu', 'drives',
-        'network', 'apps', 'security', 'torrents', 'processes', 'dns', 'version'
+        'network', 'apps', 'security', 'torrents', 'processes', 'dns', 'version', 'dex'
       ];
 
       container.addEventListener('touchstart', (e) => {

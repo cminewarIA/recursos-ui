@@ -3,15 +3,17 @@
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
 ### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v4.19.0-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v5.0.0-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](./VERSION)
 [![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white)](#-filosof%C3%ADa-de-dise%C3%B1o)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
+[![App Nativa](https://img.shields.io/badge/App_Nativa-Linux_.deb_%7C_Modo_DeX-AF52DE?style=for-the-badge&logo=debian&logoColor=white)](#-app-nativa-linux-deb--modo-dex-cockpit)
+[![Compilación](https://img.shields.io/badge/CI%2FCD-GitHub_Actions_Automated-5856D6?style=for-the-badge&logo=githubactions&logoColor=white)](#-compilación-continua-en-github-actions)
 [![Rendimiento](https://img.shields.io/badge/Rendimiento-60_FPS_HiDPI_Retina-FF9F0A?style=for-the-badge&logo=speedtest&logoColor=white)](#-rendimiento-y-motor-desacoplado)
 [![Ciberseguridad](https://img.shields.io/badge/Ciberdefensa-Fail2ban_IPS_%2B_Pi--hole_DNS-FF453A?style=for-the-badge&logo=shield&logoColor=white)](#-ciberdefensa-activa-ips-y-seguridad-zero-trust)
 [![Licencia](https://img.shields.io/badge/Licencia-MIT-64D2FF?style=for-the-badge)](#-licencia)
 
 <p align="center">
-  <b>System Cockpit</b> es una plataforma integral de monitorización y ciberdefensa en tiempo real que transforma la gestión de servidores Linux y entornos homelab en una experiencia táctil fluida, combinando la óptica multicapa de <b>Apple Liquid Glass</b> con la ergonomía automotriz de <b>Tesla Touch Cockpit</b>.
+  <b>System Cockpit</b> es una plataforma integral de monitorización y ciberdefensa en tiempo real que transforma la gestión de servidores Linux y entornos homelab en una experiencia táctil fluida, combinando la óptica multicapa de <b>Apple Liquid Glass</b> con la ergonomía automotriz de <b>Tesla Touch Cockpit</b> y un cliente nativo para Linux con <b>Modo Samsung DeX</b> interactivo por hardware.
 </p>
 
 </div>
@@ -20,7 +22,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v4.19.0 ║
+║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v5.0.0 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                              ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
@@ -34,6 +36,7 @@
 ║                                                                                                              ║
 ║           ╔══════════════════════════════════════════════════════════════════════════════════════╗           ║
 ║           ║  🏠 Cockpit   🧠 CPU   💾 RAM   🎮 GPU   💿 Discos   🌐 Red   🛡️ IPS   🐳 Docker ║           ║
+║           ║                      📱 Modo DeX (Exclusivo App Nativa .deb)                         ║           ║
 ║           ╚══════════════════════════════════════════════════════════════════════════════════════╝           ║
 ║                                     ▲ FLOATING TOUCH DOCK (TESLA UI)                                         ║
 ╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
@@ -53,8 +56,9 @@
    - [Analítica de Ancho de Banda con D3.js](#5-analítica-de-ancho-de-banda-con-d3js)
    - [Ecosistema Multimedia y Docker](#6-ecosistema-multimedia-y-docker)
    - [Centro Unificado de Registro de Fallos del Sistema (Apps, Servicios & Kernel)](#7-centro-unificado-de-registro-de-fallos-del-sistema-apps-servicios--kernel)
+   - [App Nativa Linux (.deb) & Modo Samsung DeX](#8-app-nativa-linux-deb--modo-samsung-dex)
 4. [Principio Estricto 100% Zero-Hardcoding](#-principio-estricto-100-zero-hardcoding)
-5. [Mapa de Vistas SPA (12 Pantallas)](#-mapa-de-vistas-spa-12-pantallas)
+5. [Mapa de Vistas SPA (13 Pantallas)](#-mapa-de-vistas-spa-13-pantallas)
 6. [Referencia de la API REST](#-referencia-de-la-api-rest)
 7. [Guía de Instalación y Despliegue](#-guía-de-instalación-y-despliegue)
 8. [Historial de Versiones](#-historial-de-versiones)
@@ -171,6 +175,13 @@ System Cockpit rompe con la estética tradicional de paneles de administración 
   - Tarjeta Bento colapsable (`#systemLogsCenterCard`) con filtros por categoría (`🐳 Apps & Docker`, `⚙️ Servicios`, `🐧 Kernel`), búsqueda en vivo y cambio de severidad.
   - Visor nativo HTML5 `<dialog>` a pantalla completa para auditorías exhaustivas.
 
+### 8. App Nativa Linux (.deb) & Modo Samsung DeX
+* **Exclusividad de Hardware**: La proyección interactiva y el control por periféricos de Samsung DeX residen **estrictamente en la App Nativa para Linux (`recursos-cockpit`)**. Por diseño de seguridad del kernel, el acceso a `/dev/uhid`, la captura por hardware, el paso directo de eventos táctiles/ratón y la conexión por sockets UNIX a `adb` no pueden ejecutarse dentro de un navegador web sandbox.
+* **Rendimiento Nativo (GTK3 + WebKit2GTK)**: Construida sobre la pila nativa del sistema en Python y GNOME, pesando **< 10 KB** empaquetada en formato Debian y consumiendo **< 30 MB de RAM** (frente a los > 300 MB de soluciones basadas en Electron o Chromium).
+* **Proyección Scrcpy & Pantallas Virtuales**: Integra el motor de kiosk del proyecto Lapdock OS (`kiosk-manager.py`), permitiendo detección en caliente por Udev de terminales Samsung Galaxy (Series S8 hasta S24 Ultra), configuración automática de ADB sobre TCP/IP (`adb tcpip 5555`), creación de pantallas secundarias virtuales y conmutación fluida mediante atajos (`F11` para Pantalla Completa, `Ctrl+D` para Modo DeX).
+* **Compilación CI/CD en GitHub**: Infraestructura de empaquetado reproducible en `packaging/debian/` y workflow automatizado en `.github/workflows/build-deb.yml` para compilar paquetes `.deb` auditados y publicarlos como artefactos en cada release.
+* **Distribución Integrada**: El propio servidor web sirve el paquete Debian oficial a través del endpoint `/download/recursos-cockpit.deb`.
+
 ---
 
 ## 🧭 Principio Estricto 100% Zero-Hardcoding
@@ -183,15 +194,15 @@ System Cockpit se rige por una regla arquitectónica absoluta: **cero valores es
 
 ---
 
-## 📱 Mapa de Vistas SPA (12 Pantallas)
+## 📱 Mapa de Vistas SPA (13 Pantallas)
 
 El frontend opera como una Single Page Application (SPA) desacoplada con animaciones mediante **View Transitions API**:
 
 | Ruta | Nombre de Vista | Descripción Operativa |
 | :--- | :--- | :--- |
-| `/` | **Vista General** | Cockpit panorámico con los 4 pilares de hardware, banner de estado y accesos rápidos. |
-| `/procesador` | **CPU & Frecuencias** | Monitor detallado por núcleo, frecuencias dinámicas y termografía de silicio. |
-| `/memoria` | **RAM & ZRAM** | Desglose de memoria física, caché de páginas, búferes y compresión ZRAM. |
+| `/` | **Vista General** | Cockpit panorámico con los pilares de hardware, bento grid de 11 tarjetas y accesos rápidos. |
+| `/procesador` | **CPU & Frecuencias** | Monitor detallado por hilo lógico, frecuencias dinámicas y termografía del procesador. |
+| `/memoria` | **RAM & ZRAM** | Desglose de memoria física, swap, búferes y compresión ZRAM en tiempo real. |
 | `/grafica` | **GPU & Aceleración** | Carga de GPU, reloj de núcleo, temperatura y consumo de memoria VRAM. |
 | `/almacenamiento` | **Discos & Particiones** | Monitor de espacio en disco, particiones montadas y tasas de I/O en MB/s. |
 | `/red` | **Mapa Mundial & Tráfico** | Cartografía interactiva OpenStreetMap, flujos de Pi-hole y sockets del kernel. |
@@ -199,8 +210,10 @@ El frontend opera como una Single Page Application (SPA) desacoplada con animaci
 | `/servicios` | **Servicios Systemd** | Catálogo interactivo de servicios del sistema, estados y reinicios. |
 | `/contenedores` | **Docker Runtime** | Monitor de contenedores Docker activos, memoria, CPU y tiempos de actividad. |
 | `/seguridad` | **Ciberdefensa IPS** | Centro de control Fail2ban, cárceles, IPs bloqueadas y gestión Zero-Trust. |
-| `/descargas` | **Multimedia & Torrents**| Panel unificado para descargas qBittorrent y sesiones de streaming Emby. |
-| `/version` | **Control de Versión** | Información de versión canónica, hash de Git y estado de sincronización. |
+| `/descargas` | **Multimedia & Torrents**| Panel unificado para descargas qBittorrent, streaming y gestor del bot de Telegram. |
+| `/dns` | **DNS & Tráfico por IP** | Sincronización DuckDNS, resolución por clientes de la red y tabla de tráfico DNS. |
+| `/version` | **Control de Versión** | Información de versión canónica, hash de Git y actualización OTA en 1 clic. |
+| `/dex` | **Modo DeX & App Nativa**| Guía y descarga de la aplicación nativa para Linux (`.deb`) con modo Samsung DeX. |
 
 ---
 
@@ -210,9 +223,10 @@ El servidor expone una API REST ligera en formato JSON:
 
 | Método | Endpoint | Descripción | Acceso / Auth |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/metrics` | Telemetría consolidada del sistema (CPU, RAM, GPU, Red, Discos). | Público (LAN / Token WAN) |
-| `GET` | `/api/version` | Versión canónica activa (`VERSION`), hash Git y estado del repo. | Público |
+| `GET` | `/api/metrics` | Telemetría consolidada del sistema (CPU, RAM, GPU, Red, Discos, Versión). | Público (LAN / Token WAN) |
+| `GET` | `/api/version` | Versión canónica activa (`VERSION`), hash Git y estado del repo remoto. | Público |
 | `GET` | `/api/system/logs` | Registro unificado de fallos y errores (filtros: `level`, `category`, `limit`, `refresh`). | Público (LAN / Token WAN) |
+| `GET` | `/download/recursos-cockpit.deb` | Descarga directa del paquete Debian oficial compilado para Linux amd64. | Público |
 | `POST` | `/api/net/geoip/resolve` | Resolución en lote de coordenadas geográficas para el mapa. | Abierto para clientes del mapa |
 | `POST` | `/api/net/geoip/clear-errors`| Limpia el historial de eventos del Worker GeoIP en el servidor. | Requiere sesión de confianza |
 | `POST` | `/api/fail2ban/ban` | Bloquea una dirección IP maliciosa en una cárcel de Fail2ban. | Requiere sesión de confianza |
@@ -298,6 +312,7 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v5.0.0`** | `MAJOR` | **Rediseño Completo, App Nativa para Linux (.deb) con Modo Samsung DeX y Compilación Automatizada en GitHub Actions**: (1) **Rediseño Visual & Cockpit**: Evolución a Apple Liquid Glass 2.0 y Tesla Touch Cockpit, bento grid modular de 11 tarjetas, acceso directo a la app nativa en cabecera, touch dock ampliado y vista dedicada `/dex`; (2) **App Nativa para Linux (`recursos-cockpit`)**: Cliente de escritorio ultraligero con GTK 3.0 + WebKit2GTK (< 10 KB deb, < 30 MB RAM) sin la sobrecarga de Electron; (3) **Modo Samsung DeX Exclusivo por Hardware**: Integración de la lógica del proyecto Lapdock OS (`kiosk-manager.py`) con control directo por `/dev/uhid`, proyección interactiva por `scrcpy`, creación dinámica de pantallas virtuales y soporte USB / Wi-Fi (`adb tcpip 5555`), reservado estrictamente a la app nativa por motivos de latencia cero y privilegios de hardware; (4) **Compilación CI/CD en GitHub Actions**: Pipeline automatizado en `.github/workflows/build-deb.yml` e infraestructura local en `packaging/build_deb.sh` con cálculo de sumas SHA256; (5) **Distribución Integrada**: Endpoint `/download/recursos-cockpit.deb` que sirve dinámicamente el binario compilado. |
 | **`v4.19.0`** | `MINOR` | **Panel de Ajustes, Emisor Directo e Historial de Mensajes del Bot de Telegram**: Creación de una interfaz visual completa por pestañas para el Bot de Telegram integrado en `/aplicaciones`: (1) **📋 Historial de Mensajes**: Registro auditado en tiempo real de "lo que manda el bot" (alertas de descargas qBittorrent completadas, respuestas a comandos `/status`, `/red`, `/sync`, `/help`, pings de prueba) y "lo que recibe" (comandos, enlaces magnet, archivos `.torrent`) con filtros por dirección, badges de estado, remitente/destinatario y fecha/hora; (2) **⚙️ Ajustes & Admins**: Gestión dinámica de la lista blanca de Telegram Chat IDs autorizados (alta, baja y visualización sin hardcoding) y conmutador para activar o pausar avisos automáticos de torrents completados; (3) **📢 Emisor a Telegram**: Compositor con plantillas rápidas para difundir comunicados o avisos a los administradores directamente desde el panel web; nuevos endpoints REST `/api/telegram_bot/activity`, `/api/telegram_bot/send`, `/api/telegram_bot/whitelist/add`, `/api/telegram_bot/whitelist/remove`, `/api/telegram_bot/config` y `/api/telegram_bot/activity/clear`. |
 | **`v4.18.1`** | `PATCH` | **Optimización Integral del Subsistema de Red, Backend y Payloads JSON**: Eliminación de la triplicación del historial de 2h por interfaz (`history_2h`) en `/api/metrics` reduciendo en ~66% el peso del payload de red; índice inverso $O(1)$ (`dom_to_ip_cache`), caché TTL de 12s para flujos SQLite de Pi-hole y presupuesto acotado de consultas DNS/rDNS síncronas por ciclo en `PiholeDnsTranslator` y `fetch_connections_geo_worker`; caché por `mtime` en `load_custom_logos()` y pre-cálculo asíncrono de `system_errors_summary` fuera del hilo HTTP; compilación previa de expresiones regulares (`ss`, `conntrack`, `pihole.log`); actualización in-place de tarjetas NIC y `<canvas>` sin destruir el DOM cada 2s; hidratación única por sesión en `NicBandwidthStorageManager`; y firmas de cambio (`change signatures`) con renderizado perezoso en el mapa Leaflet, tabla de conexiones, lista de dispositivos y gráfico D3.js. |
 | **`v4.18.0`** | `MINOR` | **Bot de Telegram Integrado 100% Nativo en Backend**: Integración completa del bot de descargas qBittorrent y vigilancia LAN directamente dentro del servidor web (`server.py`) sin intermediarios ni scripts delegados; soporte completo para recepción de archivos `.torrent` (descarga binaria e inyección directa en el cliente P2P), enlaces magnet y URLs; monitor continuo de finalización de descargas en qBittorrent con alertas push automáticas a la lista blanca; comandos interactivos `/status`, `/red`, `/actualizar_red` y `/help`; endpoints REST `/api/telegram_bot` y `/api/telegram_bot/test`; tarjeta visual en el panel de control con estado de long-polling, administradores registrados y botón de ping de prueba; desactivación de `telegram-comic-bot.service` para eliminar colisiones de API. |

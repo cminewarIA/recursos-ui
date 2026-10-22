@@ -1,0 +1,18 @@
+[Desktop Entry]
+Name=Recursos Cockpit
+Comment=Centro de Telemetría 60 FPS y Estación Samsung DeX para Linux
+GenericName=System Monitor & DeX Station
+Exec=/usr/bin/recursos-cockpit %u
+Icon=recursos-cockpit
+Terminal=false
+Type=Application
+Categories=System;Monitor;Utility;Telephony;
+Keywords=telemetria;servidor;cockpit;hardware;samsung;dex;scrcpy;android;
+StartupNotify=true
+StartupWMClass=recursos-cockpit
+MimeType=x-scheme-handler/recursos;
+Actions=LaunchDeX;
+
+[Desktop Action LaunchDeX]
+Name=Iniciar Modo DeX Directamente
+Exec=/usr/bin/recursos-cockpit --dex

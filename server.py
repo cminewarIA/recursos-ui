@@ -17,6 +17,7 @@ import sqlite3
 import socket
 import requests
 import collections
+import glob
 
 
 # ==============================================================================
@@ -5483,7 +5484,8 @@ VALID_WEB_ROUTES = {
     "/version",
     "/dispositivos",
     "/dns",
-    "/duckdns"
+    "/duckdns",
+    "/dex"
 }
 
 def send_wol_magic_packet(mac_str):
@@ -6033,6 +6035,35 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.send_security_headers()
                 self.end_headers()
                 self.wfile.write(b"Not Found")
+            return
+
+        # 4b. DESCARGA DIRECTA DE LA APP NATIVA PARA LINUX (.deb)
+        elif clean_path in ["/download/recursos-cockpit.deb", "/download/app.deb", "/api/download/app_deb"]:
+            dist_dir = os.path.join(BASE_DIR, "dist")
+            deb_candidates = sorted(glob.glob(os.path.join(dist_dir, "recursos-cockpit_*.deb")), reverse=True)
+            deb_file = deb_candidates[0] if deb_candidates else None
+            
+            if deb_file and os.path.isfile(deb_file):
+                try:
+                    fsize = os.path.getsize(deb_file)
+                    fname = os.path.basename(deb_file)
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/vnd.debian.binary-package')
+                    self.send_header('Content-Disposition', f'attachment; filename="{fname}"')
+                    self.send_header('Content-Length', str(fsize))
+                    self.send_security_headers()
+                    self.end_headers()
+                    with open(deb_file, 'rb') as f:
+                        while chunk := f.read(65536):
+                            self.wfile.write(chunk)
+                    return
+                except Exception as e:
+                    print(f"[DOWNLOAD DEB ERROR] {e}")
+            
+            self.send_response(404)
+            self.send_security_headers()
+            self.end_headers()
+            self.wfile.write(b"Paquete .deb no encontrado en dist/. Por favor ejecuta packaging/build_deb.sh")
             return
         else:
             self.send_response(404)
