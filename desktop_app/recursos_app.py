@@ -270,14 +270,15 @@ def detect_runtime_environment(force_env=None):
 
 
 class RecursosNativeWindow(Gtk.ApplicationWindow):
-    def __init__(self, app, start_in_dex=True, env_info=None):
+    def __init__(self, app, start_in_dex=False, env_info=None):
         self.env_info = env_info or detect_runtime_environment()
         super().__init__(
             application=app,
-            title=f"Recursos — Proyección USB (Samsung DeX / Android Desktop) v{get_app_version()}",
+            title=f"Recursos Cockpit v{get_app_version()}",
         )
         self.set_default_size(980, 660)
         self.set_position(Gtk.WindowPosition.CENTER)
+        self.set_wmclass("recursos-cockpit", "recursos-cockpit")
         self.is_fullscreen = False
         self.auto_launched_serials = set()
 
@@ -292,27 +293,28 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         self._build_headerbar()
         self._build_main_layout()
 
-        # En entorno nativo o móvil se muestra directamente la pantalla de espera de proyección USB
-        if self.env_info.get("render_usb_projection_wait_screen", True) or start_in_dex:
-            self.stack.set_visible_child_name("usb_wait_screen")
+        # Seleccionar pestaña inicial: si start_in_dex es True abrir Conexión USB, de lo contrario Telemetría
+        if start_in_dex:
+            self.stack.set_visible_child_name("devices")
+        else:
+            self.stack.set_visible_child_name("telemetry")
 
         self.connect("key-press-event", self._on_key_press)
 
-        # Timers nativos GLib
+        # Timers nativos GLib: telemetría en tiempo real (1.5s) y detección USB (2.0s)
+        self._refresh_telemetry()
+        GLib.timeout_add(1500, self._refresh_telemetry)
         self._refresh_usb_devices()
         GLib.timeout_add(2000, self._refresh_usb_devices)
-        if not self.env_info.get("render_usb_projection_wait_screen", True):
-            self._refresh_telemetry()
-            GLib.timeout_add(1500, self._refresh_telemetry)
 
     def _set_app_icon(self):
         """Asigna el icono oficial del Dragón Rojo a la ventana GTK."""
         icon_candidates = [
+            "/usr/share/pixmaps/recursos-cockpit.png",
+            "/usr/share/icons/hicolor/512x512/apps/recursos-cockpit.png",
+            "/usr/lib/recursos-cockpit/assets/recursos-cockpit.png",
             os.path.join(SCRIPT_DIR, "assets", "recursos-cockpit.png"),
             os.path.join(SCRIPT_DIR, "assets", "recursos-cockpit.svg"),
-            "/usr/lib/recursos-cockpit/assets/recursos-cockpit.png",
-            "/usr/share/icons/hicolor/512x512/apps/recursos-cockpit.png",
-            "/usr/share/pixmaps/recursos-cockpit.png",
         ]
         for c in icon_candidates:
             if os.path.isfile(c):
@@ -334,24 +336,17 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
     def _build_headerbar(self):
         hb = Gtk.HeaderBar()
         hb.set_show_close_button(True)
-        hb.props.title = "Recursos"
-        hb.props.subtitle = (
-            f"v{get_app_version()} · Proyección USB (Samsung DeX / Android Desktop)"
-        )
+        hb.props.title = "Recursos Cockpit"
+        hb.props.subtitle = f"v{get_app_version()} · Centro Nativo de Silicio"
 
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
         self.stack.set_transition_duration(200)
 
-        # En entorno nativo/móvil ocultamos automáticamente la pestaña 'Dispositivo'
-        # y cualquier barra de pestañas no web para mostrar únicamente la pantalla de espera USB
+        # Conmutador de pestañas de silicio y dispositivos siempre visible en el HeaderBar
         self.switcher = Gtk.StackSwitcher()
         self.switcher.set_stack(self.stack)
-        if self.env_info.get("is_native_or_mobile", True):
-            self.switcher.set_no_show_all(True)
-            self.switcher.set_visible(False)
-        else:
-            hb.set_custom_title(self.switcher)
+        hb.set_custom_title(self.switcher)
 
         # Etiqueta de versión en la barra superior
         ver_badge = Gtk.Label(label=f"v{get_app_version()}")
@@ -400,16 +395,17 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         about.destroy()
 
     def _build_main_layout(self):
-        # Si se detecta entorno nativo o móvil, ocultamos cualquier pestaña 'Dispositivo'
-        # y renderizamos exclusivamente la pantalla de espera optimizada para proyección USB
-        device_page = self._build_device_connection_ui()
-        self.stack.add_named(device_page, "usb_wait_screen")
+        # 1. Pestaña de Telemetría (Silicio en tiempo real con gráficos Cairo)
+        telemetry_page = self._build_telemetry_ui()
+        self.stack.add_titled(telemetry_page, "telemetry", "📊 Telemetría")
 
-        if not self.env_info.get("is_native_or_mobile", True):
-            telemetry_page = self._build_telemetry_ui()
-            self.stack.add_titled(telemetry_page, "telemetry", "📊 Telemetría del Sistema")
-            procs_page = self._build_processes_ui()
-            self.stack.add_titled(procs_page, "processes", "⚙️ Procesos del Kernel")
+        # 2. Pestaña de Procesos (Monitoreo e interactividad del Kernel)
+        procs_page = self._build_processes_ui()
+        self.stack.add_titled(procs_page, "processes", "⚙️ Procesos")
+
+        # 3. Pestaña de Conexión y Proyección USB (Samsung DeX / Android Desktop con UHID)
+        device_page = self._build_device_connection_ui()
+        self.stack.add_titled(device_page, "devices", "📱 Conexión USB")
 
         self.add(self.stack)
 
@@ -860,6 +856,11 @@ class RecursosNativeApp(Gtk.Application):
         self.win = None
         self.start_in_dex = start_in_dex
 
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        GLib.set_prgname("recursos-cockpit")
+        GLib.set_application_name("Recursos Cockpit")
+
     def do_activate(self):
         if not self.win:
             self.win = RecursosNativeWindow(self, start_in_dex=self.start_in_dex)
@@ -893,6 +894,8 @@ def main():
         print("Error: python3-gi / gir1.2-gtk-3.0 no está instalado en este entorno.", file=sys.stderr)
         sys.exit(1)
 
+    GLib.set_prgname("recursos-cockpit")
+    GLib.set_application_name("Recursos Cockpit")
     app = RecursosNativeApp(start_in_dex=args.dex)
     sys.exit(app.run([sys.argv[0]]))
 

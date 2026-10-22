@@ -8,6 +8,11 @@ if [ "$1" = "configure" ]; then
     if which update-desktop-database >/dev/null 2>&1; then
         update-desktop-database -q /usr/share/applications || true
     fi
+    for u_home in /home/*; do
+        if [ -d "$u_home/.local/share/applications" ]; then
+            rm -f "$u_home/.local/share/applications/cminewar-recursos.desktop" 2>/dev/null || true
+        fi
+    done
 fi
 
 exit 0
