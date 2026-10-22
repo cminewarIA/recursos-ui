@@ -1463,6 +1463,9 @@
       width: 100%;
       height: 440px;
       min-height: 440px;
+      position: relative;
+      z-index: 0;
+      isolation: isolate; /* Los panes de Leaflet (z-index 200-1000) quedan contenidos dentro del canvas */
     }
     .connections-map-overlay-legend {
       position: absolute;
@@ -1471,7 +1474,7 @@
       right: 58px;
       width: fit-content;
       max-width: calc(100% - 72px);
-      z-index: 4;
+      z-index: 1050;
       background: rgba(15, 23, 42, 0.90);
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -1653,7 +1656,7 @@
       background: rgba(10, 15, 28, 0.84);
       backdrop-filter: blur(10px);
       color: var(--text-secondary);
-      z-index: 6;
+      z-index: 1100;
     }
     [data-theme="light"] .connections-map-status-overlay {
       background: rgba(248, 250, 252, 0.88);
@@ -10508,8 +10511,17 @@
     // GEOSPATIAL CONNECTIONS ENGINE (DUAL ENGINE: OPENSTREETMAP LEAFLET + GOOGLE MAPS)
     // =========================================================================
     let connectionsMapFilter = 'all';
+    let connectionsMapDeviceSel = null;
+
+    function setConnectionsMapDevice(ip) {
+      connectionsMapDeviceSel = ip || null;
+      if (latestMetrics) {
+        NetworkConnectionsMapEngine.renderFromMetrics(latestMetrics, true);
+      }
+    }
 
     function setConnectionsMapFilter(filter) {
+      if (filter !== connectionsMapFilter) connectionsMapDeviceSel = null;
       connectionsMapFilter = filter;
       const mapBtns = {
         all: 'fMapConnAll',
@@ -11091,7 +11103,10 @@
             badgeHtml = `<div class="gmp-conn-marker ${dirClass} grouped"><span class="group-count-pill">🔀 ${items.length}</span><span>${escapeHtml(dynamicLabel)}</span></div>`;
           } else {
             const arrowChar = first.direction === 'incoming' ? '↓' : (first.direction === 'blocked' ? '🛡️' : '↑');
-            const displayLabel = first.domain || first.remote_ip;
+            const remoteLabel = first.domain || first.remote_ip;
+            const displayLabel = (connectionsMapFilter === 'devices' && first.local_hostname)
+              ? `${first.local_hostname} → ${remoteLabel}`
+              : remoteLabel;
             badgeHtml = `<div class="gmp-conn-marker ${dirClass}"><span>${arrowChar}</span><span>${escapeHtml(displayLabel)}</span></div>`;
           }
 
@@ -11310,7 +11325,7 @@
         const uniqueCountries = new Set(allConns.map(c => c.country).filter(Boolean)).size;
         setText('mapKpiCountries', `${uniqueCountries || 1} países / regiones en mapa`);
 
-        const filteredConns = allConns.filter(c => {
+        let filteredConns = allConns.filter(c => {
           if (connectionsMapFilter === 'all') return true;
           if (connectionsMapFilter === 'devices') {
             return c.local_ip && c.local_ip !== srvIp && c.local_ip !== '127.0.0.1' && c.local_ip !== '::1';
@@ -11318,12 +11333,44 @@
           return c.direction === connectionsMapFilter;
         });
 
+        // Desglose dispositivo por dispositivo (100% dinámico: wifi_clients + conntrack/Pi-hole)
+        let deviceGroups = [];
+        if (connectionsMapFilter === 'devices') {
+          const clientsByIp = new Map();
+          (Array.isArray(metricsData.wifi_clients) ? metricsData.wifi_clients : []).forEach(cl => {
+            if (cl && cl.ip) clientsByIp.set(String(cl.ip), cl);
+          });
+          const gMap = new Map();
+          filteredConns.forEach(c => {
+            if (!gMap.has(c.local_ip)) {
+              const cl = clientsByIp.get(String(c.local_ip)) || null;
+              gMap.set(c.local_ip, {
+                ip: c.local_ip,
+                name: (cl && cl.name) || c.local_hostname || c.local_ip,
+                client: cl,
+                conns: []
+              });
+            }
+            gMap.get(c.local_ip).conns.push(c);
+          });
+          deviceGroups = [...gMap.values()].sort((a, b) => b.conns.length - a.conns.length || String(a.name).localeCompare(String(b.name)));
+          if (connectionsMapDeviceSel && !gMap.has(connectionsMapDeviceSel)) connectionsMapDeviceSel = null;
+        } else {
+          connectionsMapDeviceSel = null;
+        }
+        const tableConns = filteredConns;
+        if (connectionsMapDeviceSel) {
+          filteredConns = filteredConns.filter(c => c.local_ip === connectionsMapDeviceSel);
+        }
+
         // Filtrar exclusivamente conexiones públicas con coordenadas reales para el mapa
         const mapConns = filteredConns.filter(c => !c.is_lan && typeof c.lat === 'number' && typeof c.lng === 'number');
         this._currentConns = mapConns;
         this._currentSrv = srv;
 
-        setText('mapConnTableMeta', `Mostrando ${filteredConns.length} de ${allConns.length} conexiones geolocalizadas`);
+        setText('mapConnTableMeta', connectionsMapFilter === 'devices'
+          ? `${deviceGroups.length} dispositivos · ${tableConns.length} conexiones${connectionsMapDeviceSel ? ' (filtrado: 1 dispositivo)' : ''}`
+          : `Mostrando ${filteredConns.length} de ${allConns.length} conexiones geolocalizadas`);
 
         // Render Interactive Connections Table
         const tableEl = document.getElementById('networkConnectionsTableList');
@@ -11331,7 +11378,7 @@
           if (filteredConns.length === 0) {
             tableEl.innerHTML = `<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 22px;">No hay conexiones ${connectionsMapFilter === 'all' ? 'activas' : 'en este filtro'} en este instante.</div>`;
           } else {
-            tableEl.innerHTML = filteredConns.map(c => {
+            const renderRow = (c) => {
               const dirIcon = c.direction === 'incoming' ? '↓ Entrante' : (c.direction === 'blocked' ? '🛡️ Bloqueada' : '↑ Saliente');
               const locText = `${c.city || 'Red'}${c.country ? ', ' + c.country : ''}`;
               const geoSt = c.geo_status || (c.is_lan ? 'lan' : 'cached');
@@ -11378,7 +11425,52 @@
                   </div>
                 </div>
               `;
-            }).join('');
+            };
+
+            if (connectionsMapFilter === 'devices') {
+              const chipsHtml = `
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 4px 10px;">
+                  <button class="seg-btn ${connectionsMapDeviceSel ? '' : 'active'}" style="font-size: 11px; padding: 4px 10px;" onclick="setConnectionsMapDevice(null)">Todos (${deviceGroups.length})</button>
+                  ${deviceGroups.map(g => `
+                    <button class="seg-btn ${connectionsMapDeviceSel === g.ip ? 'active' : ''}" style="font-size: 11px; padding: 4px 10px;" onclick="setConnectionsMapDevice('${escapeHtml(g.ip)}')" title="${escapeHtml(g.ip)}">
+                      ${getDeviceEmoji(g.client && (g.client.dev_icon || g.client.dev_type))} ${escapeHtml(g.name)} (${g.conns.length})
+                    </button>`).join('')}
+                </div>`;
+              const groupsHtml = deviceGroups.map(g => {
+                const cl = g.client || {};
+                const isSel = connectionsMapDeviceSel === g.ip;
+                const emoji = getDeviceEmoji(cl.dev_icon || cl.dev_type);
+                const domains = new Set(g.conns.map(c => c.domain || c.remote_ip)).size;
+                const speedTxt = (cl.speed_down !== undefined || cl.speed_up !== undefined)
+                  ? `<span class="mono" style="font-size: 11px; color: var(--text-secondary);" title="Consumo real del dispositivo">↓ ${formatSpeed(Number(cl.speed_down || 0))} · ↑ ${formatSpeed(Number(cl.speed_up || 0))}</span>`
+                  : '';
+                const totalTxt = (cl.tx_bytes !== undefined || cl.rx_bytes !== undefined)
+                  ? `<span class="mono" style="font-size: 10.5px; color: var(--text-muted);">Total: ↓ ${formatBytes(Number(cl.tx_bytes || 0))} · ↑ ${formatBytes(Number(cl.rx_bytes || 0))}</span>`
+                  : '';
+                const visibleConns = (connectionsMapDeviceSel && !isSel) ? [] : g.conns;
+                return `
+                  <div style="margin-bottom: 10px; border: 1px solid ${isSel ? 'var(--accent-cyan-bright)' : 'var(--border-subtle)'}; border-radius: 10px; overflow: hidden;">
+                    <div onclick="setConnectionsMapDevice(${isSel ? 'null' : `'${escapeHtml(g.ip)}'`})" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 12px; background: var(--bg-surface-inset);" title="Pulsa para ver solo este dispositivo en el mapa">
+                      <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                        <span style="font-size: 18px;">${emoji}</span>
+                        <div style="min-width: 0;">
+                          <div style="font-weight: 800; font-size: 13px; color: var(--text-primary);">${escapeHtml(g.name)}</div>
+                          <div class="mono" style="font-size: 10.5px; color: var(--text-muted);">${escapeHtml(g.ip)}${cl.mac ? ' · ' + escapeHtml(cl.mac) : ''}</div>
+                        </div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span class="adw-badge badge-blue" style="font-size: 10.5px;">${g.conns.length} conexiones · ${domains} destinos</span>
+                        ${speedTxt}
+                        ${totalTxt}
+                      </div>
+                    </div>
+                    ${visibleConns.map(renderRow).join('')}
+                  </div>`;
+              }).join('');
+              tableEl.innerHTML = chipsHtml + groupsHtml;
+            } else {
+              tableEl.innerHTML = filteredConns.map(renderRow).join('');
+            }
           }
         }
 
