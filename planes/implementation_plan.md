@@ -1,39 +1,46 @@
-# Plan de Corrección - v8.3.4: Corrección de Lanzador Único, Icono Oficial y Layout Completo en la App Nativa
+# Plan de Implementación - v8.3.5: Corrección Definitiva de Renderizado Nativo (Cairo/PyGObject) y Supresión de Lanzadores Auxiliares en el Box de Aplicaciones
 
-## 1. Problemas Reportados por el Usuario
-1. *"Al abrir la app no muestra nada"*: La ventana nativa GTK3 se abría en un estado donde la telemetría y los procesos estaban desactivados condicionalmente (`if not is_native_or_mobile`), ocultando el `StackSwitcher` y mostrando únicamente una pantalla vacía a la espera de un cable USB.
-2. *"El icono en el box es el de ajustes"*: El archivo `.desktop` tenía `Categories=System;Monitor;Utility;Telephony;` y no se invocaba `GLib.set_prgname("recursos-cockpit")`, provocando que el window manager lo catalogara como `python3` y asignara el icono de fallback de ajustes (`preferences-system`).
-3. *"Instala dos lanzadores más en el box de aplicaciones"*:
-   - El archivo `.desktop` incluía una `[Desktop Action LaunchDeX]` ("Iniciar Modo DeX Directamente") que se registraba como un segundo lanzador en el menú.
-   - Las múltiples categorías (`Utility`, `Telephony`) causaban duplicación de entradas en el menú.
-   - Existía un archivo residual antiguo de Chrome PWA (`~/.local/share/applications/cminewar-recursos.desktop`) con acción `UninstallApp`.
+## 📌 Contexto y Problema
+El usuario reporta:
+> *"la app al abrirse sige sin mostrar nada y sige instalando dos lanzadores mas en el box de aplicaciones"*
+
+### Causas Raíz Confirmadas Técnicamente:
+1. **Fallo de Renderizado Cairo en PyGObject (`TypeError: Couldn't find foreign struct converter for 'cairo.Context'`)**:
+   - `CairoSparkline.on_draw` utiliza `cr` (`cairo.Context`). En PyGObject, la conversión del tipo extranjero de C a Python requiere obligatoriamente el paquete del sistema `python3-gi-cairo` y la importación de `cairo`.
+   - Al faltar `python3-gi-cairo` en las dependencias (`Depends:` de `debian/control`) y no estar `import cairo`, cada ciclo de dibujado de GTK3 generaba excepciones continuas no capturadas de `TypeError` en los DrawingAreas de CPU, RAM y Red, haciendo que la ventana GTK no se dibujase y quedase totalmente vacía/en blanco.
+   - Además, faltaba invocar explícitamente `self.show_all()` en `RecursosNativeWindow.__init__()` y en `RecursosNativeApp.do_activate()`, dejando los widgets hijos con `visible=False`.
+
+2. **Aparición de dos lanzadores adicionales (`scrcpy` y `scrcpy-console`)**:
+   - Al declarar `scrcpy` como dependencia directa del paquete Debian, el gestor `apt` instala el paquete oficial de Ubuntu `scrcpy`, el cual incluye `/usr/share/applications/scrcpy.desktop` y `/usr/share/applications/scrcpy-console.desktop`.
+   - Estos lanzadores secundarios no tenían `NoDisplay=true` en su sección `[Desktop Entry]`, provocando que el Box de Aplicaciones de GNOME muestre dos aplicaciones extra no deseadas ("scrcpy" y "scrcpy (console)").
 
 ---
 
-## 2. Soluciones a Aplicar
+## 🛠️ Modificaciones Propuestas
 
-### A. Archivo de Escritorio Único y Limpio (`desktop_app/recursos-cockpit.desktop`)
-- Unificar categorías a `Categories=System;Monitor;` (estándar FreeDesktop validado sin duplicaciones).
-- Retirar `Actions=LaunchDeX;` y la sección secundaria para garantizar un **único lanzador en el box de aplicaciones**.
-- Asignar `Exec=/usr/bin/recursos-cockpit` y `Icon=recursos-cockpit`.
-- Purgar el lanzador residual `cminewar-recursos.desktop` de `~/.local/share/applications/`.
+### 1. `desktop_app/recursos_app.py`
+- Añadir `import cairo` e importar soporte seguro de Cairo.
+- Envolver `CairoSparkline.on_draw` en un bloque `try ... except Exception: pass` para garantizar tolerancia a fallos en el dibujado.
+- Invocar `self.show_all()` en `RecursosNativeWindow.__init__()` y en `RecursosNativeApp.do_activate()`.
 
-### B. Restauración de Interfaz Completa en la App Nativa (`desktop_app/recursos_app.py`)
-- **Tres Pestañas Nativas**:
-  1. `📊 Telemetría`: CPU, Frecuencias, Temperaturas, Memoria RAM/Swap, Discos, Tráfico de Red en tiempo real y gráficas Cairo a 60 FPS.
-  2. `⚙️ Procesos`: Monitor interactivo de procesos del kernel con ordenamiento por PID, CPU% y RAM.
-  3. `📱 Conexión USB`: Interfaz de espera e interacción con dispositivos móviles (Scrcpy / UHID).
-- **Conmutador de Pestañas Siempre Visible**: `Gtk.StackSwitcher` integrado en el `HeaderBar`.
-- **Pestaña Inicial Predeterminada**: Abrir por defecto en `📊 Telemetría` (o en `📱 Conexión USB` si se pasa el flag `--dex`).
-- **Asociación de Icono y Proceso**:
-  - `GLib.set_prgname("recursos-cockpit")` y `GLib.set_application_name("Recursos Cockpit")`.
-  - `self.set_wmclass("recursos-cockpit", "recursos-cockpit")`.
+### 2. `packaging/debian/control`
+- Incrementar versión a `8.3.5`.
+- Añadir `python3-gi-cairo` y `python3-cairo` a la directiva `Depends:`.
 
-### C. Empaquetado y Post-Instalación (`packaging/`)
-- Limpieza automática de `cminewar-recursos.desktop` en `postinst`.
-- Actualización de bases de datos de escritorio e iconos.
+### 3. `packaging/debian/postinst`
+- Añadir lógica en la fase `configure` para inyectar automáticamente `NoDisplay=true` bajo `[Desktop Entry]` en `/usr/share/applications/scrcpy.desktop` y `/usr/share/applications/scrcpy-console.desktop`.
+- Ejecutar `update-desktop-database /usr/share/applications`.
 
-### D. Control de Versiones e Instalación (Reglas 5 y 8)
-- Actualizar versión a `8.3.4` en `VERSION`, `package.json`, `packaging/debian/control`, `README.md` y planes.
-- Compilar deb e instalar en el servidor físico: `bash packaging/build_deb.sh && sudo apt-get install -y ./dist/recursos-cockpit_8.3.4_amd64.deb`.
-- Validar con `--test-mode` y subir a GitHub con tag `v8.3.4`.
+### 4. Sincronización Canónica y Documentación
+- Actualizar `VERSION` a `8.3.5`.
+- Actualizar `package.json` a `8.3.5`.
+- Actualizar `README.md` (badges, banner ASCII y tabla de versiones con la fila `v8.3.5`).
+- Crear `planes/walkthrough_v8.3.5.md` y actualizar `planes/walkthrough.md`.
+
+### 5. Compilación, Instalación Local y Verificación (Regla 8)
+- Ejecutar `bash packaging/build_deb.sh`.
+- Instalar con `sudo apt-get install -y ./dist/recursos-cockpit_8.3.5_amd64.deb`.
+- Verificar con `dpkg -l | grep recursos-cockpit`.
+- Verificar con `/usr/bin/recursos-cockpit --test-mode`.
+- Verificar con `Gio.AppInfo.get_all()` que `scrcpy` y `scrcpy-console` tienen `should_show() == False` y solo `recursos-cockpit` tiene `should_show() == True`.
+- Verificar ejecución limpia en Wayland/X11 sin `TypeError`.

@@ -2,15 +2,30 @@
 set -e
 
 if [ "$1" = "configure" ]; then
+    # Ocultar lanzadores auxiliares de dependencias CLI/backend para no saturar el box de aplicaciones
+    for extra_desktop in /usr/share/applications/scrcpy.desktop /usr/share/applications/scrcpy-console.desktop; do
+        if [ -f "$extra_desktop" ]; then
+            # Eliminar cualquier NoDisplay previo y colocar NoDisplay=true bajo [Desktop Entry]
+            grep -v "^NoDisplay=" "$extra_desktop" > "${extra_desktop}.tmp" 2>/dev/null || cp "$extra_desktop" "${extra_desktop}.tmp"
+            awk '/^\[Desktop Entry\]/{print; print "NoDisplay=true"; next}1' "${extra_desktop}.tmp" > "$extra_desktop"
+            rm -f "${extra_desktop}.tmp"
+        fi
+    done
+
+    # Actualizar bases de datos de escritorio e iconos
     if which gtk-update-icon-cache >/dev/null 2>&1; then
         gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
     fi
     if which update-desktop-database >/dev/null 2>&1; then
         update-desktop-database -q /usr/share/applications || true
     fi
+
+    # Purgar viejos lanzadores PWA residuales en perfiles de usuario
     for u_home in /home/*; do
         if [ -d "$u_home/.local/share/applications" ]; then
             rm -f "$u_home/.local/share/applications/cminewar-recursos.desktop" 2>/dev/null || true
+            rm -f "$u_home/.local/share/applications/scrcpy.desktop" 2>/dev/null || true
+            rm -f "$u_home/.local/share/applications/scrcpy-console.desktop" 2>/dev/null || true
         fi
     done
 fi

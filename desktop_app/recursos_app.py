@@ -21,6 +21,13 @@ import threading
 import time
 
 try:
+    import cairo
+    HAS_CAIRO = True
+except ImportError:
+    cairo = None
+    HAS_CAIRO = False
+
+try:
     import gi
 
     gi.require_version("Gtk", "3.0")
@@ -187,54 +194,57 @@ class CairoSparkline(Gtk.DrawingArea):
         self.queue_draw()
 
     def on_draw(self, widget, cr):
-        alloc = self.get_allocation()
-        w = alloc.width
-        h = alloc.height
-        if w <= 2 or h <= 2:
-            return False
+        try:
+            alloc = self.get_allocation()
+            w = alloc.width
+            h = alloc.height
+            if w <= 2 or h <= 2:
+                return False
 
-        # Fondo oscuro
-        cr.set_source_rgba(0.05, 0.07, 0.10, 0.9)
-        cr.rectangle(0, 0, w, h)
-        cr.fill()
+            # Fondo oscuro
+            cr.set_source_rgba(0.05, 0.07, 0.10, 0.9)
+            cr.rectangle(0, 0, w, h)
+            cr.fill()
 
-        # Líneas guía horizontales
-        cr.set_source_rgba(1.0, 1.0, 1.0, 0.06)
-        cr.set_line_width(1.0)
-        for frac in (0.25, 0.5, 0.75):
-            y = h * frac
-            cr.move_to(0, y)
-            cr.line_to(w, y)
+            # Líneas guía horizontales
+            cr.set_source_rgba(1.0, 1.0, 1.0, 0.06)
+            cr.set_line_width(1.0)
+            for frac in (0.25, 0.5, 0.75):
+                y = h * frac
+                cr.move_to(0, y)
+                cr.line_to(w, y)
+                cr.stroke()
+
+            pts = list(self.history)
+            if len(pts) < 2:
+                return False
+
+            step_x = w / float(len(pts) - 1)
+            coords = []
+            for idx, val in enumerate(pts):
+                x = idx * step_x
+                y = h - (val / 100.0) * (h - 12) - 6
+                coords.append((x, y))
+
+            # Relleno bajo la curva
+            r, g, b = self.rgb
+            cr.set_source_rgba(r, g, b, 0.18)
+            cr.move_to(coords[0][0], h)
+            for x, y in coords:
+                cr.line_to(x, y)
+            cr.line_to(coords[-1][0], h)
+            cr.close_path()
+            cr.fill()
+
+            # Trazo principal
+            cr.set_source_rgba(r, g, b, 0.95)
+            cr.set_line_width(2.2)
+            cr.move_to(coords[0][0], coords[0][1])
+            for x, y in coords[1:]:
+                cr.line_to(x, y)
             cr.stroke()
-
-        pts = list(self.history)
-        if len(pts) < 2:
-            return False
-
-        step_x = w / float(len(pts) - 1)
-        coords = []
-        for idx, val in enumerate(pts):
-            x = idx * step_x
-            y = h - (val / 100.0) * (h - 12) - 6
-            coords.append((x, y))
-
-        # Relleno bajo la curva
-        r, g, b = self.rgb
-        cr.set_source_rgba(r, g, b, 0.18)
-        cr.move_to(coords[0][0], h)
-        for x, y in coords:
-            cr.line_to(x, y)
-        cr.line_to(coords[-1][0], h)
-        cr.close_path()
-        cr.fill()
-
-        # Trazo principal
-        cr.set_source_rgba(r, g, b, 0.95)
-        cr.set_line_width(2.2)
-        cr.move_to(coords[0][0], coords[0][1])
-        for x, y in coords[1:]:
-            cr.line_to(x, y)
-        cr.stroke()
+        except Exception:
+            pass
         return False
 
 
@@ -300,6 +310,9 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             self.stack.set_visible_child_name("telemetry")
 
         self.connect("key-press-event", self._on_key_press)
+
+        # Mostrar recursivamente todos los widgets hijos de la ventana
+        self.show_all()
 
         # Timers nativos GLib: telemetría en tiempo real (1.5s) y detección USB (2.0s)
         self._refresh_telemetry()
@@ -864,6 +877,7 @@ class RecursosNativeApp(Gtk.Application):
     def do_activate(self):
         if not self.win:
             self.win = RecursosNativeWindow(self, start_in_dex=self.start_in_dex)
+        self.win.show_all()
         self.win.present()
 
 
