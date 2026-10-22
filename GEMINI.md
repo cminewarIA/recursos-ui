@@ -44,3 +44,14 @@
   3. **Identificadores y agrupamientos**: Los grupos y clusters del mapa o tablas deben computarse en tiempo de ejecución en base a coordenadas reales o distancias relativas de pantalla, nunca mediante cadenas fijas preasignadas.
 - **Objetivo**: Asegurar que la aplicación sea universal, adaptable a cualquier infraestructura o red sin código muerto ni asunciones artificiales.
 
+## 8. Compilación e Instalación Local Obligatoria de la App Nativa Linux (.deb)
+- **Regla obligatoria**: Cada vez que se realice cualquier modificación o actualización en la aplicación (frontend web, backend, configuración, empaquetado o reglas) y se incremente el número de versión canónica en `./VERSION`:
+  1. **Compilación Inmediata del Paquete**: Se debe compilar obligatoriamente el paquete Debian canónico ejecutando `bash packaging/build_deb.sh`, generando `dist/recursos-cockpit_${VERSION}_amd64.deb` y el archivo de sumas criptográficas `dist/SHA256SUMS.txt`.
+  2. **Instalación Local en el Servidor**: Se debe instalar inmediatamente en el sistema operativo del servidor físico local mediante:
+     ```bash
+     sudo apt-get install -y ./dist/recursos-cockpit_${VERSION}_amd64.deb
+     ```
+  3. **Verificación de la Instalación**: Se debe comprobar que `/usr/bin/recursos-cockpit` esté instalado y operativo ejecutando `/usr/bin/recursos-cockpit --test-mode`, asegurando que `dpkg -l | grep recursos-cockpit` refleje exactamente la misma versión canónica activa de `./VERSION`.
+- **Objetivo**: Garantizar que el servidor local mantenga instalada y sincronizada de forma permanente la versión más reciente de la aplicación nativa de escritorio GTK3, sin desfases entre la versión web, los endpoints y el ejecutable del sistema.
+
+
