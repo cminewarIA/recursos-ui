@@ -3,9 +3,10 @@
 """
 Recursos Cockpit · Aplicación Nativa de Escritorio para Linux
 =============================================================
-Combina el Centro de Telemetría y Ciberdefensa Cockpit con el
-entorno exclusivo de proyección Samsung DeX y Android Desktop.
-Desarrollada nativamente con GTK 3 y WebKit2GTK (sin Electron).
+Aplicación 100% nativa en GTK 3 para monitorización en tiempo real
+del silicio del sistema (CPU, RAM, Discos, Red) y conexión por
+hardware interactiva con dispositivos móviles vía Scrcpy y UHID.
+Sin dependencias de navegadores ni frameworks web embebidos.
 """
 
 import os
@@ -19,39 +20,55 @@ import signal
 # Soporte para ejecución en modo test sin interfaz gráfica o display
 IS_TEST_MODE = "--test-mode" in sys.argv or os.environ.get("RECURSOS_TEST_MODE") == "1"
 
-if not IS_TEST_MODE:
-    import gi
-    gi.require_version('Gtk', '3.0')
-    gi.require_version('WebKit2', '4.1')
-    from gi.repository import Gtk, Gdk, GLib, WebKit2, Gio, GdkPixbuf
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
-# Importar motor DeX local
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, Gdk, GLib, Gio, Pango
+
+# Importar controlador de conexión de dispositivos
 try:
     from dex_controller import DexController
 except ImportError:
     from desktop_app.dex_controller import DexController
 
-DEFAULT_DASHBOARD_URL = os.environ.get("RECURSOS_URL", "http://127.0.0.1:8085")
 
 class RecursosDesktopApp:
-    def __init__(self, target_url=DEFAULT_DASHBOARD_URL):
-        self.target_url = target_url
-        self.dex = DexController(log_callback=self.on_dex_log)
-        self.log_buffer = []
+    def __init__(self):
+        self.dex = DexController(log_callback=self.on_device_log)
         self.detected_devices = []
-        self.active_tab = "cockpit"
+        self.running_session = False
+        self.last_net_io = None
+        self.last_net_time = time.time()
 
         if IS_TEST_MODE:
-            print("[TEST MODE] RecursosDesktopApp inicializada correctamente en modo sin interfaz gráfica.")
+            print("[TEST MODE] Recursos Cockpit (App 100% Nativa GTK3) inicializada correctamente.")
+            # Ejecución de verificación interna de widgets nativos
+            self._verify_native_widgets_test()
             return
 
         self._build_ui()
-        self._start_device_monitor()
+        self._start_monitors()
+
+    def _verify_native_widgets_test(self):
+        """Verifica la inicialización de widgets nativos sin abrir display en modo test."""
+        win = Gtk.OffscreenWindow()
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        lbl = Gtk.Label(label="Esperando dispositivo para conectarse en su versión nativa")
+        pbar = Gtk.ProgressBar()
+        box.pack_start(lbl, True, True, 0)
+        box.pack_start(pbar, True, True, 0)
+        win.add(box)
+        win.show_all()
+        print("[TEST MODE] Widgets nativos verificados con éxito (OffscreenWindow, Label, ProgressBar).")
 
     def _build_ui(self):
         # 1. Ventana Principal GTK
-        self.window = Gtk.Window(title="Recursos Cockpit & Modo DeX")
-        self.window.set_default_size(1280, 800)
+        self.window = Gtk.Window(title="Recursos Cockpit · Sistema & Dispositivos")
+        self.window.set_default_size(1080, 720)
         self.window.set_position(Gtk.WindowPosition.CENTER)
 
         # Icono de la ventana
@@ -59,128 +76,411 @@ class RecursosDesktopApp:
         if os.path.exists(icon_path):
             self.window.set_icon_from_file(icon_path)
 
-        # 2. HeaderBar Nativa Estilo GNOME / Adwaita
+        # 2. HeaderBar Nativa Estilo GNOME Adwaita
         self.header = Gtk.HeaderBar()
         self.header.set_show_close_button(True)
         self.header.set_title("Recursos Cockpit")
-        self.header.set_subtitle("Telemetría 60 FPS & Samsung DeX Station")
+        self.header.set_subtitle("Monitor Nativo del Silicio & Conexión de Dispositivo")
         self.window.set_titlebar(self.header)
 
-        # Botón de Recargar Cockpit
-        self.btn_refresh = Gtk.Button.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
-        self.btn_refresh.set_tooltip_text("Recargar Panel Web (Ctrl+R)")
-        self.btn_refresh.connect("clicked", lambda b: self.webview.reload() if hasattr(self, 'webview') else None)
-        self.header.pack_start(self.btn_refresh)
-
-        # Selector de Modos (Cockpit vs DeX)
+        # Selector de Vistas StackSwitcher
         self.mode_stack_switcher = Gtk.StackSwitcher()
         self.header.set_custom_title(self.mode_stack_switcher)
 
-        # Botón Pantalla Completa
+        # Botón Pantalla Completa (F11)
         self.btn_fullscreen = Gtk.Button.new_from_icon_name("view-fullscreen-symbolic", Gtk.IconSize.BUTTON)
         self.btn_fullscreen.set_tooltip_text("Pantalla Completa (F11)")
         self.btn_fullscreen.connect("clicked", self._toggle_fullscreen)
         self.header.pack_end(self.btn_fullscreen)
 
-        # 3. Stack Principal de Vistas
+        # 3. Stack Principal de Vistas Nativas
         self.stack = Gtk.Stack()
-        self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        self.stack.set_transition_duration(250)
+        self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        self.stack.set_transition_duration(200)
         self.mode_stack_switcher.set_stack(self.stack)
 
-        # --- VISTA 1: COCKPIT WEBVIEW ---
-        self.cockpit_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.webview = WebKit2.WebView()
-        settings = self.webview.get_settings()
-        settings.set_enable_developer_extras(True)
-        settings.set_enable_webgl(True)
-        settings.set_enable_smooth_scrolling(True)
-        settings.set_hardware_acceleration_policy(WebKit2.HardwareAccelerationPolicy.ALWAYS)
+        # --- PESTAÑA 1: MONITOR DE SISTEMA NATIVO ---
+        self.system_view = self._build_system_monitor_ui()
+        self.stack.add_titled(self.system_view, "system", "🖥️ Sistema")
 
-        self.webview.load_uri(self.target_url)
-        self.cockpit_box.pack_start(self.webview, True, True, 0)
-        self.stack.add_titled(self.cockpit_box, "cockpit", "🛸 Cockpit")
+        # --- PESTAÑA 2: CONEXIÓN DE DISPOSITIVO NATIVO ---
+        self.device_view = self._build_device_connection_ui()
+        self.stack.add_titled(self.device_view, "device", "📱 Dispositivo")
 
-        # --- VISTA 2: MODO DEX EXCLUSIVO ---
-        self.dex_box = self._create_dex_ui()
-        self.stack.add_titled(self.dex_box, "dex", "📱 Modo DeX")
+        # --- PESTAÑA 3: DIAGNÓSTICO Y REGISTROS NATIVOS ---
+        self.diag_view = self._build_diagnostics_ui()
+        self.stack.add_titled(self.diag_view, "diagnostics", "📋 Diagnóstico")
 
         self.window.add(self.stack)
 
-        # Atajos de teclado
+        # Atajos de teclado nativos
         self.window.connect("key-press-event", self._on_key_press)
         self.window.connect("destroy", self._on_window_destroy)
 
-    def _create_dex_ui(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        box.set_margin_top(20)
-        box.set_margin_bottom(20)
+    def _build_system_monitor_ui(self):
+        """Construye un panel de monitoreo de hardware 100% nativo con widgets GTK3."""
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        main_box.set_margin_top(18)
+        main_box.set_margin_bottom(18)
+        main_box.set_margin_start(22)
+        main_box.set_margin_end(22)
+        scrolled.add(main_box)
+
+        # --- SECCIÓN CPU ---
+        cpu_frame = Gtk.Frame(label=" Procesador (CPU) ")
+        cpu_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        cpu_box.set_margin_top(10)
+        cpu_box.set_margin_bottom(10)
+        cpu_box.set_margin_start(14)
+        cpu_box.set_margin_end(14)
+
+        self.lbl_cpu_model = Gtk.Label()
+        self.lbl_cpu_model.set_markup("<b>Modelo:</b> Detectando arquitectura...")
+        self.lbl_cpu_model.set_xalign(0)
+        cpu_box.pack_start(self.lbl_cpu_model, False, False, 0)
+
+        cpu_usage_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.lbl_cpu_percent = Gtk.Label(label="Carga Global: --%")
+        self.lbl_cpu_percent.set_xalign(0)
+        self.pbar_cpu = Gtk.ProgressBar()
+        self.pbar_cpu.set_show_text(True)
+        cpu_usage_box.pack_start(self.lbl_cpu_percent, False, False, 0)
+        cpu_usage_box.pack_start(self.pbar_cpu, True, True, 0)
+        cpu_box.pack_start(cpu_usage_box, False, False, 0)
+
+        # Matriz de hilos lógicos
+        self.cpu_cores_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        cpu_box.pack_start(self.cpu_cores_box, False, False, 0)
+        cpu_frame.add(cpu_box)
+        main_box.pack_start(cpu_frame, False, False, 0)
+
+        # --- SECCIÓN MEMORIA RAM & SWAP ---
+        mem_frame = Gtk.Frame(label=" Memoria Física (RAM) & Swap ")
+        mem_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        mem_box.set_margin_top(10)
+        mem_box.set_margin_bottom(10)
+        mem_box.set_margin_start(14)
+        mem_box.set_margin_end(14)
+
+        ram_usage_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.lbl_ram_info = Gtk.Label(label="RAM: -- / -- GB")
+        self.lbl_ram_info.set_xalign(0)
+        self.pbar_ram = Gtk.ProgressBar()
+        self.pbar_ram.set_show_text(True)
+        ram_usage_box.pack_start(self.lbl_ram_info, False, False, 0)
+        ram_usage_box.pack_start(self.pbar_ram, True, True, 0)
+        mem_box.pack_start(ram_usage_box, False, False, 0)
+
+        swap_usage_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.lbl_swap_info = Gtk.Label(label="Swap / ZRAM: -- / -- GB")
+        self.lbl_swap_info.set_xalign(0)
+        self.pbar_swap = Gtk.ProgressBar()
+        self.pbar_swap.set_show_text(True)
+        swap_usage_box.pack_start(self.lbl_swap_info, False, False, 0)
+        swap_usage_box.pack_start(self.pbar_swap, True, True, 0)
+        mem_box.pack_start(swap_usage_box, False, False, 0)
+
+        mem_frame.add(mem_box)
+        main_box.pack_start(mem_frame, False, False, 0)
+
+        # --- SECCIÓN ALMACENAMIENTO & RED ---
+        row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+
+        # Discos
+        disk_frame = Gtk.Frame(label=" Almacenamiento & Discos ")
+        self.disk_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.disk_box.set_margin_top(10)
+        self.disk_box.set_margin_bottom(10)
+        self.disk_box.set_margin_start(14)
+        self.disk_box.set_margin_end(14)
+        disk_frame.add(self.disk_box)
+        row_box.pack_start(disk_frame, True, True, 0)
+
+        # Red
+        net_frame = Gtk.Frame(label=" Interfaces de Red (Tráfico en Vivo) ")
+        self.net_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.net_box.set_margin_top(10)
+        self.net_box.set_margin_bottom(10)
+        self.net_box.set_margin_start(14)
+        self.net_box.set_margin_end(14)
+        net_frame.add(self.net_box)
+        row_box.pack_start(net_frame, True, True, 0)
+
+        main_box.pack_start(row_box, False, False, 0)
+        return scrolled
+
+    def _build_device_connection_ui(self):
+        """Construye el panel de conexión e interacción de dispositivo nativo."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        box.set_margin_top(22)
+        box.set_margin_bottom(22)
         box.set_margin_start(24)
         box.set_margin_end(24)
 
-        # Cabecera Bento DeX
-        banner_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        lbl_icon = Gtk.Label()
-        lbl_icon.set_markup("<span font='36'>📱</span>")
-        banner_box.pack_start(lbl_icon, False, False, 0)
+        # Banner de Estado Destacado
+        self.banner_frame = Gtk.Frame()
+        banner_inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        banner_inner.set_margin_top(16)
+        banner_inner.set_margin_bottom(16)
+        banner_inner.set_margin_start(18)
+        banner_inner.set_margin_end(18)
 
-        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        lbl_title = Gtk.Label()
-        lbl_title.set_markup("<span font='18' weight='bold'>Estación de Trabajo Samsung DeX & Android Desktop</span>")
-        lbl_title.set_xalign(0)
-        lbl_desc = Gtk.Label()
-        lbl_desc.set_markup("<span color='#888888'>Función nativa exclusiva de la aplicación de escritorio. Control por hardware UHID, aceleración a 60 FPS y audio integrado.</span>")
-        lbl_desc.set_xalign(0)
-        info_box.pack_start(lbl_title, False, False, 0)
-        info_box.pack_start(lbl_desc, False, False, 0)
-        banner_box.pack_start(info_box, True, True, 0)
-        box.pack_start(banner_box, False, False, 0)
+        status_head = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.lbl_status_icon = Gtk.Label()
+        self.lbl_status_icon.set_markup("<span font='24'>📡</span>")
+        self.lbl_device_status = Gtk.Label()
+        self.lbl_device_status.set_markup("<span font='15' weight='bold' color='#d97706'>Esperando dispositivo para conectarse en su versión nativa</span>")
+        self.lbl_device_status.set_xalign(0)
+        status_head.pack_start(self.lbl_status_icon, False, False, 0)
+        status_head.pack_start(self.lbl_device_status, True, True, 0)
 
-        # Panel de Dispositivos Conectados
-        frame_devs = Gtk.Frame(label="Dispositivos Móviles Detectados (USB / Wi-Fi)")
-        self.devs_list_box = Gtk.ListBox()
-        self.devs_list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
-        frame_devs.add(self.devs_list_box)
-        box.pack_start(frame_devs, False, False, 0)
+        self.btn_rescan_adb = Gtk.Button.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
+        self.btn_rescan_adb.set_tooltip_text("Escanear dispositivos ADB ahora")
+        self.btn_rescan_adb.connect("clicked", lambda b: self._scan_devices_thread())
+        status_head.pack_end(self.btn_rescan_adb, False, False, 0)
+        banner_inner.pack_start(status_head, False, False, 0)
 
-        # Barra de Acciones Rápidas
-        actions_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.lbl_status_hint = Gtk.Label()
+        self.lbl_status_hint.set_markup("<span color='#888888'>Conecta un dispositivo Android / Samsung mediante cable USB con Depuración USB habilitada o emparejado por Wi-Fi TCP/IP.</span>")
+        self.lbl_status_hint.set_xalign(0)
+        banner_inner.pack_start(self.lbl_status_hint, False, False, 0)
 
-        self.btn_start_dex = Gtk.Button.new_with_label("🚀 Iniciar Samsung DeX (Pantalla Completa)")
-        self.btn_start_dex.get_style_context().add_class("suggested-action")
-        self.btn_start_dex.connect("clicked", self._on_start_dex_clicked)
-        actions_bar.pack_start(self.btn_start_dex, True, True, 0)
+        self.banner_frame.add(banner_inner)
+        box.pack_start(self.banner_frame, False, False, 0)
 
-        self.btn_start_windowed = Gtk.Button.new_with_label("🪟 Iniciar en Ventana")
-        self.btn_start_windowed.connect("clicked", lambda b: self._on_start_dex_clicked(b, fullscreen=False))
-        actions_bar.pack_start(self.btn_start_windowed, False, False, 0)
+        # Tarjeta de Dispositivo Detectado
+        self.frame_detected = Gtk.Frame(label=" Dispositivo Activo Seleccionado ")
+        detected_inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        detected_inner.set_margin_top(12)
+        detected_inner.set_margin_bottom(12)
+        detected_inner.set_margin_start(16)
+        detected_inner.set_margin_end(16)
 
-        self.btn_enable_wifi = Gtk.Button.new_with_label("📶 Activar Modo Wi-Fi (Sin Cables)")
-        self.btn_enable_wifi.connect("clicked", self._on_enable_wifi_clicked)
-        actions_bar.pack_start(self.btn_enable_wifi, False, False, 0)
+        self.lbl_dev_info = Gtk.Label(label="Ningún dispositivo detectado.")
+        self.lbl_dev_info.set_xalign(0)
+        detected_inner.pack_start(self.lbl_dev_info, False, False, 0)
 
-        self.btn_stop_dex = Gtk.Button.new_with_label("⏹️ Detener")
-        self.btn_stop_dex.get_style_context().add_class("destructive-action")
-        self.btn_stop_dex.connect("clicked", lambda b: self.dex.stop_session())
-        actions_bar.pack_start(self.btn_stop_dex, False, False, 0)
+        # Opciones de Hardware
+        options_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
 
-        box.pack_start(actions_bar, False, False, 0)
+        self.chk_uhid = Gtk.CheckButton(label="Paso directo de teclado/ratón por hardware (/dev/uhid)")
+        self.chk_uhid.set_active(True)
+        self.chk_uhid.set_tooltip_text("Permite escribir y controlar el cursor como si fuera un teclado y ratón USB físico real")
+        options_box.pack_start(self.chk_uhid, False, False, 0)
 
-        # Terminal de Logs / Estado en Vivo
-        frame_logs = Gtk.Frame(label="Registro de Conexión & Diagnósticos DeX")
+        self.chk_turn_off = Gtk.CheckButton(label="Apagar pantalla del móvil durante la sesión")
+        self.chk_turn_off.set_active(True)
+        options_box.pack_start(self.chk_turn_off, False, False, 0)
+
+        detected_inner.pack_start(options_box, False, False, 0)
+
+        # Resolución
+        res_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        lbl_res = Gtk.Label(label="Resolución de Proyección:")
+        res_box.pack_start(lbl_res, False, False, 0)
+
+        self.combo_res = Gtk.ComboBoxText()
+        self.combo_res.append("1920", "Full HD (1920x1080)")
+        self.combo_res.append("2560", "2K QHD (2560x1440)")
+        self.combo_res.append("0", "Nativa del Dispositivo")
+        self.combo_res.set_active(0)
+        res_box.pack_start(self.combo_res, False, False, 0)
+
+        self.btn_wifi_mode = Gtk.Button.new_with_label("📶 Conectar por Wi-Fi (ADB 5555)")
+        self.btn_wifi_mode.connect("clicked", self._on_enable_wifi_clicked)
+        res_box.pack_end(self.btn_wifi_mode, False, False, 0)
+
+        detected_inner.pack_start(res_box, False, False, 0)
+        self.frame_detected.add(detected_inner)
+        box.pack_start(self.frame_detected, False, False, 0)
+
+        # Botones de Acción
+        actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+
+        self.btn_connect = Gtk.Button.new_with_label("🚀 Conectar e Iniciar Sesión de Dispositivo")
+        self.btn_connect.get_style_context().add_class("suggested-action")
+        self.btn_connect.connect("clicked", self._on_start_connection_clicked)
+        actions_box.pack_start(self.btn_connect, True, True, 0)
+
+        self.btn_disconnect = Gtk.Button.new_with_label("⏹️ Desconectar")
+        self.btn_disconnect.get_style_context().add_class("destructive-action")
+        self.btn_disconnect.set_sensitive(False)
+        self.btn_disconnect.connect("clicked", self._on_disconnect_clicked)
+        actions_box.pack_start(self.btn_disconnect, False, False, 0)
+
+        box.pack_start(actions_box, False, False, 0)
+        return box
+
+    def _build_diagnostics_ui(self):
+        """Construye un visor de logs nativo con Gtk.TextView."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_top(16)
+        box.set_margin_bottom(16)
+        box.set_margin_start(20)
+        box.set_margin_end(20)
+
+        top_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        lbl_diag = Gtk.Label()
+        lbl_diag.set_markup("<b>Registro de Eventos y Diagnóstico de Dispositivos</b>")
+        top_bar.pack_start(lbl_diag, False, False, 0)
+
+        btn_clear = Gtk.Button.new_with_label("Limpiar Registro")
+        btn_clear.connect("clicked", lambda b: self.log_text_buffer.set_text(""))
+        top_bar.pack_end(btn_clear, False, False, 0)
+        box.pack_start(top_bar, False, False, 0)
+
         scrolled = Gtk.ScrolledWindow()
-        scrolled.set_min_content_height(220)
         self.log_text_view = Gtk.TextView()
         self.log_text_view.set_editable(False)
         self.log_text_view.set_cursor_visible(False)
+        self.log_text_view.set_monospace(True)
         self.log_text_buffer = self.log_text_view.get_buffer()
         scrolled.add(self.log_text_view)
-        frame_logs.add(scrolled)
-        box.pack_start(frame_logs, True, True, 0)
+        box.pack_start(scrolled, True, True, 0)
 
         return box
 
-    def on_dex_log(self, msg, level="INFO"):
+    def _start_monitors(self):
+        """Inicia temporizadores nativos de GTK para telemetría y escaneo ADB."""
+        # 1. Telemetría de hardware cada 1 segundo en el hilo principal de GTK
+        GLib.timeout_add(1000, self._update_system_metrics)
+        self._update_system_metrics()
+
+        # 2. Escáner de dispositivos cada 4 segundos
+        GLib.timeout_add(4000, self._periodic_device_scan)
+        self._scan_devices_thread()
+
+    def _update_system_metrics(self):
+        """Lee psutil y actualiza widgets nativos de GTK en tiempo real."""
+        if not psutil:
+            return True
+
+        try:
+            # CPU
+            cpu_pct = psutil.cpu_percent(interval=None)
+            self.pbar_cpu.set_fraction(cpu_pct / 100.0)
+            self.pbar_cpu.set_text(f"{cpu_pct:.1f}%")
+            self.lbl_cpu_percent.set_text(f"Carga Global: {cpu_pct:.1f}%")
+
+            cores = psutil.cpu_percent(percpu=True)
+            # Actualizar modelo y frecuencia si no están seteados
+            freq = psutil.cpu_freq()
+            freq_str = f" @ {freq.current:.0f} MHz" if freq else ""
+            self.lbl_cpu_model.set_markup(f"<b>Topología:</b> {len(cores)} Hilos Lógicos{freq_str}")
+
+            # RAM
+            mem = psutil.virtual_memory()
+            used_gb = mem.used / (1024**3)
+            total_gb = mem.total / (1024**3)
+            self.pbar_ram.set_fraction(mem.percent / 100.0)
+            self.pbar_ram.set_text(f"{mem.percent:.1f}%")
+            self.lbl_ram_info.set_text(f"RAM: {used_gb:.1f} / {total_gb:.1f} GB")
+
+            # Swap
+            swap = psutil.swap_memory()
+            if swap.total > 0:
+                s_used = swap.used / (1024**3)
+                s_tot = swap.total / (1024**3)
+                self.pbar_swap.set_fraction(swap.percent / 100.0)
+                self.pbar_swap.set_text(f"{swap.percent:.1f}%")
+                self.lbl_swap_info.set_text(f"Swap: {s_used:.1f} / {s_tot:.1f} GB")
+
+            # Discos
+            for child in self.disk_box.get_children():
+                self.disk_box.remove(child)
+
+            for part in psutil.disk_partitions(all=False):
+                if part.fstype in ('squashfs', 'iso9660'):
+                    continue
+                try:
+                    usage = psutil.disk_usage(part.mountpoint)
+                    u_gb = usage.used / (1024**3)
+                    t_gb = usage.total / (1024**3)
+                    d_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+                    lbl_part = Gtk.Label(label=f"{part.mountpoint} ({part.device}): {u_gb:.0f}/{t_gb:.0f} GB")
+                    lbl_part.set_xalign(0)
+                    p_disk = Gtk.ProgressBar()
+                    p_disk.set_fraction(usage.percent / 100.0)
+                    p_disk.set_show_text(True)
+                    p_disk.set_text(f"{usage.percent:.1f}%")
+                    d_row.pack_start(lbl_part, False, False, 0)
+                    d_row.pack_start(p_disk, True, True, 0)
+                    self.disk_box.pack_start(d_row, False, False, 0)
+                except PermissionError:
+                    continue
+            self.disk_box.show_all()
+
+            # Red
+            now = time.time()
+            net_io = psutil.net_io_counters(pernic=True)
+            dt = max(0.1, now - self.last_net_time)
+
+            for child in self.net_box.get_children():
+                self.net_box.remove(child)
+
+            for iface, io in net_io.items():
+                if iface.startswith('lo') or iface.startswith('docker') or iface.startswith('veth'):
+                    continue
+                rx_rate = 0.0
+                tx_rate = 0.0
+                if self.last_net_io and iface in self.last_net_io:
+                    rx_rate = (io.bytes_recv - self.last_net_io[iface].bytes_recv) / dt / 1024
+                    tx_rate = (io.bytes_sent - self.last_net_io[iface].bytes_sent) / dt / 1024
+
+                n_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+                lbl_if = Gtk.Label(label=f"<b>{iface}</b>")
+                lbl_if.set_use_markup(True)
+                lbl_rates = Gtk.Label(label=f"↓ {rx_rate:.1f} KB/s  ↑ {tx_rate:.1f} KB/s")
+                lbl_rates.set_xalign(1)
+                n_row.pack_start(lbl_if, False, False, 0)
+                n_row.pack_end(lbl_rates, False, False, 0)
+                self.net_box.pack_start(n_row, False, False, 0)
+
+            self.net_box.show_all()
+            self.last_net_io = net_io
+            self.last_net_time = now
+
+        except Exception as e:
+            pass
+
+        return True
+
+    def _periodic_device_scan(self):
+        self._scan_devices_thread()
+        return True
+
+    def _scan_devices_thread(self):
+        t = threading.Thread(target=self._run_scan, daemon=True)
+        t.start()
+
+    def _run_scan(self):
+        devs = self.dex.list_devices()
+        GLib.idle_add(self._update_devices_ui, devs)
+
+    def _update_devices_ui(self, devs):
+        self.detected_devices = devs
+        if devs:
+            d = devs[0]
+            name = d.get("model", d.get("serial", "Dispositivo Android"))
+            conn_type = "Wi-Fi (TCP/IP)" if ":" in d.get("serial", "") else "USB Directo"
+            self.lbl_device_status.set_markup(f"<span font='15' weight='bold' color='#10b981'>Dispositivo Listo: {name} ({conn_type})</span>")
+            self.lbl_status_icon.set_markup("<span font='24'>🟢</span>")
+            self.lbl_status_hint.set_markup(f"<span color='#10b981'>Identificador: {d.get('serial')} · Fabricante: {d.get('manufacturer', 'Android')} · Estado: Autorizado</span>")
+            self.lbl_dev_info.set_markup(f"<b>Dispositivo:</b> {name} | <b>Serial:</b> {d.get('serial')} | <b>Tipo:</b> {conn_type}")
+            self.btn_connect.set_sensitive(True)
+        else:
+            self.lbl_device_status.set_markup("<span font='15' weight='bold' color='#d97706'>Esperando dispositivo para conectarse en su versión nativa</span>")
+            self.lbl_status_icon.set_markup("<span font='24'>📡</span>")
+            self.lbl_status_hint.set_markup("<span color='#888888'>Conecta un dispositivo Android / Samsung mediante cable USB con Depuración USB habilitada o emparejado por Wi-Fi TCP/IP.</span>")
+            self.lbl_dev_info.set_markup("<i>Ningún dispositivo detectado en el puerto USB o red local.</i>")
+            if not self.running_session:
+                self.btn_connect.set_sensitive(False)
+        return False
+
+    def on_device_log(self, msg, level="INFO"):
         ts = time.strftime("%H:%M:%S")
         entry = f"[{ts}] [{level}] {msg}\n"
         if not IS_TEST_MODE:
@@ -192,100 +492,76 @@ class RecursosDesktopApp:
         if hasattr(self, 'log_text_buffer'):
             iter_end = self.log_text_buffer.get_end_iter()
             self.log_text_buffer.insert(iter_end, entry)
-            # Auto scroll
             adj = self.log_text_view.get_vadjustment()
             adj.set_value(adj.get_upper() - adj.get_page_size())
         return False
 
-    def _start_device_monitor(self):
-        """Hilo en segundo plano para escanear dispositivos ADB periódicamente."""
-        def monitor_loop():
-            while True:
-                devs = self.dex.list_connected_devices()
-                GLib.idle_add(self._update_devices_ui, devs)
-                time.sleep(3.0)
+    def _on_start_connection_clicked(self, widget):
+        dev_serial = self.detected_devices[0]["serial"] if self.detected_devices else None
+        res_val = int(self.combo_res.get_active_id() or 1920)
+        use_uhid = self.chk_uhid.get_active()
+        turn_off = self.chk_turn_off.get_active()
 
-        t = threading.Thread(target=monitor_loop, daemon=True)
+        self.on_device_log(f"Iniciando proyección nativa hacia {dev_serial or 'dispositivo por defecto'}...")
+        self.btn_connect.set_sensitive(False)
+        self.btn_disconnect.set_sensitive(True)
+        self.running_session = True
+
+        def _launch():
+            success = self.dex.start_session(
+                device_serial=dev_serial,
+                resolution=res_val,
+                fullscreen=False,
+                use_uhid=use_uhid,
+                turn_screen_off=turn_off
+            )
+            def _done():
+                self.running_session = False
+                self.btn_connect.set_sensitive(len(self.detected_devices) > 0)
+                self.btn_disconnect.set_sensitive(False)
+            GLib.idle_add(_done)
+
+        t = threading.Thread(target=_launch, daemon=True)
         t.start()
 
-    def _update_devices_ui(self, devs):
-        self.detected_devices = devs
-        # Limpiar list box
-        for row in self.devs_list_box.get_children():
-            self.devs_list_box.remove(row)
+    def _on_disconnect_clicked(self, widget):
+        self.on_device_log("Deteniendo sesión de proyección...")
+        self.dex.stop_session()
+        self.running_session = False
+        self.btn_connect.set_sensitive(len(self.detected_devices) > 0)
+        self.btn_disconnect.set_sensitive(False)
 
-        if not devs:
-            row = Gtk.ListBoxRow()
-            lbl = Gtk.Label(label="Esperando conexión USB de tu móvil Samsung o Android (Activa 'Depuración USB')...")
-            lbl.set_margin_top(12)
-            lbl.set_margin_bottom(12)
-            row.add(lbl)
-            self.devs_list_box.add(row)
-        else:
-            for d in devs:
-                row = Gtk.ListBoxRow()
-                box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-                box.set_margin_top(8)
-                box.set_margin_bottom(8)
-                box.set_margin_start(12)
-                box.set_margin_end(12)
+    def _on_enable_wifi_clicked(self, widget):
+        dev_serial = self.detected_devices[0]["serial"] if self.detected_devices else None
+        self.on_device_log("Habilitando modo Wi-Fi (ADB TCP/IP 5555)...")
+        t = threading.Thread(target=lambda: self.dex.enable_wifi_mode(dev_serial), daemon=True)
+        t.start()
 
-                badge = "📱 Samsung Galaxy" if d["is_samsung"] else "📲 Android"
-                conn_type = "📶 Wi-Fi" if d["is_wireless"] else "🔌 Cable USB"
-
-                lbl_main = Gtk.Label()
-                lbl_main.set_markup(f"<b>{d['model']}</b> ({d['id']}) · <span color='#00D2FF'>{badge}</span> · <span color='#30D158'>{conn_type}</span>")
-                lbl_main.set_xalign(0)
-                box.pack_start(lbl_main, True, True, 0)
-
-                row.add(box)
-                self.devs_list_box.add(row)
-
-        self.devs_list_box.show_all()
-        return False
-
-    def _on_start_dex_clicked(self, btn, fullscreen=True):
-        selected_id = None
-        if self.detected_devices:
-            selected_id = self.detected_devices[0]["id"]
-
-        self.dex.log(f"Iniciando DeX (Pantalla completa: {fullscreen})...")
-        threading.Thread(target=self.dex.start_dex_session, kwargs={"device_id": selected_id, "fullscreen": fullscreen}, daemon=True).start()
-
-    def _on_enable_wifi_clicked(self, btn):
-        selected_id = None
-        if self.detected_devices:
-            selected_id = self.detected_devices[0]["id"]
-        if not selected_id:
-            self.dex.log("Conecta primero el móvil por USB para activar el modo Wi-Fi.", "WARN")
-            return
-        threading.Thread(target=self.dex.enable_wireless_mode, args=(selected_id,), daemon=True).start()
-
-    def _toggle_fullscreen(self, btn):
-        if self.window.get_window().get_state() & Gdk.WindowState.FULLSCREEN:
+    def _toggle_fullscreen(self, widget):
+        if hasattr(self, '_is_fullscreen') and self._is_fullscreen:
             self.window.unfullscreen()
+            self._is_fullscreen = False
         else:
             self.window.fullscreen()
+            self._is_fullscreen = True
 
     def _on_key_press(self, widget, event):
-        # F11: Fullscreen
         if event.keyval == Gdk.KEY_F11:
-            self._toggle_fullscreen(None)
+            self._toggle_fullscreen(widget)
             return True
-        # Ctrl+R: Recargar webview
-        elif (event.state & Gdk.ModifierType.CONTROL_MASK) and event.keyval in (Gdk.KEY_r, Gdk.KEY_R):
-            if hasattr(self, 'webview'):
-                self.webview.reload()
-            return True
-        # Ctrl+D: Conmutar a Modo DeX
-        elif (event.state & Gdk.ModifierType.CONTROL_MASK) and event.keyval in (Gdk.KEY_d, Gdk.KEY_D):
-            current = self.stack.get_visible_child_name()
-            self.stack.set_visible_child_name("dex" if current == "cockpit" else "cockpit")
-            return True
+        elif event.state & Gdk.ModifierType.CONTROL_MASK:
+            if event.keyval in (Gdk.KEY_r, Gdk.KEY_R):
+                self._update_system_metrics()
+                self._scan_devices_thread()
+                return True
+            elif event.keyval in (Gdk.KEY_q, Gdk.KEY_Q):
+                self.window.destroy()
+                return True
         return False
 
     def _on_window_destroy(self, widget):
-        self.dex.stop_session()
+        if self.dex:
+            self.dex.stop_session()
         Gtk.main_quit()
 
     def run(self):
@@ -295,14 +571,15 @@ class RecursosDesktopApp:
         Gtk.main()
         return 0
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Recursos Cockpit · App Nativa Linux con Modo DeX")
-    parser.add_argument("--url", default=DEFAULT_DASHBOARD_URL, help="URL del servidor Cockpit")
-    parser.add_argument("--test-mode", action="store_true", help="Ejecutar en modo test sin interfaz gráfica")
+    parser = argparse.ArgumentParser(description="Recursos Cockpit · Aplicación 100% Nativa Linux")
+    parser.add_argument("--test-mode", action="store_true", help="Ejecutar en modo de prueba sin display gráfico")
     args = parser.parse_args()
 
-    app = RecursosDesktopApp(target_url=args.url)
+    app = RecursosDesktopApp()
     return app.run()
+
 
 if __name__ == "__main__":
     sys.exit(main())

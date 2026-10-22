@@ -5483,9 +5483,11 @@ VALID_WEB_ROUTES = {
     "/sistema",
     "/version",
     "/dispositivos",
+    "/dispositivo",
     "/dns",
     "/duckdns",
-    "/dex"
+    "/dex",
+    "/app"
 }
 
 def send_wol_magic_packet(mac_str):

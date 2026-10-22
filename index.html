@@ -2771,7 +2771,7 @@
               <a href="/dex" class="nav-link" id="navDex" onclick="return navigateTo(event, 'dex')">
                 <div class="nav-link-left">
                   <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><rect x="6" y="7" width="5" height="6" rx="1"/></svg>
-                  <span>Modo DeX (App Linux)</span>
+                  <span>Conexión de Dispositivo</span>
                 </div>
                 <span class="nav-counter" style="background: rgba(168, 85, 247, 0.2); color: var(--accent-purple-bright); font-weight: 600;">.deb</span>
               </a>
@@ -2853,7 +2853,7 @@
             <span id="lblVersionHeader" class="mono">Sincronizando...</span>
           </a>
 
-          <a href="/dex" class="action-btn" id="btnHeaderNativeApp" onclick="return navigateTo(event, 'dex')" title="App Nativa Linux (.deb) con Modo DeX">
+          <a href="/dex" class="action-btn" id="btnHeaderNativeApp" onclick="return navigateTo(event, 'dex')" title="App Nativa Linux (.deb) · Conexión de Dispositivos">
             <span>🐧</span>
             <span style="font-size: 11.5px; font-weight: 600;">App Linux</span>
           </a>
@@ -3182,21 +3182,21 @@
               </div>
             </a>
 
-            <!-- 11. MODO DEX & APP NATIVA LINUX -->
+            <!-- 11. CONEXIÓN DE DISPOSITIVO & APP NATIVA LINUX -->
             <a href="/dex" class="module-card" onclick="return navigateTo(event, 'dex')">
               <div class="module-header">
                 <div class="module-title-group">
                   <span style="color: var(--accent-purple-bright);">📱</span>
-                  <span>Modo DeX & App Nativa Linux</span>
+                  <span>Conexión de Dispositivo & App Nativa</span>
                 </div>
                 <span class="module-arrow">→</span>
               </div>
               <div>
-                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);">DeX Desktop Cockpit</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">Proyección interactiva USB/Wi-Fi, Scrcpy & UHID por hardware</div>
+                <div class="mono" style="font-size: 16px; font-weight: 700; color: #f59e0b;">Esperando dispositivo para conectarse en su versión nativa</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Control interactivo por hardware exclusivo de la aplicación nativa para Linux</div>
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <span class="adw-badge badge-purple">Exclusivo App Nativa</span>
+                <span class="adw-badge badge-purple">App Nativa GTK3</span>
                 <span class="adw-badge badge-blue">Paquete .deb</span>
               </div>
             </a>
@@ -4290,22 +4290,20 @@
         </div>
 
         <!-- ==================================================================
-             12. VISTA MODO DEX & APP NATIVA LINUX (RUTA /dex)
+        <!-- ==================================================================
+             12. VISTA CONEXIÓN DE DISPOSITIVO & APP NATIVA (RUTA /dex, /app)
              ================================================================== -->
         <div class="view-page" id="viewDex" style="display: none;">
           <div class="hero-instrument-card">
             <div class="instrument-header">
               <div>
-                <div class="instrument-kicker">Integración de Sistema Operativo & Escritorio Móvil</div>
+                <div class="instrument-kicker">Integración de Sistema Operativo & Dispositivos Móviles</div>
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px;">
-                  <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-primary);">App Nativa Linux & Modo DeX</h2>
-                  <span class="adw-badge badge-purple mono">v5.0.0</span>
+                  <h2 style="font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-primary);">Conexión de Dispositivo & App Nativa</h2>
+                  <span class="adw-badge badge-purple mono">v6.0.0</span>
                   <span class="adw-badge badge-blue">Paquete Oficial .deb</span>
-                  <span class="adw-badge badge-green">Compilación GitHub CI/CD</span>
+                  <span class="adw-badge badge-green">100% Nativo GTK 3</span>
                 </div>
-                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 6px; max-width: 760px; line-height: 1.5;">
-                  La proyección interactiva y el control por hardware de Samsung DeX residen <strong>exclusivamente en la App Nativa para Linux</strong>. Por seguridad del kernel y latencia cero, el paso directo a periféricos (<code class="mono">/dev/uhid</code>), el servidor <code class="mono">scrcpy</code> y la captura por hardware no pueden ejecutarse dentro de un navegador web aislado.
-                </p>
               </div>
               <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                 <a href="/download/recursos-cockpit.deb" class="action-btn primary-cta" style="height: 38px; padding: 0 18px; font-size: 13px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
@@ -4318,21 +4316,32 @@
               </div>
             </div>
 
+            <!-- Banner Prominente de Estado Solicitado -->
+            <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: var(--radius-lg); padding: 20px 24px; margin-top: 14px; display: flex; align-items: center; gap: 18px;">
+              <div style="font-size: 32px; flex-shrink: 0;">📡</div>
+              <div>
+                <div style="font-size: 17px; font-weight: 800; color: #f59e0b;" id="lblDeviceWaitingStatus">Esperando dispositivo para conectarse en su versión nativa</div>
+                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px; line-height: 1.5;">
+                  La versión web se mantiene a la escucha. Para proyectar la pantalla, interactuar mediante aceleración por hardware e inyectar teclado y ratón USB/Wi-Fi sin latencia, abre o instala la <strong>aplicación nativa de Linux</strong> en tu equipo.
+                </div>
+              </div>
+            </div>
+
             <!-- Bento Status Cells -->
-            <div class="hw-spec-grid" style="margin-top: 16px;">
+            <div class="hw-spec-grid" style="margin-top: 18px;">
               <div class="hw-spec-cell">
-                <span class="hw-spec-label">Tecnología de la App Nativa</span>
-                <span class="hw-spec-value" style="color: var(--accent-cyan-bright);">GTK 3.0 + WebKit2GTK</span>
-                <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Sin sobrecarga de Chromium/Electron · Consumo &lt; 30 MB RAM</span>
+                <span class="hw-spec-label">Tecnología de la App</span>
+                <span class="hw-spec-value" style="color: var(--accent-cyan-bright);">GTK 3.0 Puro Nativo</span>
+                <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Sin WebKit ni Electron · Consumo &lt; 30 MB RAM</span>
               </div>
               <div class="hw-spec-cell">
-                <span class="hw-spec-label">Motor de Proyección DeX</span>
+                <span class="hw-spec-label">Motor de Proyección</span>
                 <span class="hw-spec-value" style="color: var(--accent-purple-bright);">Scrcpy + UHID Nativo</span>
                 <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Control directo por hardware USB y Wi-Fi (ADB TCP/IP 5555)</span>
               </div>
               <div class="hw-spec-cell">
                 <span class="hw-spec-label">Dispositivos Compatibles</span>
-                <span class="hw-spec-value" style="color: var(--accent-emerald-bright);">Samsung Galaxy (DeX) &amp; Android</span>
+                <span class="hw-spec-value" style="color: var(--accent-emerald-bright);">Teléfonos &amp; Tablets Android</span>
                 <span style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Detección en caliente por Udev y switch de resolución virtual</span>
               </div>
             </div>
@@ -4342,7 +4351,7 @@
           <div class="section-block">
             <div class="section-header-bar">
               <div>
-                <div class="section-title">¿Por qué el Modo DeX es exclusivo de la App Nativa?</div>
+                <div class="section-title">¿Por qué la conexión interactiva requiere la App Nativa?</div>
                 <div class="section-subtitle">Explicación técnica de arquitectura del sistema operativo</div>
               </div>
             </div>
@@ -4353,7 +4362,7 @@
                     <span>⚡</span> <span>Acceso de Hardware UHID</span>
                   </div>
                   <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">
-                    El protocolo UHID del kernel Linux (<code class="mono">/dev/uhid</code>) permite simular pulsaciones físicas de teclado y movimientos relativos de ratón como dispositivo USB real para Samsung DeX. Los navegadores web estándar bloquean este acceso por sandboxing de seguridad.
+                    El protocolo UHID del kernel Linux (<code class="mono">/dev/uhid</code>) permite simular pulsaciones físicas de teclado y movimientos relativos de ratón como dispositivo USB real. Los navegadores web estándar bloquean este acceso por sandboxing de seguridad.
                   </p>
                 </div>
                 <div style="background: var(--bg-surface-inset); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
@@ -4361,15 +4370,15 @@
                     <span>🚀</span> <span>Scrcpy a 60 FPS con Latencia Cero</span>
                   </div>
                   <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">
-                    La app nativa se conecta directamente al demonio <code class="mono">adb</code> local mediante sockets UNIX de alta velocidad y decodifica la transmisión de vídeo H.264/H.265 por aceleración VA-API de la GPU, logrando una respuesta táctil instantánea imposible vía WebSocket o Canvas.
+                    La app nativa se conecta directamente al demonio <code class="mono">adb</code> local mediante sockets UNIX de alta velocidad y decodifica la transmisión de vídeo H.264/H.265 por aceleración VA-API de la GPU, logrando una respuesta táctil instantánea.
                   </p>
                 </div>
                 <div style="background: var(--bg-surface-inset); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
                   <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
-                    <span>🖥️</span> <span>Integración Nativa GNOME / GTK</span>
+                    <span>🖥️</span> <span>Aplicación 100% Nativa GTK3</span>
                   </div>
                   <p style="margin: 0; font-size: 12.5px; color: var(--text-muted);">
-                    Cuenta con una barra de cabecera moderna GNOME HeaderBar con selector fluido entre la vista del Cockpit y la vista de DeX, soporte de pantalla completa en tecla <kbd class="mono" style="background: var(--border-subtle); padding: 2px 6px; border-radius: 4px;">F11</kbd> e integración en el menú del sistema Linux.
+                    Construida con widgets nativos puros de GNOME (sin navegadores ni iframes web internos). Ofrece monitoreo en tiempo real del silicio, soporte de pantalla completa en tecla <kbd class="mono" style="background: var(--border-subtle); padding: 2px 6px; border-radius: 4px;">F11</kbd> e integración en el menú del sistema Linux.
                   </p>
                 </div>
               </div>
@@ -4386,12 +4395,12 @@
             </div>
             <div class="surface-panel" style="padding: 20px;">
               <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px;">
-                Puedes descargar e instalar el paquete <code class="mono">recursos-cockpit_5.0.0_amd64.deb</code> ejecutando en tu terminal:
+                Puedes descargar e instalar el paquete <code class="mono">recursos-cockpit_6.0.0_amd64.deb</code> ejecutando en tu terminal:
               </p>
               <pre class="terminal-box" style="margin: 0; font-size: 12.5px; line-height: 1.6;"># 1. Descargar el paquete deb directamente desde este servidor
 wget http://localhost:8085/download/recursos-cockpit.deb
 
-# 2. Instalar el paquete y resolver automáticamente dependencias (GTK3, WebKit2GTK, Scrcpy, ADB)
+# 2. Instalar el paquete y resolver automáticamente dependencias (GTK3, Scrcpy, ADB, Psutil)
 sudo apt-get update &amp;&amp; sudo apt-get install -y ./recursos-cockpit.deb
 
 # 3. Iniciar la aplicación nativa desde la terminal o desde el lanzador de aplicaciones del escritorio
@@ -4527,7 +4536,7 @@ recursos-cockpit</pre>
       </a>
       <a href="/dex" class="dock-item" id="dockDex" data-view="dex" onclick="return navigateTo(event, 'dex')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><rect x="6" y="7" width="5" height="6" rx="1"/></svg>
-        <span class="dock-label">DeX</span>
+        <span class="dock-label">Dispositivo</span>
         <span class="dock-dot"></span>
       </a>
     </nav>
@@ -4880,7 +4889,8 @@ recursos-cockpit</pre>
       '/dex': 'dex',
       '/samsung-dex': 'dex',
       '/desktop-app': 'dex',
-      '/app': 'dex'
+      '/app': 'dex',
+      '/dispositivo': 'dex'
     };
 
     const VIEW_TITLES = {
@@ -4896,7 +4906,7 @@ recursos-cockpit</pre>
       processes: 'Monitor de Procesos',
       dns: 'DNS, DuckDNS & Tráfico por IP',
       version: 'Versión & GitHub OTA',
-      dex: 'Modo DeX & App Nativa Linux'
+      dex: 'Conexión de Dispositivo & App Nativa'
     };
 
     function escapeHtml(str) {
