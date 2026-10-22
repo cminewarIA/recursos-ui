@@ -2412,6 +2412,59 @@
       grid-column: 1 / -1;
       width: 100%;
     }
+    .conn-capsule.is-focused {
+      border-color: #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.12) !important;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.42), 0 6px 18px rgba(0, 0, 0, 0.45) !important;
+      transform: translateY(-2px);
+    }
+    .conn-table-filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .conn-table-filter-chip:hover {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: #38bdf8;
+    }
+    .conn-table-filter-chip .chip-close {
+      opacity: 0.7;
+      font-size: 11px;
+      margin-left: 2px;
+    }
+    .conn-table-filter-chip:hover .chip-close {
+      opacity: 1;
+      color: #f43f5e;
+    }
+    .conn-table-reset-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      font-size: 9.5px;
+      font-weight: 700;
+      border-radius: 6px;
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      color: #f43f5e;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .conn-table-reset-btn:hover {
+      background: rgba(244, 63, 94, 0.22);
+      border-color: #f43f5e;
+    }
     .conn-dir-pill {
       display: inline-flex;
       align-items: center;
@@ -4419,7 +4472,10 @@
 
               <div>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap;">
-                  <span style="font-size: 12px; font-weight: 700; color: var(--text-secondary);">Detalle de Flujos y Sockets Geolocalizados (Pulsa una fila para enfocar en el mapa)</span>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text-secondary);">Detalle de Flujos y Sockets Geolocalizados (Pulsa una cápsula para enfocar en el mapa)</span>
+                    <div id="connTableFilterChips" style="display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap;"></div>
+                  </div>
                   <span class="mono" style="font-size: 11px; color: var(--text-muted);" id="mapConnTableMeta">Sincronizando sockets...</span>
                 </div>
                 <div class="conn-table-wrap" id="networkConnectionsTableList">
@@ -12469,9 +12525,9 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       const caret = document.getElementById('iconMapDrawerCaret');
       const cntEl = document.getElementById('cntMapDrawerActiveTotal');
       const svcChip = document.getElementById('btnMapClearServiceQuick');
-      const svcChipLbl = document.getElementById('lblMapActiveServiceQuick');
+      const svcChipLbl = document.getElementById('lblMapActiveService') || document.getElementById('lblMapActiveServiceQuick');
       const devChip = document.getElementById('btnMapClearDeviceQuick');
-      const devChipLbl = document.getElementById('lblMapActiveDeviceQuick');
+      const devChipLbl = document.getElementById('lblMapActiveDevice') || document.getElementById('lblMapActiveDeviceQuick');
 
       if (btn) btn.classList.toggle('open', !!connectionsMapDrawerOpen);
       if (drawer) drawer.classList.toggle('open', !!connectionsMapDrawerOpen);
@@ -12502,9 +12558,79 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       if (devChip) {
         devChip.style.display = connectionsMapDeviceSel ? 'inline-flex' : 'none';
         if (devChipLbl && connectionsMapDeviceSel) {
-          devChipLbl.textContent = `Equipo: ${connectionsMapDeviceSel}`;
+          let devDisplayName = connectionsMapDeviceSel;
+          if (latestMetrics && Array.isArray(latestMetrics.wifi_clients)) {
+            const cl = latestMetrics.wifi_clients.find(c => c && c.ip === connectionsMapDeviceSel);
+            if (cl && cl.name) devDisplayName = cl.name;
+          }
+          devChipLbl.textContent = `Equipo: ${devDisplayName}`;
         }
       }
+    }
+
+    function syncConnTableFilterChips() {
+      const container = document.getElementById('connTableFilterChips');
+      if (!container) return;
+
+      const chips = [];
+      const filterNames = {
+        incoming: '↓ Entrantes',
+        outgoing: '↑ Salientes',
+        devices: '📱 Equipos LAN',
+        blocked: '🛡️ Bloqueadas'
+      };
+
+      if (connectionsMapFilter !== 'all') {
+        chips.push(`
+          <button type="button" class="conn-table-filter-chip" onclick="setConnectionsMapFilter('all')" title="Quitar filtro de dirección">
+            <span>${filterNames[connectionsMapFilter] || connectionsMapFilter}</span>
+            <span class="chip-close">✕</span>
+          </button>
+        `);
+      }
+
+      if (connectionsMapDeviceSel) {
+        let devDisplayName = connectionsMapDeviceSel;
+        if (latestMetrics && Array.isArray(latestMetrics.wifi_clients)) {
+          const cl = latestMetrics.wifi_clients.find(c => c && c.ip === connectionsMapDeviceSel);
+          if (cl && cl.name) devDisplayName = cl.name;
+        }
+        chips.push(`
+          <button type="button" class="conn-table-filter-chip" onclick="setConnectionsMapDevice(null)" title="Quitar filtro de dispositivo">
+            <span>📱 ${escapeHtml(devDisplayName)}</span>
+            <span class="chip-close">✕</span>
+          </button>
+        `);
+      }
+
+      if (connectionsMapServiceSel) {
+        chips.push(`
+          <button type="button" class="conn-table-filter-chip" onclick="setConnectionsMapServiceFilter(null)" title="Quitar filtro de servicio">
+            <span>🏷️ ${escapeHtml(connectionsMapServiceSel)}</span>
+            <span class="chip-close">✕</span>
+          </button>
+        `);
+      }
+
+      if (connectionsMapHistorySearch) {
+        chips.push(`
+          <button type="button" class="conn-table-filter-chip" onclick="clearMapHistorySearch()" title="Quitar búsqueda">
+            <span>🔍 "${escapeHtml(connectionsMapHistorySearch)}"</span>
+            <span class="chip-close">✕</span>
+          </button>
+        `);
+      }
+
+      const hasActiveFilters = (connectionsMapFilter !== 'all' || connectionsMapDeviceSel || connectionsMapServiceSel || connectionsMapHistorySearch);
+      if (hasActiveFilters) {
+        chips.push(`
+          <button type="button" class="conn-table-reset-btn" onclick="resetAllMapFilters()" title="Restablecer todos los filtros del mapa">
+            <span>Restablecer todo</span>
+          </button>
+        `);
+      }
+
+      container.innerHTML = chips.join('');
     }
 
     function toggleMapSideDrawer(forceOpen) {
@@ -12712,28 +12838,11 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
     function setConnectionsMapDevice(ip) {
       connectionsMapDeviceSel = ip || null;
-      if (connectionsMapDeviceSel && connectionsMapFilter !== 'devices') {
-        connectionsMapFilter = 'devices';
-        const mapBtns = {
-          all: 'fMapConnAll',
-          incoming: 'fMapConnIn',
-          outgoing: 'fMapConnOut',
-          devices: 'fMapConnDev',
-          blocked: 'fMapConnBlk'
-        };
-        Object.entries(mapBtns).forEach(([k, id]) => {
-          const el = document.getElementById(id);
-          if (el) el.classList.toggle('active', k === connectionsMapFilter);
-        });
-      }
       syncMapSideDrawerUI();
       NetworkConnectionsMapEngine.renderActiveDataset(true);
     }
 
     function setConnectionsMapFilter(filter) {
-      if (filter !== 'devices') {
-        connectionsMapDeviceSel = null;
-      }
       connectionsMapFilter = filter;
       const mapBtns = {
         all: 'fMapConnAll',
@@ -12747,6 +12856,37 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         if (el) el.classList.toggle('active', k === filter);
       });
       syncMapSideDrawerUI();
+      NetworkConnectionsMapEngine.renderActiveDataset(true);
+    }
+
+    function clearMapHistorySearch() {
+      connectionsMapHistorySearch = '';
+      const inp = document.getElementById('mapHistSearchInput');
+      if (inp) inp.value = '';
+      NetworkConnectionsMapEngine.renderHistoryCatalogDrawer();
+      NetworkConnectionsMapEngine.renderActiveDataset(true);
+    }
+
+    function resetAllMapFilters() {
+      connectionsMapFilter = 'all';
+      connectionsMapDeviceSel = null;
+      connectionsMapServiceSel = null;
+      connectionsMapHistorySearch = '';
+      const inp = document.getElementById('mapHistSearchInput');
+      if (inp) inp.value = '';
+      const mapBtns = {
+        all: 'fMapConnAll',
+        incoming: 'fMapConnIn',
+        outgoing: 'fMapConnOut',
+        devices: 'fMapConnDev',
+        blocked: 'fMapConnBlk'
+      };
+      Object.entries(mapBtns).forEach(([k, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', k === 'all');
+      });
+      syncMapSideDrawerUI();
+      NetworkConnectionsMapEngine.renderHistoryCatalogDrawer();
       NetworkConnectionsMapEngine.renderActiveDataset(true);
     }
 
@@ -13582,6 +13722,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           popup._groupKey = groupKey;
           popup._selectedConnId = connId;
         }
+        this.syncFocusedCapsule(connId);
       },
 
       showGroupList(groupKey) {
@@ -13729,6 +13870,9 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             popup._selectedConnId = currentSelected;
             const content = this.buildGroupInfoWindowNode(items, currentSelected, groupKey);
             marker.setPopupContent(content);
+            if (currentSelected) {
+              this.syncFocusedCapsule(currentSelected);
+            }
           });
 
           this._groupsMap.set(groupKey, { marker, group: items, lat: cl.lat, lng: cl.lng });
@@ -13952,8 +14096,6 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           return c.direction === connectionsMapFilter;
         });
 
-        const deviceGroups = (connectionsMapFilter === 'devices') ? allDeviceGroups : [];
-        const tableConns = filteredConns;
         if (connectionsMapDeviceSel) {
           filteredConns = filteredConns.filter(c => c.local_ip === connectionsMapDeviceSel);
         }
@@ -13965,25 +14107,42 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         const modeTag = isHistoryMode
           ? `📚 Historial SQLite${connectionsMapServiceSel ? ' · Servicio: ' + connectionsMapServiceSel : ''}`
           : '🟢 En Vivo';
-        setText('mapConnTableMeta', connectionsMapFilter === 'devices'
-          ? `${modeTag} · ${deviceGroups.length} dispositivos · ${tableConns.length} conexiones${connectionsMapDeviceSel ? ' (filtrado: 1 dispositivo)' : ''}`
-          : `${modeTag} · Mostrando ${filteredConns.length} de ${rawConns.length} conexiones geolocalizadas`);
+        setText('mapConnTableMeta', `${modeTag} · Mostrando ${mapConns.length} de ${rawConns.length} conexiones geolocalizadas`);
 
-        syncMapSideDrawerUI(filteredConns.length);
+        syncMapSideDrawerUI(mapConns.length);
+        syncConnTableFilterChips();
 
         const tableEl = document.getElementById('networkConnectionsTableList');
         if (tableEl) {
           const histCacheVer = expandedDeviceHistoryIp && _deviceHistoryCache.has(expandedDeviceHistoryIp) ? 'loaded' : 'pending';
-          const tableSig = `${connectionsMapMode}|${connectionsMapServiceSel || ''}|${connectionsMapHistorySearch}|${connectionsMapFilter}|${connectionsMapDeviceSel || ''}|${expandedDeviceHistoryIp || ''}|${expandedDeviceHistoryService || ''}|${histCacheVer}|` +
-            filteredConns.map(c => `${c.id}:${c.state}:${c.geo_status || ''}:${c.city || ''}:${c.domain || ''}:${c.hit_count || 1}`).join(';');
+          const focusedId = (this._activePopupState && this._activePopupState.selectedConnId) || '';
+          const focusedIp = (this._activePopupState && this._activePopupState.activeRemoteIp) || '';
+          const tableSig = `${connectionsMapMode}|${connectionsMapServiceSel || ''}|${connectionsMapHistorySearch}|${connectionsMapFilter}|${connectionsMapDeviceSel || ''}|${expandedDeviceHistoryIp || ''}|${expandedDeviceHistoryService || ''}|${histCacheVer}|${focusedId}|${focusedIp}|` +
+            mapConns.map(c => `${c.id}:${c.state}:${c.geo_status || ''}:${c.city || ''}:${c.domain || ''}:${c.hit_count || 1}`).join(';');
 
           if (forceRedraw || this._lastTableSignature !== tableSig) {
             this._lastTableSignature = tableSig;
-            if (filteredConns.length === 0) {
-              tableEl.innerHTML = `<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 22px;">No hay conexiones ${isHistoryMode ? 'en el historial SQLite para este filtro' : (connectionsMapFilter === 'all' ? 'activas' : 'en este filtro')} en este instante.</div>`;
+            if (mapConns.length === 0) {
+              const hasFilters = (connectionsMapFilter !== 'all' || connectionsMapDeviceSel || connectionsMapServiceSel || connectionsMapHistorySearch);
+              tableEl.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 26px; text-align: center; color: var(--text-muted); background: var(--bg-surface-inset); border-radius: 12px; border: 1px dashed var(--border-subtle);">
+                  <div style="font-size: 24px;">🗺️</div>
+                  <div style="font-size: 13px; font-weight: 700; color: var(--text-secondary);">
+                    No hay conexiones geolocalizadas en el mapa con los filtros actuales
+                  </div>
+                  <div style="font-size: 11px; max-width: 440px; opacity: 0.85;">
+                    ${hasFilters ? 'Prueba a cambiar o restablecer los filtros de dirección, servicio o dispositivo del mapa.' : 'Esperando detección de sockets activos del kernel...'}
+                  </div>
+                  ${hasFilters ? `
+                    <button type="button" class="action-btn" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: var(--accent-cyan-bright); padding: 5px 12px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; margin-top: 4px;" onclick="resetAllMapFilters()">
+                      🔄 Restablecer Filtros del Mapa
+                    </button>
+                  ` : ''}
+                </div>`;
             } else {
               let renderedInlineDrawerForIp = new Set();
-              const renderRow = (c, suppressInlineDrawer = false) => {
+              const renderRow = (c) => {
+                const isMapFocused = Boolean(this._activePopupState && (this._activePopupState.selectedConnId === c.id || this._activePopupState.activeRemoteIp === c.remote_ip));
                 const dirIcon = c.direction === 'incoming' ? '↓ IN' : (c.direction === 'blocked' ? '🛡️ BLK' : '↑ OUT');
                 const locText = `${c.city || 'Red'}${c.country ? ', ' + c.country : ''}`;
                 const geoSt = c.geo_status || (c.is_lan ? 'lan' : 'cached');
@@ -14010,17 +14169,17 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                 const safeDevName = escapeHtml(devDisplayName).replace(/'/g, "\\'");
                 const isHistOpenForDev = (expandedDeviceHistoryIp === (c.local_ip || srvIp));
                 let inlineDrawerHtml = '';
-                if (!suppressInlineDrawer && isHistOpenForDev && !renderedInlineDrawerForIp.has(c.local_ip || srvIp)) {
+                if (isHistOpenForDev && !renderedInlineDrawerForIp.has(c.local_ip || srvIp)) {
                   renderedInlineDrawerForIp.add(c.local_ip || srvIp);
                   inlineDrawerHtml = buildInlineDeviceHistoryDrawerHtml(c.local_ip || srvIp, devDisplayName);
                 }
 
                 return `
-                  <div class="conn-capsule" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
+                  <div class="conn-capsule ${isMapFocused ? 'is-focused' : ''}" id="capsule-${escapeHtml(c.id)}" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
                     <div class="conn-capsule-top">
                       <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
                         <span class="conn-dir-pill ${escapeHtml(c.direction)}" title="${c.direction === 'incoming' ? 'Conexión Entrante' : (c.direction === 'blocked' ? 'IP Bloqueada' : 'Conexión Saliente')}">${dirIcon}</span>
-                        <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; cursor: pointer; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="event.stopPropagation(); setConnectionsMapMode('history'); setConnectionsMapServiceFilter('${safeSvcClick}');" title="Filtrar historial del mapa por ${escapeHtml(c.service)}">${escapeHtml(c.service)}</span>
+                        <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; font-weight: 700; cursor: pointer; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onclick="event.stopPropagation(); setConnectionsMapServiceFilter('${safeSvcClick}');" title="Filtrar mapa por servicio ${escapeHtml(c.service)}">${escapeHtml(c.service)}</span>
                       </div>
                       <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
                         ${histBadge}
@@ -14060,51 +14219,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                 `;
               };
 
-              if (connectionsMapFilter === 'devices') {
-                const groupsHtml = deviceGroups.map(g => {
-                  const cl = g.client || {};
-                  const isSel = connectionsMapDeviceSel === g.ip;
-                  const isHistOpen = expandedDeviceHistoryIp === g.ip;
-                  const emoji = getDeviceEmoji(cl.dev_icon || cl.dev_type);
-                  const domains = new Set(g.conns.map(c => c.domain || c.remote_ip)).size;
-                  const safeIp = escapeHtml(g.ip).replace(/'/g, "\\'");
-                  const safeName = escapeHtml(g.name).replace(/'/g, "\\'");
-                  const speedTxt = (cl.speed_down !== undefined || cl.speed_up !== undefined)
-                    ? `<span class="mono" style="font-size: 10.5px; color: var(--text-secondary);" title="Consumo actual del dispositivo">↓ ${formatSpeed(Number(cl.speed_down || 0))} · ↑ ${formatSpeed(Number(cl.speed_up || 0))}</span>`
-                    : '';
-                  const totalTxt = (cl.tx_bytes !== undefined || cl.rx_bytes !== undefined)
-                    ? `<span class="mono" style="font-size: 10px; color: var(--text-muted);">Total: ↓ ${formatBytes(Number(cl.tx_bytes || 0))} · ↑ ${formatBytes(Number(cl.rx_bytes || 0))}</span>`
-                    : '';
-                  const visibleConns = (connectionsMapDeviceSel && !isSel) ? [] : g.conns;
-                  return `
-                    <div style="margin-bottom: 8px; border: 1px solid ${isSel ? 'var(--accent-cyan-bright)' : 'var(--border-subtle)'}; border-radius: 10px; overflow: hidden;">
-                      <div onclick="setConnectionsMapDevice(${isSel ? 'null' : `'${safeIp}'`})" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 12px; background: var(--bg-surface-inset);" title="Pulsa para aislar este dispositivo en el mapa">
-                        <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
-                          <span style="font-size: 16px;">${emoji}</span>
-                          <div style="min-width: 0;">
-                            <div style="font-weight: 800; font-size: 12.5px; color: var(--text-primary);">${escapeHtml(g.name)}</div>
-                            <div class="mono" style="font-size: 10px; color: var(--text-muted);">${escapeHtml(g.ip)}${cl.mac ? ' · ' + escapeHtml(cl.mac) : ''}</div>
-                          </div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                          <span class="adw-badge badge-blue" style="font-size: 10px;">${g.conns.length} flujos · ${domains} destinos</span>
-                          ${speedTxt}
-                          ${totalTxt}
-                          <button type="button" class="conn-dev-history-btn ${isHistOpen ? 'active' : ''}"
-                            onclick="event.stopPropagation(); toggleDeviceHistoryInline('${safeIp}', '${safeName}')"
-                            title="Desplegar historial SQLite catalogado por servicios de ${escapeHtml(g.name)}">
-                            <span>📜 Historial SQLite</span>
-                          </button>
-                        </div>
-                      </div>
-                      ${buildInlineDeviceHistoryDrawerHtml(g.ip, g.name)}
-                      ${visibleConns.length > 0 ? `<div class="conn-capsules-grid" style="padding: 7px;">${visibleConns.map(c => renderRow(c, true)).join('')}</div>` : ''}
-                    </div>`;
-                }).join('');
-                tableEl.innerHTML = groupsHtml;
-              } else {
-                tableEl.innerHTML = `<div class="conn-capsules-grid">${filteredConns.map(c => renderRow(c, false)).join('')}</div>`;
-              }
+              tableEl.innerHTML = `<div class="conn-capsules-grid">${mapConns.map(c => renderRow(c)).join('')}</div>`;
             }
           }
         }
@@ -14244,6 +14359,20 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           popup._selectedConnId = connId;
         }
         groupEntry.marker.openPopup();
+        this.syncFocusedCapsule(connId);
+      },
+
+      syncFocusedCapsule(connId) {
+        document.querySelectorAll('.conn-capsule.is-focused').forEach(el => el.classList.remove('is-focused'));
+        if (connId) {
+          const capEl = document.getElementById(`capsule-${connId}`);
+          if (capEl) {
+            capEl.classList.add('is-focused');
+            try {
+              capEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } catch (e) {}
+          }
+        }
       }
     };
   </script>

@@ -1,17 +1,26 @@
-# Walkthrough y Verificación — v8.1.0
+# Walkthrough y Verificación — v8.2.0
 
 ## Resumen de Cambios Implementados
 
-1. **Cuadrícula de Cápsulas para Detalle de Flujos y Sockets Geolocalizados**:
-   - Se reemplazó la lista tabular unicolumna por una rejilla responsiva CSS (`.conn-capsules-grid`, `minmax(290px, 1fr)`) que aprovecha de manera uniforme todo el ancho del contenedor.
-   - Cada conexión se muestra como una cápsula compacta (`.conn-capsule`) con toda su información clave (dirección, servicio, protocolo/estado, IP:puerto, dominio, dispositivo de origen, ubicación e ISP).
-   - Incluye acceso directo a `📜 Historial` en línea (con celda expandida `grid-column: 1 / -1`), bloqueo en 1 clic y enfoque automático en el mapa al hacer clic en la cápsula.
+1. **Sincronización Total de Filtros del Mapa con el Detalle de Flujos y Sockets**:
+   - En `NetworkConnectionsMapEngine.renderActiveDataset`, la cuadrícula de conexiones `#networkConnectionsTableList` renderiza exactamente el conjunto de conexiones geolocalizadas activas del mapa (`mapConns`).
+   - Todos los filtros del mapa aplican reactivamente a las cápsulas:
+     - **Modo**: `🟢 En Vivo` vs `📚 Historial SQLite`.
+     - **Dirección / Tipo**: `Todas`, `↓ Entrantes`, `↑ Salientes`, `📱 Equipos LAN`, `🛡️ Bloqueadas`.
+     - **Dispositivo LAN Aislado**: Cuando se selecciona un equipo (`connectionsMapDeviceSel`), la cuadrícula muestra únicamente los sockets asociados a dicho dispositivo.
+     - **Servicio del Catálogo**: Cuando se selecciona un servicio (`connectionsMapServiceSel`), se filtran únicamente las conexiones de ese servicio.
+     - **Búsqueda / Ventana Temporal**: Búsqueda por texto y horas en historial SQLite.
+   - En caso de no haber conexiones con los filtros actuales, se muestra un estado amigable con botón de restablecimiento rápido (`resetAllMapFilters()`).
 
-2. **Grupos Compactos con Desglose Plegable en Distribución de Ancho de Banda**:
-   - En `NetworkBandwidthPieChart`, las tarjetas de categoría se presentan compactas por defecto con resumen minimalista (~58px de altura).
-   - Al pulsar sobre la tarjeta o su botón `▼ Desglose (N)`, se despliega de forma animada la lista de todos sus dispositivos y consumos individuales (`↓`, `↑` y total).
+2. **Chips de Filtros Activos en la Cabecera de la Sección (`#connTableFilterChips`)**:
+   - Se añadieron chips visuales reactivos en la cabecera de "Detalle de Flujos y Sockets Geolocalizados" que muestran cada filtro activo con botón `✕` para removerlo individualmente o un botón `Restablecer todo`.
+   - Se corrigieron los selectores en `syncMapSideDrawerUI` para los chips rápidos de servicio y dispositivo.
 
-3. **Sincronización y Compilación**:
-   - `/index.html` sincronizado con `/static/index.html`.
-   - Criterio de versión actualizado en `GEMINI.md` según indicación del usuario (`X.0.0` solo para rediseño total de la app, `0.X.0` para rediseño/ajuste de componentes o funciones concretas).
-   - Versión canónica establecida en `8.1.0` en `/VERSION`, `/package.json`, `/README.md` y compilado Debian `/dist/recursos-cockpit_8.1.0_amd64.deb`.
+3. **Enfoque Bidireccional Interactivo (Mapa ↔ Cápsula)**:
+   - Al pulsar una cápsula en la tabla, el mapa vuela a sus coordenadas, abre su popup de información y marca la cápsula con la clase `.is-focused` (borde cian brillante y elevación).
+   - Al pulsar un marcador o seleccionar un socket en un popup de clúster en el mapa, `syncFocusedCapsule` ilumina automáticamente la cápsula correspondiente en la cuadrícula y la desplaza a la vista.
+
+4. **Sincronización de Archivos y Compilación**:
+   - `/index.html` y `/static/index.html` 100% sincronizados.
+   - Versión canónica incrementada a `8.2.0` (`MINOR` - actualización intermedia de funcionalidad de componentes) en `/VERSION`, `/package.json`, `/README.md`.
+   - Paquete Debian recompilado en `/dist/recursos-cockpit_8.2.0_amd64.deb`.
