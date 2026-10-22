@@ -1,4 +1,4 @@
-# Plan de Implementación — v9.0.0
+# Plan de Implementación — v8.1.0
 
 ## 1. Rediseño de Cuadrícula de Cápsulas para Flujos y Sockets Geolocalizados
 - **Rejilla Responsiva de Cápsulas (`.conn-capsules-grid`)**: Sustituir la lista vertical unicolumna por una cuadrícula adaptable (`repeat(auto-fill, minmax(290px, 1fr))`) para maximizar el aprovechamiento del ancho de pantalla y mostrar un mayor número de conexiones en el mismo espacio.
