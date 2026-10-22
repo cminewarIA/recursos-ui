@@ -1462,21 +1462,53 @@
       border-radius: 12px;
       overflow: hidden;
       border: 1px solid var(--border-subtle);
-      background: rgba(10, 15, 28, 0.72);
-      transition: all 0.22s ease;
+      background: #0b1120;
+      transition: border-radius 0.2s ease;
+    }
+    /* Eliminar cualquier backdrop-filter / transform en ancestros que atrape position:fixed al activar pantalla completa */
+    body.map-fullscreen-active {
+      overflow: hidden !important;
+    }
+    body.map-fullscreen-active .connections-map-card,
+    body.map-fullscreen-active .section-block,
+    body.map-fullscreen-active .view-page,
+    body.map-fullscreen-active .viewport-scroll,
+    body.map-fullscreen-active .main-pane,
+    body.map-fullscreen-active .app-shell {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      transform: none !important;
+      filter: none !important;
+      perspective: none !important;
+      contain: none !important;
+    }
+    body.map-fullscreen-active .top-header,
+    body.map-fullscreen-active .floating-dock-shell,
+    body.map-fullscreen-active .sidebar,
+    body.map-fullscreen-active .sidebar-backdrop {
+      display: none !important;
     }
     .connections-map-stage-wrap:fullscreen,
     .connections-map-stage-wrap:-webkit-full-screen,
     .connections-map-stage-wrap.is-fullscreen {
       position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
       inset: 0 !important;
       width: 100vw !important;
       height: 100vh !important;
+      height: 100dvh !important;
       min-height: 100vh !important;
+      min-height: 100dvh !important;
       max-height: 100vh !important;
+      max-height: 100dvh !important;
+      margin: 0 !important;
+      padding: 0 !important;
       border-radius: 0 !important;
       border: none !important;
-      z-index: 9999 !important;
+      z-index: 2147483640 !important;
       background: #0b1120 !important;
     }
     /* Explicit height on #networkConnectionsMapCanvas to satisfy CF2 (never collapse to 0x0) */
@@ -1491,11 +1523,14 @@
     .connections-map-stage-wrap:fullscreen #networkConnectionsMapCanvas,
     .connections-map-stage-wrap:-webkit-full-screen #networkConnectionsMapCanvas,
     .connections-map-stage-wrap.is-fullscreen #networkConnectionsMapCanvas {
+      width: 100vw !important;
       height: 100vh !important;
+      height: 100dvh !important;
       min-height: 100vh !important;
+      min-height: 100dvh !important;
     }
     /* =========================================================================
-       PRECISION FLOATING COMMAND HUD & SERVICE DROPDOWN PANEL (v7.0.0)
+       PRECISION FLOATING COMMAND HUD & SERVICE DROPDOWN PANEL (v7.0.1)
        ========================================================================= */
     .connections-map-adaptive-hud {
       position: absolute;
@@ -1521,41 +1556,60 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: nowrap;
-      overflow-x: auto;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-      background: rgba(9, 13, 22, 0.86);
+      overflow: hidden;
+      background: rgba(9, 13, 22, 0.88);
       backdrop-filter: blur(22px) saturate(185%);
       -webkit-backdrop-filter: blur(22px) saturate(185%);
-      border: 1px solid rgba(255, 255, 255, 0.11);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 12px;
       padding: 5px 8px;
-      min-height: 44px;
+      min-height: 42px;
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.08);
       pointer-events: auto;
     }
-    .map-hud-primary-bar::-webkit-scrollbar {
-      display: none;
-    }
     [data-theme="light"] .map-hud-primary-bar {
-      background: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.94);
       border: 1px solid rgba(15, 23, 42, 0.12);
       box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+    .map-hud-scroll-track {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .map-hud-scroll-track::-webkit-scrollbar {
+      display: none;
+    }
+    .map-hud-pinned-right {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+      padding-left: 6px;
+      border-left: 1px solid rgba(255, 255, 255, 0.11);
+    }
+    [data-theme="light"] .map-hud-pinned-right {
+      border-left-color: rgba(15, 23, 42, 0.12);
     }
     .map-hud-zone {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       flex-shrink: 0;
     }
     .map-hud-divider {
       width: 1px;
-      height: 20px;
+      height: 18px;
       background: rgba(255, 255, 255, 0.11);
       flex-shrink: 0;
-      margin: 0 2px;
+      margin: 0 1px;
     }
     [data-theme="light"] .map-hud-divider {
       background: rgba(15, 23, 42, 0.12);
@@ -1732,18 +1786,24 @@
       color: #0f172a;
       background: rgba(2, 132, 199, 0.12);
     }
+    .map-hud-icon-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
     .map-hud-btn.fullscreen-btn {
       height: 30px;
-      padding: 0 11px;
+      padding: 0 10px;
       border-radius: 8px;
-      background: rgba(16, 185, 129, 0.14);
-      border: 1px solid rgba(16, 185, 129, 0.35);
+      background: rgba(16, 185, 129, 0.16);
+      border: 1px solid rgba(16, 185, 129, 0.42);
       color: #34d399;
-      font-weight: 600;
+      font-weight: 700;
+      flex-shrink: 0;
     }
     [data-theme="light"] .map-hud-btn.fullscreen-btn {
       color: #059669;
-      background: rgba(16, 185, 129, 0.10);
+      background: rgba(16, 185, 129, 0.12);
     }
     .map-hud-btn.fullscreen-btn:hover,
     .map-hud-btn.fullscreen-btn.active {
@@ -1751,6 +1811,39 @@
       border-color: #34d399;
       color: #042f2e;
       font-weight: 700;
+    }
+    .map-corner-fullscreen-fab {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      z-index: 1055;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: rgba(9, 13, 22, 0.90);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #f8fafc;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+      transition: all 0.16s ease;
+      pointer-events: auto;
+    }
+    [data-theme="light"] .map-corner-fullscreen-fab {
+      background: rgba(255, 255, 255, 0.94);
+      border-color: rgba(15, 23, 42, 0.15);
+      color: #0f172a;
+    }
+    .map-corner-fullscreen-fab:hover,
+    .map-corner-fullscreen-fab.active {
+      background: #10B981;
+      border-color: #34d399;
+      color: #042f2e;
+      transform: scale(1.05);
     }
     /* Barra Adaptativa de Dispositivos (Una sola línea compacta deslizable) */
     .map-hud-devices-bar {
@@ -3916,6 +4009,10 @@
                   <span>🗺️</span>
                   <span>OpenStreetMap · SQLite GeoIP</span>
                 </div>
+                <button type="button" class="action-btn" id="btnMapHeaderFullscreen" onclick="toggleConnectionsMapFullscreen()" style="min-height: 30px; height: 30px; padding: 0 11px; font-size: 11.5px; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Abrir el mapa geoespacial en pantalla completa">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                  <span id="lblMapHeaderFullscreen">Pantalla Completa</span>
+                </button>
               </div>
             </div>
 
@@ -3949,70 +4046,74 @@
                 <!-- HUD Flotante de Precisión Integrado en el Mapa (Vista Estándar y Pantalla Completa) -->
                 <div class="connections-map-adaptive-hud" id="networkConnectionsMapAdaptiveHud">
                   <div class="map-hud-primary-bar">
-                    <!-- Zona Izquierda: Fuente de Datos (En Vivo / Historial SQL) + Desplegable de Servicios -->
-                    <div class="map-hud-zone">
-                      <div class="map-hud-seg-track">
-                        <button type="button" class="map-hud-btn active" id="btnMapModeLive" onclick="setConnectionsMapMode('live')" title="Telemetría de conexiones en tiempo real">
-                          <span class="hud-status-pip live"></span>
-                          <span>En Vivo</span>
+                    <!-- Carril Deslizable Izquierdo/Central: Modo + Servicios + Filtros de Tráfico -->
+                    <div class="map-hud-scroll-track">
+                      <div class="map-hud-zone">
+                        <div class="map-hud-seg-track">
+                          <button type="button" class="map-hud-btn active" id="btnMapModeLive" onclick="setConnectionsMapMode('live')" title="Telemetría de conexiones en tiempo real">
+                            <span class="hud-status-pip live"></span>
+                            <span>En Vivo</span>
+                          </button>
+                          <button type="button" class="map-hud-btn mode-history" id="btnMapModeHistory" onclick="setConnectionsMapMode('history')" title="Consultar historial persistente en base de datos SQLite">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                            <span>Historial</span>
+                          </button>
+                        </div>
+
+                        <div class="map-hud-divider"></div>
+
+                        <!-- Botón Desplegable del Catálogo de Servicios -->
+                        <button type="button" class="map-hud-dropdown-trigger" id="btnMapServicesDropdown" onclick="toggleMapServiceCatalogDrawer()" title="Desplegar catálogo de servicios detectados y filtrar mapa">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                          <span id="lblMapActiveService">Servicios</span>
+                          <span class="map-hud-count-pill" id="cntMapHistServices">0</span>
+                          <svg id="iconMapHistDrawerCaret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.18s ease;"><polyline points="6 9 12 15 18 9"/></svg>
                         </button>
-                        <button type="button" class="map-hud-btn mode-history" id="btnMapModeHistory" onclick="setConnectionsMapMode('history')" title="Consultar historial persistente en base de datos SQLite">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-                          <span>Historial</span>
+
+                        <button type="button" class="map-hud-icon-btn" id="btnMapClearServiceQuick" onclick="setConnectionsMapServiceFilter(null)" style="display: none; width: 24px; height: 28px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.35);" title="Quitar filtro de servicio activo">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                       </div>
 
                       <div class="map-hud-divider"></div>
 
-                      <!-- Botón Desplegable del Catálogo de Servicios -->
-                      <button type="button" class="map-hud-dropdown-trigger" id="btnMapServicesDropdown" onclick="toggleMapServiceCatalogDrawer()" title="Desplegar catálogo de servicios detectados y filtrar mapa">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-                        <span id="lblMapActiveService">Servicios</span>
-                        <span class="map-hud-count-pill" id="cntMapHistServices">0</span>
-                        <svg id="iconMapHistDrawerCaret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.18s ease;"><polyline points="6 9 12 15 18 9"/></svg>
-                      </button>
-
-                      <button type="button" class="map-hud-icon-btn" id="btnMapClearServiceQuick" onclick="setConnectionsMapServiceFilter(null)" style="display: none; width: 24px; height: 28px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.35);" title="Quitar filtro de servicio activo">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                      </button>
-                    </div>
-
-                    <!-- Zona Central: Controles de Filtrado Adaptativo (Tráfico y Dispositivos LAN) -->
-                    <div class="map-hud-zone">
-                      <div class="map-hud-seg-track">
-                        <button type="button" class="map-hud-btn active" id="fMapConnAll" onclick="setConnectionsMapFilter('all')">
-                          <span>Todas</span>
-                          <span class="map-hud-count-pill" id="cntMapAll">0</span>
-                        </button>
-                        <button type="button" class="map-hud-btn" id="fMapConnIn" onclick="setConnectionsMapFilter('incoming')">
-                          <span class="hud-status-pip in"></span>
-                          <span>Entrantes</span>
-                          <span class="map-hud-count-pill" id="cntMapIn">0</span>
-                        </button>
-                        <button type="button" class="map-hud-btn" id="fMapConnOut" onclick="setConnectionsMapFilter('outgoing')">
-                          <span class="hud-status-pip out"></span>
-                          <span>Salientes</span>
-                          <span class="map-hud-count-pill" id="cntMapOut">0</span>
-                        </button>
-                        <button type="button" class="map-hud-btn" id="fMapConnDev" onclick="setConnectionsMapFilter('devices', true)" title="Filtrar por dispositivos de la red local y mostrar selector adaptativo">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                          <span>Dispositivos</span>
-                          <span class="map-hud-count-pill" id="cntMapDev">0</span>
-                        </button>
-                        <button type="button" class="map-hud-btn" id="fMapConnBlk" onclick="setConnectionsMapFilter('blocked')">
-                          <span class="hud-status-pip blk"></span>
-                          <span>Bloqueadas</span>
-                          <span class="map-hud-count-pill" id="cntMapBlk">0</span>
-                        </button>
+                      <!-- Controles de Filtrado Adaptativo (Tráfico y Dispositivos LAN) -->
+                      <div class="map-hud-zone">
+                        <div class="map-hud-seg-track">
+                          <button type="button" class="map-hud-btn active" id="fMapConnAll" onclick="setConnectionsMapFilter('all')">
+                            <span>Todas</span>
+                            <span class="map-hud-count-pill" id="cntMapAll">0</span>
+                          </button>
+                          <button type="button" class="map-hud-btn" id="fMapConnIn" onclick="setConnectionsMapFilter('incoming')">
+                            <span class="hud-status-pip in"></span>
+                            <span>Entrantes</span>
+                            <span class="map-hud-count-pill" id="cntMapIn">0</span>
+                          </button>
+                          <button type="button" class="map-hud-btn" id="fMapConnOut" onclick="setConnectionsMapFilter('outgoing')">
+                            <span class="hud-status-pip out"></span>
+                            <span>Salientes</span>
+                            <span class="map-hud-count-pill" id="cntMapOut">0</span>
+                          </button>
+                          <button type="button" class="map-hud-btn" id="fMapConnDev" onclick="setConnectionsMapFilter('devices', true)" title="Filtrar por dispositivos de la red local y mostrar selector adaptativo">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                            <span>Dispositivos</span>
+                            <span class="map-hud-count-pill" id="cntMapDev">0</span>
+                          </button>
+                          <button type="button" class="map-hud-btn" id="fMapConnBlk" onclick="setConnectionsMapFilter('blocked')">
+                            <span class="hud-status-pip blk"></span>
+                            <span>Bloqueadas</span>
+                            <span class="map-hud-count-pill" id="cntMapBlk">0</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    <!-- Zona Derecha: Zoom, Cámara y Modo Pantalla Completa -->
-                    <div class="map-hud-zone">
-                      <button type="button" class="map-hud-icon-btn" onclick="mapZoomIn()" title="Acercar mapa (Zoom +)">
+                    <!-- Zona Derecha Fija (Siempre Visible): Zoom, Cámara y Modo Pantalla Completa -->
+                    <div class="map-hud-pinned-right">
+                      <button type="button" class="map-hud-icon-btn" id="btnMapZoomIn" onclick="mapZoomIn()" title="Acercar mapa (Zoom +)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
-                      <button type="button" class="map-hud-icon-btn" onclick="mapZoomOut()" title="Alejar mapa (Zoom −)">
+                      <button type="button" class="map-hud-icon-btn" id="btnMapZoomOut" onclick="mapZoomOut()" title="Alejar mapa hasta el límite mundial (Zoom −)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
                       <button type="button" class="map-hud-icon-btn" onclick="fitConnectionsMapBounds()" title="Encuadrar todas las conexiones activas">
@@ -4022,9 +4123,7 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
                       </button>
 
-                      <div class="map-hud-divider"></div>
-
-                      <button type="button" class="map-hud-btn fullscreen-btn" id="btnMapFullscreenToggle" onclick="toggleConnectionsMapFullscreen()" title="Alternar modo Pantalla Completa con controles integrados">
+                      <button type="button" class="map-hud-btn fullscreen-btn" id="btnMapFullscreenToggle" onclick="toggleConnectionsMapFullscreen()" title="Alternar modo Pantalla Completa (Esc para salir)">
                         <span id="iconMapFullscreenToggle" style="display: inline-flex; align-items: center;">
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                         </span>
@@ -4085,6 +4184,11 @@
                   </span>
                   <span id="lblMapProviderAttribution" style="font-family: var(--font-mono); font-size: 10px; opacity: 0.8;">OpenStreetMap · Precisión Dual GeoIP + SQLite</span>
                 </div>
+
+                <!-- Botón Flotante Esquina Inferior Derecha para Pantalla Completa -->
+                <button type="button" class="map-corner-fullscreen-fab" id="btnMapCornerFullscreen" onclick="toggleConnectionsMapFullscreen()" title="Alternar Mapa en Pantalla Completa (Esc para salir)">
+                  <svg id="iconMapCornerFullscreen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                </button>
               </div>
 
               <div>
@@ -12176,15 +12280,24 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
     }
 
     function mapZoomIn() {
-      if (NetworkConnectionsMapEngine._leafletMap) {
-        NetworkConnectionsMapEngine._leafletMap.zoomIn();
+      const map = NetworkConnectionsMapEngine._leafletMap;
+      if (!map) return;
+      NetworkConnectionsMapEngine.enforceMapWorldBounds();
+      if (map.getZoom() < map.getMaxZoom()) {
+        map.zoomIn(0.5);
       }
+      NetworkConnectionsMapEngine.syncZoomButtonsUI();
     }
 
     function mapZoomOut() {
-      if (NetworkConnectionsMapEngine._leafletMap) {
-        NetworkConnectionsMapEngine._leafletMap.zoomOut();
+      const map = NetworkConnectionsMapEngine._leafletMap;
+      if (!map) return;
+      const minZ = NetworkConnectionsMapEngine.enforceMapWorldBounds();
+      const curZ = map.getZoom();
+      if (curZ > minZ) {
+        map.setZoom(Math.max(minZ, curZ - 0.5));
       }
+      NetworkConnectionsMapEngine.syncZoomButtonsUI();
     }
 
     async function clearMapConnectionHistorySql() {
@@ -12214,26 +12327,44 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       }
     }
 
+    let _wasNativeMapFullscreenActive = false;
+
     function syncConnectionsMapFullscreenUI() {
       const wrap = document.getElementById('networkConnectionsMapStageWrap');
       const btn = document.getElementById('btnMapFullscreenToggle');
       const icon = document.getElementById('iconMapFullscreenToggle');
       const lbl = document.getElementById('lblMapFullscreenToggle');
+      const cornerBtn = document.getElementById('btnMapCornerFullscreen');
+      const cornerIcon = document.getElementById('iconMapCornerFullscreen');
+      const hdrBtn = document.getElementById('btnMapHeaderFullscreen');
+      const hdrLbl = document.getElementById('lblMapHeaderFullscreen');
       if (!wrap) return;
       const isNativeFs = (document.fullscreenElement === wrap || document.webkitFullscreenElement === wrap);
       const isCssFs = wrap.classList.contains('is-fullscreen');
       const active = isNativeFs || isCssFs;
+
+      document.body.classList.toggle('map-fullscreen-active', active);
       if (btn) btn.classList.toggle('active', active);
-      if (icon) {
-        icon.innerHTML = active
-          ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`
-          : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+      if (cornerBtn) cornerBtn.classList.toggle('active', active);
+      if (hdrBtn) hdrBtn.classList.toggle('active', active);
+
+      const exitSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+      const enterSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+
+      if (icon) icon.innerHTML = active ? exitSvg : enterSvg;
+      if (cornerIcon) {
+        cornerIcon.innerHTML = active
+          ? `<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>`
+          : `<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>`;
       }
       if (lbl) lbl.textContent = active ? 'Salir' : 'Pantalla Completa';
-      [60, 220].forEach(ms => {
+      if (hdrLbl) hdrLbl.textContent = active ? 'Salir de Pantalla Completa' : 'Pantalla Completa';
+
+      [16, 90, 240].forEach(ms => {
         setTimeout(() => {
           if (NetworkConnectionsMapEngine._leafletMap) {
-            NetworkConnectionsMapEngine._leafletMap.invalidateSize();
+            NetworkConnectionsMapEngine._leafletMap.invalidateSize({ animate: false });
+            NetworkConnectionsMapEngine.enforceMapWorldBounds();
           }
         }, ms);
       });
@@ -12245,24 +12376,33 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       const isNativeFs = (document.fullscreenElement === wrap || document.webkitFullscreenElement === wrap);
       const isCssFs = wrap.classList.contains('is-fullscreen');
 
-      if (isNativeFs) {
-        try {
-          if (document.exitFullscreen) await document.exitFullscreen();
-          else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
-        } catch (e) {}
+      if (isNativeFs || isCssFs) {
+        _wasNativeMapFullscreenActive = false;
         wrap.classList.remove('is-fullscreen');
-      } else if (isCssFs) {
-        wrap.classList.remove('is-fullscreen');
+        document.body.classList.remove('map-fullscreen-active');
+        if (isNativeFs) {
+          try {
+            if (document.exitFullscreen) await document.exitFullscreen();
+            else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+          } catch (e) {}
+        }
       } else {
         wrap.classList.add('is-fullscreen');
+        document.body.classList.add('map-fullscreen-active');
         try {
-          if (wrap.requestFullscreen) {
-            await wrap.requestFullscreen();
-          } else if (wrap.webkitRequestFullscreen) {
-            await wrap.webkitRequestFullscreen();
+          if (document.fullscreenEnabled !== false) {
+            if (wrap.requestFullscreen) {
+              await wrap.requestFullscreen();
+              _wasNativeMapFullscreenActive = true;
+            } else if (wrap.webkitRequestFullscreen) {
+              await wrap.webkitRequestFullscreen();
+              _wasNativeMapFullscreenActive = true;
+            }
           }
         } catch (e) {
-          // Fallback .is-fullscreen permanece activo en contenedores iframe restringidos
+          // En iframes con política de permisos restringida (ej. Google AI Studio preview),
+          // el modo .is-fullscreen + body.map-fullscreen-active cubre el 100% del viewport.
+          _wasNativeMapFullscreenActive = false;
         }
       }
       syncConnectionsMapFullscreenUI();
@@ -12270,8 +12410,13 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
     document.addEventListener('fullscreenchange', () => {
       const wrap = document.getElementById('networkConnectionsMapStageWrap');
-      if (wrap && !document.fullscreenElement) {
+      const isNowNative = Boolean(wrap && (document.fullscreenElement === wrap || document.webkitFullscreenElement === wrap));
+      if (isNowNative) {
+        _wasNativeMapFullscreenActive = true;
+      } else if (_wasNativeMapFullscreenActive && wrap) {
+        _wasNativeMapFullscreenActive = false;
         wrap.classList.remove('is-fullscreen');
+        document.body.classList.remove('map-fullscreen-active');
       }
       syncConnectionsMapFullscreenUI();
     });
@@ -12283,8 +12428,10 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           return;
         }
         const wrap = document.getElementById('networkConnectionsMapStageWrap');
-        if (wrap && wrap.classList.contains('is-fullscreen') && !document.fullscreenElement) {
+        if (wrap && wrap.classList.contains('is-fullscreen')) {
+          _wasNativeMapFullscreenActive = false;
           wrap.classList.remove('is-fullscreen');
+          document.body.classList.remove('map-fullscreen-active');
           syncConnectionsMapFullscreenUI();
         }
       }
@@ -12626,9 +12773,23 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         try {
           this._isBootstrapping = true;
           container.innerHTML = '';
+          const worldBounds = L.latLngBounds(
+            L.latLng(-85.05112878, -179.99),
+            L.latLng(85.05112878, 179.99)
+          );
+          this._worldBounds = worldBounds;
+
           this._leafletMap = L.map(container, {
             center: [initLat, initLng],
             zoom: 3,
+            minZoom: 2,
+            maxZoom: 19,
+            zoomSnap: 0.25,
+            zoomDelta: 0.5,
+            maxBounds: worldBounds,
+            maxBoundsViscosity: 1.0,
+            bounceAtZoomLimits: false,
+            worldCopyJump: false,
             zoomControl: false,
             attributionControl: false,
             closePopupOnClick: false
@@ -12636,6 +12797,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
           const mainTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
+            minZoom: 1,
+            noWrap: false,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
           });
           mainTileLayer.on('tileerror', function(error, tile) {
@@ -12646,6 +12809,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             }
           });
           mainTileLayer.addTo(this._leafletMap);
+
+          this.enforceMapWorldBounds();
 
           container.addEventListener('click', (e) => {
             if (connectionsMapServiceDrawerOpen) {
@@ -12662,7 +12827,13 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             }
           });
 
+          this._leafletMap.on('resize', () => {
+            this.enforceMapWorldBounds();
+          });
+
           this._leafletMap.on('zoomend', () => {
+            this.enforceMapWorldBounds();
+            this.syncZoomButtonsUI();
             if (this._isReady && Array.isArray(this._currentConns) && this._currentConns.length > 0) {
               this.renderDynamicClusters();
             }
@@ -12672,7 +12843,11 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           this._isBootstrapping = false;
           this.setStatusOverlay(false);
           setTimeout(() => {
-            if (this._leafletMap) this._leafletMap.invalidateSize();
+            if (this._leafletMap) {
+              this._leafletMap.invalidateSize({ animate: false });
+              this.enforceMapWorldBounds();
+              this.syncZoomButtonsUI();
+            }
           }, 120);
           return true;
         } catch (err) {
@@ -13532,8 +13707,58 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         }
       },
 
+      enforceMapWorldBounds() {
+        if (!this._leafletMap || typeof L === 'undefined') return 2;
+        const container = document.getElementById('networkConnectionsMapCanvas');
+        const w = (container && container.clientWidth) ? container.clientWidth : 1024;
+        const h = (container && container.clientHeight) ? container.clientHeight : 500;
+        const worldBounds = this._worldBounds || L.latLngBounds(
+          L.latLng(-85.05112878, -179.99),
+          L.latLng(85.05112878, 179.99)
+        );
+        this._worldBounds = worldBounds;
+
+        // Calcular el zoom mínimo exacto para que el mapa del mundo (256 * 2^z px)
+        // cubra el 100% del ancho y alto del contenedor sin mostrar jamás fondo vacío fuera del mapa
+        const requiredSpanPx = Math.max(w, h) + 20;
+        const minZoomBySpan = Math.ceil(Math.log2(requiredSpanPx / 256) * 4) / 4;
+        const insideZoom = this._leafletMap.getBoundsZoom(worldBounds, true);
+        const safeMinZoom = Math.max(2, minZoomBySpan, Number.isFinite(insideZoom) ? insideZoom : 2);
+
+        this._leafletMap.setMinZoom(safeMinZoom);
+        this._leafletMap.setMaxBounds(worldBounds);
+        if (this._leafletMap.getZoom() < safeMinZoom) {
+          this._leafletMap.setZoom(safeMinZoom, { animate: false });
+        }
+        try {
+          this._leafletMap.panInsideBounds(worldBounds, { animate: false });
+        } catch (e) {}
+        return safeMinZoom;
+      },
+
+      syncZoomButtonsUI() {
+        if (!this._leafletMap) return;
+        const curZ = this._leafletMap.getZoom();
+        const minZ = this._leafletMap.getMinZoom();
+        const maxZ = this._leafletMap.getMaxZoom();
+        const btnOut = document.getElementById('btnMapZoomOut');
+        const btnIn = document.getElementById('btnMapZoomIn');
+        if (btnOut) {
+          const atMin = curZ <= minZ + 0.05;
+          btnOut.disabled = atMin;
+          btnOut.title = atMin
+            ? 'Zoom mínimo alcanzado (límite de cobertura mundial)'
+            : 'Alejar mapa hasta el límite mundial (Zoom −)';
+        }
+        if (btnIn) {
+          const atMax = curZ >= maxZ - 0.05;
+          btnIn.disabled = atMax;
+        }
+      },
+
       fitAllBounds() {
         if (!this._leafletMap) return;
+        const safeMinZoom = this.enforceMapWorldBounds();
         const srv = this._lastConnData ? this._lastConnData.server_node : null;
         const pts = [];
         if (srv && typeof srv.lat === 'number' && typeof srv.lng === 'number') {
@@ -13545,10 +13770,17 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           }
         }
         if (pts.length > 1) {
-          this._leafletMap.fitBounds(L.latLngBounds(pts).pad(0.12));
+          this._leafletMap.fitBounds(L.latLngBounds(pts).pad(0.12), {
+            maxZoom: 12
+          });
+          if (this._leafletMap.getZoom() < safeMinZoom) {
+            this._leafletMap.setZoom(safeMinZoom, { animate: false });
+          }
         } else if (pts.length === 1) {
-          this._leafletMap.setView(pts[0], 6);
+          this._leafletMap.setView(pts[0], Math.max(6, safeMinZoom));
         }
+        this.enforceMapWorldBounds();
+        this.syncZoomButtonsUI();
       },
 
       focusServerNode() {

@@ -1,16 +1,15 @@
-# Walkthrough — v7.0.0: Rediseño de Precisión del HUD Flotante del Mapa, Panel Desplegable de Servicios y Modo Pantalla Completa
+# Walkthrough — v7.0.1: Pantalla Completa Garantizada y Límite Dinámico de Zoom Mundial en el Mapa
 
-## 1. Resumen de Mejoras de Interfaz y Experiencia de Usuario (`v7.0.0`)
+## 1. Correcciones y Mejoras Verificadas (`v7.0.1`)
 
-### A. Barra Superior Flotante de Una Sola Línea (`.map-hud-primary-bar`)
-- **Simetría Total y Cero Colisiones**: Se desactivó el control de zoom nativo de Leaflet (`zoomControl: false`) y se integraron botones vectoriales SVG de `Zoom +`, `Zoom −`, `Encuadrar` y `Host` directamente en la zona derecha de la barra superior flotante (`left: 12px; right: 12px; top: 12px;`).
-- **Jerarquía Limpia sin Saturación**: Se reemplazaron los botones apilados con emojis por pistas segmentadas (`.map-hud-seg-track`) sobre cristal oscuro (`rgba(9, 13, 22, 0.86)`, `backdrop-filter: blur(22px) saturate(185%)`), indicadores luminosos de `6px` (`.hud-status-pip`) y contadores monoespaciados `tabular-nums` (`.map-hud-count-pill`).
+### A. Modo Pantalla Completa Real (`100vw × 100dvh`) y Accesibilidad Permanente
+- **Eliminación de Trampa CSS (`backdrop-filter`)**: Se añadió la clase global `body.map-fullscreen-active` que neutraliza `backdrop-filter`, `transform`, `filter` y `contain` en `.connections-map-card` y sus ancestros mientras el mapa está en pantalla completa, ocultando además la barra superior del sistema y el dock táctil para que el mapa ocupe el 100% de la ventana (`100vw × 100dvh`) incluso dentro de iframes con permisos restringidos.
+- **Controles de Pantalla Completa Siempre Visibles**:
+  1. **Zona Derecha Fija en el HUD (`.map-hud-pinned-right`)**: Anclada a la derecha de la barra superior flotante para que los botones de `Zoom +`, `Zoom −`, `Encuadrar`, `Host` y `Pantalla Completa` nunca queden ocultos por desplazamiento horizontal.
+  2. **Botón Flotante en Esquina Inferior Derecha (`#btnMapCornerFullscreen`)**: Acceso directo táctil en la esquina inferior derecha del mapa.
+  3. **Botón en Cabecera de Sección (`#btnMapHeaderFullscreen`)**: Situado junto a la insignia `OpenStreetMap · SQLite GeoIP`.
 
-### B. Panel Desplegable de Servicios Operativo en Tiempo Real e Historial (`#mapHudServiceCatalogDrawer`)
-- **Popover Flotante No Invasivo**: El botón `Servicios` (`#btnMapServicesDropdown`) abre un panel flotante de cristal oscuro (`max-width: 720px`) con cuadrícula CSS responsiva de tarjetas de servicio.
-- **Catálogo Unificado (`buildUnifiedServicesCatalog`)**: Funciona tanto en modo **En Vivo** (agrupando al vuelo los servicios de las conexiones activas) como en modo **Historial SQLite** (`/api/net/history`).
-- **Cierre Automático y Limpieza Rápida**: Al elegir un servicio en el desplegable, el mapa se filtra al instante, el panel se pliega para dejar el lienzo despejado y el botón superior muestra el nombre del servicio activo junto a un botón `×` (`#btnMapClearServiceQuick`) para restablecer el filtro en un clic.
-
-### C. Controles Adaptativos de Dispositivos y Pantalla Completa
-- **Tira Adaptativa de Equipos LAN (`#mapHudDeviceFilterBar`)**: Permanece oculta mientras se inspecciona el tráfico general y se despliega suavemente en una sola fila horizontal al pulsar `Dispositivos` o seleccionar un equipo.
-- **Modo Pantalla Completa (`toggleConnectionsMapFullscreen`)**: Expande el contenedor del mapa a `100vw × 100vh` conservando intactos todos los controles flotantes y permitiendo cerrar el desplegable o salir de pantalla completa con la tecla `Escape`.
+### B. Bloqueo de Zoom-Out Más Allá del Mapa Mundial (`enforceMapWorldBounds`)
+- **Cálculo Dinámico de `minZoom`**: La función `enforceMapWorldBounds()` mide las dimensiones reales de `#networkConnectionsMapCanvas` (`w × h`) al inicializar, redimensionar o conmutar Pantalla Completa y fija automáticamente el nivel mínimo de zoom (`minZoom`) de modo que la proyección Web Mercator (`256 * 2^z` px) sea siempre mayor que el ancho y alto del visor.
+- **Fronteras Rígidas (`maxBoundsViscosity: 1.0` y `bounceAtZoomLimits: false`)**: Impide arrastrar o alejar la cámara más allá de los polos (`±85.05°`) o de los extremos longitudinales (`±179.99°`), eliminando por completo la aparición de franjas vacías o transparentes fuera del mapa.
+- **Indicador Visual en Botones de Zoom (`syncZoomButtonsUI`)**: El botón `Zoom −` (`#btnMapZoomOut`) se deshabilita automáticamente al alcanzar el límite mundial de cobertura.

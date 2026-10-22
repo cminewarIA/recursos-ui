@@ -1,17 +1,14 @@
-# Plan de Implementación — v7.0.0: Rediseño de Precisión del HUD Flotante del Mapa, Panel Desplegable de Servicios y Modo Pantalla Completa
+# Plan de Implementación — v7.0.1: Pantalla Completa Garantizada y Límite Dinámico de Zoom Mundial en el Mapa
 
-## 1. Objetivo del Rediseño (`MAJOR` v7.0.0)
-Sustituir la interfaz anterior de botones apilados por una **Barra Superior Flotante de Precisión (`.map-hud-primary-bar`)** de una sola línea, un **Panel Desplegable Flotante de Servicios (`#mapHudServiceCatalogDrawer`)** en cristal oscuro y una **Tira Adaptativa de Dispositivos (`#mapHudDeviceFilterBar`)** que no obstruyan el lienzo del mapa ni colisionen con los controles de Leaflet, funcionando de forma idéntica en vista estándar y en **Pantalla Completa (`100vw × 100vh`)**.
+## 1. Objetivo (`PATCH` v7.0.1)
+1. Garantizar que el mapa geoespacial (`#networkConnectionsMapStageWrap`) pueda activarse y visualizarse siempre a **Pantalla Completa real (`100vw × 100dvh`)** tanto en navegadores de escritorio/móvil como dentro de contenedores `<iframe>` restringidos (sin quedar atrapado dentro de `.connections-map-card` ni ocultar el botón de Pantalla Completa fuera del borde derecho en pantallas estrechas).
+2. Impedir que el usuario pueda hacer **zoom-out más allá de los límites del mapa mundial** (`[-85.0511°, -179.99°]` a `[85.0511°, 179.99°]`), evitando por completo que se vea el fondo vacío/transparente alrededor de los bordes superior, inferior o laterales del mapa.
 
-## 2. Arquitectura Visual y Funcional
-1. **Barra Superior Flotante Simétrica (`left: 12px; right: 12px; top: 12px;`)**:
-   - Una sola línea horizontal (`flex-wrap: nowrap`) con tres zonas claramente diferenciadas y separadores verticales de `1px`:
-     - **Zona Izquierda**: Conmutador segmentado `En Vivo` / `Historial` + botón desplegable `Servicios` (`#btnMapServicesDropdown`) con icono vectorial SVG de capas, contador tabular (`#cntMapHistServices`), indicador de servicio activo y botón rápido `×` (`#btnMapClearServiceQuick`).
-     - **Zona Central**: Pista segmentada de filtrado adaptativo (`Todas`, `Entrantes`, `Salientes`, `Dispositivos`, `Bloqueadas`) con indicadores semánticos de `6px` y contadores `tabular-nums`.
-     - **Zona Derecha**: Controles integrados de cámara y zoom en SVG (`Zoom +`, `Zoom −`, `Encuadrar`, `Host`) —reemplazando el control nativo de Leaflet que generaba asimetría— junto al botón de **Pantalla Completa**.
-2. **Panel Desplegable Flotante de Servicios (`#mapHudServiceCatalogDrawer`)**:
-   - Popover de cristal oscuro (`max-width: 720px`) con animación suave (`hudDropdownSlideIn`), operativo tanto en modo **En Vivo** (agregando servicios activos en tiempo real) como en modo **Historial SQLite**.
-   - Incluye selector de ventana temporal (`Todo`, `6h`, `24h`, `7d`), buscador con icono SVG, recarga en vivo, limpieza de base de datos y cuadrícula CSS responsiva (`grid-template-columns: repeat(auto-fill, minmax(195px, 1fr))`).
-   - Al seleccionar un servicio, filtra el mapa de inmediato y cierra el popover para despejar la vista cartográfica (también se cierra automáticamente al hacer clic sobre el mapa o pulsar `Escape`).
-3. **Tira Adaptativa de Dispositivos LAN (`#mapHudDeviceFilterBar`)**:
-   - Se muestra de forma adaptativa únicamente cuando el usuario activa el filtro `Dispositivos` o aísla un equipo específico, evitando ocupar espacio vertical en el resto de vistas.
+## 2. Solución Técnica Implementada
+1. **Pantalla Completa sin Trampa de `backdrop-filter` (`body.map-fullscreen-active`)**:
+   - En CSS, `.connections-map-card` tenía `backdrop-filter: blur(22px)`, lo cual creaba un bloque contenedor que atrapaba los elementos hijos con `position: fixed`. Al activar `body.map-fullscreen-active`, se desactivan `backdrop-filter`, `transform`, `filter` y `contain` en todos los ancestros y se ocultan `.top-header`, `.floating-dock-shell` y `.sidebar`, permitiendo que `#networkConnectionsMapStageWrap.is-fullscreen` ocupe el `100vw × 100dvh` con `z-index: 2147483640`.
+   - En `.map-hud-primary-bar`, se dividió el carril izquierdo/central deslizable (`.map-hud-scroll-track`) de la **zona derecha anclada (`.map-hud-pinned-right`)**, de modo que los botones de `Zoom +`, `Zoom −`, `Encuadrar`, `Host` y `Pantalla Completa` permanezcan siempre visibles sin recortarse en pantallas de menor anchura.
+   - Se añadieron además dos accesos directos adicionales: un botón flotante en la esquina inferior derecha del mapa (`#btnMapCornerFullscreen`) y un botón `Pantalla Completa` en la barra de cabecera de la sección (`#btnMapHeaderFullscreen`).
+2. **Límite Matemático de Zoom-Out y Fronteras Mundiales (`enforceMapWorldBounds`)**:
+   - Se configuró Leaflet con `zoomSnap: 0.25`, `zoomDelta: 0.5`, `maxBounds: [[-85.05112878, -179.99], [85.05112878, 179.99]]`, `maxBoundsViscosity: 1.0` y `bounceAtZoomLimits: false`.
+   - `enforceMapWorldBounds()` calcula dinámicamente el `minZoom` exacto en función del ancho y alto actuales del contenedor (`Math.ceil(Math.log2((Math.max(w, h) + 20) / 256) * 4) / 4` y `getBoundsZoom(worldBounds, true)`), asegurando que las teselas de OpenStreetMap cubran siempre el 100% del lienzo tanto en vista estándar como en pantalla completa.
