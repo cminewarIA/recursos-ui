@@ -1,11 +1,6 @@
-# Walkthrough General: Recursos Dashboard (`v4.13.0`)
+# Walkthrough Activo (`v4.18.1`)
 
-## Última Actualización: Ingesta de Flujos de Dispositivos del Hogar vía Pi-hole (`v4.13.0`)
+Consulte el detalle completo de validación en `./planes/walkthrough_v4.18.1.md`.
 
-Para detalles completos ver: [2026-10-21_walkthrough_flujos_conexiones_dispositivos_hogar_pihole.md](file:///home/servidor/servicios/dashboard/planes/2026-10-21_walkthrough_flujos_conexiones_dispositivos_hogar_pihole.md)
-
-### Resumen de Cambios
-- **Ingesta de Dispositivos del Hogar**: Extracción automática de las conexiones salientes a Internet realizadas por tabletas, móviles, televisores y consolas desde Pi-hole (`pihole-FTL.db` `queries`).
-- **Filtro `📱 Dispositivos`**: Control en el mapa para alternar entre ver el tráfico de los dispositivos del hogar o el del servidor.
-- **Iconografía**: Diferenciación clara con `📱 <dispositivo>` vs `🖥️ Servidor`.
-- **Regla 5**: Subida de versión a `4.13.0`.
+- **Versión Activa**: `4.18.1` (`PATCH` — Optimización de rendimiento en backend, frontend de Red y payloads de telemetría).
+- **Archivos Sincronizados**: `server.py`, `index.html`, `static/index.html`, `VERSION`, `package.json`, `README.md` y documentación en `planes/`.

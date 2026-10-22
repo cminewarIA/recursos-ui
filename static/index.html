@@ -4801,6 +4801,12 @@
       } else if (viewName === 'dns') {
         loadDnsAllData();
       } else if (viewName === 'network') {
+        if (latestMetrics && latestMetrics.net) {
+          const netIfaces = Array.isArray(latestMetrics.net.interfaces_list)
+            ? latestMetrics.net.interfaces_list
+            : (latestMetrics.net.interfaces ? Object.values(latestMetrics.net.interfaces) : []);
+          BandwidthThresholdMonitor.evaluateAndRender(netIfaces);
+        }
         setTimeout(() => {
           if (NetworkConnectionsMapEngine && NetworkConnectionsMapEngine._leafletMap) {
             NetworkConnectionsMapEngine._leafletMap.invalidateSize();
@@ -5178,6 +5184,7 @@
       MAX_WINDOW_MS: 2 * 60 * 60 * 1000, // 2 hours in ms
       SAMPLE_INTERVAL_MS: 15 * 1000,     // 15 seconds bucket threshold
       _cache: {},                        // { [nicName]: [ { t, rx, tx } ] }
+      _hydratedNics: new Set(),          // Evita re-fusionar 3600 puntos del servidor cada 2s
       _dirty: false,
       _saveTimer: null,
 
@@ -5235,10 +5242,15 @@
 
       mergeServerHistory(nicName, serverHistory) {
         if (!nicName || !Array.isArray(serverHistory) || serverHistory.length === 0) return;
-        const now = Date.now();
-        const cutoff = now - this.MAX_WINDOW_MS;
         const localSeries = this._cache[nicName] || (this._cache[nicName] = []);
 
+        // Si ya se hidrató el historial de 2h para esta NIC en la sesión actual, omitir el re-sort O(N log N)
+        if (this._hydratedNics.has(nicName) && localSeries.length > 0) {
+          return;
+        }
+
+        const now = Date.now();
+        const cutoff = now - this.MAX_WINDOW_MS;
         const mergedMap = new Map();
         for (const pt of localSeries) {
           if (pt && pt.t >= cutoff) {
@@ -5258,20 +5270,25 @@
 
         const combined = Array.from(mergedMap.values()).sort((a, b) => a.t - b.t);
         this._cache[nicName] = combined;
+        this._hydratedNics.add(nicName);
         this._scheduleSave();
       },
 
       getHistory(nicName) {
         const series = this._cache[nicName] || [];
         const cutoff = Date.now() - this.MAX_WINDOW_MS;
-        return series.filter(pt => pt.t >= cutoff);
+        while (series.length > 0 && series[0].t < cutoff) {
+          series.shift();
+        }
+        return series;
       },
 
       getPeak(nicName) {
         const series = this.getHistory(nicName);
         let maxRx = 0;
         let maxTx = 0;
-        for (const pt of series) {
+        for (let i = 0; i < series.length; i++) {
+          const pt = series[i];
           if (pt.rx > maxRx) maxRx = pt.rx;
           if (pt.tx > maxTx) maxTx = pt.tx;
         }
@@ -5281,7 +5298,7 @@
       _scheduleSave() {
         this._dirty = true;
         if (!this._saveTimer) {
-          this._saveTimer = setTimeout(() => this.flush(), 4000);
+          this._saveTimer = setTimeout(() => this.flush(), 15000);
         }
       },
 
@@ -6811,7 +6828,7 @@
       } else if (activeView === 'network') {
         drawTelemetryChart('canvasNet', hist.net_rx, '#34D399', hist.net_tx, '#38BDF8', null);
 
-        // Render Active OS Network Interfaces (NICs) with Automatic Logo & Local Upload Override
+        // Render Active OS Network Interfaces (NICs) with In-Place DOM & Canvas Updates
         const netObj = latestMetrics.net || {};
         const nicsList = Array.isArray(netObj.interfaces_list)
           ? netObj.interfaces_list
@@ -6819,98 +6836,137 @@
         const nicsGrid = document.getElementById('activeNicsGrid');
         if (nicsGrid) {
           if (nicsList.length === 0) {
-            nicsGrid.innerHTML = '<div class="nic-card" style="color: var(--text-muted);">No se detectaron interfaces de red físicas activas.</div>';
+            if (nicsGrid.dataset.structSig !== '__empty__') {
+              nicsGrid.dataset.structSig = '__empty__';
+              nicsGrid.innerHTML = '<div class="nic-card" style="color: var(--text-muted);">No se detectaron interfaces de red físicas activas.</div>';
+            }
           } else {
-            nicsGrid.innerHTML = nicsList.map(nic => {
+            const structSig = nicsList.map(nic => {
               const nicLogo = resolveNicLogo(nic);
-              const isDataCover = nicLogo.isCustom && nicLogo.url.startsWith('data:image/');
-              const nicTitle = `Interfaz ${nic.name} (${nic.ip || 'Activa'})`;
-              const nicPeak = NicBandwidthStorageManager.getPeak(nic.name);
-              const nicExceed = BandwidthThresholdMonitor.checkNic(nic);
-              return `
-                <div class="nic-card" style="${nicExceed.exceeded ? 'border-color: rgba(244, 63, 94, 0.72); box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.25);' : ''}">
-                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-                      <div class="nic-logo-box interactive-logo" onclick="openLogoPickerModal('${escapeHtml(nicLogo.key)}', '${escapeHtml(nicTitle)}', '${escapeHtml(nicLogo.query)}', '${escapeHtml(nicLogo.url)}')" title="Haz clic para cambiar el logo de la interfaz ${escapeHtml(nic.name)}">
-                        <img class="${isDataCover ? 'custom-cover' : ''}" src="${escapeHtml(nicLogo.url)}" alt="${escapeHtml(nic.name)}" onerror="if(this.dataset.fb && this.src!==this.dataset.fb){this.src=this.dataset.fb;}">
-                        <div class="logo-edit-overlay"><span>🖼️</span><span>Logo</span></div>
+              return `${nic.name}|${nic.ip || ''}|${nic.mac || ''}|${nic.is_up !== false}|${nic.speed_mbps || ''}|${nicLogo.url}`;
+            }).join(';;');
+
+            if (nicsGrid.dataset.structSig !== structSig) {
+              nicsGrid.dataset.structSig = structSig;
+              nicsGrid.innerHTML = nicsList.map(nic => {
+                const nicLogo = resolveNicLogo(nic);
+                const isDataCover = nicLogo.isCustom && nicLogo.url.startsWith('data:image/');
+                const nicTitle = `Interfaz ${nic.name} (${nic.ip || 'Activa'})`;
+                const nicPeak = NicBandwidthStorageManager.getPeak(nic.name);
+                const nicExceed = BandwidthThresholdMonitor.checkNic(nic);
+                const safeNicId = escapeHtml(nic.name);
+                return `
+                  <div class="nic-card" id="nicCard_${safeNicId}" style="${nicExceed.exceeded ? 'border-color: rgba(244, 63, 94, 0.72); box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.25);' : ''}">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                      <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                        <div class="nic-logo-box interactive-logo" onclick="openLogoPickerModal('${escapeHtml(nicLogo.key)}', '${escapeHtml(nicTitle)}', '${escapeHtml(nicLogo.query)}', '${escapeHtml(nicLogo.url)}')" title="Haz clic para cambiar el logo de la interfaz ${safeNicId}">
+                          <img class="${isDataCover ? 'custom-cover' : ''}" src="${escapeHtml(nicLogo.url)}" alt="${safeNicId}" onerror="if(this.dataset.fb && this.src!==this.dataset.fb){this.src=this.dataset.fb;}">
+                          <div class="logo-edit-overlay"><span>🖼️</span><span>Logo</span></div>
+                        </div>
+                        <div>
+                          <div style="display: flex; align-items: center; gap: 7px;">
+                            <span class="live-dot" style="background: ${nic.is_up !== false ? 'var(--accent-emerald)' : 'var(--accent-amber)'};"></span>
+                            <strong class="mono" style="font-size: 15px; color: var(--text-primary);">${safeNicId}</strong>
+                          </div>
+                          <div style="font-size: 11px; color: var(--text-muted);">Adaptador de Red del Sistema</div>
+                        </div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <span id="nicExceedBadge_${safeNicId}" class="adw-badge mono" style="${nicExceed.exceeded ? '' : 'display:none;'} background: rgba(244, 63, 94, 0.18); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.45);">⚠️ Supera umbral (${nicExceed.dirLabel})</span>
+                        <span class="adw-badge badge-blue mono">${nic.speed_mbps ? nic.speed_mbps + ' Mbps' : 'Activa'}</span>
+                        <button class="action-btn" style="height: 26px; padding: 0 8px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(nicLogo.key)}', '${escapeHtml(nicTitle)}', '${escapeHtml(nicLogo.query)}', '${escapeHtml(nicLogo.url)}')" title="Cambiar logo de interfaz">🖼️</button>
+                      </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+                      <div>
+                        <div style="color: var(--text-muted); font-size: 11px;">Dirección IPv4</div>
+                        <div class="mono" style="color: var(--accent-cyan-bright); font-weight: 600;">${escapeHtml(nic.ip || 'Sin IPv4 asignada')}</div>
                       </div>
                       <div>
-                        <div style="display: flex; align-items: center; gap: 7px;">
-                          <span class="live-dot" style="background: ${nic.is_up !== false ? 'var(--accent-emerald)' : 'var(--accent-amber)'};"></span>
-                          <strong class="mono" style="font-size: 15px; color: var(--text-primary);">${escapeHtml(nic.name)}</strong>
+                        <div style="color: var(--text-muted); font-size: 11px;">Dirección Física MAC</div>
+                        <div class="mono" style="color: var(--text-secondary);">${escapeHtml(nic.mac || 'N/A')}</div>
+                      </div>
+                      <div>
+                        <div style="color: var(--text-muted); font-size: 11px;">Caudal Actual</div>
+                        <div class="mono" id="nicRxTxVal_${safeNicId}" style="color: var(--accent-emerald-bright);">↓ ${formatSpeed(nic.rx_bytes_sec)} · ↑ ${formatSpeed(nic.tx_bytes_sec)}</div>
+                      </div>
+                      <div>
+                        <div style="color: var(--text-muted); font-size: 11px;">Tráfico Acumulado</div>
+                        <div class="mono" id="nicTotalBytesVal_${safeNicId}" style="color: var(--text-secondary);">↓ ${formatBytes(nic.bytes_recv)} · ↑ ${formatBytes(nic.bytes_sent)}</div>
+                      </div>
+                    </div>
+
+                    <!-- 2-Hour Bandwidth History Sparkline -->
+                    <div class="nic-sparkline-box">
+                      <div class="nic-sparkline-header">
+                        <div class="nic-sparkline-title">
+                          <span style="font-size: 13px;">📈</span>
+                          <span>Historial de Banda Ancha (Últimas 2 Horas)</span>
+                          <span class="nic-sparkline-meta" id="nicSparkMeta_${safeNicId}">${nicPeak.count} pts</span>
                         </div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Adaptador de Red del Sistema</div>
+                        <div class="nic-sparkline-legend">
+                          <span class="spark-legend-item"><span class="legend-pip rx"></span> ↓ Descarga</span>
+                          <span class="spark-legend-item"><span class="legend-pip tx"></span> ↑ Subida</span>
+                          <span class="spark-peak-badge" id="nicSparkPeak_${safeNicId}">Pico: ↓ ${formatSpeed(nicPeak.maxRx)} · ↑ ${formatSpeed(nicPeak.maxTx)}</span>
+                        </div>
+                      </div>
+                      <div class="nic-sparkline-stage" id="nicSparkStage_${safeNicId}">
+                        <canvas id="nicSpark_${safeNicId}" class="nic-sparkline-canvas"></canvas>
+                        <div class="nic-sparkline-scrub-tooltip" id="nicSparkTip_${safeNicId}"></div>
+                      </div>
+                      <div class="nic-sparkline-axis">
+                        <span>-2 horas</span>
+                        <span>-1 hora</span>
+                        <span>-30 min</span>
+                        <span>Ahora</span>
                       </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                      ${nicExceed.exceeded ? `<span class="adw-badge mono" style="background: rgba(244, 63, 94, 0.18); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.45);">⚠️ Supera umbral (${nicExceed.dirLabel})</span>` : ''}
-                      <span class="adw-badge badge-blue mono">${nic.speed_mbps ? nic.speed_mbps + ' Mbps' : 'Activa'}</span>
-                      <button class="action-btn" style="height: 26px; padding: 0 8px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(nicLogo.key)}', '${escapeHtml(nicTitle)}', '${escapeHtml(nicLogo.query)}', '${escapeHtml(nicLogo.url)}')" title="Cambiar logo de interfaz">🖼️</button>
-                    </div>
                   </div>
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
-                    <div>
-                      <div style="color: var(--text-muted); font-size: 11px;">Dirección IPv4</div>
-                      <div class="mono" style="color: var(--accent-cyan-bright); font-weight: 600;">${escapeHtml(nic.ip || 'Sin IPv4 asignada')}</div>
-                    </div>
-                    <div>
-                      <div style="color: var(--text-muted); font-size: 11px;">Dirección Física MAC</div>
-                      <div class="mono" style="color: var(--text-secondary);">${escapeHtml(nic.mac || 'N/A')}</div>
-                    </div>
-                    <div>
-                      <div style="color: var(--text-muted); font-size: 11px;">Caudal Actual</div>
-                      <div class="mono" style="color: var(--accent-emerald-bright);">↓ ${formatSpeed(nic.rx_bytes_sec)} · ↑ ${formatSpeed(nic.tx_bytes_sec)}</div>
-                    </div>
-                    <div>
-                      <div style="color: var(--text-muted); font-size: 11px;">Tráfico Acumulado</div>
-                      <div class="mono" style="color: var(--text-secondary);">↓ ${formatBytes(nic.bytes_recv)} · ↑ ${formatBytes(nic.bytes_sent)}</div>
-                    </div>
-                  </div>
+                `;
+              }).join('');
+            } else {
+              // Actualización in-place sin destruir el DOM ni los contextos <canvas>
+              for (const nic of nicsList) {
+                const nicExceed = BandwidthThresholdMonitor.checkNic(nic);
+                const cardEl = document.getElementById('nicCard_' + nic.name);
+                if (cardEl) {
+                  cardEl.style.borderColor = nicExceed.exceeded ? 'rgba(244, 63, 94, 0.72)' : '';
+                  cardEl.style.boxShadow = nicExceed.exceeded ? '0 0 0 1px rgba(244, 63, 94, 0.25)' : '';
+                }
+                const badgeEl = document.getElementById('nicExceedBadge_' + nic.name);
+                if (badgeEl) {
+                  if (nicExceed.exceeded) {
+                    badgeEl.style.display = '';
+                    badgeEl.textContent = `⚠️ Supera umbral (${nicExceed.dirLabel})`;
+                  } else {
+                    badgeEl.style.display = 'none';
+                  }
+                }
+                const rxTxEl = document.getElementById('nicRxTxVal_' + nic.name);
+                if (rxTxEl) {
+                  rxTxEl.textContent = `↓ ${formatSpeed(nic.rx_bytes_sec)} · ↑ ${formatSpeed(nic.tx_bytes_sec)}`;
+                }
+                const totEl = document.getElementById('nicTotalBytesVal_' + nic.name);
+                if (totEl) {
+                  totEl.textContent = `↓ ${formatBytes(nic.bytes_recv)} · ↑ ${formatBytes(nic.bytes_sent)}`;
+                }
+              }
+            }
 
-                  <!-- 2-Hour Bandwidth History Sparkline -->
-                  <div class="nic-sparkline-box">
-                    <div class="nic-sparkline-header">
-                      <div class="nic-sparkline-title">
-                        <span style="font-size: 13px;">📈</span>
-                        <span>Historial de Banda Ancha (Últimas 2 Horas)</span>
-                        <span class="nic-sparkline-meta" id="nicSparkMeta_${escapeHtml(nic.name)}">${nicPeak.count} pts</span>
-                      </div>
-                      <div class="nic-sparkline-legend">
-                        <span class="spark-legend-item"><span class="legend-pip rx"></span> ↓ Descarga</span>
-                        <span class="spark-legend-item"><span class="legend-pip tx"></span> ↑ Subida</span>
-                        <span class="spark-peak-badge" id="nicSparkPeak_${escapeHtml(nic.name)}">Pico: ↓ ${formatSpeed(nicPeak.maxRx)} · ↑ ${formatSpeed(nicPeak.maxTx)}</span>
-                      </div>
-                    </div>
-                    <div class="nic-sparkline-stage" id="nicSparkStage_${escapeHtml(nic.name)}">
-                      <canvas id="nicSpark_${escapeHtml(nic.name)}" class="nic-sparkline-canvas"></canvas>
-                      <div class="nic-sparkline-scrub-tooltip" id="nicSparkTip_${escapeHtml(nic.name)}"></div>
-                    </div>
-                    <div class="nic-sparkline-axis">
-                      <span>-2 horas</span>
-                      <span>-1 hora</span>
-                      <span>-30 min</span>
-                      <span>Ahora</span>
-                    </div>
-                  </div>
-                </div>
-              `;
-            }).join('');
-
-            // Draw sparklines for all active system network interfaces
-            nicsList.forEach(nic => {
+            // Redibujar sparklines en los <canvas> existentes
+            for (const nic of nicsList) {
               drawNicSparkline(nic.name);
-            });
+            }
           }
         }
 
-        // Render Google Maps Geospatial Incoming & Outgoing Connections
+        // Render Geospatial Incoming & Outgoing Connections
         NetworkConnectionsMapEngine.renderFromMetrics(latestMetrics);
 
         // Render Bandwidth Distribution Pie Chart across Subnets & Device Groups
         NetworkBandwidthPieChart.renderFromMetrics(latestMetrics);
 
-        // Render Connected Network Clients with Automatic Brand/Device Logo & Local File Override
+        // Render Connected Network Clients with Signature-Gated DOM Updates
         const clients = latestMetrics.wifi_clients || [];
         const filtered = clients.filter(c => {
           if (netSubfilter === 'cable' && c.conn_type !== 'cable') return false;
@@ -6925,48 +6981,56 @@
 
         const list = document.getElementById('networkDevicesList');
         if (list) {
-          if (filtered.length === 0) {
-            list.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 24px;">No hay dispositivos que coincidan con el filtro seleccionado.</div>';
-          } else {
-            list.innerHTML = filtered.map(c => {
-              const isCable = c.conn_type === 'cable' || c.band === 'Ethernet';
-              const is5g = !isCable && c.band && c.band.includes('5');
-              const badgeClass = isCable ? 'badge-purple' : (is5g ? 'badge-blue' : 'badge-green');
-              const badgeLabel = isCable ? (c.band || 'Ethernet') : (c.band || 'Wi-Fi');
-              const devLogo = resolveNetworkDeviceLogo(c);
-              const isCustomData = devLogo.isCustom && devLogo.url.startsWith('data:image/');
-              const fallbackEmoji = getDeviceEmoji(c.dev_icon || c.icon || c.dev_type);
-              const vendorLabel = (c.brand_name && c.brand_name !== 'Dispositivo') ? c.brand_name : (c.vendor || '');
-              const devTitle = `${c.name || c.ip} (${c.ip || c.mac || ''})`;
+          const devListSig = `${netSubfilter}|${q}|` + filtered.map(c => {
+            const dLogo = resolveNetworkDeviceLogo(c);
+            return `${c.mac || c.ip}:${c.name || ''}:${c.band || ''}:${c.rssi || ''}:${c.tx_rate || ''}:${c.tx_bytes || 0}:${c.rx_bytes || 0}:${dLogo.url}`;
+          }).join(';');
 
-              const avatarInner = devLogo.url
-                ? `<img class="${isCustomData ? 'custom-cover' : ''}" src="${escapeHtml(devLogo.url)}" alt="${escapeHtml(c.name || c.ip)}" data-fb="${escapeHtml(devLogo.fallback || '')}" onerror="if(this.dataset.fb && this.src!==this.dataset.fb){this.src=this.dataset.fb;}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline';}"><span style="display:none;font-size:18px;">${fallbackEmoji}</span>`
-                : `<span style="font-size: 18px;">${fallbackEmoji}</span>`;
+          if (list.dataset.renderSig !== devListSig) {
+            list.dataset.renderSig = devListSig;
+            if (filtered.length === 0) {
+              list.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 24px;">No hay dispositivos que coincidan con el filtro seleccionado.</div>';
+            } else {
+              list.innerHTML = filtered.map(c => {
+                const isCable = c.conn_type === 'cable' || c.band === 'Ethernet';
+                const is5g = !isCable && c.band && c.band.includes('5');
+                const badgeClass = isCable ? 'badge-purple' : (is5g ? 'badge-blue' : 'badge-green');
+                const badgeLabel = isCable ? (c.band || 'Ethernet') : (c.band || 'Wi-Fi');
+                const devLogo = resolveNetworkDeviceLogo(c);
+                const isCustomData = devLogo.isCustom && devLogo.url.startsWith('data:image/');
+                const fallbackEmoji = getDeviceEmoji(c.dev_icon || c.icon || c.dev_type);
+                const vendorLabel = (c.brand_name && c.brand_name !== 'Dispositivo') ? c.brand_name : (c.vendor || '');
+                const devTitle = `${c.name || c.ip} (${c.ip || c.mac || ''})`;
 
-              return `
-                <div class="data-row">
-                  <div class="row-title-box">
-                    <div class="device-circle interactive-logo" onclick="openLogoPickerModal('${escapeHtml(devLogo.key)}', '${escapeHtml(devTitle)}', '${escapeHtml(devLogo.query)}', '${escapeHtml(devLogo.url)}')" title="Haz clic para buscar un logo en Google o subir un icono local para ${escapeHtml(c.name || c.ip)}">
-                      ${avatarInner}
-                      <div class="logo-edit-overlay"><span>🖼️</span><span>Logo</span></div>
-                    </div>
-                    <div>
-                      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <span class="row-label">${escapeHtml(c.name || c.ip)}</span>
-                        <span class="adw-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>
-                        ${vendorLabel ? `<span class="brand-badge">${getBrandLogoSvg(c.brand || detectBrandKeyFromText(vendorLabel))} <span>${escapeHtml(vendorLabel)}</span></span>` : ''}
+                const avatarInner = devLogo.url
+                  ? `<img class="${isCustomData ? 'custom-cover' : ''}" src="${escapeHtml(devLogo.url)}" alt="${escapeHtml(c.name || c.ip)}" data-fb="${escapeHtml(devLogo.fallback || '')}" onerror="if(this.dataset.fb && this.src!==this.dataset.fb){this.src=this.dataset.fb;}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline';}"><span style="display:none;font-size:18px;">${fallbackEmoji}</span>`
+                  : `<span style="font-size: 18px;">${fallbackEmoji}</span>`;
+
+                return `
+                  <div class="data-row">
+                    <div class="row-title-box">
+                      <div class="device-circle interactive-logo" onclick="openLogoPickerModal('${escapeHtml(devLogo.key)}', '${escapeHtml(devTitle)}', '${escapeHtml(devLogo.query)}', '${escapeHtml(devLogo.url)}')" title="Haz clic para buscar un logo en Google o subir un icono local para ${escapeHtml(c.name || c.ip)}">
+                        ${avatarInner}
+                        <div class="logo-edit-overlay"><span>🖼️</span><span>Logo</span></div>
                       </div>
-                      <div class="row-sublabel mono">IP: ${escapeHtml(c.ip)} · MAC: ${escapeHtml(c.mac)}${(c.rssi && c.rssi < 0) ? ` · Señal: ${c.rssi} dBm` : ''}${c.tx_rate ? ` · ${escapeHtml(c.tx_rate)}` : ''}</div>
+                      <div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                          <span class="row-label">${escapeHtml(c.name || c.ip)}</span>
+                          <span class="adw-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>
+                          ${vendorLabel ? `<span class="brand-badge">${getBrandLogoSvg(c.brand || detectBrandKeyFromText(vendorLabel))} <span>${escapeHtml(vendorLabel)}</span></span>` : ''}
+                        </div>
+                        <div class="row-sublabel mono">IP: ${escapeHtml(c.ip)} · MAC: ${escapeHtml(c.mac)}${(c.rssi && c.rssi < 0) ? ` · Señal: ${c.rssi} dBm` : ''}${c.tx_rate ? ` · ${escapeHtml(c.tx_rate)}` : ''}</div>
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                      ${(c.rx_bytes || c.tx_bytes) ? `<div class="mono" style="font-size: 12px; color: var(--text-secondary);">↓ ${formatBytes(c.tx_bytes || 0)} · ↑ ${formatBytes(c.rx_bytes || 0)}</div>` : ''}
+                      <button class="action-btn" style="height: 28px; padding: 0 9px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(devLogo.key)}', '${escapeHtml(devTitle)}', '${escapeHtml(devLogo.query)}', '${escapeHtml(devLogo.url)}')" title="Cambiar logo del dispositivo">🖼️ Logo</button>
+                      ${c.mac && c.mac.includes(':') ? `<button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="wakeDevice('${escapeHtml(c.mac)}', '${encodeURIComponent(c.name || c.ip)}', this)" title="Despertar dispositivo por red (Wake-on-LAN)">⚡ WoL</button>` : ''}
                     </div>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                    ${(c.rx_bytes || c.tx_bytes) ? `<div class="mono" style="font-size: 12px; color: var(--text-secondary);">↓ ${formatBytes(c.tx_bytes || 0)} · ↑ ${formatBytes(c.rx_bytes || 0)}</div>` : ''}
-                    <button class="action-btn" style="height: 28px; padding: 0 9px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(devLogo.key)}', '${escapeHtml(devTitle)}', '${escapeHtml(devLogo.query)}', '${escapeHtml(devLogo.url)}')" title="Cambiar logo del dispositivo">🖼️ Logo</button>
-                    ${c.mac && c.mac.includes(':') ? `<button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="wakeDevice('${escapeHtml(c.mac)}', '${encodeURIComponent(c.name || c.ip)}', this)" title="Despertar dispositivo por red (Wake-on-LAN)">⚡ WoL</button>` : ''}
-                  </div>
-                </div>
-              `;
-            }).join('');
+                `;
+              }).join('');
+            }
           }
         }
       } else if (activeView === 'security') {
@@ -7608,15 +7672,16 @@
           }
         }
 
-        // Evaluate per-NIC incoming/outgoing bandwidth against configurable threshold and update map legend alert
-        BandwidthThresholdMonitor.evaluateAndRender(netInterfaces);
+        // Evaluate per-NIC bandwidth threshold lazily when on the Network view
+        if (activeView === 'network') {
+          BandwidthThresholdMonitor.evaluateAndRender(netInterfaces);
+        }
 
         // Sync real-time GeoIP Worker errors from backend into the Main Node Error Terminal
         if (typeof MainNodeErrorTerminal !== 'undefined') {
           if (net && net.connections_map && net.connections_map.geoip_worker && Array.isArray(net.connections_map.geoip_worker.error_history)) {
             MainNodeErrorTerminal.ingestBackendErrors(net.connections_map.geoip_worker.error_history);
           }
-          MainNodeErrorTerminal.renderAll();
         }
 
         // Sync system failure logs summary into Unified System Logs Center
@@ -8783,6 +8848,10 @@
         const isModeSwitch = Boolean(opts.forceModeAnimation || this._pendingModeTransition);
         const hasTrafficShift = (newSig !== this._lastDataSignature);
         this._pendingModeTransition = false;
+
+        if (!isModeSwitch && !hasTrafficShift && this._lastDataSignature !== '') {
+          return;
+        }
         this._lastDataSignature = newSig;
 
         const durationMs = isModeSwitch ? 680 : (hasTrafficShift ? 460 : 0);
@@ -10413,9 +10482,16 @@
       updateFromMetrics(summary) {
         if (!summary) return;
         this._summary = summary;
-        const total = Number(summary.total_errors || 0);
+        const total = Number(summary.total_errors ?? summary.total ?? 0);
         const failedUnits = Number(summary.failed_units_count || 0);
-        const counts = summary.counts_by_category || {};
+        const counts = summary.counts_by_category || {
+          docker: summary.docker_errors || 0,
+          service: summary.service_errors || 0,
+          kernel: summary.kernel_errors || 0
+        };
+        const summarySig = `${total}|${failedUnits}|${counts.docker || 0}|${counts.service || 0}|${counts.kernel || 0}|${this._isVisible}`;
+        if (this._lastSummarySig === summarySig) return;
+        this._lastSummarySig = summarySig;
 
         const ovBadgeText = document.getElementById('ovSystemLogsBadgeText');
         const ovBtn = document.getElementById('ovSystemLogsToggleBtn');
@@ -11480,104 +11556,110 @@
           ? `${deviceGroups.length} dispositivos · ${tableConns.length} conexiones${connectionsMapDeviceSel ? ' (filtrado: 1 dispositivo)' : ''}`
           : `Mostrando ${filteredConns.length} de ${allConns.length} conexiones geolocalizadas`);
 
-        // Render Interactive Connections Table
+        // Render Interactive Connections Table with Change-Signature Guard
         const tableEl = document.getElementById('networkConnectionsTableList');
         if (tableEl) {
-          if (filteredConns.length === 0) {
-            tableEl.innerHTML = `<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 22px;">No hay conexiones ${connectionsMapFilter === 'all' ? 'activas' : 'en este filtro'} en este instante.</div>`;
-          } else {
-            const renderRow = (c) => {
-              const dirIcon = c.direction === 'incoming' ? '↓ Entrante' : (c.direction === 'blocked' ? '🛡️ Bloqueada' : '↑ Saliente');
-              const locText = `${c.city || 'Red'}${c.country ? ', ' + c.country : ''}`;
-              const geoSt = c.geo_status || (c.is_lan ? 'lan' : 'cached');
-              const geoTagLabel = geoSt === 'lan' ? '🏠 LAN' : (geoSt === 'pending' ? '⏳ Cola GeoIP' : '⚡ GeoIP Caché');
-              const isBlocked = c.direction === 'blocked';
-              const blockBtnLabel = isBlocked ? '🔓 Desbloquear' : '🚫 Bloquear';
-              const blockBtnStyle = isBlocked
-                ? 'background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10B981;'
-                : 'background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); color: #f43f5e;';
-              const blockOnClick = isBlocked
-                ? `event.stopPropagation(); window.unblockIpDirectly('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.jail || '')}')`
-                : `event.stopPropagation(); window.blockIpDirectly('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.jail || 'caddy-scan')}', '${escapeHtml(c.service)}')`;
-              const procInfo = c.process ? `<span style="opacity: 0.75; font-weight: 500;">· proc: <strong>${escapeHtml(c.process)}</strong></span>` : '';
-              const isDevRow = c.local_ip && c.local_ip !== srvIp && c.local_ip !== '127.0.0.1';
-              const devIcon = isDevRow ? '📱' : '🖥️';
-              const devColor = isDevRow ? '#38bdf8' : 'var(--accent-cyan-bright)';
-              return `
-                <div class="conn-row-item" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
-                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
-                    <span class="conn-dir-pill ${escapeHtml(c.direction)}">${dirIcon}</span>
-                    <div style="min-width: 0; flex: 1;">
-                      <div style="font-weight: 700; font-size: 12.5px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                        <span class="mono">${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
-                        ${c.domain ? `<span class="adw-badge badge-blue" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #3b82f6;" title="Dominio DNS Pi-hole">🌐 ${escapeHtml(c.domain)}</span>` : ''}
-                        <span style="color: var(--text-muted); font-weight: 400;">←</span>
-                        <span class="mono" style="color: ${devColor}; font-weight: 700;">${devIcon} ${escapeHtml(c.local_hostname || c.local_ip)}:${c.local_port}</span>
-                        <span class="adw-badge badge-blue" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700;" title="Servicio al que se conecta">${escapeHtml(c.service)}</span>
-                        ${procInfo}
-                        <span class="conn-geo-tag ${escapeHtml(geoSt)}">${geoTagLabel}</span>
-                      </div>
-                      <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
-                        📍 ${escapeHtml(locText)} · ${escapeHtml(c.isp || 'Red')} ${c.asn ? '(' + escapeHtml(c.asn) + ')' : ''} ${c.details ? '· ' + escapeHtml(c.details) : ''}
-                      </div>
-                    </div>
-                  </div>
-                  <div style="text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 10px;">
-                    <div>
-                      <div class="mono" style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">${escapeHtml(c.protocol)} · ${escapeHtml(c.state)}</div>
-                      <div class="mono" style="font-size: 10px; color: var(--text-muted);">${Number(c.lat).toFixed(2)}°, ${Number(c.lng).toFixed(2)}°</div>
-                    </div>
-                    <button class="action-btn" style="height: 26px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 6px; cursor: pointer; ${blockBtnStyle}" onclick="${blockOnClick}">
-                      ${blockBtnLabel}
-                    </button>
-                  </div>
-                </div>
-              `;
-            };
+          const tableSig = `${connectionsMapFilter}|${connectionsMapDeviceSel || ''}|` +
+            filteredConns.map(c => `${c.id}:${c.state}:${c.geo_status || ''}:${c.city || ''}:${c.domain || ''}`).join(';');
 
-            if (connectionsMapFilter === 'devices') {
-              const chipsHtml = `
-                <div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 4px 10px;">
-                  <button class="seg-btn ${connectionsMapDeviceSel ? '' : 'active'}" style="font-size: 11px; padding: 4px 10px;" onclick="setConnectionsMapDevice(null)">Todos (${deviceGroups.length})</button>
-                  ${deviceGroups.map(g => `
-                    <button class="seg-btn ${connectionsMapDeviceSel === g.ip ? 'active' : ''}" style="font-size: 11px; padding: 4px 10px;" onclick="setConnectionsMapDevice('${escapeHtml(g.ip)}')" title="${escapeHtml(g.ip)}">
-                      ${getDeviceEmoji(g.client && (g.client.dev_icon || g.client.dev_type))} ${escapeHtml(g.name)} (${g.conns.length})
-                    </button>`).join('')}
-                </div>`;
-              const groupsHtml = deviceGroups.map(g => {
-                const cl = g.client || {};
-                const isSel = connectionsMapDeviceSel === g.ip;
-                const emoji = getDeviceEmoji(cl.dev_icon || cl.dev_type);
-                const domains = new Set(g.conns.map(c => c.domain || c.remote_ip)).size;
-                const speedTxt = (cl.speed_down !== undefined || cl.speed_up !== undefined)
-                  ? `<span class="mono" style="font-size: 11px; color: var(--text-secondary);" title="Consumo real del dispositivo">↓ ${formatSpeed(Number(cl.speed_down || 0))} · ↑ ${formatSpeed(Number(cl.speed_up || 0))}</span>`
-                  : '';
-                const totalTxt = (cl.tx_bytes !== undefined || cl.rx_bytes !== undefined)
-                  ? `<span class="mono" style="font-size: 10.5px; color: var(--text-muted);">Total: ↓ ${formatBytes(Number(cl.tx_bytes || 0))} · ↑ ${formatBytes(Number(cl.rx_bytes || 0))}</span>`
-                  : '';
-                const visibleConns = (connectionsMapDeviceSel && !isSel) ? [] : g.conns;
+          if (forceRedraw || this._lastTableSignature !== tableSig) {
+            this._lastTableSignature = tableSig;
+            if (filteredConns.length === 0) {
+              tableEl.innerHTML = `<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 22px;">No hay conexiones ${connectionsMapFilter === 'all' ? 'activas' : 'en este filtro'} en este instante.</div>`;
+            } else {
+              const renderRow = (c) => {
+                const dirIcon = c.direction === 'incoming' ? '↓ Entrante' : (c.direction === 'blocked' ? '🛡️ Bloqueada' : '↑ Saliente');
+                const locText = `${c.city || 'Red'}${c.country ? ', ' + c.country : ''}`;
+                const geoSt = c.geo_status || (c.is_lan ? 'lan' : 'cached');
+                const geoTagLabel = geoSt === 'lan' ? '🏠 LAN' : (geoSt === 'pending' ? '⏳ Cola GeoIP' : '⚡ GeoIP Caché');
+                const isBlocked = c.direction === 'blocked';
+                const blockBtnLabel = isBlocked ? '🔓 Desbloquear' : '🚫 Bloquear';
+                const blockBtnStyle = isBlocked
+                  ? 'background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10B981;'
+                  : 'background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); color: #f43f5e;';
+                const blockOnClick = isBlocked
+                  ? `event.stopPropagation(); window.unblockIpDirectly('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.jail || '')}')`
+                  : `event.stopPropagation(); window.blockIpDirectly('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.jail || 'caddy-scan')}', '${escapeHtml(c.service)}')`;
+                const procInfo = c.process ? `<span style="opacity: 0.75; font-weight: 500;">· proc: <strong>${escapeHtml(c.process)}</strong></span>` : '';
+                const isDevRow = c.local_ip && c.local_ip !== srvIp && c.local_ip !== '127.0.0.1';
+                const devIcon = isDevRow ? '📱' : '🖥️';
+                const devColor = isDevRow ? '#38bdf8' : 'var(--accent-cyan-bright)';
                 return `
-                  <div style="margin-bottom: 10px; border: 1px solid ${isSel ? 'var(--accent-cyan-bright)' : 'var(--border-subtle)'}; border-radius: 10px; overflow: hidden;">
-                    <div onclick="setConnectionsMapDevice(${isSel ? 'null' : `'${escapeHtml(g.ip)}'`})" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 12px; background: var(--bg-surface-inset);" title="Pulsa para ver solo este dispositivo en el mapa">
-                      <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
-                        <span style="font-size: 18px;">${emoji}</span>
-                        <div style="min-width: 0;">
-                          <div style="font-weight: 800; font-size: 13px; color: var(--text-primary);">${escapeHtml(g.name)}</div>
-                          <div class="mono" style="font-size: 10.5px; color: var(--text-muted);">${escapeHtml(g.ip)}${cl.mac ? ' · ' + escapeHtml(cl.mac) : ''}</div>
+                  <div class="conn-row-item" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
+                      <span class="conn-dir-pill ${escapeHtml(c.direction)}">${dirIcon}</span>
+                      <div style="min-width: 0; flex: 1;">
+                        <div style="font-weight: 700; font-size: 12.5px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                          <span class="mono">${escapeHtml(c.remote_ip)}${c.remote_port ? ':' + c.remote_port : ''}</span>
+                          ${c.domain ? `<span class="adw-badge badge-blue" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #3b82f6;" title="Dominio DNS Pi-hole">🌐 ${escapeHtml(c.domain)}</span>` : ''}
+                          <span style="color: var(--text-muted); font-weight: 400;">←</span>
+                          <span class="mono" style="color: ${devColor}; font-weight: 700;">${devIcon} ${escapeHtml(c.local_hostname || c.local_ip)}:${c.local_port}</span>
+                          <span class="adw-badge badge-blue" style="font-size: 10.5px; padding: 2px 7px; font-weight: 700;" title="Servicio al que se conecta">${escapeHtml(c.service)}</span>
+                          ${procInfo}
+                          <span class="conn-geo-tag ${escapeHtml(geoSt)}">${geoTagLabel}</span>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                          📍 ${escapeHtml(locText)} · ${escapeHtml(c.isp || 'Red')} ${c.asn ? '(' + escapeHtml(c.asn) + ')' : ''} ${c.details ? '· ' + escapeHtml(c.details) : ''}
                         </div>
                       </div>
-                      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                        <span class="adw-badge badge-blue" style="font-size: 10.5px;">${g.conns.length} conexiones · ${domains} destinos</span>
-                        ${speedTxt}
-                        ${totalTxt}
-                      </div>
                     </div>
-                    ${visibleConns.map(renderRow).join('')}
+                    <div style="text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 10px;">
+                      <div>
+                        <div class="mono" style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">${escapeHtml(c.protocol)} · ${escapeHtml(c.state)}</div>
+                        <div class="mono" style="font-size: 10px; color: var(--text-muted);">${Number(c.lat).toFixed(2)}°, ${Number(c.lng).toFixed(2)}°</div>
+                      </div>
+                      <button class="action-btn" style="height: 26px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 6px; cursor: pointer; ${blockBtnStyle}" onclick="${blockOnClick}">
+                        ${blockBtnLabel}
+                      </button>
+                    </div>
+                  </div>
+                `;
+              };
+
+              if (connectionsMapFilter === 'devices') {
+                const chipsHtml = `
+                  <div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 4px 10px;">
+                    <button class="seg-btn ${connectionsMapDeviceSel ? '' : 'active'}" style="font-size: 11px; padding: 4px 10px;" onclick="setConnectionsMapDevice(null)">Todos (${deviceGroups.length})</button>
+                    ${deviceGroups.map(g => `
+                      <button class="seg-btn ${connectionsMapDeviceSel === g.ip ? 'active' : ''}" style="font-size: 11px; padding: 4px 10px;" onclick="setConnectionsMapDevice('${escapeHtml(g.ip)}')" title="${escapeHtml(g.ip)}">
+                        ${getDeviceEmoji(g.client && (g.client.dev_icon || g.client.dev_type))} ${escapeHtml(g.name)} (${g.conns.length})
+                      </button>`).join('')}
                   </div>`;
-              }).join('');
-              tableEl.innerHTML = chipsHtml + groupsHtml;
-            } else {
-              tableEl.innerHTML = filteredConns.map(renderRow).join('');
+                const groupsHtml = deviceGroups.map(g => {
+                  const cl = g.client || {};
+                  const isSel = connectionsMapDeviceSel === g.ip;
+                  const emoji = getDeviceEmoji(cl.dev_icon || cl.dev_type);
+                  const domains = new Set(g.conns.map(c => c.domain || c.remote_ip)).size;
+                  const speedTxt = (cl.speed_down !== undefined || cl.speed_up !== undefined)
+                    ? `<span class="mono" style="font-size: 11px; color: var(--text-secondary);" title="Consumo real del dispositivo">↓ ${formatSpeed(Number(cl.speed_down || 0))} · ↑ ${formatSpeed(Number(cl.speed_up || 0))}</span>`
+                    : '';
+                  const totalTxt = (cl.tx_bytes !== undefined || cl.rx_bytes !== undefined)
+                    ? `<span class="mono" style="font-size: 10.5px; color: var(--text-muted);">Total: ↓ ${formatBytes(Number(cl.tx_bytes || 0))} · ↑ ${formatBytes(Number(cl.rx_bytes || 0))}</span>`
+                    : '';
+                  const visibleConns = (connectionsMapDeviceSel && !isSel) ? [] : g.conns;
+                  return `
+                    <div style="margin-bottom: 10px; border: 1px solid ${isSel ? 'var(--accent-cyan-bright)' : 'var(--border-subtle)'}; border-radius: 10px; overflow: hidden;">
+                      <div onclick="setConnectionsMapDevice(${isSel ? 'null' : `'${escapeHtml(g.ip)}'`})" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 12px; background: var(--bg-surface-inset);" title="Pulsa para ver solo este dispositivo en el mapa">
+                        <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                          <span style="font-size: 18px;">${emoji}</span>
+                          <div style="min-width: 0;">
+                            <div style="font-weight: 800; font-size: 13px; color: var(--text-primary);">${escapeHtml(g.name)}</div>
+                            <div class="mono" style="font-size: 10.5px; color: var(--text-muted);">${escapeHtml(g.ip)}${cl.mac ? ' · ' + escapeHtml(cl.mac) : ''}</div>
+                          </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                          <span class="adw-badge badge-blue" style="font-size: 10.5px;">${g.conns.length} conexiones · ${domains} destinos</span>
+                          ${speedTxt}
+                          ${totalTxt}
+                        </div>
+                      </div>
+                      ${visibleConns.map(renderRow).join('')}
+                    </div>`;
+                }).join('');
+                tableEl.innerHTML = chipsHtml + groupsHtml;
+              } else {
+                tableEl.innerHTML = filteredConns.map(renderRow).join('');
+              }
             }
           }
         }
@@ -11589,7 +11671,7 @@
         if (!ready || !this._leafletMap) return;
 
         const zoomLevel = this._leafletMap.getZoom();
-        const sig = `${connectionsMapFilter}|z${zoomLevel}|${srv.lat},${srv.lng}|` + mapConns.map(c => `${c.id}:${c.lat},${c.lng}:${c.state}:${c.geo_status || ''}`).join(';');
+        const sig = `${connectionsMapFilter}|${connectionsMapDeviceSel || ''}|z${zoomLevel}|${srv.lat},${srv.lng}|` + mapConns.map(c => `${c.id}:${c.lat},${c.lng}:${c.state}:${c.geo_status || ''}`).join(';');
         if (!forceRedraw && sig === this._lastSignature) return;
         this._lastSignature = sig;
 

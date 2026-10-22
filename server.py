@@ -87,20 +87,36 @@ CUSTOM_LOGOS_FILE = os.path.join(BASE_DIR, "custom_logos.json")
 CUSTOM_LOGOS_LOCK = threading.Lock()
 ADMIN_MASTER_KEY = os.environ.get("ADMIN_MASTER_KEY", "Cminewar2026!")  # Clave maestra de rescate / desbloqueo remoto
 
+CUSTOM_LOGOS_CACHE = {"mtime": -1.0, "data": {}}
+
 def load_custom_logos():
     if not os.path.isfile(CUSTOM_LOGOS_FILE):
+        CUSTOM_LOGOS_CACHE["mtime"] = -1.0
+        CUSTOM_LOGOS_CACHE["data"] = {}
         return {}
     try:
+        mtime = os.path.getmtime(CUSTOM_LOGOS_FILE)
+        if mtime == CUSTOM_LOGOS_CACHE["mtime"] and isinstance(CUSTOM_LOGOS_CACHE["data"], dict):
+            return dict(CUSTOM_LOGOS_CACHE["data"])
         with open(CUSTOM_LOGOS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return data if isinstance(data, dict) else {}
+            clean = data if isinstance(data, dict) else {}
+            CUSTOM_LOGOS_CACHE["mtime"] = mtime
+            CUSTOM_LOGOS_CACHE["data"] = clean
+            return dict(clean)
     except Exception:
-        return {}
+        return dict(CUSTOM_LOGOS_CACHE.get("data") or {})
 
 def save_custom_logos(logos_dict):
     try:
+        clean = logos_dict if isinstance(logos_dict, dict) else {}
         with open(CUSTOM_LOGOS_FILE, "w", encoding="utf-8") as f:
-            json.dump(logos_dict, f, indent=2, ensure_ascii=False)
+            json.dump(clean, f, indent=2, ensure_ascii=False)
+        try:
+            CUSTOM_LOGOS_CACHE["mtime"] = os.path.getmtime(CUSTOM_LOGOS_FILE)
+        except Exception:
+            CUSTOM_LOGOS_CACHE["mtime"] = time.time()
+        CUSTOM_LOGOS_CACHE["data"] = dict(clean)
         return True
     except Exception:
         return False
@@ -1079,6 +1095,13 @@ PORT_SERVICE_LABELS = {
 LISTENING_PORTS_MAP = {}
 LAST_LISTENING_SCAN = 0.0
 
+RE_SS_PORT = re.compile(r':(\d+)\s+')
+RE_SS_PROC = re.compile(r'users:\(\(\"([^\"]+)\",pid=(\d+)')
+RE_PIHOLE_LOG_REPLY = re.compile(
+    r"(?:reply|cached|cached-stale)\s+([a-zA-Z0-9\.\-_]+)\s+is\s+([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})"
+)
+RE_CONNTRACK_FLOW = re.compile(r"src=([^\s]+)\s+dst=([^\s]+)\s+sport=(\d+)\s+dport=(\d+)")
+
 def update_listening_ports_map(force=False):
     global LISTENING_PORTS_MAP, LAST_LISTENING_SCAN
     now = time.time()
@@ -1090,8 +1113,8 @@ def update_listening_ports_map(force=False):
         p = subprocess.run(['sudo', 'ss', '-tulpn', '-H'], capture_output=True, text=True, timeout=2.0)
         if p.returncode == 0:
             for line in p.stdout.splitlines():
-                m_port = re.search(r':(\d+)\s+', line)
-                m_proc = re.search(r'users:\(\(\"([^\"]+)\",pid=(\d+)', line)
+                m_port = RE_SS_PORT.search(line)
+                m_proc = RE_SS_PROC.search(line)
                 if m_port and m_proc:
                     port = int(m_port.group(1))
                     proc = m_proc.group(1)
@@ -1354,16 +1377,20 @@ def resolve_geoip_batch_from_ip_api(ip_list):
 class PiholeDnsTranslator:
     """Traduce en tiempo real IPs locales (a nombres de host amigables)
     e IPs remotas WAN (a nombres de dominio resueltos) consultando Pi-hole
-    (custom.list, pihole-FTL.db, /var/log/pihole/pihole.log) y rDNS."""
+    (custom.list, pihole-FTL.db, /var/log/pihole/pihole.log) y rDNS con caché O(1)."""
     def __init__(self):
         self.local_cache = {}
         self.last_local_refresh = 0.0
-        self.ext_cache = {}
+        self.ext_cache = {}         # { ip: domain_lower }
+        self.dom_to_ip_cache = {}   # { domain_lower: ip } -> Índice inverso O(1)
         self.ext_log_offset = 0
         self.ext_log_inode = None
         self.last_ext_refresh = 0.0
         self.rdns_cache = {}
         self.rdns_negative = {}
+        self.fwd_dns_negative = {}  # { domain_lower: ts_failed }
+        self.flows_cache = []
+        self.last_flows_refresh = 0.0
 
     def refresh_local_names(self):
         now = time.time()
@@ -1442,26 +1469,29 @@ class PiholeDnsTranslator:
                 # En la primera ejecución leer los últimos 3 MB para tener historial inmediato
                 self.ext_log_offset = max(0, curr_size - 3_000_000)
 
+            if curr_size == self.ext_log_offset:
+                return
+
             with open(lpath, "r", encoding="utf-8", errors="ignore") as f:
                 f.seek(self.ext_log_offset)
                 chunk = f.read()
                 self.ext_log_offset = f.tell()
 
             if chunk:
-                # Patrones de respuesta de dnsmasq en Pi-hole
-                matches = re.findall(
-                    r"(?:reply|cached|cached-stale)\s+([a-zA-Z0-9\.\-_]+)\s+is\s+([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})",
-                    chunk
-                )
-                for dom, ip in matches:
+                # Patrones de respuesta de dnsmasq en Pi-hole con regex precompilada
+                for dom, ip in RE_PIHOLE_LOG_REPLY.findall(chunk):
                     if not _is_private_ip(ip):
-                        self.ext_cache[ip] = dom.lower()
+                        d_low = dom.lower()
+                        self.ext_cache[ip] = d_low
+                        self.dom_to_ip_cache[d_low] = ip
 
             # Evitar crecimiento ilimitado de memoria
             if len(self.ext_cache) > 25000:
                 keys = list(self.ext_cache.keys())
                 for k in keys[:5000]:
-                    del self.ext_cache[k]
+                    old_dom = self.ext_cache.pop(k, None)
+                    if old_dom and self.dom_to_ip_cache.get(old_dom) == k:
+                        self.dom_to_ip_cache.pop(old_dom, None)
         except Exception:
             pass
 
@@ -1472,7 +1502,7 @@ class PiholeDnsTranslator:
             return "Servidor"
         return self.local_cache.get(ip, "")
 
-    def translate_external(self, ip):
+    def translate_external(self, ip, rdns_budget=None):
         if not ip or _is_private_ip(ip):
             return ""
         dom = self.ext_cache.get(ip)
@@ -1487,6 +1517,10 @@ class PiholeDnsTranslator:
                 del self.rdns_cache[ip]
         if ip in self.rdns_negative and (now - self.rdns_negative[ip] < 1800):
             return ""
+        if rdns_budget is not None:
+            if rdns_budget[0] <= 0:
+                return ""
+            rdns_budget[0] -= 1
         try:
             name, _, _ = socket.gethostbyaddr(ip)
             if name and name != ip:
@@ -1498,12 +1532,17 @@ class PiholeDnsTranslator:
 
     def fetch_active_device_flows(self, cutoff_seconds=900, max_entries=50):
         """Extrae de Pi-hole las consultas DNS externas recientes realizadas por
-        otros dispositivos del hogar (móviles, consolas, TVs, tabletas)."""
+        otros dispositivos del hogar usando índice inverso O(1) y caché temporal de 12s."""
+        now = time.time()
+        if (now - self.last_flows_refresh < 12.0) and self.flows_cache:
+            return list(self.flows_cache[:max_entries])
+
         dbpath = "/etc/pihole/pihole-FTL.db"
         if not os.path.exists(dbpath):
             return []
-        cutoff = int(time.time()) - cutoff_seconds
+        cutoff = int(now) - cutoff_seconds
         flows = []
+        sync_dns_budget = 4  # Máximo 4 resoluciones DNS síncronas nuevas por ciclo
         try:
             con = sqlite3.connect(f"file:{dbpath}?mode=ro", uri=True, timeout=1.0)
             cur = con.cursor()
@@ -1518,25 +1557,31 @@ class PiholeDnsTranslator:
             """, (cutoff,))
             seen = set()
             for ts, dom, client in cur.fetchall():
-                if not dom or dom.endswith(".local") or dom.endswith(".lan") or dom.endswith(".arpa"):
+                if not dom:
                     continue
-                key = (client, dom)
+                d_low = dom.lower()
+                if d_low.endswith((".local", ".lan", ".arpa")):
+                    continue
+                key = (client, d_low)
                 if key in seen:
                     continue
                 seen.add(key)
 
-                ext_ip = None
-                for ip, d in self.ext_cache.items():
-                    if d == dom.lower():
-                        ext_ip = ip
-                        break
-                if not ext_ip:
-                    try:
-                        ext_ip = socket.gethostbyname(dom)
-                        if ext_ip and not _is_private_ip(ext_ip):
-                            self.ext_cache[ext_ip] = dom.lower()
-                    except Exception:
-                        pass
+                # Búsqueda O(1) en índice inverso dom_to_ip_cache
+                ext_ip = self.dom_to_ip_cache.get(d_low)
+                if not ext_ip and sync_dns_budget > 0:
+                    neg_ts = self.fwd_dns_negative.get(d_low, 0.0)
+                    if now - neg_ts >= 900.0:
+                        sync_dns_budget -= 1
+                        try:
+                            ext_ip = socket.gethostbyname(dom)
+                            if ext_ip and not _is_private_ip(ext_ip):
+                                self.ext_cache[ext_ip] = d_low
+                                self.dom_to_ip_cache[d_low] = ext_ip
+                            else:
+                                self.fwd_dns_negative[d_low] = now
+                        except Exception:
+                            self.fwd_dns_negative[d_low] = now
 
                 if ext_ip and not _is_private_ip(ext_ip):
                     loc_name = self.translate_local(client) or f"Dispositivo {client}"
@@ -1550,6 +1595,8 @@ class PiholeDnsTranslator:
                     if len(flows) >= max_entries:
                         break
             con.close()
+            self.flows_cache = flows
+            self.last_flows_refresh = now
         except Exception:
             pass
         return flows
@@ -1637,6 +1684,8 @@ def fetch_connections_geo_worker():
             listening_map = update_listening_ports_map()
             listening_ports = set(listening_map.keys()) | {22, 53, 80, 443, 2283, 3000, 8080, 8082, 8085, 8088, 8089, 8096, 8123, 8550, 8884, 9000, 9980, 11434, 18554, 18555, 32400, 51820}
             raw_sockets = []
+            pid_proc_cache = {}
+            rdns_budget = [6]  # Límite por ciclo para evitar bloqueos por rDNS síncrono
             try:
                 conns = psutil.net_connections(kind="inet")
                 for c in conns:
@@ -1662,10 +1711,14 @@ def fetch_connections_geo_worker():
 
                     proc_name = ""
                     if c.pid:
-                        try:
-                            proc_name = psutil.Process(c.pid).name()
-                        except Exception:
-                            proc_name = ""
+                        if c.pid in pid_proc_cache:
+                            proc_name = pid_proc_cache[c.pid]
+                        else:
+                            try:
+                                proc_name = psutil.Process(c.pid).name()
+                            except Exception:
+                                proc_name = ""
+                            pid_proc_cache[c.pid] = proc_name
                     if not proc_name:
                         if is_in and loc_port in listening_map:
                             proc_name = listening_map[loc_port].get("proc", "")
@@ -1727,7 +1780,7 @@ def fetch_connections_geo_worker():
                             svc_label = PORT_SERVICE_LABELS.get(svc_port, f"{proto_str} Puerto :{svc_port}")
                     norm_loc_ip = loc_ip if loc_ip != "0.0.0.0" else SERVER_LOCAL_IP
                     loc_name = pihole_translator.translate_local(norm_loc_ip, SERVER_LOCAL_IP)
-                    ext_dom = pihole_translator.translate_external(rem_ip)
+                    ext_dom = pihole_translator.translate_external(rem_ip, rdns_budget)
                     target_label = f"{ext_dom} ({rem_ip})" if ext_dom else rem_ip
 
                     if is_in:
@@ -1760,13 +1813,12 @@ def fetch_connections_geo_worker():
                 ct_proc = subprocess.run(["sudo", "-n", "conntrack", "-L"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.5)
                 if ct_proc.returncode == 0 and ct_proc.stdout:
                     for line in ct_proc.stdout.splitlines():
-                        m = re.findall(r"src=([^\s]+)\s+dst=([^\s]+)\s+sport=(\d+)\s+dport=(\d+)", line)
+                        m = RE_CONNTRACK_FLOW.search(line)
                         if not m:
                             continue
                         proto_str = "TCP" if "tcp" in line[:8] else ("UDP" if "udp" in line[:8] else "NET")
                         state_str = "ESTABLISHED" if "ESTABLISHED" in line else ("TIME_WAIT" if "TIME_WAIT" in line else "ACTIVE")
-                        (s_ip, d_ip, s_port, d_port) = m[0]
-                        s_port, d_port = int(s_port), int(d_port)
+                        s_ip, d_ip, s_port, d_port = m.group(1), m.group(2), int(m.group(3)), int(m.group(4))
 
                         # Identify public vs private flow
                         if _is_private_ip(s_ip) and not _is_private_ip(d_ip):
@@ -1789,7 +1841,7 @@ def fetch_connections_geo_worker():
                         svc_label = PORT_SERVICE_LABELS.get(target_port, f"{proto_str} Puerto :{target_port}")
 
                         loc_name = pihole_translator.translate_local(loc_ip, SERVER_LOCAL_IP)
-                        ext_dom = pihole_translator.translate_external(rem_ip)
+                        ext_dom = pihole_translator.translate_external(rem_ip, rdns_budget)
                         source_hint = loc_name if loc_name else ("Servidor" if loc_ip == SERVER_LOCAL_IP else f"Dispositivo {loc_ip}")
                         target_info = f"{ext_dom} ({rem_ip})" if ext_dom else rem_ip
 
@@ -1941,7 +1993,7 @@ def fetch_connections_geo_worker():
                     asn = ""
                     geo_status = "pending"
 
-                ext_domain = s.get("domain") or pihole_translator.translate_external(r_ip)
+                ext_domain = s.get("domain") or pihole_translator.translate_external(r_ip, rdns_budget)
                 loc_hostname = s.get("local_hostname") or pihole_translator.translate_local(s["local_ip"], SERVER_LOCAL_IP)
                 svc_title = s["service"]
 
@@ -5060,9 +5112,10 @@ def background_collector():
                     while n_hist and n_hist[0]["t"] < cutoff_ms:
                         n_hist.pop(0)
                     
+                    # Incluir history_2h únicamente en interfaces_list (evita triplicar el payload JSON)
                     nic_item["history_2h"] = list(n_hist)
                     if n_name in interfaces:
-                        interfaces[n_name]["history_2h"] = list(n_hist)
+                        interfaces[n_name] = {k: v for k, v in nic_item.items() if k != "history_2h"}
             
             curr_r, curr_w = get_real_disk()
             read_bytes_sec = max(0, (curr_r - last_r) / dt)
@@ -5123,7 +5176,6 @@ def background_collector():
                 "local_ip": SERVER_LOCAL_IP,
                 "interfaces": interfaces,
                 "interfaces_list": interfaces_list,
-                "interfaces_history_2h": {k: list(v) for k, v in NIC_BANDWIDTH_HISTORY_2H.items()},
                 "connections_map": conn_map_data
             }
             
@@ -5158,6 +5210,8 @@ def background_collector():
             with TELEGRAM_BOT_LOCK:
                 telegram_bot_act = dict(TELEGRAM_BOT_CACHE)
 
+            sys_errors_summary = get_system_errors_summary()
+
             payload = {
                 "system": sys_info,
                 "cpu": cpu_info,
@@ -5177,7 +5231,8 @@ def background_collector():
                 "wifi_summary": wifi_data.get("summary", {}),
                 "security": security_data,
                 "history": HISTORY,
-                "telegram_bot": telegram_bot_act
+                "telegram_bot": telegram_bot_act,
+                "system_errors_summary": sys_errors_summary
             }
             
             serialized = json.dumps(payload).encode('utf-8')
@@ -5355,7 +5410,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             base_payload["maps_engine"] = "leaflet"
             base_payload["version_info"] = get_version_info(force_refresh=False)
             base_payload["version_info"]["public_domain"] = req_domain
-            base_payload["system_errors_summary"] = get_system_errors_summary()
+            if "system_errors_summary" not in base_payload:
+                base_payload["system_errors_summary"] = get_system_errors_summary()
             with CUSTOM_LOGOS_LOCK:
                 base_payload["custom_logos"] = load_custom_logos()
             data = json.dumps(base_payload).encode('utf-8')
