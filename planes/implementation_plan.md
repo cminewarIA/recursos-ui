@@ -1,15 +1,17 @@
-# Plan de Implementación — v6.3.0: Mapa Geoespacial Adaptativo en Pantalla Completa con Historial por Servicios y Precisión GeoIP en SQLite
+# Plan de Implementación — v7.0.0: Rediseño de Precisión del HUD Flotante del Mapa, Panel Desplegable de Servicios y Modo Pantalla Completa
 
-## 1. Decisiones de Arquitectura Confirmadas
-- **Interfaz Adaptativa Dentro del Mapa (HUD Flotante)**: Barra superior flotante translúcida (`.connections-map-adaptive-hud`) integrada dentro del contenedor `#networkConnectionsMapStageWrap`, equipada con selector de modo (`🟢 En Vivo` vs `📚 Historial por Servicios`), filtros de dirección/dispositivos, barra adaptativa de chips de dispositivos LAN (`#mapHudDeviceFilterBar`), panel desplegable colapsable de Catálogo de Servicios (`#mapHudServiceCatalogDrawer`) y botón de **Pantalla Completa (`⛶`)** operativo en todo momento.
-- **Estructura del Historial en SQLite (`geoip_history.db`)**: Agrupación deduplicada (`UPSERT`) por servicio, dispositivo e IP remota con contador incremental de conexiones (`hit_count`) y marcas de tiempo (`first_seen`, `last_seen`), complementada con filtro de ventana temporal (`hours`).
-- **Geolocalización de Alta Exactitud Combinada (`ip-api.com` + `ipwho.is`)**: Consulta en lote a `ip-api.com` incluyendo distrito (`district`), código postal (`zip`) y región (`regionName`), refinando coordenadas sub-urbanas y metadatos ISP/ASN con `ipwho.is` (`_enrich_ip_precision_with_ipwhois`) y cacheando de forma persistente en la tabla SQLite `geoip_locations`.
+## 1. Objetivo del Rediseño (`MAJOR` v7.0.0)
+Sustituir la interfaz anterior de botones apilados por una **Barra Superior Flotante de Precisión (`.map-hud-primary-bar`)** de una sola línea, un **Panel Desplegable Flotante de Servicios (`#mapHudServiceCatalogDrawer`)** en cristal oscuro y una **Tira Adaptativa de Dispositivos (`#mapHudDeviceFilterBar`)** que no obstruyan el lienzo del mapa ni colisionen con los controles de Leaflet, funcionando de forma idéntica en vista estándar y en **Pantalla Completa (`100vw × 100vh`)**.
 
-## 2. Componentes Implementados
-1. **Capa de Persistencia SQLite (`geoip_history.db`) en `server.py`**:
-   - Tabla `geoip_locations`: almacena las ubicaciones exactas de cada IP pública resuelta (`lat`, `lng`, `city`, `region`, `postal`, `country`, `country_code`, `isp`, `asn`, `accuracy_source`, `updated_at`).
-   - Tabla `connection_history`: persiste el historial de todas las conexiones públicas geolocalizadas catalogadas por el **servicio** al que se conectaron (`service`, `conn_key`, `direction`, `protocol`, `local_ip`, `local_hostname`, `remote_ip`, `remote_port`, `domain`, `hit_count`, `first_seen`, `last_seen`, coordenadas y metadatos de precisión).
-   - Endpoints REST: `GET /api/net/history` (con soporte de filtrado por `service`, `device`, `direction`, `q`, `hours` y `limit`) y `POST /api/net/history/clear`.
-2. **HUD Adaptativo y Modo Pantalla Completa (`index.html` y `static/index.html`)**:
-   - Controles integrados directamente en `#networkConnectionsMapStageWrap` para operar sin interrupciones tanto en vista estándar como en Pantalla Completa (`100vw × 100vh`).
-   - Panel desplegable de servicios con buscador en tiempo real, selector de ventana temporal (`Todo el historial`, `Últimas 6h`, `Últimas 24h`, `Últimos 7 días`), cifras tabulares (`tabular-nums`) con contador `hit_count` (`x`) y vaciado de base de datos con confirmación inline.
+## 2. Arquitectura Visual y Funcional
+1. **Barra Superior Flotante Simétrica (`left: 12px; right: 12px; top: 12px;`)**:
+   - Una sola línea horizontal (`flex-wrap: nowrap`) con tres zonas claramente diferenciadas y separadores verticales de `1px`:
+     - **Zona Izquierda**: Conmutador segmentado `En Vivo` / `Historial` + botón desplegable `Servicios` (`#btnMapServicesDropdown`) con icono vectorial SVG de capas, contador tabular (`#cntMapHistServices`), indicador de servicio activo y botón rápido `×` (`#btnMapClearServiceQuick`).
+     - **Zona Central**: Pista segmentada de filtrado adaptativo (`Todas`, `Entrantes`, `Salientes`, `Dispositivos`, `Bloqueadas`) con indicadores semánticos de `6px` y contadores `tabular-nums`.
+     - **Zona Derecha**: Controles integrados de cámara y zoom en SVG (`Zoom +`, `Zoom −`, `Encuadrar`, `Host`) —reemplazando el control nativo de Leaflet que generaba asimetría— junto al botón de **Pantalla Completa**.
+2. **Panel Desplegable Flotante de Servicios (`#mapHudServiceCatalogDrawer`)**:
+   - Popover de cristal oscuro (`max-width: 720px`) con animación suave (`hudDropdownSlideIn`), operativo tanto en modo **En Vivo** (agregando servicios activos en tiempo real) como en modo **Historial SQLite**.
+   - Incluye selector de ventana temporal (`Todo`, `6h`, `24h`, `7d`), buscador con icono SVG, recarga en vivo, limpieza de base de datos y cuadrícula CSS responsiva (`grid-template-columns: repeat(auto-fill, minmax(195px, 1fr))`).
+   - Al seleccionar un servicio, filtra el mapa de inmediato y cierra el popover para despejar la vista cartográfica (también se cierra automáticamente al hacer clic sobre el mapa o pulsar `Escape`).
+3. **Tira Adaptativa de Dispositivos LAN (`#mapHudDeviceFilterBar`)**:
+   - Se muestra de forma adaptativa únicamente cuando el usuario activa el filtro `Dispositivos` o aísla un equipo específico, evitando ocupar espacio vertical en el resto de vistas.

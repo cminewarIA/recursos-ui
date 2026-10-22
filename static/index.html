@@ -1494,209 +1494,436 @@
       height: 100vh !important;
       min-height: 100vh !important;
     }
-    /* Adaptive Floating HUD inside the Map */
+    /* =========================================================================
+       PRECISION FLOATING COMMAND HUD & SERVICE DROPDOWN PANEL (v7.0.0)
+       ========================================================================= */
     .connections-map-adaptive-hud {
       position: absolute;
-      top: 10px;
-      left: 52px;
+      top: 12px;
+      left: 12px;
       right: 12px;
       z-index: 1060;
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      align-items: stretch;
+      gap: 8px;
       pointer-events: none;
     }
     @media (max-width: 768px) {
       .connections-map-adaptive-hud {
-        left: 46px;
-        right: 8px;
         top: 8px;
+        left: 8px;
+        right: 8px;
+        gap: 6px;
       }
     }
     .map-hud-primary-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
-      flex-wrap: wrap;
-      background: rgba(15, 23, 42, 0.88);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 11px;
-      padding: 6px 10px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      gap: 10px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      background: rgba(9, 13, 22, 0.86);
+      backdrop-filter: blur(22px) saturate(185%);
+      -webkit-backdrop-filter: blur(22px) saturate(185%);
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 12px;
+      padding: 5px 8px;
+      min-height: 44px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.08);
       pointer-events: auto;
+    }
+    .map-hud-primary-bar::-webkit-scrollbar {
+      display: none;
     }
     [data-theme="light"] .map-hud-primary-bar {
       background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(15, 23, 42, 0.14);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8);
     }
-    .map-hud-group {
+    .map-hud-zone {
       display: flex;
       align-items: center;
-      gap: 5px;
-      flex-wrap: wrap;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .map-hud-divider {
+      width: 1px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.11);
+      flex-shrink: 0;
+      margin: 0 2px;
+    }
+    [data-theme="light"] .map-hud-divider {
+      background: rgba(15, 23, 42, 0.12);
+    }
+    .map-hud-seg-track {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+      background: rgba(2, 6, 14, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 9px;
+      flex-shrink: 0;
+    }
+    [data-theme="light"] .map-hud-seg-track {
+      background: rgba(241, 245, 249, 0.9);
+      border-color: rgba(15, 23, 42, 0.08);
     }
     .map-hud-btn {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 5px 10px;
+      justify-content: center;
+      gap: 6px;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 7px;
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #94a3b8;
+      background: transparent;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+      user-select: none;
+    }
+    [data-theme="light"] .map-hud-btn {
+      color: #475569;
+    }
+    .map-hud-btn:hover {
+      color: #f8fafc;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    [data-theme="light"] .map-hud-btn:hover {
+      color: #0f172a;
+      background: rgba(15, 23, 42, 0.06);
+    }
+    .map-hud-btn.active {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+    }
+    [data-theme="light"] .map-hud-btn.active {
+      background: #ffffff;
+      border-color: rgba(15, 23, 42, 0.14);
+      color: #0f172a;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+    .map-hud-btn.mode-history.active {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: rgba(56, 189, 248, 0.42);
+      color: #38bdf8;
+    }
+    [data-theme="light"] .map-hud-btn.mode-history.active {
+      background: rgba(2, 132, 199, 0.12);
+      border-color: rgba(2, 132, 199, 0.35);
+      color: #0284c7;
+    }
+    /* Botón desplegable del catálogo de servicios */
+    .map-hud-dropdown-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 32px;
+      padding: 0 11px;
       border-radius: 8px;
-      font-size: 11px;
-      font-weight: 700;
-      color: #cbd5e1;
-      background: rgba(30, 41, 59, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.10);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #e2e8f0;
+      background: rgba(30, 41, 59, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.11);
       cursor: pointer;
       transition: all 0.16s ease;
       white-space: nowrap;
     }
-    [data-theme="light"] .map-hud-btn {
-      color: #334155;
+    [data-theme="light"] .map-hud-dropdown-trigger {
+      color: #1e293b;
       background: rgba(241, 245, 249, 0.9);
       border-color: rgba(15, 23, 42, 0.12);
     }
-    .map-hud-btn:hover {
-      background: rgba(56, 189, 248, 0.18);
+    .map-hud-dropdown-trigger:hover,
+    .map-hud-dropdown-trigger.open {
+      background: rgba(56, 189, 248, 0.14);
       border-color: rgba(56, 189, 248, 0.45);
       color: #ffffff;
     }
-    [data-theme="light"] .map-hud-btn:hover {
+    [data-theme="light"] .map-hud-dropdown-trigger:hover,
+    [data-theme="light"] .map-hud-dropdown-trigger.open {
+      background: rgba(2, 132, 199, 0.10);
+      border-color: rgba(2, 132, 199, 0.40);
       color: #0f172a;
     }
-    .map-hud-btn.active {
-      background: linear-gradient(135deg, rgba(14, 165, 233, 0.92), rgba(37, 99, 235, 0.92));
-      border-color: #7dd3fc;
-      color: #ffffff;
-      box-shadow: 0 2px 10px rgba(14, 165, 233, 0.35);
+    .map-hud-dropdown-trigger.has-selection {
+      background: rgba(14, 165, 233, 0.20);
+      border-color: rgba(56, 189, 248, 0.55);
+      color: #7dd3fc;
     }
-    .map-hud-btn.mode-history.active {
-      background: linear-gradient(135deg, rgba(168, 85, 247, 0.95), rgba(126, 34, 206, 0.95));
-      border-color: #d8b4fe;
+    .map-hud-count-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+    }
+    [data-theme="light"] .map-hud-count-pill {
+      background: rgba(15, 23, 42, 0.08);
+      color: #334155;
+    }
+    .map-hud-btn.active .map-hud-count-pill {
+      background: rgba(56, 189, 248, 0.22);
+      color: #38bdf8;
+    }
+    [data-theme="light"] .map-hud-btn.active .map-hud-count-pill {
+      background: rgba(2, 132, 199, 0.15);
+      color: #0284c7;
+    }
+    .hud-status-pip {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .hud-status-pip.live {
+      background: #10B981;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.75);
+    }
+    .hud-status-pip.in { background: #10B981; }
+    .hud-status-pip.out { background: #06B6D4; }
+    .hud-status-pip.blk { background: #F43F5E; }
+    .map-hud-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      color: #cbd5e1;
+      background: rgba(30, 41, 59, 0.60);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    [data-theme="light"] .map-hud-icon-btn {
+      color: #334155;
+      background: rgba(241, 245, 249, 0.9);
+      border-color: rgba(15, 23, 42, 0.11);
+    }
+    .map-hud-icon-btn:hover {
       color: #ffffff;
-      box-shadow: 0 2px 12px rgba(168, 85, 247, 0.4);
+      background: rgba(56, 189, 248, 0.18);
+      border-color: rgba(56, 189, 248, 0.45);
+    }
+    [data-theme="light"] .map-hud-icon-btn:hover {
+      color: #0f172a;
+      background: rgba(2, 132, 199, 0.12);
     }
     .map-hud-btn.fullscreen-btn {
-      background: rgba(16, 185, 129, 0.16);
-      border-color: rgba(16, 185, 129, 0.42);
+      height: 30px;
+      padding: 0 11px;
+      border-radius: 8px;
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.35);
       color: #34d399;
+      font-weight: 600;
     }
     [data-theme="light"] .map-hud-btn.fullscreen-btn {
       color: #059669;
+      background: rgba(16, 185, 129, 0.10);
     }
     .map-hud-btn.fullscreen-btn:hover,
     .map-hud-btn.fullscreen-btn.active {
-      background: rgba(16, 185, 129, 0.9);
-      border-color: #6ee7b7;
-      color: #ffffff;
+      background: #10B981;
+      border-color: #34d399;
+      color: #042f2e;
+      font-weight: 700;
     }
+    /* Barra Adaptativa de Dispositivos (Una sola línea compacta deslizable) */
     .map-hud-devices-bar {
       display: flex;
       align-items: center;
       gap: 6px;
+      flex-wrap: nowrap;
       overflow-x: auto;
-      scrollbar-width: thin;
-      background: rgba(15, 23, 42, 0.86);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(56, 189, 248, 0.25);
+      scrollbar-width: none;
+      background: rgba(9, 13, 22, 0.84);
+      backdrop-filter: blur(18px) saturate(180%);
+      -webkit-backdrop-filter: blur(18px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.10);
       border-radius: 10px;
-      padding: 5px 9px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+      padding: 5px 10px;
+      min-height: 36px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.40);
       pointer-events: auto;
+    }
+    .map-hud-devices-bar::-webkit-scrollbar {
+      display: none;
     }
     [data-theme="light"] .map-hud-devices-bar {
       background: rgba(255, 255, 255, 0.92);
-      border-color: rgba(2, 132, 199, 0.28);
+      border-color: rgba(15, 23, 42, 0.12);
     }
     .map-hud-device-chip {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 3px 9px;
-      border-radius: 999px;
-      font-size: 10.5px;
-      font-weight: 700;
-      color: #e2e8f0;
-      background: rgba(30, 41, 59, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      gap: 6px;
+      height: 26px;
+      padding: 0 10px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #cbd5e1;
+      background: rgba(30, 41, 59, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.09);
       cursor: pointer;
       white-space: nowrap;
+      flex-shrink: 0;
       transition: all 0.15s ease;
     }
     [data-theme="light"] .map-hud-device-chip {
-      color: #1e293b;
+      color: #334155;
       background: rgba(241, 245, 249, 0.95);
-      border-color: rgba(15, 23, 42, 0.12);
+      border-color: rgba(15, 23, 42, 0.10);
     }
     .map-hud-device-chip:hover {
-      border-color: #38bdf8;
-      background: rgba(56, 189, 248, 0.18);
+      border-color: rgba(56, 189, 248, 0.45);
+      color: #ffffff;
+      background: rgba(56, 189, 248, 0.14);
+    }
+    [data-theme="light"] .map-hud-device-chip:hover {
+      color: #0f172a;
     }
     .map-hud-device-chip.active {
-      background: rgba(56, 189, 248, 0.92);
-      border-color: #bae6fd;
-      color: #0f172a;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+      background: rgba(56, 189, 248, 0.20);
+      border-color: #38bdf8;
+      color: #38bdf8;
+      box-shadow: 0 2px 8px rgba(56, 189, 248, 0.20);
     }
+    [data-theme="light"] .map-hud-device-chip.active {
+      background: rgba(2, 132, 199, 0.14);
+      border-color: #0284c7;
+      color: #0284c7;
+    }
+    /* Panel Desplegable Flotante de Servicios (Popover de Cristal Oscuro) */
     .map-hud-services-drawer {
-      background: rgba(15, 23, 42, 0.92);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(168, 85, 247, 0.40);
-      border-radius: 12px;
-      padding: 10px 12px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+      width: 100%;
+      max-width: 720px;
+      background: rgba(9, 13, 22, 0.94);
+      backdrop-filter: blur(26px) saturate(190%);
+      -webkit-backdrop-filter: blur(26px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 14px;
+      padding: 12px 14px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
       pointer-events: auto;
-      max-height: 220px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
+      animation: hudDropdownSlideIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes hudDropdownSlideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     [data-theme="light"] .map-hud-services-drawer {
-      background: rgba(255, 255, 255, 0.95);
-      border-color: rgba(126, 34, 206, 0.35);
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(15, 23, 42, 0.14);
+      color: #0f172a;
+      box-shadow: 0 20px 42px rgba(15, 23, 42, 0.18);
+    }
+    .map-hud-services-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    [data-theme="light"] .map-hud-services-header {
+      border-bottom-color: rgba(15, 23, 42, 0.08);
+    }
+    .map-hud-search-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 28px;
+      padding: 0 9px;
+      background: rgba(2, 6, 14, 0.60);
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 7px;
+      color: #f8fafc;
+    }
+    [data-theme="light"] .map-hud-search-box {
+      background: rgba(241, 245, 249, 0.95);
+      border-color: rgba(15, 23, 42, 0.12);
       color: #0f172a;
     }
+    .map-hud-search-box input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: inherit;
+      font-size: 11px;
+      width: 170px;
+      font-family: inherit;
+    }
     .map-hud-services-grid {
-      display: flex;
-      align-items: stretch;
-      gap: 7px;
-      overflow-x: auto;
-      padding-bottom: 4px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 2px;
       scrollbar-width: thin;
     }
     .map-service-cat-card {
-      flex: 0 0 auto;
-      min-width: 155px;
-      max-width: 220px;
-      padding: 7px 10px;
+      padding: 9px 11px;
       border-radius: 9px;
-      background: rgba(30, 41, 59, 0.82);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(22, 30, 46, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       cursor: pointer;
-      transition: all 0.16s ease;
+      transition: all 0.15s ease;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 4px;
+      gap: 6px;
     }
     [data-theme="light"] .map-service-cat-card {
       background: rgba(248, 250, 252, 0.95);
-      border-color: rgba(15, 23, 42, 0.12);
+      border-color: rgba(15, 23, 42, 0.10);
     }
     .map-service-cat-card:hover {
-      border-color: #c084fc;
-      background: rgba(168, 85, 247, 0.16);
+      border-color: rgba(56, 189, 248, 0.45);
+      background: rgba(30, 41, 59, 0.92);
       transform: translateY(-1px);
     }
+    [data-theme="light"] .map-service-cat-card:hover {
+      background: #ffffff;
+      border-color: rgba(2, 132, 199, 0.45);
+    }
     .map-service-cat-card.active {
-      background: linear-gradient(135deg, rgba(168, 85, 247, 0.32), rgba(59, 130, 246, 0.28));
-      border-color: #d8b4fe;
-      box-shadow: 0 0 0 1px rgba(216, 180, 254, 0.4), 0 4px 12px rgba(168, 85, 247, 0.3);
+      background: rgba(14, 165, 233, 0.16);
+      border-color: #38bdf8;
+      box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25);
+    }
+    [data-theme="light"] .map-service-cat-card.active {
+      background: rgba(2, 132, 199, 0.10);
+      border-color: #0284c7;
     }
     .connections-map-overlay-legend {
       position: absolute;
@@ -3719,64 +3946,125 @@
               <div class="connections-map-stage-wrap" id="networkConnectionsMapStageWrap">
                 <div id="networkConnectionsMapCanvas"></div>
 
-                <!-- HUD Adaptativo Integrado dentro del propio Mapa (funciona en vista normal y Pantalla Completa) -->
+                <!-- HUD Flotante de Precisión Integrado en el Mapa (Vista Estándar y Pantalla Completa) -->
                 <div class="connections-map-adaptive-hud" id="networkConnectionsMapAdaptiveHud">
                   <div class="map-hud-primary-bar">
-                    <!-- Selector de Modo: Tiempo Real vs Historial por Servicios (SQLite) -->
-                    <div class="map-hud-group">
-                      <button type="button" class="map-hud-btn active" id="btnMapModeLive" onclick="setConnectionsMapMode('live')" title="Ver flujos activos en tiempo real">
-                        <span>🟢</span><span>En Vivo</span>
+                    <!-- Zona Izquierda: Fuente de Datos (En Vivo / Historial SQL) + Desplegable de Servicios -->
+                    <div class="map-hud-zone">
+                      <div class="map-hud-seg-track">
+                        <button type="button" class="map-hud-btn active" id="btnMapModeLive" onclick="setConnectionsMapMode('live')" title="Telemetría de conexiones en tiempo real">
+                          <span class="hud-status-pip live"></span>
+                          <span>En Vivo</span>
+                        </button>
+                        <button type="button" class="map-hud-btn mode-history" id="btnMapModeHistory" onclick="setConnectionsMapMode('history')" title="Consultar historial persistente en base de datos SQLite">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                          <span>Historial</span>
+                        </button>
+                      </div>
+
+                      <div class="map-hud-divider"></div>
+
+                      <!-- Botón Desplegable del Catálogo de Servicios -->
+                      <button type="button" class="map-hud-dropdown-trigger" id="btnMapServicesDropdown" onclick="toggleMapServiceCatalogDrawer()" title="Desplegar catálogo de servicios detectados y filtrar mapa">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                        <span id="lblMapActiveService">Servicios</span>
+                        <span class="map-hud-count-pill" id="cntMapHistServices">0</span>
+                        <svg id="iconMapHistDrawerCaret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.18s ease;"><polyline points="6 9 12 15 18 9"/></svg>
                       </button>
-                      <button type="button" class="map-hud-btn mode-history" id="btnMapModeHistory" onclick="setConnectionsMapMode('history', true)" title="Explorar historial persistente en base de datos SQLite catalogado por servicios (Pulsa de nuevo para desplegar/ocultar el panel)">
-                        <span>📚</span><span>Historial por Servicios (<span id="cntMapHistServices" style="font-variant-numeric: tabular-nums;">0</span>)</span><span id="iconMapHistDrawerCaret" style="font-size: 9px; opacity: 0.8; margin-left: 2px;">▼</span>
+
+                      <button type="button" class="map-hud-icon-btn" id="btnMapClearServiceQuick" onclick="setConnectionsMapServiceFilter(null)" style="display: none; width: 24px; height: 28px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.35);" title="Quitar filtro de servicio activo">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                       </button>
                     </div>
 
-                    <!-- Filtros de Dirección y Dispositivos integrados en el Mapa -->
-                    <div class="map-hud-group">
-                      <button type="button" class="map-hud-btn active" id="fMapConnAll" onclick="setConnectionsMapFilter('all')">Todas (<span id="cntMapAll" style="font-variant-numeric: tabular-nums;">0</span>)</button>
-                      <button type="button" class="map-hud-btn" id="fMapConnIn" onclick="setConnectionsMapFilter('incoming')">↓ Entrantes (<span id="cntMapIn" style="font-variant-numeric: tabular-nums;">0</span>)</button>
-                      <button type="button" class="map-hud-btn" id="fMapConnOut" onclick="setConnectionsMapFilter('outgoing')">↑ Salientes (<span id="cntMapOut" style="font-variant-numeric: tabular-nums;">0</span>)</button>
-                      <button type="button" class="map-hud-btn" id="fMapConnDev" onclick="setConnectionsMapFilter('devices')">📱 Dispositivos (<span id="cntMapDev" style="font-variant-numeric: tabular-nums;">0</span>)</button>
-                      <button type="button" class="map-hud-btn" id="fMapConnBlk" onclick="setConnectionsMapFilter('blocked')">🛡️ Bloqueadas (<span id="cntMapBlk" style="font-variant-numeric: tabular-nums;">0</span>)</button>
+                    <!-- Zona Central: Controles de Filtrado Adaptativo (Tráfico y Dispositivos LAN) -->
+                    <div class="map-hud-zone">
+                      <div class="map-hud-seg-track">
+                        <button type="button" class="map-hud-btn active" id="fMapConnAll" onclick="setConnectionsMapFilter('all')">
+                          <span>Todas</span>
+                          <span class="map-hud-count-pill" id="cntMapAll">0</span>
+                        </button>
+                        <button type="button" class="map-hud-btn" id="fMapConnIn" onclick="setConnectionsMapFilter('incoming')">
+                          <span class="hud-status-pip in"></span>
+                          <span>Entrantes</span>
+                          <span class="map-hud-count-pill" id="cntMapIn">0</span>
+                        </button>
+                        <button type="button" class="map-hud-btn" id="fMapConnOut" onclick="setConnectionsMapFilter('outgoing')">
+                          <span class="hud-status-pip out"></span>
+                          <span>Salientes</span>
+                          <span class="map-hud-count-pill" id="cntMapOut">0</span>
+                        </button>
+                        <button type="button" class="map-hud-btn" id="fMapConnDev" onclick="setConnectionsMapFilter('devices', true)" title="Filtrar por dispositivos de la red local y mostrar selector adaptativo">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                          <span>Dispositivos</span>
+                          <span class="map-hud-count-pill" id="cntMapDev">0</span>
+                        </button>
+                        <button type="button" class="map-hud-btn" id="fMapConnBlk" onclick="setConnectionsMapFilter('blocked')">
+                          <span class="hud-status-pip blk"></span>
+                          <span>Bloqueadas</span>
+                          <span class="map-hud-count-pill" id="cntMapBlk">0</span>
+                        </button>
+                      </div>
                     </div>
 
-                    <!-- Controles de Cámara y Pantalla Completa -->
-                    <div class="map-hud-group">
-                      <button type="button" class="map-hud-btn" onclick="fitConnectionsMapBounds()" title="Ajustar zoom a todas las conexiones visibles">🌍 Encuadrar</button>
-                      <button type="button" class="map-hud-btn" onclick="focusServerNodeOnMap()" title="Centrar en el nodo del servidor">🖥️ Host</button>
+                    <!-- Zona Derecha: Zoom, Cámara y Modo Pantalla Completa -->
+                    <div class="map-hud-zone">
+                      <button type="button" class="map-hud-icon-btn" onclick="mapZoomIn()" title="Acercar mapa (Zoom +)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </button>
+                      <button type="button" class="map-hud-icon-btn" onclick="mapZoomOut()" title="Alejar mapa (Zoom −)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </button>
+                      <button type="button" class="map-hud-icon-btn" onclick="fitConnectionsMapBounds()" title="Encuadrar todas las conexiones activas">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
+                      </button>
+                      <button type="button" class="map-hud-icon-btn" onclick="focusServerNodeOnMap()" title="Centrar en el nodo del servidor">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                      </button>
+
+                      <div class="map-hud-divider"></div>
+
                       <button type="button" class="map-hud-btn fullscreen-btn" id="btnMapFullscreenToggle" onclick="toggleConnectionsMapFullscreen()" title="Alternar modo Pantalla Completa con controles integrados">
-                        <span id="iconMapFullscreenToggle">⛶</span>
+                        <span id="iconMapFullscreenToggle" style="display: inline-flex; align-items: center;">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                        </span>
                         <span id="lblMapFullscreenToggle">Pantalla Completa</span>
                       </button>
                     </div>
                   </div>
 
-                  <!-- Barra Adaptativa de Filtrado Rápido por Dispositivo dentro del Mapa -->
+                  <!-- Barra Adaptativa de Dispositivos (Se muestra al filtrar por Dispositivos o seleccionar un equipo) -->
                   <div class="map-hud-devices-bar" id="mapHudDeviceFilterBar" style="display: none;"></div>
 
-                  <!-- Panel Adaptativo de Catálogo de Servicios e Historial SQLite dentro del Mapa -->
+                  <!-- Panel Desplegable Flotante de Servicios (Funciona en modo En Vivo e Historial SQLite) -->
                   <div class="map-hud-services-drawer" id="mapHudServiceCatalogDrawer" style="display: none;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                    <div class="map-hud-services-header">
                       <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <span style="font-size: 11.5px; font-weight: 800; color: #c084fc; text-transform: uppercase; letter-spacing: 0.04em;">📚 Catálogo Histórico por Servicios (SQLite)</span>
-                        <span class="mono" style="font-size: 10.5px; color: var(--text-muted); font-variant-numeric: tabular-nums;" id="mapHistSummaryText">Cargando base de datos...</span>
+                        <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em;">Catálogo de Servicios</span>
+                        <span class="mono" style="font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums;" id="mapHistSummaryText">Sincronizando...</span>
                       </div>
                       <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                        <select id="mapHistHoursSelect" onchange="onMapHistoryHoursChange(this.value)" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 7px; padding: 4px 8px; font-size: 11px; color: #f8fafc; outline: none; cursor: pointer;" title="Filtrar ventana temporal del historial SQLite">
+                        <select id="mapHistHoursSelect" onchange="onMapHistoryHoursChange(this.value)" style="height: 28px; background: rgba(2, 6, 14, 0.60); border: 1px solid rgba(255, 255, 255, 0.11); border-radius: 7px; padding: 0 8px; font-size: 11px; color: #cbd5e1; outline: none; cursor: pointer;" title="Ventana temporal del historial SQLite">
                           <option value="0">Todo el historial</option>
-                          <option value="6">Últimas 6 horas</option>
-                          <option value="24">Últimas 24 horas</option>
+                          <option value="6">Últimas 6h</option>
+                          <option value="24">Últimas 24h</option>
                           <option value="168">Últimos 7 días</option>
                         </select>
-                        <input type="text" id="mapHistSearchInput" placeholder="Buscar servicio, dominio, IP o ciudad..." oninput="onMapHistorySearchInput(this.value)" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 7px; padding: 4px 9px; font-size: 11px; color: #f8fafc; min-width: 195px; outline: none;">
-                        <button type="button" class="map-hud-btn" onclick="NetworkConnectionsMapEngine.fetchHistoryData(true)" title="Recargar historial desde SQLite">🔄 Actualizar</button>
-                        <button type="button" class="map-hud-btn" id="btnClearMapHistorySql" onclick="clearMapConnectionHistorySql()" style="color: #fda4af; border-color: rgba(244, 63, 94, 0.35);" title="Vaciar el historial de conexiones en SQLite">🗑️ Limpiar BD</button>
-                        <button type="button" class="map-hud-btn" onclick="toggleMapServiceCatalogDrawer(false)" title="Ocultar panel desplegable manteniendo el modo historial activo">▲ Ocultar</button>
+                        <div class="map-hud-search-box">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                          <input type="text" id="mapHistSearchInput" placeholder="Filtrar servicio, dominio o IP..." oninput="onMapHistorySearchInput(this.value)">
+                        </div>
+                        <button type="button" class="map-hud-icon-btn" style="width: 28px; height: 28px;" onclick="NetworkConnectionsMapEngine.fetchHistoryData(true)" title="Actualizar catálogo de servicios">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                        </button>
+                        <button type="button" class="map-hud-btn" id="btnClearMapHistorySql" onclick="clearMapConnectionHistorySql()" style="height: 28px; padding: 0 8px; color: #fda4af; border-color: rgba(244, 63, 94, 0.28); font-size: 11px;" title="Vaciar historial de conexiones en SQLite">Limpiar BD</button>
+                        <button type="button" class="map-hud-icon-btn" style="width: 28px; height: 28px;" onclick="toggleMapServiceCatalogDrawer(false)" title="Cerrar panel desplegable">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
                       </div>
                     </div>
                     <div class="map-hud-services-grid" id="mapHistServicesCatalogList">
-                      <div style="font-size: 11px; color: var(--text-muted); padding: 6px;">Consultando catálogo de servicios en SQLite...</div>
+                      <div style="font-size: 11px; color: var(--text-muted); padding: 6px;">Cargando catálogo de servicios...</div>
                     </div>
                   </div>
                 </div>
@@ -11783,6 +12071,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
     let connectionsMapHistorySearch = '';
     let connectionsMapHistoryHours = '0';
     let connectionsMapServiceDrawerOpen = false;
+    let connectionsMapDevicesBarOpen = false;
     let _clearMapHistoryConfirmTimer = null;
 
     function formatHistoryTimestamp(tsSec) {
@@ -11796,40 +12085,66 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
+    function syncMapServicesDropdownButtonUI() {
+      const btn = document.getElementById('btnMapServicesDropdown');
+      const lbl = document.getElementById('lblMapActiveService');
+      const caret = document.getElementById('iconMapHistDrawerCaret');
+      const clearBtn = document.getElementById('btnMapClearServiceQuick');
+      if (btn) {
+        btn.classList.toggle('open', !!connectionsMapServiceDrawerOpen);
+        btn.classList.toggle('has-selection', !!connectionsMapServiceSel);
+      }
+      if (lbl) {
+        if (connectionsMapServiceSel) {
+          const shortName = connectionsMapServiceSel.length > 22
+            ? connectionsMapServiceSel.slice(0, 20) + '…'
+            : connectionsMapServiceSel;
+          lbl.textContent = shortName;
+        } else {
+          lbl.textContent = 'Servicios';
+        }
+      }
+      if (caret) {
+        caret.style.transform = connectionsMapServiceDrawerOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+      }
+      if (clearBtn) {
+        clearBtn.style.display = connectionsMapServiceSel ? 'inline-flex' : 'none';
+      }
+    }
+
     function toggleMapServiceCatalogDrawer(forceOpen) {
       const drawer = document.getElementById('mapHudServiceCatalogDrawer');
-      const caret = document.getElementById('iconMapHistDrawerCaret');
       if (!drawer) return;
       if (typeof forceOpen === 'boolean') {
         connectionsMapServiceDrawerOpen = forceOpen;
       } else {
         connectionsMapServiceDrawerOpen = !connectionsMapServiceDrawerOpen;
       }
-      drawer.style.display = (connectionsMapMode === 'history' && connectionsMapServiceDrawerOpen) ? 'flex' : 'none';
-      if (caret) caret.textContent = (connectionsMapMode === 'history' && connectionsMapServiceDrawerOpen) ? '▲' : '▼';
+      drawer.style.display = connectionsMapServiceDrawerOpen ? 'flex' : 'none';
+      syncMapServicesDropdownButtonUI();
+      if (connectionsMapServiceDrawerOpen) {
+        NetworkConnectionsMapEngine.fetchHistoryData(false);
+        NetworkConnectionsMapEngine.renderHistoryCatalogDrawer();
+      }
     }
 
-    function setConnectionsMapMode(mode, allowToggleDrawer = false) {
+    function setConnectionsMapMode(mode) {
       const nextMode = mode === 'history' ? 'history' : 'live';
-      if (allowToggleDrawer && connectionsMapMode === 'history' && nextMode === 'history') {
-        toggleMapServiceCatalogDrawer();
-        return;
-      }
       connectionsMapMode = nextMode;
       const btnLive = document.getElementById('btnMapModeLive');
       const btnHist = document.getElementById('btnMapModeHistory');
       if (btnLive) btnLive.classList.toggle('active', nextMode === 'live');
       if (btnHist) btnHist.classList.toggle('active', nextMode === 'history');
-      toggleMapServiceCatalogDrawer(nextMode === 'history');
 
       if (nextMode === 'history') {
         NetworkConnectionsMapEngine.fetchHistoryData(true);
       } else {
-        connectionsMapServiceSel = null;
         if (latestMetrics) {
           NetworkConnectionsMapEngine.renderFromMetrics(latestMetrics, true);
         }
+        NetworkConnectionsMapEngine.renderHistoryCatalogDrawer();
       }
+      syncMapServicesDropdownButtonUI();
       setTimeout(() => {
         if (NetworkConnectionsMapEngine._leafletMap) {
           NetworkConnectionsMapEngine._leafletMap.invalidateSize();
@@ -11837,8 +12152,14 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       }, 80);
     }
 
-    function setConnectionsMapServiceFilter(serviceName) {
+    function setConnectionsMapServiceFilter(serviceName, closeDrawer = false) {
       connectionsMapServiceSel = serviceName || null;
+      if (closeDrawer) {
+        connectionsMapServiceDrawerOpen = false;
+        const drawer = document.getElementById('mapHudServiceCatalogDrawer');
+        if (drawer) drawer.style.display = 'none';
+      }
+      syncMapServicesDropdownButtonUI();
       NetworkConnectionsMapEngine.renderHistoryCatalogDrawer();
       NetworkConnectionsMapEngine.renderActiveDataset(true);
     }
@@ -11854,29 +12175,42 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       NetworkConnectionsMapEngine.fetchHistoryData(true);
     }
 
+    function mapZoomIn() {
+      if (NetworkConnectionsMapEngine._leafletMap) {
+        NetworkConnectionsMapEngine._leafletMap.zoomIn();
+      }
+    }
+
+    function mapZoomOut() {
+      if (NetworkConnectionsMapEngine._leafletMap) {
+        NetworkConnectionsMapEngine._leafletMap.zoomOut();
+      }
+    }
+
     async function clearMapConnectionHistorySql() {
       const btn = document.getElementById('btnClearMapHistorySql');
       if (!btn) return;
       if (btn.dataset.confirming !== '1') {
         btn.dataset.confirming = '1';
-        btn.textContent = '⚠️ ¿Confirmar vaciado?';
+        btn.textContent = '¿Confirmar?';
         if (_clearMapHistoryConfirmTimer) clearTimeout(_clearMapHistoryConfirmTimer);
         _clearMapHistoryConfirmTimer = setTimeout(() => {
           btn.dataset.confirming = '0';
-          btn.textContent = '🗑️ Limpiar BD';
+          btn.textContent = 'Limpiar BD';
         }, 4000);
         return;
       }
       btn.dataset.confirming = '0';
-      btn.textContent = '⏳ Vaciando...';
+      btn.textContent = 'Vaciando...';
       try {
         await fetch('/api/net/history/clear', { method: 'POST' });
         connectionsMapServiceSel = null;
+        syncMapServicesDropdownButtonUI();
         await NetworkConnectionsMapEngine.fetchHistoryData(true);
       } catch (e) {
         console.error('Error vaciando historial SQLite:', e);
       } finally {
-        btn.textContent = '🗑️ Limpiar BD';
+        btn.textContent = 'Limpiar BD';
       }
     }
 
@@ -11890,8 +12224,12 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       const isCssFs = wrap.classList.contains('is-fullscreen');
       const active = isNativeFs || isCssFs;
       if (btn) btn.classList.toggle('active', active);
-      if (icon) icon.textContent = active ? '🗗' : '⛶';
-      if (lbl) lbl.textContent = active ? 'Salir Pantalla Completa' : 'Pantalla Completa';
+      if (icon) {
+        icon.innerHTML = active
+          ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`
+          : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+      }
+      if (lbl) lbl.textContent = active ? 'Salir' : 'Pantalla Completa';
       [60, 220].forEach(ms => {
         setTimeout(() => {
           if (NetworkConnectionsMapEngine._leafletMap) {
@@ -11940,6 +12278,10 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
+        if (connectionsMapServiceDrawerOpen) {
+          toggleMapServiceCatalogDrawer(false);
+          return;
+        }
         const wrap = document.getElementById('networkConnectionsMapStageWrap');
         if (wrap && wrap.classList.contains('is-fullscreen') && !document.fullscreenElement) {
           wrap.classList.remove('is-fullscreen');
@@ -11950,6 +12292,9 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
     function setConnectionsMapDevice(ip) {
       connectionsMapDeviceSel = ip || null;
+      if (connectionsMapDeviceSel) {
+        connectionsMapDevicesBarOpen = true;
+      }
       if (connectionsMapDeviceSel && connectionsMapFilter !== 'devices') {
         connectionsMapFilter = 'devices';
         const mapBtns = {
@@ -11967,8 +12312,17 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       NetworkConnectionsMapEngine.renderActiveDataset(true);
     }
 
-    function setConnectionsMapFilter(filter) {
-      if (filter !== connectionsMapFilter) connectionsMapDeviceSel = null;
+    function setConnectionsMapFilter(filter, toggleDeviceBar = false) {
+      if (filter === 'devices') {
+        if (connectionsMapFilter === 'devices' && toggleDeviceBar) {
+          connectionsMapDevicesBarOpen = !connectionsMapDevicesBarOpen;
+        } else {
+          connectionsMapDevicesBarOpen = true;
+        }
+      } else {
+        connectionsMapDeviceSel = null;
+        connectionsMapDevicesBarOpen = false;
+      }
       connectionsMapFilter = filter;
       const mapBtns = {
         all: 'fMapConnAll',
@@ -12048,8 +12402,6 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             if (data && data.status === 'ok') {
               this._historyData = data;
               this._lastHistoryFetchTs = Date.now();
-              const svcCount = (data.summary && data.summary.total_services) || (Array.isArray(data.services_catalog) ? data.services_catalog.length : 0);
-              setText('cntMapHistServices', svcCount);
               this.renderHistoryCatalogDrawer();
               if (connectionsMapMode === 'history' || forceRender) {
                 this.renderActiveDataset(true);
@@ -12063,20 +12415,93 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         }
       },
 
+      buildUnifiedServicesCatalog() {
+        const isHistoryMode = (connectionsMapMode === 'history');
+        const hData = this._historyData;
+        const liveConns = (this._lastConnData && Array.isArray(this._lastConnData.connections)) ? this._lastConnData.connections : [];
+
+        if (isHistoryMode && hData && Array.isArray(hData.services_catalog)) {
+          return {
+            catalog: hData.services_catalog,
+            summary: hData.summary || {
+              total_services: hData.services_catalog.length,
+              total_records: (hData.connections || []).length,
+              total_unique_ips: new Set((hData.connections || []).map(c => c.remote_ip)).size,
+              total_devices: new Set((hData.connections || []).map(c => c.local_ip)).size
+            }
+          };
+        }
+
+        // En modo En Vivo: combinar servicios activos en tiempo real con el catálogo SQLite si existe
+        const svcMap = new Map();
+        liveConns.forEach(c => {
+          const sName = String(c.service || 'Servicio Red');
+          if (!svcMap.has(sName)) {
+            svcMap.set(sName, {
+              service: sName,
+              connections_count: 0,
+              total_hits: 0,
+              ips: new Set(),
+              devs: new Set(),
+              countries: new Set(),
+              domains: new Set(),
+              last_seen: Math.floor(Date.now() / 1000)
+            });
+          }
+          const entry = svcMap.get(sName);
+          entry.connections_count += 1;
+          entry.total_hits += Number(c.hit_count || 1);
+          if (c.remote_ip) entry.ips.add(c.remote_ip);
+          if (c.local_ip) entry.devs.add(c.local_ip);
+          if (c.country) entry.countries.add(c.country);
+          if (c.domain) entry.domains.add(c.domain);
+        });
+
+        // Si no hay conexiones en vivo aún pero sí datos en SQLite, mostrar el catálogo SQLite
+        if (svcMap.size === 0 && hData && Array.isArray(hData.services_catalog) && hData.services_catalog.length > 0) {
+          return {
+            catalog: hData.services_catalog,
+            summary: hData.summary || {}
+          };
+        }
+
+        const catalog = [...svcMap.values()].map(e => ({
+          service: e.service,
+          connections_count: e.connections_count,
+          total_hits: e.total_hits,
+          unique_ips: e.ips.size,
+          unique_devices: e.devs.size,
+          countries: [...e.countries].slice(0, 4),
+          sample_domains: [...e.domains].slice(0, 4),
+          last_seen: e.last_seen
+        })).sort((a, b) => b.connections_count - a.connections_count);
+
+        return {
+          catalog,
+          summary: {
+            total_services: catalog.length,
+            total_records: liveConns.length,
+            total_unique_ips: new Set(liveConns.map(c => c.remote_ip).filter(Boolean)).size,
+            total_devices: new Set(liveConns.map(c => c.local_ip).filter(Boolean)).size
+          }
+        };
+      },
+
       renderHistoryCatalogDrawer() {
         const listEl = document.getElementById('mapHistServicesCatalogList');
         const sumEl = document.getElementById('mapHistSummaryText');
+        const { catalog: rawCatalog, summary } = this.buildUnifiedServicesCatalog();
+        const svcCount = summary.total_services || rawCatalog.length || 0;
+        setText('cntMapHistServices', svcCount);
+        syncMapServicesDropdownButtonUI();
+
         if (!listEl) return;
-        const hData = this._historyData;
-        if (!hData) {
-          listEl.innerHTML = `<div style="font-size: 11px; color: var(--text-muted); padding: 6px;">Sincronizando base de datos SQLite...</div>`;
-          return;
-        }
-        const summary = hData.summary || {};
         if (sumEl) {
-          sumEl.textContent = `${summary.total_services || 0} servicios · ${summary.total_records || 0} rutas · ${summary.total_unique_ips || 0} IPs exactas`;
+          const modeTxt = connectionsMapMode === 'history' ? 'SQLite' : 'En Vivo';
+          sumEl.textContent = `${modeTxt} · ${svcCount} servicios · ${summary.total_records || 0} flujos · ${summary.total_unique_ips || 0} IPs`;
         }
-        let catalog = Array.isArray(hData.services_catalog) ? hData.services_catalog : [];
+
+        let catalog = rawCatalog;
         const q = (connectionsMapHistorySearch || '').toLowerCase();
         if (q) {
           catalog = catalog.filter(s =>
@@ -12087,13 +12512,13 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         }
 
         const allCardHtml = `
-          <div class="map-service-cat-card ${!connectionsMapServiceSel ? 'active' : ''}" onclick="setConnectionsMapServiceFilter(null)">
+          <div class="map-service-cat-card ${!connectionsMapServiceSel ? 'active' : ''}" onclick="setConnectionsMapServiceFilter(null, true)">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-              <span style="font-size: 11.5px; font-weight: 800; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🌐 Todos los Servicios</span>
-              <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; font-variant-numeric: tabular-nums;">${summary.total_records || 0}</span>
+              <span style="font-size: 11.5px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Todos los Servicios</span>
+              <span class="map-hud-count-pill">${summary.total_records || 0}</span>
             </div>
-            <div style="font-size: 10px; color: #94a3b8; font-family: var(--font-mono); font-variant-numeric: tabular-nums;">
-              ${summary.total_unique_ips || 0} IPs · ${summary.total_devices || 0} disp.
+            <div style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums;">
+              ${summary.total_unique_ips || 0} IPs únicas · ${summary.total_devices || 0} disp.
             </div>
           </div>
         `;
@@ -12101,19 +12526,20 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         const cardsHtml = catalog.map(s => {
           const isSel = connectionsMapServiceSel === s.service;
           const safeSvc = escapeHtml(s.service).replace(/'/g, "\\'");
-          const countriesTxt = Array.isArray(s.countries) && s.countries.length > 0 ? s.countries.slice(0, 2).join(', ') : 'Global';
+          const countriesTxt = Array.isArray(s.countries) && s.countries.length > 0 ? s.countries.slice(0, 2).join(', ') : 'Red Global';
+          const countVal = connectionsMapMode === 'history' ? `${s.total_hits || s.connections_count}x` : `${s.connections_count}`;
           return `
-            <div class="map-service-cat-card ${isSel ? 'active' : ''}" onclick="setConnectionsMapServiceFilter('${safeSvc}')" title="${escapeHtml(s.service)} · Total conexiones: ${s.total_hits || s.connections_count} · Última vez: ${formatHistoryTimestamp(s.last_seen)}">
+            <div class="map-service-cat-card ${isSel ? 'active' : ''}" onclick="setConnectionsMapServiceFilter('${safeSvc}', true)" title="${escapeHtml(s.service)} · Última actividad: ${formatHistoryTimestamp(s.last_seen)}">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-                <span style="font-size: 11px; font-weight: 800; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(s.service)}</span>
-                <span class="adw-badge badge-blue" style="font-size: 9.5px; padding: 1px 6px; flex-shrink: 0; font-variant-numeric: tabular-nums;" title="Contador total de conexiones registradas">${s.total_hits || s.connections_count}x</span>
+                <span style="font-size: 11.5px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(s.service)}</span>
+                <span class="map-hud-count-pill" style="flex-shrink: 0;">${countVal}</span>
               </div>
-              <div style="font-size: 9.5px; color: var(--text-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 4px;">
-                <span>🎯 ${s.unique_ips} IPs · 📱 ${s.unique_devices}</span>
+              <div style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; gap: 4px;">
+                <span>${s.unique_ips} IPs · ${s.unique_devices} disp.</span>
                 <span>${formatHistoryTimestamp(s.last_seen)}</span>
               </div>
-              <div style="font-size: 9.5px; color: #38bdf8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                📍 ${escapeHtml(countriesTxt)}
+              <div style="font-size: 10px; color: #38bdf8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${escapeHtml(countriesTxt)}
               </div>
             </div>
           `;
@@ -12125,35 +12551,38 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       renderInMapDeviceFilterBar(deviceGroups, allDeviceConnsCount) {
         const barEl = document.getElementById('mapHudDeviceFilterBar');
         if (!barEl) return;
-        if (!Array.isArray(deviceGroups) || deviceGroups.length === 0) {
-          if (connectionsMapFilter === 'devices') {
-            barEl.style.display = 'flex';
-            barEl.innerHTML = `<span style="font-size: 10.5px; color: var(--text-muted); font-weight: 700;">📱 Dispositivos en mapa: Sin conexiones de dispositivos LAN en este filtro</span>`;
-          } else {
-            barEl.style.display = 'none';
-          }
+        const shouldShow = (connectionsMapFilter === 'devices' || connectionsMapDevicesBarOpen || !!connectionsMapDeviceSel);
+        if (!shouldShow) {
+          barEl.style.display = 'none';
           return;
         }
-        // Mostrar siempre la barra adaptativa de dispositivos en el mapa cuando el filtro Dispositivos está activo o hay dispositivos detectados
+        if (!Array.isArray(deviceGroups) || deviceGroups.length === 0) {
+          barEl.style.display = 'flex';
+          barEl.innerHTML = `
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Sin flujos de dispositivos LAN adicionales en esta vista</span>
+            <button type="button" class="map-hud-device-chip" style="margin-left: auto;" onclick="setConnectionsMapFilter('all')">Ver Todas</button>
+          `;
+          return;
+        }
         barEl.style.display = 'flex';
         const isAllDevsActive = (connectionsMapFilter === 'devices' && !connectionsMapDeviceSel);
         barEl.innerHTML = `
-          <span style="font-size: 10.5px; font-weight: 800; color: #38bdf8; white-space: nowrap; margin-right: 2px;">📱 Dispositivos:</span>
+          <span style="font-size: 10.5px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; margin-right: 4px;">Equipos LAN:</span>
           <button type="button" class="map-hud-device-chip ${isAllDevsActive ? 'active' : ''}" onclick="setConnectionsMapFilter('devices'); setConnectionsMapDevice(null);">
-            <span>Todos (${deviceGroups.length})</span>
+            <span>Todos</span>
+            <span class="map-hud-count-pill">${deviceGroups.length}</span>
           </button>
           ${deviceGroups.map(g => {
             const isSel = connectionsMapDeviceSel === g.ip;
-            const emoji = getDeviceEmoji(g.client && (g.client.dev_icon || g.client.dev_type));
             const safeIp = escapeHtml(g.ip).replace(/'/g, "\\'");
             return `
-              <button type="button" class="map-hud-device-chip ${isSel ? 'active' : ''}" onclick="setConnectionsMapDevice('${safeIp}')" title="Filtrar mapa por ${escapeHtml(g.name)} (${escapeHtml(g.ip)})">
-                <span>${emoji}</span>
+              <button type="button" class="map-hud-device-chip ${isSel ? 'active' : ''}" onclick="setConnectionsMapDevice('${safeIp}')" title="Aislar tráfico de ${escapeHtml(g.name)} (${escapeHtml(g.ip)})">
                 <span>${escapeHtml(g.name)}</span>
-                <span style="opacity: 0.78;">(${g.conns.length})</span>
+                <span class="map-hud-count-pill">${g.conns.length}</span>
               </button>
             `;
           }).join('')}
+          ${connectionsMapDeviceSel ? `<button type="button" class="map-hud-device-chip" onclick="setConnectionsMapDevice(null)" title="Mostrar todos los dispositivos">✕ Quitar filtro</button>` : ''}
         `;
       },
 
@@ -12200,7 +12629,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           this._leafletMap = L.map(container, {
             center: [initLat, initLng],
             zoom: 3,
-            zoomControl: true,
+            zoomControl: false,
             attributionControl: false,
             closePopupOnClick: false
           });
@@ -12219,6 +12648,9 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           mainTileLayer.addTo(this._leafletMap);
 
           container.addEventListener('click', (e) => {
+            if (connectionsMapServiceDrawerOpen) {
+              toggleMapServiceCatalogDrawer(false);
+            }
             if (e.target && (e.target.classList.contains('leaflet-popup-close-button') || e.target.closest('.leaflet-popup-close-button'))) {
               this._activePopupState = null;
             }
@@ -12864,6 +13296,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         // Sincronizar periódicamente el contador de servicios en SQLite cada 15s cuando estamos en la vista Red
         if (activeView === 'network' && (Date.now() - this._lastHistoryFetchTs > 15000)) {
           this.fetchHistoryData(false);
+        } else {
+          this.renderHistoryCatalogDrawer();
         }
 
         await this.renderActiveDataset(forceRedraw);
@@ -12876,26 +13310,24 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         const srvIp = srv.ip || (latestMetrics && latestMetrics.system && latestMetrics.system.local_ip) || (latestMetrics && latestMetrics.net && latestMetrics.net.local_ip) || '127.0.0.1';
 
         const isHistoryMode = (connectionsMapMode === 'history');
-        let rawConns = [];
-        if (isHistoryMode) {
-          rawConns = (this._historyData && Array.isArray(this._historyData.connections)) ? this._historyData.connections : [];
-          if (connectionsMapServiceSel) {
-            rawConns = rawConns.filter(c => c.service === connectionsMapServiceSel);
-          }
-          if (connectionsMapHistorySearch) {
-            const q = connectionsMapHistorySearch.toLowerCase();
-            rawConns = rawConns.filter(c =>
-              String(c.service || '').toLowerCase().includes(q) ||
-              String(c.domain || '').toLowerCase().includes(q) ||
-              String(c.remote_ip || '').toLowerCase().includes(q) ||
-              String(c.city || '').toLowerCase().includes(q) ||
-              String(c.country || '').toLowerCase().includes(q) ||
-              String(c.isp || '').toLowerCase().includes(q) ||
-              String(c.local_hostname || '').toLowerCase().includes(q)
-            );
-          }
-        } else {
-          rawConns = Array.isArray(connMap.connections) ? connMap.connections : [];
+        let rawConns = isHistoryMode
+          ? ((this._historyData && Array.isArray(this._historyData.connections)) ? this._historyData.connections : [])
+          : (Array.isArray(connMap.connections) ? connMap.connections : []);
+
+        if (connectionsMapServiceSel) {
+          rawConns = rawConns.filter(c => c.service === connectionsMapServiceSel);
+        }
+        if (connectionsMapHistorySearch) {
+          const q = connectionsMapHistorySearch.toLowerCase();
+          rawConns = rawConns.filter(c =>
+            String(c.service || '').toLowerCase().includes(q) ||
+            String(c.domain || '').toLowerCase().includes(q) ||
+            String(c.remote_ip || '').toLowerCase().includes(q) ||
+            String(c.city || '').toLowerCase().includes(q) ||
+            String(c.country || '').toLowerCase().includes(q) ||
+            String(c.isp || '').toLowerCase().includes(q) ||
+            String(c.local_hostname || '').toLowerCase().includes(q)
+          );
         }
 
         const totalCount = rawConns.length;
