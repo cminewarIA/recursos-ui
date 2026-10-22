@@ -1,78 +1,39 @@
-# Integración de Identidad Visual Oficial (Logo Dragón Rojo): Icono App .deb y Favicon Web
+# Plan de Implementación - v8.3.1: Instalación Local de Recursos Cockpit y Publicación Pública de Releases en GitHub
 
-## Análisis de las Imágenes Proporcionadas
+## 1. Contexto y Objetivos
 
-El usuario ha facilitado dos versiones del logotipo oficial con temática de Dragón Rojo y Emblema Central:
-
-1. **Versión PNG (`media_1792708422206.png`, 523×500 RGBA)**:
-   - Dragón carmesí con textura detallada envuelto sobre un símbolo/emblema central en **color negro**.
-   - Fondo con canal alfa transparente y partículas/salpicaduras anaranjadas.
-   - *Comportamiento*: Al tener el símbolo central negro, sobre pestañas de navegador en modo oscuro o docks oscuros de Linux (GNOME/Ubuntu) el centro pierde contraste si no tiene marco.
-
-2. **Versión JPG (`media_1792708422246.jpg`, 1024×978 RGB)**:
-   - Dragón carmesí de alta definición sobre el símbolo/emblema central en **blanco puro resplandeciente**.
-   - Fondo negro espacial profundo con destellos, chispas incandescentes y efecto de fuego ardiente.
-   - *Comportamiento*: Máximo contraste y legibilidad en entornos oscuros (coherente con el diseño *Space Black / Apple Liquid Glass / Tesla UI* del sistema).
+El usuario solicitó:
+1. **Instalar la aplicación nativa** en el servidor local.
+2. **Asegurar que la aplicación compilada (.deb) se publique de forma pública en GitHub** y no quede retenida de forma privada o como artefacto interno temporal.
 
 ---
 
-## Opciones de Diseño para el Usuario
+## 2. Acciones Propuestas e Implementadas
 
-### Opción 1: Insignia Squircle GNOME / Apple (Recomendada para la App .deb)
-- Se utiliza la versión de alta resolución con fondo negro y símbolo blanco, recortada con una máscara de **superelipse / squircle** (`rx=220` a 1024px) y un delicado bisel perimetral de fuego/titanio.
-- **Resultado**: Estilo premium estándar de GNOME/macOS, perfecto para el lanzador de aplicaciones de Linux, menú inicio y dock de Ubuntu.
+### A. Instalación de la Aplicación en el Servidor
+- **Compilación previa**: Ejecución de `packaging/build_deb.sh` generando `dist/recursos-cockpit_8.3.1_amd64.deb`.
+- **Instalación con APT**: `sudo apt-get install -y ./dist/recursos-cockpit_8.3.1_amd64.deb`.
+- **Validación del binario**: `/usr/bin/recursos-cockpit --test-mode`.
 
-### Opción 2: Favicon de Alto Contraste para la Pestaña del Navegador
-- A escala diminuta (16×16 y 32×32), los detalles sutiles se pierden. Se genera un icono multirresolución (`.ico` y `.png`) enfocado en el núcleo del dragón y el emblema blanco para que sea **100% nítido y reconocible** en la pestaña de cualquier navegador (Chrome, Firefox, Safari, Edge).
+### B. Publicación Pública en GitHub Releases
+- **Diagnóstico**: `.github/workflows/build-deb.yml` contenía `if: startsWith(github.ref, 'refs/tags/v')`, omitiendo la creación de releases en commits directos a `main`.
+- **Modificación**:
+  - Eliminar la restricción condicional en el paso `softprops/action-gh-release@v3`.
+  - Configurar `tag_name: v${{ steps.pkg_info.outputs.version }}`.
+  - Configurar `name: Recursos Cockpit v${{ steps.pkg_info.outputs.version }}`.
+  - Declarar `draft: false` y `prerelease: false`.
+  - Adjuntar `dist/*.deb` y `dist/SHA256SUMS.txt`.
+
+### C. Control de Versiones Semánticas (Regla 5)
+- Versión incrementada a `8.3.1` (`PATCH`: corrección de automatización de compilación/despliegue e instalación de paquete).
+- Sincronización en `VERSION`, `package.json`, `packaging/debian/control`, `README.md` y planes.
 
 ---
 
-## Decisiones y Puntos Clave
+## 3. Plan de Verificación
 
-> [!IMPORTANT]
-> **Elección de Estilo para el Icono de la App .deb**:
-> - **Variante A (Insignia Squircle con Fondo Negro y Chispas)**: Proporciona la apariencia más pulida e integrada en escritorios Linux modernos (estilo Adwaita/macOS).
-> - **Variante B (Silueta Recortada con Fondo Transparente)**: El dragón con su halo transparente sin contenedor squircle.
->
-> **Favicon del Navegador**: Se recomienda la versión con el símbolo central blanco y halo oscuro/resplandeciente para garantizar contraste perfecto tanto en pestañas de tema oscuro como claro.
-
----
-
-## Plan de Cambios Propuestos
-
-### 1. Activos Gráficos del Proyecto (`desktop_app/assets/` y `static/`)
-- `desktop_app/assets/recursos-cockpit.png`: Icono en alta resolución (512×512 y 1024×1024) para la app de escritorio Linux.
-- `desktop_app/assets/recursos-cockpit-logo.png`: Logotipo oficial en su resolución original para la cabecera y el diálogo "Acerca de".
-- `static/favicon.ico`: Archivo ICO estándar con capas multirresolución (16×16, 32×32, 48×48) para compatibilidad total con todos los navegadores web.
-- `static/favicon.png`: Favicon moderno PNG de alta resolución (32×32, 192×192) y `apple-touch-icon.png` (180×180).
-
-### 2. Empaquetado Debian (`packaging/build_deb.sh`)
-- Instalar los iconos en las rutas del estándar XDG de FreeDesktop:
-  - `/usr/share/icons/hicolor/512x512/apps/recursos-cockpit.png`
-  - `/usr/share/icons/hicolor/256x256/apps/recursos-cockpit.png`
-  - `/usr/share/icons/hicolor/128x128/apps/recursos-cockpit.png`
-  - `/usr/share/icons/hicolor/64x64/apps/recursos-cockpit.png`
-  - `/usr/share/icons/hicolor/48x48/apps/recursos-cockpit.png`
-  - `/usr/share/pixmaps/recursos-cockpit.png`
-  - `/usr/lib/recursos-cockpit/assets/`
-- Actualizar el lanzador `.desktop` para referenciar el nuevo icono.
-
-### 3. Aplicación Nativa GTK 3 (`desktop_app/recursos_app.py`)
-- Asignar el icono a la ventana principal de GTK con `set_icon_from_file(...)`.
-- Enriquecer el diálogo nativo `Gtk.AboutDialog` con el logotipo oficial de alta fidelidad.
-
-### 4. Servidor Web Backend (`server.py`)
-- Servir de forma explícita `/favicon.ico`, `/favicon.png` y `/apple-touch-icon.png` desde `STATIC_DIR` con tipos MIME exactos (`image/x-icon`, `image/png`), cabeceras de caché eficiente (`Cache-Control: public, max-age=86400`) y cabeceras de seguridad.
-
-### 5. Frontend Web (`static/index.html` e `index.html`)
-- Añadir en `<head>`:
-  ```html
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  ```
-- Replicar cambios de forma idéntica en `index.html`.
-
-### 6. Control de Versión y Documentación
-- `VERSION` -> `8.3.0` (adición de identidad visual, nuevo subsistema de favicons e iconografía nativa del sistema).
-- `README.md`: Actualizar badges y tabla de versiones con la entrega `v8.3.0`.
+- [x] Ejecutar `dpkg -l | grep recursos-cockpit` y comprobar versión 8.3.1 instalada.
+- [x] Ejecutar `recursos-cockpit --test-mode` y validar detección de GTK3, Scrcpy, ADB y entorno nativo.
+- [x] Ejecutar `git status` y verificar archivos limpios.
+- [ ] Hacer `git push origin main` con tag `v8.3.1`.
+- [ ] Validar la creación y disponibilidad de la Release pública en `https://github.com/cminewarIA/recursos-ui/releases`.
