@@ -42,7 +42,7 @@ sed -i "s/^Version:.*/Version: $VERSION/" "$PKG_DIR/DEBIAN/control"
 # 2. Copiar archivos de la aplicación y punto único de verdad de versión
 cp "$PROJECT_ROOT/desktop_app/recursos_app.py" "$PKG_DIR/usr/lib/$PKG_NAME/recursos_app.py"
 cp "$PROJECT_ROOT/desktop_app/dex_controller.py" "$PKG_DIR/usr/lib/$PKG_NAME/dex_controller.py"
-cp "$PROJECT_ROOT/desktop_app/assets/recursos-cockpit.svg" "$PKG_DIR/usr/lib/$PKG_NAME/assets/recursos-cockpit.svg"
+cp "$PROJECT_ROOT/desktop_app/assets/"* "$PKG_DIR/usr/lib/$PKG_NAME/assets/"
 cp "$PROJECT_ROOT/VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/VERSION"
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/*.py
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/VERSION
@@ -60,9 +60,23 @@ exec python3 "$APP_DIR/recursos_app.py" "$@"
 EOF
 chmod 755 "$PKG_DIR/usr/bin/recursos-cockpit"
 
-# 4. Copiar entrada de escritorio (.desktop) e iconos
+# 4. Copiar entrada de escritorio (.desktop) e iconos oficiales multirresolución
 cp "$PROJECT_ROOT/desktop_app/recursos-cockpit.desktop" "$PKG_DIR/usr/share/applications/recursos-cockpit.desktop"
 chmod 644 "$PKG_DIR/usr/share/applications/recursos-cockpit.desktop"
+
+mkdir -p "$PKG_DIR/usr/share/pixmaps"
+cp "$PROJECT_ROOT/desktop_app/assets/recursos-cockpit.png" "$PKG_DIR/usr/share/pixmaps/recursos-cockpit.png"
+chmod 644 "$PKG_DIR/usr/share/pixmaps/recursos-cockpit.png"
+
+for S in 16 32 48 64 128 256 512; do
+    mkdir -p "$PKG_DIR/usr/share/icons/hicolor/${S}x${S}/apps"
+    if [ -f "$PROJECT_ROOT/desktop_app/assets/recursos-cockpit-${S}.png" ]; then
+        cp "$PROJECT_ROOT/desktop_app/assets/recursos-cockpit-${S}.png" "$PKG_DIR/usr/share/icons/hicolor/${S}x${S}/apps/recursos-cockpit.png"
+    else
+        cp "$PROJECT_ROOT/desktop_app/assets/recursos-cockpit.png" "$PKG_DIR/usr/share/icons/hicolor/${S}x${S}/apps/recursos-cockpit.png"
+    fi
+    chmod 644 "$PKG_DIR/usr/share/icons/hicolor/${S}x${S}/apps/recursos-cockpit.png"
+done
 
 cp "$PROJECT_ROOT/desktop_app/assets/recursos-cockpit.svg" "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/recursos-cockpit.svg"
 chmod 644 "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/recursos-cockpit.svg"

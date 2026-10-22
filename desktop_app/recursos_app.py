@@ -25,7 +25,8 @@ try:
 
     gi.require_version("Gtk", "3.0")
     gi.require_version("Gdk", "3.0")
-    from gi.repository import Gdk, GLib, Gtk, Pango
+    gi.require_version("GdkPixbuf", "2.0")
+    from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango
 
     HAS_GTK = True
 except ImportError:
@@ -281,6 +282,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         self.auto_launched_serials = set()
 
         self._apply_css()
+        self._set_app_icon()
         self.dex = DexController(on_status_change=self._on_dex_status_callback)
 
         # Variables de red para cálculo de caudal
@@ -302,6 +304,23 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         if not self.env_info.get("render_usb_projection_wait_screen", True):
             self._refresh_telemetry()
             GLib.timeout_add(1500, self._refresh_telemetry)
+
+    def _set_app_icon(self):
+        """Asigna el icono oficial del Dragón Rojo a la ventana GTK."""
+        icon_candidates = [
+            os.path.join(SCRIPT_DIR, "assets", "recursos-cockpit.png"),
+            os.path.join(SCRIPT_DIR, "assets", "recursos-cockpit.svg"),
+            "/usr/lib/recursos-cockpit/assets/recursos-cockpit.png",
+            "/usr/share/icons/hicolor/512x512/apps/recursos-cockpit.png",
+            "/usr/share/pixmaps/recursos-cockpit.png",
+        ]
+        for c in icon_candidates:
+            if os.path.isfile(c):
+                try:
+                    self.set_icon_from_file(c)
+                    break
+                except Exception:
+                    pass
 
     def _apply_css(self):
         provider = Gtk.CssProvider()
@@ -345,7 +364,40 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         btn_fs.connect("clicked", lambda *_: self._toggle_fullscreen())
         hb.pack_end(btn_fs)
 
+        # Botón Acerca de con Logo Oficial Dragón
+        btn_about = Gtk.Button.new_from_icon_name("help-about-symbolic", Gtk.IconSize.BUTTON)
+        btn_about.set_tooltip_text(f"Acerca de Recursos Cockpit (v{get_app_version()})")
+        btn_about.connect("clicked", self._show_about_dialog)
+        hb.pack_end(btn_about)
+
         self.set_titlebar(hb)
+
+    def _show_about_dialog(self, widget):
+        """Muestra el diálogo nativo Acerca de con el logo del Dragón Rojo."""
+        about = Gtk.AboutDialog(transient_for=self, modal=True)
+        about.set_program_name("Recursos Cockpit")
+        about.set_version(f"v{get_app_version()}")
+        about.set_comments("Monitor de Silicio Nativo 60 FPS & Estación de Proyección USB por Hardware (Scrcpy + UHID)")
+        about.set_website("https://github.com/cminewarIA/recursos-ui")
+        about.set_website_label("GitHub cminewarIA/recursos-ui")
+        about.set_authors(["cminewarIA"])
+        about.set_license_type(Gtk.License.MIT_X11)
+
+        logo_candidates = [
+            os.path.join(SCRIPT_DIR, "assets", "recursos-cockpit.png"),
+            os.path.join(SCRIPT_DIR, "assets", "recursos-cockpit-logo.png"),
+            "/usr/lib/recursos-cockpit/assets/recursos-cockpit.png",
+        ]
+        for l_path in logo_candidates:
+            if os.path.isfile(l_path):
+                try:
+                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(l_path, 128, 128, True)
+                    about.set_logo(pb)
+                    break
+                except Exception:
+                    pass
+        about.run()
+        about.destroy()
 
     def _build_main_layout(self):
         # Si se detecta entorno nativo o móvil, ocultamos cualquier pestaña 'Dispositivo'

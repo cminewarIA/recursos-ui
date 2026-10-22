@@ -6675,6 +6675,46 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b"Not Found")
             return
 
+        # 4a. ARCHIVOS ESTÁTICOS DE IDENTIDAD VISUAL & FAVICONS
+        elif clean_path in [
+            "/favicon.ico",
+            "/favicon.png",
+            "/favicon-16x16.png",
+            "/favicon-32x32.png",
+            "/favicon-192x192.png",
+            "/favicon-512x512.png",
+            "/apple-touch-icon.png",
+            "/recursos-cockpit.png",
+            "/assets/recursos-cockpit.png"
+        ]:
+            fname = os.path.basename(clean_path)
+            target_file = os.path.join(STATIC_DIR, fname)
+            if not os.path.isfile(target_file):
+                target_file = os.path.join(BASE_DIR, "desktop_app", "assets", fname)
+
+            if os.path.isfile(target_file):
+                try:
+                    fsize = os.path.getsize(target_file)
+                    mime_type = "image/x-icon" if fname.endswith(".ico") else "image/png"
+                    self.send_response(200)
+                    self.send_header('Content-Type', mime_type)
+                    self.send_header('Cache-Control', 'public, max-age=86400')
+                    self.send_security_headers()
+                    self.send_header('Content-Length', str(fsize))
+                    self.end_headers()
+                    with open(target_file, 'rb') as f:
+                        while chunk := f.read(65536):
+                            self.wfile.write(chunk)
+                    return
+                except Exception as e:
+                    print(f"[FAVICON SERVE ERROR] {e}")
+
+            self.send_response(404)
+            self.send_security_headers()
+            self.end_headers()
+            self.wfile.write(b"Icon Not Found")
+            return
+
         # 4b. DESCARGA DIRECTA DE LA APP NATIVA PARA LINUX (.deb)
         elif clean_path in ["/download/recursos-cockpit.deb", "/download/app.deb", "/api/download/app_deb"] or (
             clean_path.startswith("/download/recursos-cockpit") and clean_path.endswith(".deb")
