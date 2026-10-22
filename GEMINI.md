@@ -54,4 +54,28 @@
   3. **Verificación de la Instalación**: Se debe comprobar que `/usr/bin/recursos-cockpit` esté instalado y operativo ejecutando `/usr/bin/recursos-cockpit --test-mode`, asegurando que `dpkg -l | grep recursos-cockpit` refleje exactamente la misma versión canónica activa de `./VERSION`.
 - **Objetivo**: Garantizar que el servidor local mantenga instalada y sincronizada de forma permanente la versión más reciente de la aplicación nativa de escritorio GTK3, sin desfases entre la versión web, los endpoints y el ejecutable del sistema.
 
+## 9. Arquitectura Contractual de Aplicaciones Nativas (Linux & Android)
+- **Regla obligatoria**: El diseño, desarrollo y evolución de cualquier aplicación cliente nativa del ecosistema (tanto para Linux/Ubuntu/Debian como para Android) debe ajustarse de forma estricta y permanente a los siguientes principios fundamentales:
+  1. **Interfaces 100% Nativas Puras (Cero WebApps / Cero Navegadores)**:
+     - Queda estrictamente prohibido utilizar WebViews embebidas (`WebKit`, `Chromium`, `Gecko`), frameworks híbridos basados en navegadores (`Electron`, `Tauri` web-view, `Cordova`, `Capacitor`) o convertir las aplicaciones nativas en clientes web camuflados.
+     - En Linux, la interfaz debe construirse exclusivamente con widgets y componentes nativos de GTK 3 / GTK 4 y renderizado gráfico vectorial por aceleración de hardware con Cairo.
+     - En Android, la interfaz debe desarrollarse en arquitectura nativa pura (Kotlin con Jetpack Compose o SDK nativo de Android).
+     - Las pantallas, tarjetas, listas, tablas y gráficos son componentes nativos del sistema que únicamente solicitan datos estructurados (JSON/binario) al backend y los presentan en sus propios campos visuales.
+  2. **Autodescubrimiento y Enlace en Red Local (Wi-Fi / LAN)**:
+     - Al conectarse a la red Wi-Fi o red de área local, las aplicaciones nativas deben implementar autodescubrimiento dinámico (mDNS/Zeroconf `_recursos._tcp`, SSDP o escaneo de subred local) para localizar de manera automática el servidor web del dashboard sin que el usuario tenga que introducir IPs manuales.
+     - Una vez descubierto el servidor, la aplicación inicia un protocolo de enlace (pairing handshake) para vincular el dispositivo con el nodo.
+  3. **Certificación y Criptografía de Dispositivo**:
+     - Las aplicaciones nativas deben certificarse utilizando el sistema de certificados/tokens criptográficos seguros del servidor web.
+     - Durante el enlace, el servidor emite una certificación/token criptográfico firmado que la app almacena de forma segura en el gestor de credenciales del sistema (Secret Service / Keyring en Linux, Android KeyStore / EncryptedSharedPreferences en Android).
+     - Toda la comunicación con el servidor viaja 100% cifrada bajo TLS/HTTPS con verificación mutua de identidad.
+  4. **Acceso Dual Transparente y Conexión Automática (LAN / Exterior WAN)**:
+     - **Conexión Inmediata al Abrir**: Al abrir la aplicación nativa, esta debe conectarse de forma automática e instantánea al nodo servidor enlazado, sin solicitar credenciales repetitivas al usuario.
+     - **Conmutación Inteligente LAN ↔ WAN**:
+       - *En Red Local (Wi-Fi/LAN)*: La app se comunica directamente con la IP y puerto local del nodo a latencia mínima.
+       - *Desde el Exterior (Red Móvil / Internet / WAN)*: Al detectar que no se encuentra en la red local, la app conmuta automáticamente su enlace hacia el nodo público / DDNS (`cminewar.duckdns.org` o dominio configurado) empleando la certificación criptográfica otorgada en el emparejamiento.
+  5. **Consumo Seguro de la Base de Datos y APIs Backend**:
+     - Las apps nativas interactúan con el backend mediante endpoints REST y sockets seguros autenticados, transmitiendo exclusivamente la telemetría, métricas y controles solicitados de manera cifrada, garantizando cero exposición de secretos o credenciales en texto plano.
+- **Objetivo**: Asegurar un ecosistema de aplicaciones nativas de máximo rendimiento, ultra fluidas a 60 FPS, con conectividad ubicua y seguridad de nivel empresarial, sin depender de navegadores web embebidos.
+
+
 
