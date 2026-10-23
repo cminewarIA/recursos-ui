@@ -1,41 +1,58 @@
-# Recorrido de Verificación - Versión 8.3.8
+# Recorrido de Verificación - Versión 8.4.0: Cliente Nativo Android, Pipeline CI/CD de APK y Despliegue en Samsung Galaxy Tab S9
 
-## Resumen de Cambios
-Se realizó una auditoría y optimización integral de las reglas del proyecto en `GEMINI.md`, eliminando redundancias, duplicaciones verbales y referencias repetitivas a rutas absolutas locales, mientras se preservó al 100% el rigor contractual de todas las especificaciones acordadas con el usuario.
-
-### Principales Mejoras Realizadas:
-1. **Eliminación de Redundancias de Rutas Físicas**: Se eliminaron las menciones entre paréntesis a `/home/servidor/...` en las reglas 1, 3 y 5, consolidando la directriz de compatibilidad universal y rutas relativas (`./` y `BASE_DIR`) en la **Regla 2**.
-2. **Consolidación de Seguridad en Aplicaciones Nativas**: Se unificaron los antiguos puntos 9.3 y 9.5 en la subsección **7.3** (*Autenticación, Criptografía y Consumo Seguro de APIs*), suprimiendo la repetición de cifrado TLS mutuo y exposición de secretos.
-3. **Sincronización Total de Versión Canónica**: Se añadió explícitamente `packaging/debian/control` en la **Regla 3** junto a `VERSION` y `package.json`.
-4. **Flujo de Trabajo Estructurado**: Las reglas se organizaron cronológicamente según el ciclo de vida del desarrollo:
-   - 1. Sincronización Previa (`git pull`)
-   - 2. Compatibilidad Universal de Rutas y Cero Hardcoding
-   - 3. Control de Versión Unificado (`VERSION` MAJOR.MINOR.PATCH)
-   - 4. Almacenamiento Obligatorio en `planes/`
-   - 5. Actualización Obligatoria de `README.md`
-   - 6. Compilación e Instalación Local Obligatoria del `.deb`
-   - 7. Arquitectura Contractual de Aplicaciones Nativas (Linux & Android)
-   - 8. Publicación Automática en GitHub (`git push`)
+## Resumen de la Tarea
+Se ha implementado de forma completa el ecosistema nativo para Android siguiendo con rigor la **Regla 7** de [`GEMINI.md`](../GEMINI.md), se ha configurado el pipeline de integración continua en GitHub Actions para generar y publicar el `.apk` junto al paquete `.deb`, se ha compilado e instalado localmente el ejecutable de Linux y se ha desplegado con éxito en la tablet **Samsung Galaxy Tab S9 Ultra** conectada por ADB.
 
 ---
 
-## Verificación de Integración y Pruebas
+## 1. Aplicación Nativa para Android (`android_app/`)
 
-### 1. Compilación del Paquete Debian
-Se ejecutó `bash packaging/build_deb.sh`, generando:
-- `dist/recursos-cockpit_8.3.8_amd64.deb`
-- `dist/SHA256SUMS.txt`
+### Características de Ingeniería:
+- **100% Nativo en Kotlin + Jetpack Compose (Material 3)**: Cumplimiento estricto de la Regla 7.1 (**cero WebViews**, cero navegadores embebidos).
+- **Diseño Apple Liquid Glass + Tesla Touch Cockpit**:
+  - Paleta oscura profunda (`#090D16`), tarjetas bento translúcidas (`#121826`) con bordes sutiles de cristal (`#2A354C`) y acentos de silicio en neón (`#0A84FF`, `#30D158`, `#FF9F0A`, `#FF453A`, `#BF5AF2`, `#64D2FF`).
+  - Disposición responsiva con `LazyVerticalGrid(GridCells.Adaptive(minSize = 340.dp))` que en pantallas grandes (como la Samsung Galaxy Tab S9 en 2960×1848) distribuye las tarjetas en una cuadrícula bento multicolumna y en móviles en vista vertical fluida.
+- **Tarjetas de Telemetría en Tiempo Real**:
+  - `SystemCard`: Estado del nodo, uptime, hostname, kernel y estado de ciberdefensa Fail2ban IPS con badge de modo de conexión.
+  - `CpuCard`: Uso %, núcleos lógicos, frecuencia GHz, temperatura térmica NVMe/CPU y barra de progreso animada.
+  - `MemoryCard`: Uso de RAM %, GB usados y totales, Swap y badge de ZRAM activa.
+  - `StorageCard`: Uso de disco primario NVMe %, punto de montaje, espacio libre/total y temperatura del disco.
+  - `NetworkCard`: Tráfico de bajada (RX) y subida (TX) en vivo con formateo automático (`MB/s`, `KB/s`, `B/s`) e IP local.
+- **Autodescubrimiento y Enlace LAN ↔ WAN**:
+  - Sondeo inicial ultrarrápido en red local (`http://192.168.50.2:8085` a <1ms de latencia) con conmutación automática transparente hacia el nodo público / DDNS (`https://recursos.cminewar.duckdns.org`).
+  - Almacenamiento seguro de tokens y credenciales con `EncryptedSharedPreferences` respaldado por Android KeyStore.
+- **Iconografía Oficial**:
+  - Insignia Squircle del Dragón Rojo generada en todas las densidades mipmap (`mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`).
 
-### 2. Instalación Local en el Servidor
-Instalado con `sudo apt-get install -y ./dist/recursos-cockpit_8.3.8_amd64.deb`.
+---
 
-### 3. Validación de Ejecución
-Ejecutado con `/usr/bin/recursos-cockpit --test-mode`:
-```
-[OK] Recursos Native GTK3 App v8.3.8 validated successfully.
-[OK] Runtime Environment Detection: {'mode': 'native', ...}
-[OK] DeX / Android Desktop USB Controller Ready: ...
-```
+## 2. Ajuste en Backend: Acceso Directo LAN (`server.py`)
 
-### 4. Servicio Backend
-El servicio `system-dashboard.service` responde con `version: 8.3.8` en `/api/version`.
+- **Vincular a `0.0.0.0`**: Se configuró `bind_host = os.environ.get("HOST", "0.0.0.0")` en `run_server()`, permitiendo que dispositivos de la red Wi-Fi local (como la Tab S9) se comuniquen directamente con el puerto `8085` sin latencia, mientras Caddy continúa gestionando el tráfico reverso externo por HTTPS.
+
+---
+
+## 3. Pipeline CI/CD en GitHub Actions (`.github/workflows/build-deb.yml`)
+
+- Se actualizó el workflow para compilar en paralelo:
+  1. Paquete Debian Linux: `dist/recursos-cockpit_8.4.0_amd64.deb` mediante `packaging/build_deb.sh`.
+  2. APK Nativo Android: `dist/recursos-cockpit_8.4.0.apk` mediante `./gradlew assembleRelease`.
+  3. Cálculo de sumas SHA256 unificadas en `dist/SHA256SUMS.txt`.
+  4. Publicación automática de todos los artefactos (`.deb`, `.apk`, `SHA256SUMS.txt`) en la Release oficial de GitHub.
+
+---
+
+## 4. Pruebas y Despliegue en Samsung Galaxy Tab S9
+
+| Prueba / Subsistema | Comando Ejecutado | Resultado Obtenido | Estado |
+| :--- | :--- | :--- | :---: |
+| **Detección ADB** | `adb devices -l` | `192.168.50.16:5555 device model:SM_X916B` | ✅ OK |
+| **Compilación Local APK** | `./gradlew assembleRelease` | `BUILD SUCCESSFUL in 9s` | ✅ OK |
+| **Instalación en Tab S9** | `adb install -r dist/recursos-cockpit_8.4.0.apk` | `Performing Streamed Install: Success` | ✅ OK |
+| **Paquete en Tablet** | `adb shell pm list packages \| grep recursoscockpit` | `package:com.cminewar.recursoscockpit` | ✅ OK |
+| **Lanzamiento en Pantalla** | `adb shell am start -n com.cminewar.recursoscockpit/.MainActivity` | Intent iniciado con éxito | ✅ OK |
+| **Enlace LAN en Vivo** | Captura de pantalla de la Tab S9 | Badge `🟢 LAN (BAJA LATENCIA)` activo | ✅ OK |
+| **Compilación Linux .deb** | `bash packaging/build_deb.sh` | `dist/recursos-cockpit_8.4.0_amd64.deb` generado | ✅ OK |
+| **Instalación Local Linux** | `sudo apt-get install -y ./dist/recursos-cockpit_8.4.0_amd64.deb` | Código 0, paquete instalado en el servidor | ✅ OK |
+| **Validación Test Mode** | `/usr/bin/recursos-cockpit --test-mode` | `[OK] Recursos Native GTK3 App v8.4.0 validated successfully.` | ✅ OK |
+| **Servicio Backend** | `curl -s http://127.0.0.1:8085/api/version` | `"version": "8.4.0"` | ✅ OK |

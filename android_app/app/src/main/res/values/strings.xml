@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Recursos Cockpit</string>
+    <string name="status_connected_lan">🟢 Conectado (LAN)</string>
+    <string name="status_connected_wan">🌐 Conectado (WAN)</string>
+    <string name="status_connecting">🔍 Conectando...</string>
+    <string name="status_error">🔴 Error de Conexión</string>
+</resources>

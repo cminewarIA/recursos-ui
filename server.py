@@ -7852,9 +7852,10 @@ def run_server(port=8085):
     threading.Thread(target=telegram_bot_polling_worker, daemon=True, name="TelegramBotPolling").start()
     threading.Thread(target=telegram_bot_monitor_worker, daemon=True, name="TelegramBotMonitor").start()
     
-    server_address = ('127.0.0.1', port)
+    bind_host = os.environ.get("HOST", "0.0.0.0")
+    server_address = (bind_host, port)
     httpd = ThreadingHTTPServer(server_address, DashboardHTTPHandler)
-    print(f"[+] Monitor de Sistema iniciado en http://127.0.0.1:{port} con Zero-Trust Pairing, Monitor Wi-Fi y Bot de Telegram Integrado")
+    print(f"[+] Monitor de Sistema iniciado en http://{bind_host}:{port} con Zero-Trust Pairing, Monitor Wi-Fi y Bot de Telegram Integrado")
     httpd.serve_forever()
 
 if __name__ == '__main__':

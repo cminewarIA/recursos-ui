@@ -1,4 +1,4 @@
-name: Compilación Automática de Paquete Linux (.deb)
+name: Compilación Automática de Paquetes (.deb Linux & .apk Android)
 
 on:
   push:
@@ -12,37 +12,59 @@ permissions:
   contents: write
 
 jobs:
-  build-deb:
-    name: 📦 Compilar recursos-cockpit.deb
+  build-packages:
+    name: 📦 Compilar Recursos Cockpit (.deb & .apk)
     runs-on: ubuntu-24.04
 
     steps:
       - name: 📥 Clonar Repositorio
         uses: actions/checkout@v7
 
-      - name: 🛠️ Instalar Dependencias de Compilación
+      - name: 🛠️ Instalar Dependencias Linux (.deb)
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg-dev binutils
 
-      - name: 🚀 Compilar y Empaquetar .deb
+      - name: ☕ Configurar Java JDK 17 para Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🚀 Compilar y Empaquetar Linux (.deb)
         run: |
           chmod +x packaging/build_deb.sh
           bash packaging/build_deb.sh
 
-      - name: 📋 Extraer Información del Paquete
+      - name: 🤖 Compilar APK Nativo de Android
+        run: |
+          cd android_app
+          chmod +x gradlew
+          ./gradlew assembleRelease
+          cd ..
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          cp android_app/app/build/outputs/apk/release/app-release.apk dist/recursos-cockpit_${VERSION}.apk
+          cp android_app/app/build/outputs/apk/release/app-release.apk dist/recursos-cockpit.apk
+
+      - name: 🔐 Calcular Sumas SHA256 de Todos los Paquetes
+        run: |
+          cd dist
+          sha256sum *.deb *.apk > SHA256SUMS.txt
+          cd ..
+
+      - name: 📋 Extraer Información de Versión
         id: pkg_info
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "deb_path=dist/recursos-cockpit_${VERSION}_amd64.deb" >> $GITHUB_OUTPUT
 
       - name: 📤 Subir Artefactos de Compilación
         uses: actions/upload-artifact@v7
         with:
-          name: recursos-cockpit-${{ steps.pkg_info.outputs.version }}-deb
+          name: recursos-cockpit-${{ steps.pkg_info.outputs.version }}-binaries
           path: |
             dist/*.deb
+            dist/*.apk
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -54,6 +76,7 @@ jobs:
           name: Recursos Cockpit v${{ steps.pkg_info.outputs.version }}
           files: |
             dist/*.deb
+            dist/*.apk
             dist/SHA256SUMS.txt
           generate_release_notes: true
           draft: false

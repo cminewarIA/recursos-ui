@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="cockpit_bg">#090D16</color>
+    <color name="cockpit_surface">#121826</color>
+    <color name="cockpit_surface_variant">#1A2234</color>
+    <color name="cockpit_border">#2A354C</color>
+    <color name="accent_blue">#0A84FF</color>
+    <color name="accent_green">#30D158</color>
+    <color name="accent_orange">#FF9F0A</color>
+    <color name="accent_red">#FF453A</color>
+    <color name="accent_purple">#BF5AF2</color>
+    <color name="accent_cyan">#64D2FF</color>
+    <color name="text_primary">#F5F5F7</color>
+    <color name="text_secondary">#8E9BAE</color>
+</resources>
