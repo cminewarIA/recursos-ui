@@ -1,62 +1,23 @@
-# Walkthrough de Verificación v9.1.2 · Auditoría Línea a Línea y Validación de Normas
+# Walkthrough & Verificación — v9.2.0: Gráfico de Barras Horizontal Animado D3.js en Vista de Procesos
 
-## Objetivo
-Verificar y documentar la auditoría integral línea a línea realizada sobre las aplicaciones nativas (Android y Ubuntu) y la plataforma web, asegurando el cumplimiento estricto de todas las reglas del proyecto (`GEMINI.md`).
+## 1. Resumen de Cambios Implementados
 
----
+1. **Visualización D3.js v7 en la Vista de Procesos (`index.html` & `static/index.html`)**:
+   - Se añadió la sección `#procCpuD3Section` en la parte superior de `#viewProcesses` (`/procesos`) manteniendo la simetría estructural y estética *Apple Liquid Glass + Tesla Touch Cockpit* (Regla 8).
+   - Se implementó el motor `window.ProcessCpuBarChart` basado en **D3.js v7** con:
+     - Escalas dinámicas `d3.scaleLinear()` (horizontal) y `d3.scaleBand()` (vertical, indexada por PID).
+     - Conmutador interactivo entre **Escala Dinámica** y **Escala 100%** (`setProcD3ScaleMode`).
+     - Tira superior de métricas en vivo con separadores limpios (`·`) y números tabulares (`Carga Top 10`, `Proceso Líder` y `RAM Privada Top 10`).
+     - Animaciones fluidas de 550 ms (`d3.easeCubicOut`) en el ancho de las barras, reordenamiento vertical por ranking y tweening numérico continuo (`d3.interpolateNumber`).
+     - Tooltip interactivo translúcido con cuota porcentual sobre el Top 10 y selección bidireccional de PID con la tabla inferior `#processesList`.
 
-## Pruebas de Verificación Ejecutadas
+2. **Telemetría Diferencial de CPU en Tiempo Real (`vite.config.ts`)**:
+   - Se actualizó `sampleRealProcesses()` para leer los ticks de CPU del kernel en `/proc/[pid]/stat` (`utime + stime`) y calcular el delta instantáneo entre muestras consecutivas, ofreciendo lecturas dinámicas reales sin ningún valor estático (Regla 2: Zero-Hardcoding).
 
-### 1. Auditoría de Código Android (`android_app/`)
-* **Ausencia de WebViews (Regla 7.1)**:
-  - Verificado: 0 ocurrencias de `android.webkit.WebView`, `WebKit` o navegadores embebidos.
-  - La interfaz de usuario está construida 100% en Jetpack Compose nativo con Material 3.
-* **Aislamiento de Samsung DeX (Regla 7.5)**:
-  - `CockpitDashboard.kt` contiene exactamente 8 pestañas operativas (`COCKPIT`, `CPU`, `RAM`, `DISKS`, `NET`, `SECURITY`, `DOCKER`, `PROCESSES`).
-  - Cero menús, diálogos o botones de Samsung DeX o proyección USB en Android.
-* **Zero-Hardcoding de Versión (Regla 2 y Regla 3)**:
-  - `ApiService.kt`: Purgadas las líneas 37 y 69 que contenían `"RecursosCockpit-Android/8.5.0"`. Ahora utilizan `BuildConfig.VERSION_NAME` inyectado dinámicamente desde Gradle.
-  - `Models.kt`: Purgado el valor predeterminado `"8.5.0"` en `VersionInfo`.
-  - `CockpitDashboard.kt`: Muestra `v${BuildConfig.VERSION_NAME}` en el HeaderBar.
-* **Autodescubrimiento Dinámico y Criptografía (Regla 7.2 y 7.3)**:
-  - `DiscoveryManager.kt`: Extrae la subred `/24` dinámicamente desde `NetworkInterface.getNetworkInterfaces()`.
-  - `SecurePreferences.kt`: Emplea `EncryptedSharedPreferences` y `MasterKey` con AES256-GCM / AES256-SIV.
+3. **Sincronización Canónica `v9.2.0` y Empaquetado Nativo (Reglas 3, 4, 5 y 6)**:
+   - Actualizados `./VERSION`, `package.json`, `packaging/debian/control`, `android_app/app/build.gradle.kts`, `index.html`, `static/index.html` y `README.md` a la versión `9.2.0`.
+   - Compilado el paquete Debian canónico `dist/recursos-cockpit_9.2.0_amd64.deb` y verificado con `python3 desktop_app/recursos_app.py --test-mode`.
 
-### 2. Auditoría de Código Ubuntu Linux (`desktop_app/`)
-* **Modo de Prueba CLI (`--test-mode`) (Regla 6.3)**:
-  - Ejecución: `python3 desktop_app/recursos_app.py --test-mode`
-  - Resultado:
-    ```
-    [OK] Recursos Native GTK3 App v9.1.2 validated successfully.
-    [OK] Runtime Environment Detection: {'mode': 'native', 'is_native': True, 'is_mobile': False, 'is_web': False, 'is_native_or_mobile': True, 'hide_device_tab': False, 'render_usb_projection_wait_screen': True}
-    [OK] DeX / Android Desktop USB Controller Ready: {'adb_installed': False, 'scrcpy_installed': False, ...}
-    [OK] Server Auto-Discovery & Zero-Trust Engine Ready: active='https://recursos.cminewar.duckdns.org', mode='REVOKED'
-    ```
-* **Interfaz 100% Nativa GTK 3 + Cairo (Regla 7.1)**:
-  - `CairoSparkline` dibuja gráficos vectoriales fluidos a 60 FPS mediante contextos Cairo nativos.
-* **Desbloqueo de Estación USB DeX (Regla 7.5)**:
-  - En la aplicación nativa de Ubuntu, la pestaña `📱 Conexión USB (DeX)` está desbloqueada y operativa mediante `DexController`, Scrcpy y UHID.
-
-### 3. Compilación e Instalación del Paquete Debian (.deb) (Regla 6)
-* **Compilación**:
-  - Comando ejecutado: `bash packaging/build_deb.sh`
-  - Paquete generado: `dist/recursos-cockpit_9.1.2_amd64.deb`
-  - Symlink canónico: `dist/recursos-cockpit.deb`
-  - Sumas criptográficas generadas: `dist/SHA256SUMS.txt`
-* **Inspección con dpkg**:
-  - `dpkg -l | grep recursos-cockpit`:
-    ```
-    iU  recursos-cockpit  9.1.2  amd64  Recursos Cockpit - Monitor de Silicio Nativo GTK3 y Conexion de Dispositivos
-    ```
-
-### 4. Plataforma Web y Servidor
-* **Endpoints HTTP probados**:
-  - `/api/net/history`: `HTTP/1.1 200 OK` con JSON estructurado (`services_catalog`, `devices_catalog`, `connections`, `summary`).
-  - `/download/recursos-cockpit.deb`: `HTTP/1.1 200 OK` con `Content-Disposition: attachment; filename="recursos-cockpit_9.1.2_amd64.deb"`.
-* **Blindaje en Frontend (`index.html` & `static/index.html`)**:
-  - `window.connectionsMapDrawerOpen = false;` y `window.connectionsMapServiceDrawerOpen = false;` inicializados y reactivos a la apertura del cajón del mapa.
-  - Botones OTA actualizados a `v9.1.2`.
-
-### 5. Compilación y Linter
-* `tsc --noEmit` (Linter): **0 errores**.
-* `compile_applet`: **Build succeeded exitosamente**.
+## 2. Verificación Técnica
+- **Validación App Nativa GTK3 (`--test-mode`)**: `[OK] Recursos Native GTK3 App v9.2.0 validated successfully.`
+- **Compilación y Linter TypeScript/Vite**: Verificados mediante `lint_applet` y `compile_applet`.

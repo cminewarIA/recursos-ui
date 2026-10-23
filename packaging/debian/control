@@ -1,5 +1,5 @@
 Package: recursos-cockpit
-Version: 9.1.2
+Version: 9.2.0
 Section: utils
 Priority: optional
 Architecture: amd64

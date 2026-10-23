@@ -3,7 +3,7 @@
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
 ### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v9.1.2-0A84FF?style=for-the-badge)](./VERSION)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v9.2.0-0A84FF?style=for-the-badge)](./VERSION)
 [![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white)](#-filosof%C3%ADa-de-dise%C3%B1o)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
 [![App Nativa Linux](https://img.shields.io/badge/App_Linux-Nativa_GTK3_.deb-AF52DE?style=for-the-badge&logo=debian&logoColor=white)](#-app-nativa-linux-deb--proyecci%C3%B3n-usb-dex--modo-escritorio-android)
@@ -23,7 +23,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v9.1.2 ║
+║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v9.2.0 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                              ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
@@ -48,12 +48,12 @@
 
 Descarga directamente los binarios compilados y firmados oficialmente para cada plataforma, sin intermediarios:
 
-### 🚀 Última Versión Canónica (`v9.1.2`)
+### 🚀 Última Versión Canónica (`v9.2.0`)
 
 | Paquete Oficial | Plataforma / Arquitectura | Enlace de Descarga Directa | Firma & Verificación |
 | :--- | :--- | :--- | :--- |
-| **🐧 Recursos Cockpit (`.deb`)** | Linux Ubuntu / Debian 64-bit (`amd64`) | [**`recursos-cockpit_9.1.2_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.2/recursos-cockpit_9.1.2_amd64.deb) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.2/SHA256SUMS.txt) |
-| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ (ARM64 / x86_64 / Tablets & Móviles) | [**`recursos-cockpit_9.1.2.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.2/recursos-cockpit_9.1.2.apk) | Firmado con Keystore Oficial Permanente |
+| **🐧 Recursos Cockpit (`.deb`)** | Linux Ubuntu / Debian 64-bit (`amd64`) | [**`recursos-cockpit_9.2.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/recursos-cockpit_9.2.0_amd64.deb) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/SHA256SUMS.txt) |
+| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ (ARM64 / x86_64 / Tablets & Móviles) | [**`recursos-cockpit_9.2.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/recursos-cockpit_9.2.0.apk) | Firmado con Keystore Oficial Permanente |
 | **⚡ Symlink Última Release (`latest`)** | Paquete Debian canónico | [**`recursos-cockpit.deb` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) | Canonical Release Asset |
 | **⚡ Symlink Última Release (`latest`)** | Paquete Android canónico | [**`recursos-cockpit.apk` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Canonical Release Asset |
 
@@ -66,7 +66,7 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 * **Actualización en un Clic**: Al compartir el mismo certificado criptográfico en todas las versiones, Android permite instalar nuevas versiones directamente sobre la existente **sin desinstalar primero**, preservando intactas las configuraciones, credenciales de emparejamiento y tokens guardados sin advertencias de conflicto de firma (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`).
 * **Instalación vía terminal o ADB**:
   ```bash
-  adb install -r dist/recursos-cockpit_9.1.2.apk
+  adb install -r dist/recursos-cockpit_9.2.0.apk
   ```
   O descarga el archivo directamente desde el navegador de tu tablet o móvil y pulsa **Actualizar**.
 
@@ -75,11 +75,11 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 * **Directivas de Reemplazo Limpio**: El metadato `DEBIAN/control` declara `Replaces: recursos-cockpit` y `Provides: recursos-cockpit`, garantizando que `dpkg` y `apt` gestionen la actualización sin conflictos de dependencia ni advertencias residuales.
 * **Comando recomendado de actualización limpia**:
   ```bash
-  sudo apt-get install --reinstall -y ./dist/recursos-cockpit_9.1.2_amd64.deb
+  sudo apt-get install --reinstall -y ./dist/recursos-cockpit_9.2.0_amd64.deb
   ```
   O con `dpkg`:
   ```bash
-  sudo dpkg -i --force-overwrite ./dist/recursos-cockpit_9.1.2_amd64.deb
+  sudo dpkg -i --force-overwrite ./dist/recursos-cockpit_9.2.0_amd64.deb
   ```
 
 ---
@@ -88,6 +88,7 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 
 | Versión | Paquete Linux (`.deb`) | Paquete Android (`.apk`) | Sumas Criptográficas |
 | :---: | :--- | :--- | :--- |
+| **`v9.2.0`** | [recursos-cockpit_9.2.0_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/recursos-cockpit_9.2.0_amd64.deb) | [recursos-cockpit_9.2.0.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/recursos-cockpit_9.2.0.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/SHA256SUMS.txt) |
 | **`v9.1.2`** | [recursos-cockpit_9.1.2_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.2/recursos-cockpit_9.1.2_amd64.deb) | [recursos-cockpit_9.1.2.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.2/recursos-cockpit_9.1.2.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.2/SHA256SUMS.txt) |
 | **`v9.1.1`** | [recursos-cockpit_9.1.1_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.1/recursos-cockpit_9.1.1_amd64.deb) | [recursos-cockpit_9.1.1.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.1/recursos-cockpit_9.1.1.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.1/SHA256SUMS.txt) |
 | **`v9.1.0`** | [recursos-cockpit_9.1.0_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.0/recursos-cockpit_9.1.0_amd64.deb) | [recursos-cockpit_9.1.0.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.0/recursos-cockpit_9.1.0.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.0/SHA256SUMS.txt) |
@@ -263,7 +264,7 @@ El frontend opera como una Single Page Application (SPA) desacoplada con animaci
 | `/grafica` | **GPU & Aceleración** | Carga de GPU, reloj de núcleo, temperatura y consumo de memoria VRAM. |
 | `/almacenamiento` | **Discos & Particiones** | Monitor de espacio en disco, particiones montadas y tasas de I/O en MB/s. |
 | `/red` | **Mapa Mundial & Tráfico** | Cartografía interactiva OpenStreetMap, flujos de Pi-hole y sockets del kernel. |
-| `/procesos` | **Gestor de Procesos** | Monitor de procesos activos por CPU/RAM con capacidad de filtrado y señales. |
+| `/procesos` | **Gestor de Procesos** | Gráfico de barras horizontal animado con D3.js (Top 10 CPU) y tabla interactiva de procesos del kernel. |
 | `/servicios` | **Servicios Systemd** | Catálogo interactivo de servicios del sistema, estados y reinicios. |
 | `/contenedores` | **Docker Runtime** | Monitor de contenedores Docker activos, memoria, CPU y tiempos de actividad. |
 | `/seguridad` | **Ciberdefensa IPS** | Centro de control Fail2ban, cárceles, IPs bloqueadas y gestión Zero-Trust. |
@@ -372,6 +373,7 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v9.2.0`** | `MINOR` | **Visualización D3.js v7 de Distribución de Uso de CPU de los 10 Procesos Principales (Gráfico de Barras Horizontal Animado en `/procesos`) y Telemetría Delta de CPU en `/proc/[pid]/stat`**: (1) **Motor Vectorial D3.js v7 (`window.ProcessCpuBarChart` en `index.html` y `static/index.html`)**: Implementación en `#viewProcesses` (`#procCpuD3Section`) de un gráfico de barras horizontal animado con D3.js v7 que muestra en tiempo real la distribución de uso de CPU de los 10 procesos más activos del sistema, utilizando unión de datos por clave única (`data(top10, d => String(d.pid))`), transiciones cúbicas fluidas (`d3.easeCubicOut`, 550 ms) para el reordenamiento vertical de filas (`scaleBand`) y anchura de barras (`scaleLinear`), interpolación numérica cuadro a cuadro (`d3.interpolateNumber`) en las etiquetas de porcentaje y gradientes cromáticos semánticos por nivel de carga (`<15%` cian, `15–45%` ámbar, `>45%` rosa coral); (2) **Conmutador de Escala e Interacción Bidireccional con la Tabla de Procesos**: Selector segmentado entre **Escala Dinámica** (ajustada al proceso líder para máxima resolución visual en cargas bajas/medias) y **Escala 100%**, tira superior de resumen con tipografía monoespaciada tabular (`Carga Top 10`, `Proceso Líder` y `RAM Privada Top 10`), tooltip flotante *Liquid Glass* con cuota relativa sobre el Top 10 y selección interactiva al hacer clic en cualquier barra para resaltar y desplazar suavemente hasta el PID correspondiente en `#processesList`; (3) **Muestreo Instantáneo de Ticks de CPU por Proceso en Dev Server (`vite.config.ts`)**: Lectura directa de `/proc/[pid]/stat` (`utime + stime`) con cálculo diferencial entre intervalos de muestreo en `sampleRealProcesses()`, proporcionando porcentajes decimales exactos en tiempo real 100% *Zero-Hardcoding*; (4) **Sincronización Canónica y Paquete Nativo (Reglas 3 y 6)**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control` y `android_app/app/build.gradle.kts` a `9.2.0`, y compilación verificada de `dist/recursos-cockpit_9.2.0_amd64.deb`. |
 | **`v9.1.2`** | `PATCH` | **Auditoría Integral Línea a Línea de Interfaces Nativas (Android & Ubuntu), Purga Estricta de Versiones Hardcodeadas y Blindaje de Variables Globales**: (1) **Auditoría Exhaustiva de la App Android (`android_app/`)**: En `ApiService.kt`, sustitución del valor estático hardcodeado `RecursosCockpit-Android/8.5.0` por `BuildConfig.VERSION_NAME` dinámico; en `Models.kt`, erradicación del valor predeterminado estático en `VersionInfo` (cumplimiento estricto de las Reglas 2 y 3); verificación de ausencia total de WebViews y menús DeX (Regla 7.5); (2) **Auditoría de la App Nativa Ubuntu (`desktop_app/recursos_app.py`)**: Validación con `--test-mode` sin fallos, verificación de lectura dinámica de versión canónica, aceleración por hardware con gráficos vectoriales Cairo a 60 FPS y control de estación USB DeX con UHID y Scrcpy; (3) **Sincronización Web y Blindaje de Variables (`index.html` & `static/index.html`)**: Actualización de atributos iniciales `download` y badges en la pestaña OTA a `v9.1.2` y blindaje de las variables de estado `window.connectionsMapDrawerOpen` y `window.connectionsMapServiceDrawerOpen` para prevenir errores de ámbito; (4) **Compilación e Instalación Automática (Regla 6)**: Generación del paquete Debian canónico `dist/recursos-cockpit_9.1.2_amd64.deb` con sumas SHA256 e instalación verificada en el sistema; (5) **Sincronización Canónica**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control` y `app/build.gradle.kts` a `9.1.2`. |
 | **`v9.1.1`** | `PATCH` | **Corrección de Errores de Ejecución en Frontend (ReferenceError en Clic del Mapa) y Manejador de Historial /api/net/history en Dev Server**: (1) **Corrección de `ReferenceError: connectionsMapServiceDrawerOpen is not defined`**: Sustitución segura en el listener de clic del contenedor del mapa por `connectionsMapDrawerOpen` y `toggleMapSideDrawer(false)`, añadiendo variables y funciones puente de compatibilidad retrospectiva; (2) **Solución a `SyntaxError: Unexpected token '<'` en `/api/net/history`**: Implementación del endpoint `/api/net/history` y `/api/net/history/clear` en `vite.config.ts` para el dev server sirviendo JSON nativo, e incorporación de validación estricta de cabecera `content-type: application/json` antes de parsear `res.json()` en `fetchHistoryData()` y `toggleDeviceInlineHistory()`; (3) **Sincronización Canónica**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control`, `android_app/app/build.gradle.kts` y [`README.md`](./README.md) a `9.1.1`. |
 | **`v9.1.0`** | `MINOR` | **Botones de Descarga Directa Exclusivos para la Versión Web en la Pestaña OTA (/version), Endpoint Backend para APK y Sincronización Canónica**: (1) **Botones de Descarga Directa en la Pestaña OTA (Solo en la Web)**: Inclusión en `#viewVersion` de botones dedicados para descarga del paquete nativo Debian/Ubuntu (`recursos-cockpit_9.1.0_amd64.deb`) y del paquete Android (`recursos-cockpit_9.1.0.apk`), acompañados de un Bento Panel exclusivo (`#otaWebDownloadsCard`) con metadatos de compilación y enlaces directos; (2) **Aislamiento Estricto Solo en la Web**: Supresión automática de los botones y tarjeta mediante `EnvironmentDetector` y reglas CSS `[data-runtime-env="native"]` ante ejecución nativa (Ubuntu GTK3 / Android Compose), garantizando que solo aparezcan en la versión web; (3) **Endpoint Backend y Dev Server para APK**: Adición de `/download/recursos-cockpit.apk` en `server.py` y `vite.config.ts` con streaming binario local desde `dist/` y redirección automática (302) a GitHub Releases en caso de ausencia local; (4) **Sincronización Canónica**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control`, `android_app/app/build.gradle.kts` y [`README.md`](./README.md) a `9.1.0`. |

@@ -1133,13 +1133,16 @@ function sampleRealDisks() {
   return disks;
 }
 
+const prevProcCpuTicks = new Map<number, { ticks: number; ts: number }>();
+
 function sampleRealProcesses() {
   const now = Date.now();
-  if (cachedProcesses.data.length > 0 && now - cachedProcesses.ts < 3000) {
+  if (cachedProcesses.data.length > 0 && now - cachedProcesses.ts < 1800) {
     return cachedProcesses.data;
   }
   try {
-    const out = execSync('ps -eo pid,user,pcpu,rss,comm --sort=-pcpu | head -n 45', { timeout: 1500 }).toString();
+    const out = execSync('ps -eo pid,user,pcpu,rss,comm --sort=-pcpu,-rss | head -n 45', { timeout: 1500 }).toString();
+    const seenPids = new Set<number>();
     const procs = out
       .split('\n')
       .slice(1)
@@ -1149,10 +1152,37 @@ function sampleRealProcesses() {
         const parts = line.split(/\s+/);
         const pid = parseInt(parts[0], 10) || 0;
         const user = parts[1] || 'root';
-        const cpu = parseFloat(parts[2]) || 0;
+        let cpu = parseFloat(parts[2]) || 0;
         const rssKb = parseInt(parts[3], 10) || 0;
         const name = parts.slice(4).join(' ') || 'process';
         const memMb = Math.round((rssKb / 1024) * 10) / 10;
+
+        if (pid > 0) {
+          seenPids.add(pid);
+          try {
+            const statLine = fs.readFileSync(`/proc/${pid}/stat`, 'utf-8');
+            const closeIdx = statLine.lastIndexOf(')');
+            if (closeIdx !== -1) {
+              const fields = statLine.slice(closeIdx + 2).trim().split(/\s+/);
+              const utime = parseInt(fields[11], 10) || 0;
+              const stime = parseInt(fields[12], 10) || 0;
+              const totalTicks = utime + stime;
+              const prev = prevProcCpuTicks.get(pid);
+              if (prev && now > prev.ts) {
+                const dtSec = (now - prev.ts) / 1000;
+                const dTicks = Math.max(0, totalTicks - prev.ticks);
+                const instCpu = Math.round((dTicks / dtSec) * 10) / 10;
+                if (instCpu > 0 || cpu === 0) {
+                  cpu = Math.min(100, Math.max(instCpu, cpu));
+                }
+              }
+              prevProcCpuTicks.set(pid, { ticks: totalTicks, ts: now });
+            }
+          } catch {
+            // Process may have exited
+          }
+        }
+
         return {
           pid,
           name,
@@ -1165,6 +1195,12 @@ function sampleRealProcesses() {
           status: 'running',
         };
       });
+
+    for (const k of prevProcCpuTicks.keys()) {
+      if (!seenPids.has(k)) prevProcCpuTicks.delete(k);
+    }
+
+    procs.sort((a, b) => (b.cpu_percent - a.cpu_percent) || (b.priv_mb - a.priv_mb));
     cachedProcesses = { data: procs, ts: now };
     return procs;
   } catch {
