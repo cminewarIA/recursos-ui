@@ -1,6 +1,7 @@
 package com.cminewar.recursoscockpit.data
 
 import android.util.Log
+import com.cminewar.recursoscockpit.BuildConfig
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -34,7 +35,7 @@ class ApiService(private val securePreferences: SecurePreferences) {
             val url = "$baseUrl/api/version"
             val reqBuilder = Request.Builder()
                 .url(url)
-                .header("User-Agent", "RecursosCockpit-Android/8.5.0")
+                .header("User-Agent", "RecursosCockpit-Android/${BuildConfig.VERSION_NAME}")
 
             val token = securePreferences.deviceToken
             if (token.isNotEmpty()) {
@@ -66,7 +67,7 @@ class ApiService(private val securePreferences: SecurePreferences) {
             val url = "$baseUrl/api/metrics"
             val reqBuilder = Request.Builder()
                 .url(url)
-                .header("User-Agent", "RecursosCockpit-Android/8.5.0")
+                .header("User-Agent", "RecursosCockpit-Android/${BuildConfig.VERSION_NAME}")
 
             val token = securePreferences.deviceToken
             if (token.isNotEmpty()) {

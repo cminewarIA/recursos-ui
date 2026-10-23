@@ -3148,11 +3148,11 @@ def get_app_version():
         try:
             with open(pkg_path, "r", encoding="utf-8") as pf:
                 pkg_json = json.load(pf)
-                return pkg_json.get("version", "2.1.0")
+                return pkg_json.get("version", "0.0.0")
         except Exception:
             pass
 
-    return "2.1.0"
+    return "0.0.0"
 
 def get_version_info(force_refresh=False):
     """

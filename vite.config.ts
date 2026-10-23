@@ -26,9 +26,9 @@ const historyBuffer: Record<string, (number | string)[]> = {
 
 function readAppVersion(): string {
   try {
-    return fs.readFileSync(path.resolve(__dirname, 'VERSION'), 'utf-8').trim() || '4.0.0';
+    return fs.readFileSync(path.resolve(__dirname, 'VERSION'), 'utf-8').trim() || '0.0.0';
   } catch {
-    return '4.0.0';
+    return '0.0.0';
   }
 }
 
