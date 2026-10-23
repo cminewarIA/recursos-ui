@@ -11,13 +11,16 @@ Arquitectura Híbrida Unificada:
 """
 
 import argparse
+import base64
 import collections
+import hashlib
 import http.server
 import json
 import os
 import platform
 import socket
 import socketserver
+import subprocess
 import sys
 import threading
 import time
@@ -132,6 +135,284 @@ def resolve_bundled_html_path():
     return None
 
 
+def _read_sysfs_str(path):
+    try:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                val = f.read().strip()
+                if val and val.lower() not in (
+                    "to be filled by o.e.m.",
+                    "default string",
+                    "none",
+                    "unknown",
+                    "not specified",
+                ):
+                    return val
+    except Exception:
+        pass
+    return ""
+
+
+def collect_native_device_telemetry():
+    """
+    Recopila con acceso total al sistema operativo todos los metadatos de hardware,
+    silicio, red, energía y entorno gráfico del equipo Ubuntu Linux sin ningún valor hardcodeado.
+    """
+    ver = get_app_version()
+    hostname = socket.gethostname()
+    arch = platform.machine() or "x86_64"
+    kernel = f"{platform.system()} {platform.release()}"
+
+    # 1. OS Distro desde /etc/os-release
+    os_distro = kernel
+    if os.path.isfile("/etc/os-release"):
+        try:
+            with open("/etc/os-release", "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.startswith("PRETTY_NAME="):
+                        os_distro = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        break
+        except Exception:
+            pass
+
+    # 2. Identidad DMI / SMBIOS de placa y fabricante
+    dmi_base = "/sys/devices/virtual/dmi/id"
+    if not os.path.isdir(dmi_base):
+        dmi_base = "/sys/class/dmi/id"
+    manufacturer = (
+        _read_sysfs_str(os.path.join(dmi_base, "sys_vendor"))
+        or _read_sysfs_str(os.path.join(dmi_base, "board_vendor"))
+    )
+    product_name = (
+        _read_sysfs_str(os.path.join(dmi_base, "product_name"))
+        or _read_sysfs_str(os.path.join(dmi_base, "product_family"))
+        or _read_sysfs_str("/proc/device-tree/model")
+    )
+    board_name = _read_sysfs_str(os.path.join(dmi_base, "board_name"))
+    bios_version = _read_sysfs_str(os.path.join(dmi_base, "bios_version"))
+    chassis_code = _read_sysfs_str(os.path.join(dmi_base, "chassis_type"))
+    chassis_map = {
+        "3": "Workstation Desktop",
+        "4": "Low Profile Desktop",
+        "6": "Mini Tower",
+        "7": "Tower",
+        "8": "Portable",
+        "9": "Laptop",
+        "10": "Notebook",
+        "14": "Sub Notebook",
+        "17": "Main Server Chassis",
+        "23": "Rack Mount Chassis",
+        "30": "Tablet",
+        "31": "Convertible",
+        "32": "Detachable",
+        "35": "Mini PC",
+    }
+    chassis_type = chassis_map.get(chassis_code, "Linux Workstation")
+
+    # 3. CPU & GPU
+    cpu_model = ""
+    if os.path.isfile("/proc/cpuinfo"):
+        try:
+            with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        if k.strip().lower() in ("model name", "hardware", "processor") and not v.strip().isdigit():
+                            cpu_model = v.strip()
+                            break
+        except Exception:
+            pass
+    if not cpu_model or cpu_model.lower() == "unknown":
+        proc_str = platform.processor()
+        cpu_model = proc_str if (proc_str and proc_str.lower() != "unknown") else f"CPU ({arch})"
+
+    phys_cores = (psutil.cpu_count(logical=False) or 1) if psutil else (os.cpu_count() or 1)
+    log_cores = (psutil.cpu_count(logical=True) or 1) if psutil else (os.cpu_count() or 1)
+
+    gpu_model = ""
+    try:
+        out = subprocess.check_output(
+            ["sh", "-c", "lspci 2>/dev/null | grep -iE 'vga|3d|display' | head -n 1"],
+            timeout=1.0,
+        ).decode("utf-8", errors="ignore").strip()
+        if ":" in out:
+            gpu_model = out.split(":", 2)[-1].strip()
+    except Exception:
+        pass
+
+    # 4. RAM & Almacenamiento (con respaldo directo /proc/meminfo y os.statvfs)
+    vm = psutil.virtual_memory() if psutil else None
+    ram_total_bytes = int(vm.total) if vm else 0
+    if not ram_total_bytes and os.path.isfile("/proc/meminfo"):
+        try:
+            with open("/proc/meminfo", "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        parts = line.split()
+                        if len(parts) >= 2 and parts[1].isdigit():
+                            ram_total_bytes = int(parts[1]) * 1024
+                        break
+        except Exception:
+            pass
+    ram_total_gb = round(ram_total_bytes / (1024 ** 3), 1) if ram_total_bytes else 0.0
+
+    storage_total_bytes = 0
+    storage_free_bytes = 0
+    if psutil:
+        try:
+            du = psutil.disk_usage("/")
+            storage_total_bytes = int(du.total)
+            storage_free_bytes = int(du.free)
+        except Exception:
+            pass
+    if not storage_total_bytes:
+        try:
+            st = os.statvfs("/")
+            storage_total_bytes = int(st.f_blocks * st.f_frsize)
+            storage_free_bytes = int(st.f_bavail * st.f_frsize)
+        except Exception:
+            pass
+    storage_total_gb = round(storage_total_bytes / (1024 ** 3), 1) if storage_total_bytes else 0.0
+    storage_free_gb = round(storage_free_bytes / (1024 ** 3), 1) if storage_free_bytes else 0.0
+
+    # 5. Batería y Energía
+    battery_percent = None
+    battery_charging = None
+    if psutil and hasattr(psutil, "sensors_battery"):
+        try:
+            bat = psutil.sensors_battery()
+            if bat is not None:
+                battery_percent = int(round(bat.percent))
+                battery_charging = bool(bat.power_plugged)
+        except Exception:
+            pass
+
+    # 6. Interfaz de Red Activa, IP Local y MAC
+    local_ip = "127.0.0.1"
+    interface_name = "lo"
+    mac_address = ""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.2)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        pass
+
+    if psutil:
+        try:
+            if_addrs = psutil.net_if_addrs()
+            for ifname, addr_list in if_addrs.items():
+                if ifname == "lo" or ifname.startswith(("docker", "veth", "br-")):
+                    continue
+                if_ipv4 = ""
+                if_mac = ""
+                for addr in addr_list:
+                    if addr.family == socket.AF_INET and addr.address:
+                        if_ipv4 = addr.address
+                    elif getattr(psutil, "AF_LINK", None) and addr.family == psutil.AF_LINK and addr.address:
+                        if addr.address != "00:00:00:00:00:00":
+                            if_mac = addr.address.upper()
+                if if_ipv4 == local_ip or (local_ip == "127.0.0.1" and if_ipv4):
+                    local_ip = if_ipv4
+                    interface_name = ifname
+                    mac_address = if_mac
+                    break
+        except Exception:
+            pass
+
+    if (interface_name == "lo" or not mac_address) and os.path.isdir("/sys/class/net"):
+        try:
+            for ifname in sorted(os.listdir("/sys/class/net")):
+                if ifname == "lo" or ifname.startswith(("docker", "veth", "br-")):
+                    continue
+                addr_val = _read_sysfs_str(f"/sys/class/net/{ifname}/address")
+                if addr_val and addr_val != "00:00:00:00:00:00":
+                    if interface_name == "lo":
+                        interface_name = ifname
+                    if not mac_address:
+                        mac_address = addr_val.upper()
+                    break
+        except Exception:
+            pass
+
+    # 7. Pantalla y Sesión Gráfica
+    desktop_env = os.environ.get("XDG_CURRENT_DESKTOP") or os.environ.get("DESKTOP_SESSION") or "GTK3"
+    session_type = os.environ.get("XDG_SESSION_TYPE") or "x11"
+    desktop_session = f"{desktop_env} ({session_type.upper()})"
+    screen_resolution = ""
+    if HAS_GTK:
+        try:
+            scr = Gdk.Screen.get_default()
+            if scr:
+                screen_resolution = f"{scr.get_width()}x{scr.get_height()}"
+        except Exception:
+            pass
+
+    # 8. Huella Criptográfica Única de Hardware (Hardware Fingerprint)
+    raw_machine_id = _read_sysfs_str("/etc/machine-id") or _read_sysfs_str("/var/lib/dbus/machine-id")
+    fp_seed = f"ubuntu_native:{raw_machine_id or mac_address or hostname}:{arch}"
+    hardware_id = "ubn_" + hashlib.sha256(fp_seed.encode("utf-8")).hexdigest()[:16]
+
+    display_title_parts = []
+    if manufacturer and product_name:
+        if manufacturer.lower() in product_name.lower():
+            display_title_parts.append(product_name)
+        else:
+            display_title_parts.append(f"{manufacturer} {product_name}")
+    elif product_name:
+        display_title_parts.append(product_name)
+    elif board_name:
+        display_title_parts.append(f"{manufacturer} {board_name}".strip())
+    display_model = " ".join(display_title_parts).strip() or f"Ubuntu Workstation ({hostname})"
+
+    return {
+        "client_type": "ubuntu_native",
+        "client_label": "App Nativa Ubuntu (.deb)",
+        "access_level": "FULL_NATIVE_ACCESS",
+        "full_access": True,
+        "dex_capable": True,
+        "app_version": ver,
+        "hardware_id": hardware_id,
+        "name": f"{display_model} · {hostname}",
+        "hostname": hostname,
+        "manufacturer": manufacturer or "Linux System",
+        "brand": manufacturer or "Ubuntu",
+        "model": product_name or board_name or hostname,
+        "board": board_name,
+        "bios_version": bios_version,
+        "chassis_type": chassis_type,
+        "os_distro": os_distro,
+        "kernel": kernel,
+        "arch": arch,
+        "desktop_session": desktop_session,
+        "cpu_model": cpu_model,
+        "cpu_cores_physical": phys_cores,
+        "cpu_cores_logical": log_cores,
+        "gpu_model": gpu_model,
+        "ram_total_bytes": ram_total_bytes,
+        "ram_total_gb": ram_total_gb,
+        "storage_total_bytes": storage_total_bytes,
+        "storage_total_gb": storage_total_gb,
+        "storage_free_gb": storage_free_gb,
+        "battery_percent": battery_percent,
+        "battery_charging": battery_charging,
+        "screen_resolution": screen_resolution,
+        "local_ip": local_ip,
+        "interface_name": interface_name,
+        "mac_address": mac_address,
+    }
+
+
+def encode_telemetry_header(telemetry_dict):
+    try:
+        raw = json.dumps(telemetry_dict, ensure_ascii=False).encode("utf-8")
+        return base64.b64encode(raw).decode("ascii")
+    except Exception:
+        return ""
+
+
 NATIVE_CSS = b"""
 window {
     background-color: #06070a;
@@ -236,7 +517,27 @@ class ServerConnectionManager:
         self.is_revoked = False
         self._last_net_io = psutil.net_io_counters() if psutil else None
         self._last_net_ts = time.time()
+        self.device_telemetry = collect_native_device_telemetry()
         self._load_config()
+
+    def refresh_device_telemetry(self):
+        self.device_telemetry = collect_native_device_telemetry()
+        self.device_telemetry["connection_mode"] = self.connection_mode
+        return self.device_telemetry
+
+    def _build_auth_headers(self, extra=None):
+        ver = get_app_version()
+        headers = {
+            "User-Agent": f"RecursosCockpit-Linux/{ver} (Ubuntu; NativeHTML; FullAccess)",
+            "X-Recursos-Client": "ubuntu_native",
+            "X-Device-Telemetry": encode_telemetry_header(self.device_telemetry),
+        }
+        if self.device_token:
+            headers["X-Device-Token"] = self.device_token
+            headers["Authorization"] = f"Bearer {self.device_token}"
+        if extra:
+            headers.update(extra)
+        return headers
 
     def _load_config(self):
         try:
@@ -260,6 +561,7 @@ class ServerConnectionManager:
                         "saved_host": self.saved_host,
                         "wan_domain": self.wan_domain,
                         "is_revoked": self.is_revoked,
+                        "hardware_id": self.device_telemetry.get("hardware_id", ""),
                     },
                     f,
                     indent=2,
@@ -267,13 +569,33 @@ class ServerConnectionManager:
         except Exception:
             pass
 
+    def register_device_with_server(self, base_url=None):
+        target_base = base_url or self.active_url
+        if not target_base or self.is_revoked:
+            return False
+        try:
+            telemetry = self.refresh_device_telemetry()
+            url = f"{target_base.rstrip('/')}/api/auth/register-device"
+            raw = json.dumps({"device_telemetry": telemetry}, ensure_ascii=False).encode("utf-8")
+            headers = self._build_auth_headers({"Content-Type": "application/json"})
+            req = urllib.request.Request(url, data=raw, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=2.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    new_tok = data.get("token")
+                    if new_tok and new_tok != self.device_token:
+                        self.device_token = new_tok
+                        self.is_revoked = False
+                        self._save_config()
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _probe(self, base_url, timeout=0.6):
         try:
             url = f"{base_url.rstrip('/')}/api/version"
-            headers = {"User-Agent": f"RecursosCockpit-Linux/{get_app_version()} (Ubuntu; NativeHTML)"}
-            if self.device_token:
-                headers["X-Device-Token"] = self.device_token
-                headers["Authorization"] = f"Bearer {self.device_token}"
+            headers = self._build_auth_headers()
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 if resp.status == 200:
@@ -382,10 +704,7 @@ class ServerConnectionManager:
             return self.build_local_fallback_metrics()
 
         url = f"{self.active_url.rstrip('/')}/api/metrics"
-        headers = {"User-Agent": f"RecursosCockpit-Linux/{get_app_version()} (Ubuntu; NativeHTML)"}
-        if self.device_token:
-            headers["X-Device-Token"] = self.device_token
-            headers["Authorization"] = f"Bearer {self.device_token}"
+        headers = self._build_auth_headers()
 
         req = urllib.request.Request(url, headers=headers)
         try:
@@ -578,13 +897,16 @@ class LocalHtmlBridgeServer:
                 token_js = json.dumps(parent.conn_mgr.device_token or "")
                 mode_js = json.dumps(parent.conn_mgr.connection_mode or "LOCAL")
                 node_js = json.dumps(parent.conn_mgr.active_url or "local")
+                dev_info_js = json.dumps(parent.conn_mgr.refresh_device_telemetry(), ensure_ascii=False)
                 bridge_script = (
                     "<script>"
                     "window.__RECURSOS_UBUNTU_NATIVE__ = true;"
                     "window.__RECURSOS_NATIVE__ = true;"
+                    "window.__RECURSOS_NATIVE_PLATFORM__ = 'ubuntu';"
                     f"window.__RECURSOS_DEVICE_TOKEN__ = {token_js};"
                     f"window.__RECURSOS_CONN_MODE__ = {mode_js};"
                     f"window.__RECURSOS_NODE_URL__ = {node_js};"
+                    f"window.__RECURSOS_NATIVE_DEVICE_INFO__ = {dev_info_js};"
                     f"try {{ if ({token_js}) localStorage.setItem('sysmon_device_token', {token_js}); }} catch(e) {{}}"
                     "</script>"
                 )
@@ -606,16 +928,12 @@ class LocalHtmlBridgeServer:
                 if not active_base:
                     return False
                 target_url = f"{active_base.rstrip('/')}{self.path}"
-                headers = {
-                    "User-Agent": f"RecursosCockpit-Linux/{get_app_version()} (Ubuntu; NativeHTML)",
+                extra_hdrs = {
                     "Accept": self.headers.get("Accept", "*/*"),
                 }
                 if self.headers.get("Content-Type"):
-                    headers["Content-Type"] = self.headers.get("Content-Type")
-                token = parent.conn_mgr.device_token
-                if token:
-                    headers["X-Device-Token"] = token
-                    headers["Authorization"] = f"Bearer {token}"
+                    extra_hdrs["Content-Type"] = self.headers.get("Content-Type")
+                headers = parent.conn_mgr._build_auth_headers(extra_hdrs)
 
                 req = urllib.request.Request(target_url, data=body, headers=headers, method=method)
                 try:
@@ -651,6 +969,10 @@ class LocalHtmlBridgeServer:
                 parsed = urllib.parse.urlparse(self.path)
                 clean_path = parsed.path
 
+                if clean_path == "/api/native/device-info":
+                    self._send_json(parent.conn_mgr.refresh_device_telemetry())
+                    return
+
                 # 1. Control local de hardware DeX USB exclusivo de Ubuntu
                 if clean_path == "/api/dex/status":
                     deps = parent.dex.check_dependencies()
@@ -673,6 +995,30 @@ class LocalHtmlBridgeServer:
                         return
                     if clean_path == "/api/metrics":
                         self._send_json(parent.conn_mgr.build_local_fallback_metrics())
+                        return
+                    if clean_path == "/api/auth/devices":
+                        tel = parent.conn_mgr.refresh_device_telemetry()
+                        self._send_json(
+                            [
+                                {
+                                    "id": tel.get("hardware_id", "dev_local_ubuntu"),
+                                    "name": tel.get("name", "Ubuntu Workstation"),
+                                    "client_type": "ubuntu_native",
+                                    "client_label": "App Nativa Ubuntu (.deb)",
+                                    "access_level": "FULL_NATIVE_ACCESS",
+                                    "full_access": True,
+                                    "app_version": tel.get("app_version"),
+                                    "local_ip": tel.get("local_ip", "127.0.0.1"),
+                                    "last_external_ip": "",
+                                    "first_seen": "Sesión Activa",
+                                    "last_seen": "Ahora mismo",
+                                    "verified_in_lan": True,
+                                    "trusted": True,
+                                    "is_current": True,
+                                    "device_telemetry": tel,
+                                }
+                            ]
+                        )
                         return
                     if clean_path == "/api/version":
                         ver = get_app_version()
@@ -818,6 +1164,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
     def _initial_discovery_worker(self):
         self.conn_mgr.discover_server()
         self.conn_mgr.fetch_metrics()
+        self.conn_mgr.register_device_with_server()
         GLib.idle_add(self._refresh_connection_badge)
         GLib.idle_add(self._sync_webview_session)
 
@@ -826,7 +1173,11 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             tok = json.dumps(self.conn_mgr.device_token or "")
             mode = json.dumps(self.conn_mgr.connection_mode or "LOCAL")
             url = json.dumps(self.conn_mgr.active_url or "local")
-            js = f"if(window.injectNativeSession){{window.injectNativeSession({tok},{mode},{url});}}"
+            dev_info = json.dumps(self.conn_mgr.refresh_device_telemetry(), ensure_ascii=False)
+            js = (
+                f"window.__RECURSOS_NATIVE_DEVICE_INFO__={dev_info};"
+                f"if(window.injectNativeSession){{window.injectNativeSession({tok},{mode},{url},{dev_info});}}"
+            )
             try:
                 if hasattr(self.webview, "evaluate_javascript"):
                     self.webview.evaluate_javascript(js, -1, None, None, None, None, None)

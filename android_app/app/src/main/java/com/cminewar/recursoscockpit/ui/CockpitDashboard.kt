@@ -46,6 +46,7 @@ class RecursosAndroidBridge(
     private val securePreferences: SecurePreferences,
     private val currentModeProvider: () -> ConnectionMode,
     private val activeUrlProvider: () -> String,
+    private val deviceTelemetryProvider: () -> String,
     private val onOpenSettings: () -> Unit,
     private val onTriggerRescan: () -> Unit
 ) {
@@ -73,6 +74,11 @@ class RecursosAndroidBridge(
     }
 
     @JavascriptInterface
+    fun getDeviceTelemetryJson(): String {
+        return deviceTelemetryProvider()
+    }
+
+    @JavascriptInterface
     fun openNativeSettings() {
         onOpenSettings()
     }
@@ -90,6 +96,7 @@ fun CockpitDashboard(
     connectionMode: ConnectionMode,
     activeUrl: String,
     scanningMessage: String,
+    deviceTelemetryProvider: () -> String,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
@@ -102,22 +109,25 @@ fun CockpitDashboard(
         webViewRef?.goBack()
     }
 
-    // Inyectar sesión criptográfica y banderas nativas en el DOM HTML5
+    // Inyectar sesión criptográfica, telemetría de dispositivo y banderas nativas en el DOM HTML5
     fun injectNativeContext(webView: WebView?) {
         val wv = webView ?: return
         val tokenEscaped = securePreferences.deviceToken.replace("'", "\\'")
         val modeEscaped = connectionMode.name.replace("'", "\\'")
         val urlEscaped = activeUrl.replace("'", "\\'")
+        val telemetryJson = deviceTelemetryProvider().ifBlank { "{}" }
 
         val jsPayload = """
             (function() {
                 window.__RECURSOS_ANDROID_NATIVE__ = true;
+                window.__RECURSOS_NATIVE__ = true;
                 window.__RECURSOS_NATIVE_PLATFORM__ = 'android';
+                try { window.__RECURSOS_NATIVE_DEVICE_INFO__ = $telemetryJson; } catch(e) {}
                 if ('$tokenEscaped') {
                     try { localStorage.setItem('sysmon_device_token', '$tokenEscaped'); } catch(e) {}
                 }
                 if (typeof window.injectNativeSession === 'function') {
-                    window.injectNativeSession('$tokenEscaped', '$modeEscaped', '$urlEscaped');
+                    window.injectNativeSession('$tokenEscaped', '$modeEscaped', '$urlEscaped', window.__RECURSOS_NATIVE_DEVICE_INFO__);
                 }
                 if (typeof EnvironmentDetector !== 'undefined' && typeof EnvironmentDetector.applyStrictLayout === 'function') {
                     EnvironmentDetector.applyStrictLayout();
@@ -285,7 +295,7 @@ fun CockpitDashboard(
                             setSupportZoom(false)
                             builtInZoomControls = false
                             displayZoomControls = false
-                            userAgentString = "$userAgentString RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (NativeHTML)"
+                            userAgentString = "$userAgentString RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (NativeHTML; FullAccess)"
                         }
 
                         addJavascriptInterface(
@@ -293,6 +303,7 @@ fun CockpitDashboard(
                                 securePreferences = securePreferences,
                                 currentModeProvider = { connectionMode },
                                 activeUrlProvider = { activeUrl },
+                                deviceTelemetryProvider = deviceTelemetryProvider,
                                 onOpenSettings = onOpenSettings,
                                 onTriggerRescan = onRefresh
                             ),

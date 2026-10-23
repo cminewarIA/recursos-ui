@@ -4801,6 +4801,60 @@
             </div>
           </div>
 
+          <!-- ==================================================================
+               INVENTARIO DE DISPOSITIVOS ZERO-TRUST & TELEMETRÍA NATIVA TOTAL
+               ================================================================== -->
+          <div class="section-block" id="secZeroTrustDevicesSection">
+            <div class="section-header-bar" style="flex-wrap: wrap; gap: 10px;">
+              <div>
+                <div class="section-title">Dispositivos Vinculados & Identificación de Hardware Zero-Trust (<span id="secTrustedDevicesCount">0</span>)</div>
+                <div class="section-subtitle">Identificación profunda de Apps Nativas (Ubuntu .deb / Android .apk con Acceso Total al Silicio) y sesiones autorizadas con HMAC-SHA256</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <div class="segmented-control" title="Filtrar dispositivos por tipo de contenedor y nivel de acceso">
+                  <button type="button" class="seg-btn active" id="btnSecDevFilterAll" onclick="setSecDeviceFilter('all')">Todos (<span id="secDevCntAll">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSecDevFilterNative" onclick="setSecDeviceFilter('native')">⚡ Apps Nativas (<span id="secDevCntNative">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSecDevFilterWeb" onclick="setSecDeviceFilter('web')">🌐 Web (<span id="secDevCntWeb">0</span>)</button>
+                </div>
+                <button type="button" class="action-btn" onclick="syncCurrentDeviceTelemetry(true)" style="height: 32px; padding: 0 10px; font-size: 11.5px;" title="Sincronizar todos los sensores y datos de hardware de este dispositivo">
+                  🔄 Identificar Este Dispositivo
+                </button>
+                <button type="button" class="btn-revoke" onclick="revokeAllOtherDevices()" style="height: 32px; padding: 0 10px; font-size: 11.5px;">
+                  Revocar demás sesiones
+                </button>
+              </div>
+            </div>
+
+            <div class="hw-spec-grid" style="margin-bottom: 12px;">
+              <div class="hw-spec-cell">
+                <span class="hw-spec-label">Dispositivos Autorizados</span>
+                <span class="hw-spec-value mono" style="font-size: 20px; color: var(--accent-cyan-bright);" id="secTrustedTotalVal">0</span>
+                <span style="font-size: 11px; color: var(--text-muted);" id="secTrustedTotalSub">Certificados HMAC activos</span>
+              </div>
+              <div class="hw-spec-cell">
+                <span class="hw-spec-label">Apps Nativas (Acceso Total)</span>
+                <span class="hw-spec-value mono" style="font-size: 20px; color: var(--accent-emerald-bright);" id="secTrustedNativeVal">0</span>
+                <span style="font-size: 11px; color: var(--text-muted);" id="secTrustedNativeSub">Ubuntu .deb & Android .apk</span>
+              </div>
+              <div class="hw-spec-cell">
+                <span class="hw-spec-label">Identidad de Este Dispositivo</span>
+                <span class="hw-spec-value mono" style="font-size: 14.5px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="secCurrentDeviceTypeVal">Detectando...</span>
+                <span style="font-size: 11px; color: var(--text-muted);" class="mono" id="secCurrentDeviceHwSub">Sondeando silicio...</span>
+              </div>
+              <div class="hw-spec-cell">
+                <span class="hw-spec-label">Canal & Nivel de Privilegio</span>
+                <span class="hw-spec-value mono" style="font-size: 15px; color: var(--accent-violet-bright);" id="secCurrentChannelVal">LAN / Zero-Trust</span>
+                <span style="font-size: 11px; color: var(--text-muted);" class="mono" id="secCurrentIpSub">IP: --</span>
+              </div>
+            </div>
+
+            <div class="surface-panel" id="secTrustedDevicesList">
+              <div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 24px;">
+                Sincronizando inventario criptográfico de dispositivos e identificando hardware...
+              </div>
+            </div>
+          </div>
+
           <div class="section-block">
             <div class="section-title">Top Dominios y Rastreadores Bloqueados Hoy</div>
             <div class="surface-panel" id="secTopBlockedList">
@@ -5228,11 +5282,11 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <!-- Botones de Descarga Directa Exclusivos para la Versión Web -->
                 <div class="ota-web-download-row" id="otaWebDownloadButtons" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_9.3.1_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_9.4.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_9.3.1.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_9.4.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5252,7 +5306,7 @@
                 <div style="display: flex; flex-direction: column; gap: 3px;">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">📦 Paquetes Oficiales Compilados</span>
-                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v9.3.1</span>
+                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v9.4.0</span>
                     <span class="adw-badge badge-purple" style="font-size: 10px; font-weight: 600;">Solo en la Web</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);">
@@ -5260,11 +5314,11 @@
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_9.3.1_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_9.4.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux amd64)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_9.3.1.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_9.4.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5798,11 +5852,11 @@
        MODAL: AUDITORÍA DE DISPOSITIVOS ZERO-TRUST
        ====================================================================== -->
   <div class="modal-overlay" id="trustDialog" onclick="if(event.target===this) closeTrustDialog()">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 760px; width: calc(100vw - 28px);">
       <div class="modal-header">
         <div>
-          <h3 style="font-family: var(--font-display); font-size: 16px; font-weight: 700;">Seguridad Zero-Trust & Sesiones Vinculadas</h3>
-          <div style="font-size: 11.5px; color: var(--text-muted);">Tokens firmados con HMAC-SHA256</div>
+          <h3 style="font-family: var(--font-display); font-size: 16px; font-weight: 700;">Seguridad Zero-Trust & Identificación de Dispositivos</h3>
+          <div style="font-size: 11.5px; color: var(--text-muted);">Tokens firmados con HMAC-SHA256 · Telemetría Nativa con Acceso Total</div>
         </div>
         <button class="action-btn" style="height: 28px; padding: 0 8px;" onclick="closeTrustDialog()">✕</button>
       </div>
@@ -5818,12 +5872,15 @@
           <span class="adw-badge badge-blue" id="trustModalBadge">Zero-Trust Activo</span>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap;">
           <span style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Dispositivos Autorizados (<span id="trustDeviceCount">0</span>)</span>
-          <button class="btn-revoke" onclick="revokeAllOtherDevices()">Revocar demás sesiones</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="syncCurrentDeviceTelemetry(true)">🔄 Re-identificar Hardware</button>
+            <button class="btn-revoke" onclick="revokeAllOtherDevices()">Revocar demás sesiones</button>
+          </div>
         </div>
 
-        <div class="surface-panel" id="trustDevicesCard" style="max-height: 300px; overflow-y: auto;"></div>
+        <div class="surface-panel" id="trustDevicesCard" style="max-height: 420px; overflow-y: auto;"></div>
 
         <div style="margin-top: 14px; font-size: 12px; color: var(--text-muted); line-height: 1.5;">
           Dominio público activo: <a href="#" id="trustPublicDomainLink" target="_blank" rel="noopener" class="mono" style="color: var(--accent-cyan-bright);">detectando...</a>
@@ -5959,11 +6016,16 @@
         if (token && !h['X-Device-Token'] && !h['Authorization']) {
           h['X-Device-Token'] = token;
         }
+        if (window.__RECURSOS_UBUNTU_NATIVE__) {
+          h['X-Recursos-Client'] = 'ubuntu_native';
+        } else if (window.__RECURSOS_ANDROID_NATIVE__ || window.RecursosAndroidBridge) {
+          h['X-Recursos-Client'] = 'android_native';
+        }
       } catch (e) {}
       return h;
     }
 
-    window.injectNativeSession = function(token, mode, nodeUrl) {
+    window.injectNativeSession = function(token, mode, nodeUrl, nativeDeviceInfo) {
       try {
         if (token) {
           window.__RECURSOS_DEVICE_TOKEN__ = token;
@@ -5971,6 +6033,12 @@
         }
         if (mode) window.__RECURSOS_CONN_MODE__ = mode;
         if (nodeUrl) window.__RECURSOS_NODE_URL__ = nodeUrl;
+        if (nativeDeviceInfo && typeof nativeDeviceInfo === 'object') {
+          window.__RECURSOS_NATIVE_DEVICE_INFO__ = nativeDeviceInfo;
+        }
+        if (typeof syncCurrentDeviceTelemetry === 'function') {
+          syncCurrentDeviceTelemetry(false);
+        }
         if (typeof updateMetrics === 'function') updateMetrics();
       } catch (e) {}
     };
@@ -8098,8 +8166,184 @@
     }
 
     // =========================================================================
-    // ZERO-TRUST ACCESS & TRUSTED DEVICES
+    // ZERO-TRUST ACCESS, FULL NATIVE TELEMETRY & TRUSTED DEVICES
     // =========================================================================
+    let cachedTrustedDevicesList = [];
+    let currentSecDeviceFilter = 'all';
+    let lastSecDevicesFetchTs = 0;
+
+    function detectWebGlGpuModel() {
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return '';
+        const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+        if (dbg) {
+          const renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '';
+          return String(renderer).replace(/^ANGLE \((.+)\)$/i, '$1').trim();
+        }
+        return String(gl.getParameter(gl.RENDERER) || '').trim();
+      } catch (e) {
+        return '';
+      }
+    }
+
+    async function collectClientDeviceTelemetry() {
+      let baseTel = {};
+      try {
+        if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.getDeviceTelemetryJson === 'function') {
+          const rawJson = window.RecursosAndroidBridge.getDeviceTelemetryJson();
+          if (rawJson) {
+            baseTel = JSON.parse(rawJson) || {};
+            window.__RECURSOS_NATIVE_DEVICE_INFO__ = baseTel;
+          }
+        } else if (window.__RECURSOS_NATIVE_DEVICE_INFO__ && typeof window.__RECURSOS_NATIVE_DEVICE_INFO__ === 'object') {
+          baseTel = Object.assign({}, window.__RECURSOS_NATIVE_DEVICE_INFO__);
+        } else if (window.__RECURSOS_UBUNTU_NATIVE__) {
+          const res = await fetch('/api/native/device-info', { cache: 'no-store' });
+          if (res.ok) {
+            baseTel = await res.json();
+            window.__RECURSOS_NATIVE_DEVICE_INFO__ = baseTel;
+          }
+        }
+      } catch (e) {}
+
+      const ua = navigator.userAgent || '';
+      const isUbuntuNative = Boolean(window.__RECURSOS_UBUNTU_NATIVE__ || baseTel.client_type === 'ubuntu_native' || /RecursosCockpit-Linux/i.test(ua));
+      const isAndroidNative = Boolean(window.__RECURSOS_ANDROID_NATIVE__ || window.RecursosAndroidBridge || baseTel.client_type === 'android_native' || /RecursosCockpit-Android/i.test(ua));
+      const isNative = isUbuntuNative || isAndroidNative;
+
+      const gpuWebGl = detectWebGlGpuModel();
+      const scrW = window.screen ? window.screen.width : 0;
+      const scrH = window.screen ? window.screen.height : 0;
+      const dpr = window.devicePixelRatio ? Math.round(window.devicePixelRatio * 100) / 100 : 1;
+      const screenStr = scrW && scrH ? `${scrW}x${scrH} (@${dpr}x)` : '';
+
+      let batPct = baseTel.battery_percent ?? null;
+      let batChg = baseTel.battery_charging ?? null;
+      if (batPct === null && typeof navigator.getBattery === 'function') {
+        try {
+          const bat = await navigator.getBattery();
+          if (bat && typeof bat.level === 'number') {
+            batPct = Math.round(bat.level * 100);
+            batChg = Boolean(bat.charging);
+          }
+        } catch (e) {}
+      }
+
+      let uaPlatform = navigator.platform || '';
+      let uaArch = baseTel.arch || '';
+      let uaModel = baseTel.model || '';
+      let uaBrand = baseTel.manufacturer || baseTel.brand || '';
+      let uaOsVersion = baseTel.os_distro || '';
+
+      if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+        try {
+          const hi = await navigator.userAgentData.getHighEntropyValues(['architecture', 'bitness', 'model', 'platform', 'platformVersion', 'fullVersionList']);
+          if (hi.architecture && !uaArch) uaArch = `${hi.architecture}${hi.bitness ? '_' + hi.bitness : ''}`;
+          if (hi.model && !uaModel) uaModel = hi.model;
+          if (hi.platform && !uaOsVersion) {
+            uaOsVersion = `${hi.platform} ${hi.platformVersion || ''}`.trim();
+          }
+        } catch (e) {}
+      }
+
+      if (!uaOsVersion) {
+        if (/Android\s+([\d.]+)/i.test(ua)) {
+          uaOsVersion = `Android ${RegExp.$1}`;
+        } else if (/Ubuntu/i.test(ua)) {
+          uaOsVersion = 'Ubuntu Linux';
+        } else if (/Windows NT 10\.0/i.test(ua)) {
+          uaOsVersion = 'Windows 10/11';
+        } else if (/Mac OS X ([\d_]+)/i.test(ua)) {
+          uaOsVersion = `macOS ${RegExp.$1.replace(/_/g, '.')}`;
+        } else if (/Linux/i.test(ua)) {
+          uaOsVersion = 'Linux';
+        } else {
+          uaOsVersion = uaPlatform || 'Sistema Operativo';
+        }
+      }
+
+      if (!uaModel && /Android[^;]*;\s*([^;)]+)/i.test(ua)) {
+        const cand = RegExp.$1.replace(/Build\/.*/i, '').trim();
+        if (cand && !/^(K|wv|Mobile|Linux)$/i.test(cand)) uaModel = cand;
+      }
+
+      const clientType = isUbuntuNative ? 'ubuntu_native' : (isAndroidNative ? 'android_native' : 'web_browser');
+      const clientLabel = isUbuntuNative
+        ? 'App Nativa Ubuntu (.deb)'
+        : (isAndroidNative ? 'App Nativa Android (.apk)' : 'Navegador Web');
+      const accessLevel = isNative ? 'FULL_NATIVE_ACCESS' : 'WEB_SANDBOX';
+
+      let hwId = baseTel.hardware_id || '';
+      if (!hwId) {
+        try {
+          hwId = localStorage.getItem('sysmon_hw_fingerprint') || '';
+          if (!hwId) {
+            const rawSeed = `${clientType}:${uaPlatform}:${uaArch}:${scrW}x${scrH}:${navigator.hardwareConcurrency || 0}:${gpuWebGl}`;
+            let hash = 0;
+            for (let i = 0; i < rawSeed.length; i++) {
+              hash = ((hash << 5) - hash) + rawSeed.charCodeAt(i);
+              hash |= 0;
+            }
+            hwId = `web_${Math.abs(hash).toString(16)}_${Date.now().toString(16).slice(-6)}`;
+            localStorage.setItem('sysmon_hw_fingerprint', hwId);
+          }
+        } catch (e) {}
+      }
+
+      return Object.assign({}, baseTel, {
+        client_type: clientType,
+        client_label: clientLabel,
+        access_level: accessLevel,
+        full_access: isNative,
+        dex_capable: isUbuntuNative,
+        app_version: baseTel.app_version || (latestMetrics && latestMetrics.version) || '',
+        hardware_id: hwId,
+        manufacturer: baseTel.manufacturer || uaBrand || (isUbuntuNative ? 'Ubuntu Linux' : (isAndroidNative ? 'Android OEM' : 'Cliente Web')),
+        model: baseTel.model || uaModel || (isUbuntuNative ? 'Workstation' : (isAndroidNative ? 'Dispositivo Android' : uaOsVersion)),
+        os_distro: baseTel.os_distro || uaOsVersion,
+        arch: baseTel.arch || uaArch || uaPlatform || 'x86_64',
+        cpu_model: baseTel.cpu_model || baseTel.hardware_soc || (gpuWebGl ? `CPU + ${gpuWebGl.slice(0, 42)}` : `${navigator.hardwareConcurrency || '?'} hilos lógicos`),
+        cpu_cores_logical: baseTel.cpu_cores_logical || navigator.hardwareConcurrency || 0,
+        gpu_model: baseTel.gpu_model || gpuWebGl || '',
+        ram_total_gb: baseTel.ram_total_gb || (navigator.deviceMemory ? Number(navigator.deviceMemory) : 0),
+        screen_resolution: baseTel.screen_resolution || screenStr,
+        battery_percent: batPct,
+        battery_charging: batChg,
+      });
+    }
+
+    async function syncCurrentDeviceTelemetry(showFeedback = false) {
+      try {
+        const telemetry = await collectClientDeviceTelemetry();
+        const res = await fetch('/api/auth/register-device', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ device_telemetry: telemetry })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.token) {
+            try {
+              localStorage.setItem('sysmon_device_token', data.token);
+              if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.onTokenUpdated === 'function') {
+                window.RecursosAndroidBridge.onTokenUpdated(data.token);
+              }
+            } catch (e) {}
+          }
+          if (showFeedback && typeof showToast === 'function') {
+            showToast('Datos completos de hardware del dispositivo sincronizados', 'success');
+          }
+          loadTrustedDevicesList();
+        }
+      } catch (e) {
+        if (showFeedback && typeof showToast === 'function') {
+          showToast('No se pudo sincronizar la telemetría del dispositivo', 'error');
+        }
+      }
+    }
+
     function updateTrustStatusBanner() {
       const auth = (latestMetrics && latestMetrics.auth_status) ? latestMetrics.auth_status : null;
       const dot = document.getElementById('trustModalDot');
@@ -8138,47 +8382,246 @@
       document.getElementById('trustDialog').classList.remove('open');
     }
 
+    function setSecDeviceFilter(filterMode) {
+      currentSecDeviceFilter = filterMode || 'all';
+      document.getElementById('btnSecDevFilterAll')?.classList.toggle('active', currentSecDeviceFilter === 'all');
+      document.getElementById('btnSecDevFilterNative')?.classList.toggle('active', currentSecDeviceFilter === 'native');
+      document.getElementById('btnSecDevFilterWeb')?.classList.toggle('active', currentSecDeviceFilter === 'web');
+      renderTrustedDevices(cachedTrustedDevicesList);
+    }
+
     function loadTrustedDevicesList() {
-      const list = document.getElementById('trustDevicesCard');
-      if (list) {
-        list.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 20px;">Consultando sesiones autorizadas...</div>';
-      }
+      lastSecDevicesFetchTs = Date.now();
       fetch('/api/auth/devices', { headers: authHeaders() })
         .then(r => r.ok ? r.json() : [])
-        .then(devs => renderTrustedDevices(devs))
-        .catch(() => renderTrustedDevices([]));
+        .then(devs => {
+          cachedTrustedDevicesList = Array.isArray(devs) ? devs : [];
+          renderTrustedDevices(cachedTrustedDevicesList);
+        })
+        .catch(() => {
+          renderTrustedDevices(cachedTrustedDevicesList || []);
+        });
+    }
+
+    function openRenameDeviceInline(devId) {
+      const box = document.getElementById(`renameBox_${devId}`);
+      if (box) {
+        box.style.display = box.style.display === 'none' ? 'flex' : 'none';
+        const inp = document.getElementById(`renameInput_${devId}`);
+        if (inp && box.style.display === 'flex') inp.focus();
+      }
+    }
+
+    function submitRenameDevice(devId) {
+      const inp = document.getElementById(`renameInput_${devId}`);
+      if (!inp) return;
+      const newAlias = inp.value.trim();
+      fetch('/api/auth/rename-device', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ id: devId, alias: newAlias })
+      })
+        .then(r => r.json())
+        .then(res => {
+          if (res && res.success) {
+            if (typeof showToast === 'function') {
+              showToast(newAlias ? `Dispositivo identificado como "${newAlias}"` : 'Nombre automático restaurado', 'success');
+            }
+            loadTrustedDevicesList();
+          }
+        });
+    }
+
+    function buildDeviceIdentityCardHtml(d, isCompactModal = false) {
+      const isCurrent = Boolean(d.is_current);
+      const tel = (d.device_telemetry && typeof d.device_telemetry === 'object') ? d.device_telemetry : {};
+      const cType = d.client_type || tel.client_type || 'web_browser';
+      const isUbuntuNative = cType === 'ubuntu_native';
+      const isAndroidNative = cType === 'android_native';
+      const isNative = Boolean(d.full_access || tel.full_access || isUbuntuNative || isAndroidNative);
+
+      const devIcon = isUbuntuNative
+        ? '🐧'
+        : isAndroidNative
+          ? '🤖'
+          : (/android|iphone|ipad|mobile/i.test(d.user_agent || '') ? '📱' : '💻');
+
+      const typeBadgeHtml = isUbuntuNative
+        ? '<span class="adw-badge badge-green mono">🐧 APP NATIVA UBUNTU (.DEB) · ACCESO TOTAL</span>'
+        : isAndroidNative
+          ? '<span class="adw-badge badge-green mono">🤖 APP NATIVA ANDROID (.APK) · ACCESO TOTAL</span>'
+          : '<span class="adw-badge badge-amber mono">🌐 SESIÓN NAVEGADOR WEB</span>';
+
+      const connMode = d.connection_mode || (d.last_external_ip ? 'WAN' : 'LAN');
+      const connBadgeHtml = connMode === 'WAN'
+        ? '<span class="adw-badge badge-purple mono">🌐 WAN TLS</span>'
+        : '<span class="adw-badge badge-blue mono">🟢 LAN DIRECTA</span>';
+
+      const verStr = d.app_version || tel.app_version || '';
+      const verBadgeHtml = verStr ? `<span class="adw-badge mono" style="background: rgba(148,163,184,0.14); color: var(--text-secondary);">v${escapeHtml(verStr)}</span>` : '';
+
+      const manufacturer = tel.manufacturer || tel.brand || '';
+      const model = tel.model || '';
+      const board = tel.board || tel.product || tel.device_codename || '';
+      const chassis = tel.chassis_type || (isAndroidNative ? 'Android Mobile / Tablet' : (isUbuntuNative ? 'Linux Workstation' : 'Cliente Web'));
+      const hwTitle = [manufacturer, model].filter(Boolean).join(' ') || d.auto_name || d.name || 'Dispositivo';
+      const hwSub = [board ? `Placa/Codename: ${board}` : '', chassis].filter(Boolean).join(' · ') || 'Identificación dinámica Zero-Trust';
+
+      const osDistro = tel.os_distro || 'SO Detectado';
+      const kernel = tel.kernel || (tel.security_patch ? `Parche Seg: ${tel.security_patch}` : 'Kernel Activo');
+      const arch = tel.arch || 'x86_64 / arm64';
+
+      const cpuModel = tel.cpu_model || tel.hardware_soc || 'Procesador Detectado';
+      const coresPhys = tel.cpu_cores_physical || tel.cpu_cores_logical || '';
+      const coresLog = tel.cpu_cores_logical || '';
+      const coresText = coresPhys && coresLog && coresPhys !== coresLog
+        ? `${coresPhys}C / ${coresLog}T`
+        : (coresLog ? `${coresLog} núcleos` : '');
+      const gpuModel = tel.gpu_model || '';
+
+      const ramGb = tel.ram_total_gb ? `${tel.ram_total_gb} GB RAM` : 'RAM Dinámica';
+      const storGb = tel.storage_total_gb
+        ? `${tel.storage_total_gb} GB Total${tel.storage_free_gb ? ` (${tel.storage_free_gb} GB libres)` : ''}`
+        : 'Almacenamiento del Sistema';
+
+      const hostStr = tel.hostname || d.id || '--';
+      const lanIp = d.local_ip || tel.local_ip || '--';
+      const wanIp = d.last_external_ip || 'Directo LAN';
+      const ifaceStr = [tel.interface_name, tel.mac_address].filter(Boolean).join(' · ') || 'Enlace verificado';
+
+      const screenStr = tel.screen_resolution || 'Resolución estándar';
+      const batStr = (tel.battery_percent !== null && tel.battery_percent !== undefined)
+        ? `Batería ${tel.battery_percent}% ${tel.battery_charging ? '⚡ Cargando' : '🔋'}`
+        : 'Alimentación CA Directa';
+      const hwFp = d.hardware_id || tel.hardware_id || d.id;
+
+      const safeId = escapeHtml(d.id);
+      const safeName = escapeHtml(d.name || 'Dispositivo');
+
+      return `
+        <div class="data-row" style="flex-direction: column; align-items: stretch; gap: 10px; padding: ${isCompactModal ? '12px 14px' : '16px 18px'}; border-left: 3px solid ${isCurrent ? 'var(--accent-cyan-bright)' : (isNative ? 'var(--accent-emerald)' : 'rgba(148,163,184,0.35)')};">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <div style="width: 38px; height: 38px; border-radius: 6px; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.28); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
+                ${devIcon}
+              </div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span class="row-label" style="font-size: 14.5px; font-weight: 700; color: var(--text-primary);">${safeName}</span>
+                  ${isCurrent ? '<span class="adw-badge badge-blue mono">ESTE DISPOSITIVO</span>' : ''}
+                  ${typeBadgeHtml}
+                  ${connBadgeHtml}
+                  ${verBadgeHtml}
+                </div>
+                <div class="row-sublabel mono" style="margin-top: 3px; font-size: 11.5px; color: var(--text-secondary);">
+                  ID: ${escapeHtml(hwFp)} · Emparejado: ${escapeHtml(d.first_seen || '--')} · Última actividad: ${escapeHtml(d.last_seen || '--')}
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="openRenameDeviceInline('${safeId}')" title="Personalizar alias del dispositivo">
+                ✏️ Alias
+              </button>
+              <button type="button" class="btn-revoke" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="revokeDevice('${safeId}', '${safeName}', ${isCurrent})">
+                ${isCurrent ? 'Cerrar sesión' : 'Revocar'}
+              </button>
+            </div>
+          </div>
+
+          <div id="renameBox_${safeId}" style="display: none; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px;">
+            <input type="text" id="renameInput_${safeId}" value="${escapeHtml(d.custom_alias || d.name || '')}" placeholder="Alias personalizado (vacío para nombre de hardware automático)" style="flex: 1; height: 30px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-primary); font-size: 12px; font-family: var(--font-mono); outline: none;">
+            <button type="button" class="action-btn primary-cta" style="height: 30px; padding: 0 12px; font-size: 11.5px;" onclick="submitRenameDevice('${safeId}')">Guardar</button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(${isCompactModal ? '195px' : '220px'}, 1fr)); gap: 8px;">
+            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Equipo & Fabricante</div>
+              <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${escapeHtml(hwTitle)}</div>
+              <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(hwSub)}</div>
+            </div>
+            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Sistema Operativo & Kernel</div>
+              <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan-bright); margin-top: 2px;">${escapeHtml(osDistro)}</div>
+              <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(kernel)} · ${escapeHtml(arch)}</div>
+            </div>
+            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Silicio (CPU / SoC & GPU)</div>
+              <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${escapeHtml(cpuModel)} ${coresText ? `(${escapeHtml(coresText)})` : ''}</div>
+              <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(gpuModel || (isNative ? 'Aceleración Hardware Nativa' : 'Renderizador WebGL'))}</div>
+            </div>
+            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Memoria & Almacenamiento</div>
+              <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--accent-emerald-bright); margin-top: 2px;">${escapeHtml(ramGb)}</div>
+              <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(storGb)}</div>
+            </div>
+            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Red & Direccionamiento</div>
+              <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">LAN: ${escapeHtml(lanIp)} · Host: ${escapeHtml(hostStr)}</div>
+              <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">WAN: ${escapeHtml(wanIp)} · ${escapeHtml(ifaceStr)}</div>
+            </div>
+            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+              <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Pantalla, Energía & Acceso</div>
+              <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${escapeHtml(screenStr)}</div>
+              <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(batStr)} · ${isNative ? 'Acceso Total OS' : 'Sandbox Web'}</div>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     function renderTrustedDevices(devs) {
-      const list = document.getElementById('trustDevicesCard');
-      const countEl = document.getElementById('trustDeviceCount');
-      if (!list) return;
-      if (!Array.isArray(devs) || devs.length === 0) {
-        if (countEl) countEl.innerText = '0';
-        list.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 22px;">No hay dispositivos emparejados registrados.</div>';
-        return;
+      const allDevs = Array.isArray(devs) ? devs : [];
+      cachedTrustedDevicesList = allDevs;
+
+      const nativeDevs = allDevs.filter(d => {
+        const tel = d.device_telemetry || {};
+        const ct = d.client_type || tel.client_type || '';
+        return Boolean(d.full_access || tel.full_access || ct === 'ubuntu_native' || ct === 'android_native');
+      });
+      const webDevs = allDevs.filter(d => !nativeDevs.includes(d));
+
+      setText('trustDeviceCount', String(allDevs.length));
+      setText('secTrustedDevicesCount', String(allDevs.length));
+      setText('secDevCntAll', String(allDevs.length));
+      setText('secDevCntNative', String(nativeDevs.length));
+      setText('secDevCntWeb', String(webDevs.length));
+      setText('secTrustedTotalVal', String(allDevs.length));
+      setText('secTrustedNativeVal', String(nativeDevs.length));
+
+      const currentDev = allDevs.find(d => d.is_current) || allDevs[0] || null;
+      if (currentDev) {
+        const tel = currentDev.device_telemetry || {};
+        setText('secCurrentDeviceTypeVal', currentDev.name || tel.name || 'Sesión Activa');
+        const subSpec = [tel.os_distro, tel.cpu_model, tel.ram_total_gb ? `${tel.ram_total_gb} GB` : ''].filter(Boolean).join(' · ');
+        setText('secCurrentDeviceHwSub', subSpec || currentDev.client_label || 'Certificado verificado');
+        const isNat = Boolean(currentDev.full_access || tel.full_access);
+        setText('secCurrentChannelVal', `${currentDev.connection_mode || 'LAN'} · ${isNat ? 'ACCESO TOTAL' : 'WEB'}`);
+        setText('secCurrentIpSub', `LAN: ${currentDev.local_ip || '--'}${currentDev.last_external_ip ? ' · WAN: ' + currentDev.last_external_ip : ''}`);
       }
-      if (countEl) countEl.innerText = String(devs.length);
-      list.innerHTML = devs.map(d => {
-        const isCurrent = Boolean(d.is_current);
-        let subText = `LAN: ${d.local_ip || '--'}`;
-        if (d.last_external_ip) subText += ` · WAN: ${d.last_external_ip}`;
-        subText += ` · Visto: ${d.last_seen || d.first_seen || '--'}`;
-        return `
-          <div class="data-row">
-            <div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="row-label">${escapeHtml(d.name || 'Dispositivo')}</span>
-                ${isCurrent ? '<span class="adw-badge badge-blue">Sesión Actual</span>' : '<span class="adw-badge badge-green">Autorizado</span>'}
-              </div>
-              <div class="row-sublabel mono">${escapeHtml(subText)}</div>
-            </div>
-            <button class="btn-revoke" onclick="revokeDevice('${escapeHtml(d.id)}', '${escapeHtml(d.name || 'Dispositivo')}', ${isCurrent})">
-              ${isCurrent ? 'Cerrar sesión' : 'Revocar'}
-            </button>
-          </div>
-        `;
-      }).join('');
+
+      // 1. Renderizar en el modal #trustDevicesCard
+      const modalList = document.getElementById('trustDevicesCard');
+      if (modalList) {
+        if (allDevs.length === 0) {
+          modalList.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 22px;">No hay dispositivos emparejados registrados.</div>';
+        } else {
+          modalList.innerHTML = allDevs.map(d => buildDeviceIdentityCardHtml(d, true)).join('');
+        }
+      }
+
+      // 2. Renderizar en el Panel de Seguridad #secTrustedDevicesList
+      const secList = document.getElementById('secTrustedDevicesList');
+      if (secList) {
+        let filtered = allDevs;
+        if (currentSecDeviceFilter === 'native') filtered = nativeDevs;
+        else if (currentSecDeviceFilter === 'web') filtered = webDevs;
+
+        if (filtered.length === 0) {
+          secList.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 24px;">No hay dispositivos registrados que coincidan con el filtro seleccionado.</div>';
+        } else {
+          secList.innerHTML = filtered.map(d => buildDeviceIdentityCardHtml(d, false)).join('');
+        }
+      }
     }
 
     function revokeDevice(devId, devName, isCurrent = false) {
@@ -9059,6 +9502,11 @@
 
     // Security View Helpers
     function renderSecurityView(sec) {
+      if (Date.now() - lastSecDevicesFetchTs > 5000 || cachedTrustedDevicesList.length === 0) {
+        loadTrustedDevicesList();
+      } else {
+        renderTrustedDevices(cachedTrustedDevicesList);
+      }
       if (!sec) return;
       const pi = sec.pihole || {};
       const f2b = sec.fail2ban || {};
@@ -10692,6 +11140,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
       updateMetrics();
       setInterval(updateMetrics, 2000);
+      setTimeout(() => syncCurrentDeviceTelemetry(false), 600);
 
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) updateMetrics();

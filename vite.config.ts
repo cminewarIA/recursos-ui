@@ -1663,24 +1663,138 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
           return;
         }
 
-        if (url === '/api/auth/devices') {
+        if (url === '/api/auth/devices' || url === '/api/auth/register-device' || url === '/api/auth/rename-device' || url === '/api/auth/revoke' || url === '/api/auth/revoke_all_others') {
           const net = sampleRealNetwork();
-          res.setHeader('Content-Type', 'application/json');
-          res.end(
-            JSON.stringify([
-              {
+          const cpu = sampleRealCpuUsage();
+          const mem = sampleRealMemory();
+          const disks = sampleRealDisks();
+          const rootDisk = (disks as Array<{ total_bytes?: number; free_bytes?: number }>)[0] || {};
+          const curVer = readAppVersion();
+          const g = globalThis as unknown as { __viteTrustedDevices?: Record<string, Record<string, unknown>> };
+          if (!g.__viteTrustedDevices) {
+            let osDistro = `${os.type()} ${os.release()}`;
+            try {
+              const osRel = fs.readFileSync('/etc/os-release', 'utf-8');
+              const m = osRel.match(/^PRETTY_NAME=["']?([^"'\n]+)["']?/m);
+              if (m && m[1]) osDistro = m[1].trim();
+            } catch {
+              // ignore
+            }
+            const defaultTel = {
+              client_type: 'ubuntu_native',
+              client_label: 'App Nativa Ubuntu (.deb)',
+              access_level: 'FULL_NATIVE_ACCESS',
+              full_access: true,
+              dex_capable: true,
+              app_version: curVer,
+              hardware_id: `ubn_${os.hostname()}_${os.arch()}`,
+              name: `${os.hostname()} · ${cpu.model}`,
+              hostname: os.hostname(),
+              manufacturer: cpu.vendor || 'Linux System',
+              brand: 'Ubuntu Linux',
+              model: os.hostname(),
+              chassis_type: 'Linux Workstation / Server',
+              os_distro: osDistro,
+              kernel: `${os.type()} ${os.release()}`,
+              arch: os.arch(),
+              cpu_model: cpu.model,
+              cpu_cores_physical: os.cpus().length,
+              cpu_cores_logical: os.cpus().length,
+              ram_total_bytes: mem.total_bytes,
+              ram_total_gb: Math.round((mem.total_bytes / (1024 ** 3)) * 10) / 10,
+              storage_total_bytes: rootDisk.total_bytes || 0,
+              storage_total_gb: rootDisk.total_bytes ? Math.round((rootDisk.total_bytes / (1024 ** 3)) * 10) / 10 : 0,
+              storage_free_gb: rootDisk.free_bytes ? Math.round((rootDisk.free_bytes / (1024 ** 3)) * 10) / 10 : 0,
+              local_ip: net.local_ip,
+              interface_name: 'eth0',
+            };
+            g.__viteTrustedDevices = {
+              dev_active_session: {
                 id: 'dev_active_session',
-                name: `Sesión Actual (${os.hostname()})`,
+                name: `${os.hostname()} · ${cpu.model}`,
+                auto_name: `${os.hostname()} · ${cpu.model}`,
+                custom_alias: '',
+                client_type: 'ubuntu_native',
+                client_label: 'App Nativa Ubuntu (.deb)',
+                access_level: 'FULL_NATIVE_ACCESS',
+                full_access: true,
+                app_version: curVer,
+                hardware_id: defaultTel.hardware_id,
                 local_ip: net.local_ip,
                 last_external_ip: '',
+                connection_mode: 'LAN',
                 first_seen: new Date().toISOString().slice(0, 19).replace('T', ' '),
-                last_seen: 'Ahora mismo',
+                last_seen: new Date().toISOString().slice(0, 19).replace('T', ' '),
                 verified_in_lan: true,
                 trusted: true,
                 is_current: true,
+                device_telemetry: defaultTel,
               },
-            ])
-          );
+            };
+          }
+
+          if (req.method === 'POST') {
+            let rawBody = '';
+            req.on('data', (chunk) => {
+              rawBody += chunk;
+            });
+            req.on('end', () => {
+              let body: Record<string, unknown> = {};
+              try {
+                body = JSON.parse(rawBody || '{}');
+              } catch {
+                body = {};
+              }
+              const store = g.__viteTrustedDevices!;
+              if (url === '/api/auth/register-device') {
+                const incoming = (body.device_telemetry as Record<string, unknown>) || body;
+                const active = store.dev_active_session || {};
+                const prevTel = (active.device_telemetry as Record<string, unknown>) || {};
+                const mergedTel = { ...prevTel, ...incoming };
+                const cType = String(mergedTel.client_type || active.client_type || 'web_browser');
+                const isNat = cType === 'ubuntu_native' || cType === 'android_native' || Boolean(mergedTel.full_access);
+                const cLabel = cType === 'ubuntu_native'
+                  ? 'App Nativa Ubuntu (.deb)'
+                  : cType === 'android_native'
+                    ? 'App Nativa Android (.apk)'
+                    : String(mergedTel.client_label || 'Navegador Web');
+                const autoName = String(mergedTel.name || active.auto_name || `Sesión Actual (${os.hostname()})`);
+                store.dev_active_session = {
+                  ...active,
+                  name: active.custom_alias ? active.custom_alias : autoName,
+                  auto_name: autoName,
+                  client_type: cType,
+                  client_label: cLabel,
+                  access_level: isNat ? 'FULL_NATIVE_ACCESS' : String(mergedTel.access_level || 'WEB_SANDBOX'),
+                  full_access: isNat,
+                  app_version: String(mergedTel.app_version || curVer),
+                  hardware_id: String(mergedTel.hardware_id || active.hardware_id || 'dev_active_session'),
+                  last_seen: new Date().toISOString().slice(0, 19).replace('T', ' '),
+                  device_telemetry: mergedTel,
+                };
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: true, device_id: 'dev_active_session', device: store.dev_active_session }));
+                return;
+              }
+              if (url === '/api/auth/rename-device') {
+                const targetId = String(body.id || 'dev_active_session');
+                const alias = String(body.alias || body.name || '').trim();
+                if (store[targetId]) {
+                  store[targetId].custom_alias = alias;
+                  store[targetId].name = alias || store[targetId].auto_name || 'Dispositivo';
+                }
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: true, id: targetId, name: store[targetId]?.name || alias }));
+                return;
+              }
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true }));
+            });
+            return;
+          }
+
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(Object.values(g.__viteTrustedDevices)));
           return;
         }
 

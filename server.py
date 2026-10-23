@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http import cookies
 from datetime import datetime
 import ipaddress
+import base64
 import secrets
 import hashlib
 import hmac
@@ -3458,33 +3459,152 @@ def parse_user_agent(ua):
     if not ua:
         return "Dispositivo desconocido"
     ua_lower = ua.lower()
-    dev = "PC"
+
+    if "recursoscockpit-linux" in ua_lower:
+        return "App Nativa Ubuntu (.deb)"
+    if "recursoscockpit-android" in ua_lower:
+        m = re.search(r"android\s+[\d.]+;\s*([^;)]+)", ua, re.IGNORECASE)
+        if m:
+            model_str = m.group(1).strip()
+            if model_str and model_str.lower() not in ("wv", "mobile", "linux"):
+                return f"{model_str} · App Nativa Android"
+        return "App Nativa Android (.apk)"
+
+    dev = "Equipo"
     if "iphone" in ua_lower:
-        dev = "iPhone"
+        dev = "Apple iPhone"
     elif "ipad" in ua_lower:
-        dev = "iPad"
+        dev = "Apple iPad"
     elif "android" in ua_lower:
-        dev = "Android"
-    elif "macintosh" in ua_lower:
-        dev = "Mac"
+        m = re.search(r"android\s+[\d.]+;\s*([^;)]+)", ua, re.IGNORECASE)
+        if m:
+            cand = m.group(1).replace("Build/", "").strip()
+            if cand and cand.lower() not in ("k", "wv", "mobile", "linux"):
+                dev = f"Android ({cand})"
+            else:
+                dev = "Dispositivo Android"
+        else:
+            dev = "Dispositivo Android"
+    elif "macintosh" in ua_lower or "mac os x" in ua_lower:
+        dev = "Apple Mac"
+    elif "windows nt 10.0" in ua_lower:
+        dev = "Windows 10/11 PC"
     elif "windows" in ua_lower:
         dev = "Windows PC"
+    elif "ubuntu" in ua_lower:
+        dev = "Ubuntu Linux PC"
     elif "linux" in ua_lower:
-        dev = "Linux PC"
+        dev = "Linux Workstation"
     elif "nintendo" in ua_lower:
         dev = "Nintendo"
-    
+
     browser = ""
-    if "edg/" in ua_lower:
+    if "recursoscockpit" in ua_lower or "nativehtml" in ua_lower:
+        browser = "Motor Nativo HTML5"
+    elif "edg/" in ua_lower:
         browser = "Edge"
+    elif "opr/" in ua_lower or "opera" in ua_lower:
+        browser = "Opera"
     elif "chrome/" in ua_lower:
         browser = "Chrome"
     elif "safari/" in ua_lower and "chrome" not in ua_lower:
         browser = "Safari"
     elif "firefox/" in ua_lower:
         browser = "Firefox"
-    
+
     return f"{dev} • {browser}" if browser else dev
+
+
+def extract_header_telemetry(handler):
+    """Decodifica la cabecera X-Device-Telemetry (Base64 JSON) enviada por las apps nativas."""
+    raw_b64 = handler.headers.get("X-Device-Telemetry", "").strip()
+    if not raw_b64:
+        return {}
+    try:
+        decoded = base64.b64decode(raw_b64).decode("utf-8", errors="ignore")
+        data = json.loads(decoded)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
+    """
+    Fusiona los metadatos completos de hardware, SO, red y nivel de acceso nativo
+    en el registro del dispositivo sin sobrescribir un alias personalizado.
+    """
+    tel = telemetry if isinstance(telemetry, dict) else {}
+    prev_tel = entry.get("device_telemetry") if isinstance(entry.get("device_telemetry"), dict) else {}
+    merged_tel = dict(prev_tel)
+    for k, v in tel.items():
+        if v is not None and v != "":
+            merged_tel[k] = v
+
+    ua_lower = (ua or "").lower()
+    client_type = merged_tel.get("client_type") or entry.get("client_type") or ""
+    if not client_type:
+        if "recursoscockpit-linux" in ua_lower:
+            client_type = "ubuntu_native"
+        elif "recursoscockpit-android" in ua_lower:
+            client_type = "android_native"
+        else:
+            client_type = "web_browser"
+
+    is_native = client_type in ("ubuntu_native", "android_native") or bool(merged_tel.get("full_access"))
+    if client_type == "ubuntu_native":
+        client_label = "App Nativa Ubuntu (.deb)"
+    elif client_type == "android_native":
+        client_label = "App Nativa Android (.apk)"
+    else:
+        client_label = merged_tel.get("client_label") or "Navegador Web"
+
+    access_level = "FULL_NATIVE_ACCESS" if is_native else (merged_tel.get("access_level") or "WEB_SANDBOX")
+    merged_tel["client_type"] = client_type
+    merged_tel["client_label"] = client_label
+    merged_tel["access_level"] = access_level
+    merged_tel["full_access"] = is_native
+
+    # Nombre descriptivo automático si el usuario no ha definido un custom_alias
+    custom_alias = entry.get("custom_alias", "").strip()
+    auto_name = (
+        merged_tel.get("name")
+        or (
+            f"{merged_tel.get('manufacturer', '')} {merged_tel.get('model', '')}".strip()
+            if (merged_tel.get("manufacturer") or merged_tel.get("model"))
+            else ""
+        )
+        or parse_user_agent(ua)
+    )
+    if custom_alias:
+        entry["name"] = custom_alias
+    elif auto_name and (
+        not entry.get("name")
+        or entry.get("name") in ("Dispositivo", "Dispositivo desconocido", "PC", "Linux PC", "Android")
+        or "•" in str(entry.get("name", ""))
+        or is_native
+    ):
+        entry["name"] = auto_name
+
+    entry["auto_name"] = auto_name
+    entry["client_type"] = client_type
+    entry["client_label"] = client_label
+    entry["access_level"] = access_level
+    entry["full_access"] = is_native
+    entry["app_version"] = merged_tel.get("app_version") or entry.get("app_version") or get_app_version()
+    if merged_tel.get("hardware_id"):
+        entry["hardware_id"] = str(merged_tel["hardware_id"])
+    entry["connection_mode"] = "LAN" if is_local else "WAN"
+    if is_local:
+        entry["local_ip"] = merged_tel.get("local_ip") or client_ip
+    else:
+        entry["last_external_ip"] = client_ip
+        if merged_tel.get("local_ip") and not entry.get("local_ip"):
+            entry["local_ip"] = merged_tel.get("local_ip")
+    if ua:
+        entry["user_agent"] = ua[:220]
+    entry["device_telemetry"] = merged_tel
+    return entry
+
 
 def check_trust_status(handler):
     """
@@ -3515,19 +3635,32 @@ def check_trust_status(handler):
                     token = c['_sysmon_trust'].value
             except Exception:
                 pass
-            
+
+    hdr_telemetry = extract_header_telemetry(handler)
+    hdr_hw_id = str(hdr_telemetry.get("hardware_id") or "").strip()
+
     with TRUST_LOCK:
         devices = load_trusted_devices()
         verified_device_id = verify_device_token(token) if token else None
         device_entry = devices.get(verified_device_id) if verified_device_id else None
+
+        # Si una app nativa reconecta con su hardware_id único pero sin token previo, reutilizar su registro
+        if not device_entry and hdr_hw_id and is_local:
+            for existing_id, existing_dev in devices.items():
+                if existing_dev.get("hardware_id") == hdr_hw_id and existing_dev.get("trusted", True):
+                    verified_device_id = existing_id
+                    device_entry = existing_dev
+                    token = create_device_token(existing_id)
+                    break
+
         new_token = None
         now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ua = handler.headers.get('User-Agent', '')
 
         if is_local:
             # En la red local, el dispositivo siempre tiene acceso.
-            # Omitir persistencia de tokens para herramientas CLI locales (curl, scripts internos, urllib)
-            if ua.startswith(('curl/', 'Wget/', 'python-requests', 'Go-http-client', 'Python-urllib')):
+            # Omitir persistencia de tokens para herramientas CLI locales (curl, scripts internos, urllib sin telemetría nativa)
+            if ua.startswith(('curl/', 'Wget/', 'python-requests', 'Go-http-client', 'Python-urllib')) and not hdr_telemetry:
                 return {
                     "is_local": True,
                     "is_trusted": True,
@@ -3541,9 +3674,9 @@ def check_trust_status(handler):
             # Si el dispositivo ya tiene un token firmado válido y registrado en devices
             if device_entry and device_entry.get("trusted", True):
                 device_entry["last_seen"] = now_iso
-                device_entry["local_ip"] = client_ip
                 device_entry["verified_in_lan"] = True
                 device_entry["trusted"] = True
+                enrich_device_entry(device_entry, ua, hdr_telemetry, client_ip, is_local=True)
                 save_trusted_devices(devices)
                 return {
                     "is_local": True,
@@ -3566,10 +3699,11 @@ def check_trust_status(handler):
                     "last_seen": now_iso,
                     "local_ip": client_ip,
                     "last_external_ip": "",
-                    "user_agent": ua[:150],
+                    "user_agent": ua[:220],
                     "verified_in_lan": True,
                     "trusted": True
                 }
+                enrich_device_entry(device_entry, ua, hdr_telemetry, client_ip, is_local=True)
                 devices[dev_id] = device_entry
                 save_trusted_devices(devices)
                 return {
@@ -3587,6 +3721,7 @@ def check_trust_status(handler):
                 # Dispositivo previamente emparejado en LAN con firma válida
                 device_entry["last_seen"] = now_iso
                 device_entry["last_external_ip"] = client_ip
+                enrich_device_entry(device_entry, ua, hdr_telemetry, client_ip, is_local=False)
                 save_trusted_devices(devices)
                 return {
                     "is_local": False,
@@ -6311,7 +6446,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 2. LISTADO DE DISPOSITIVOS EMPAREJADOS
+        # 2. LISTADO DE DISPOSITIVOS EMPAREJADOS CON IDENTIFICACIÓN COMPLETA DE HARDWARE
         elif clean_path == "/api/auth/devices":
             if not auth["is_trusted"]:
                 self.send_response(403)
@@ -6324,20 +6459,45 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 caller_dev_id = auth.get("device_id")
                 for k, v in devices.items():
                     dev_id = v.get("id") or k
+                    tel = v.get("device_telemetry") if isinstance(v.get("device_telemetry"), dict) else {}
+                    ua_str = v.get("user_agent", "")
+                    c_type = v.get("client_type") or tel.get("client_type") or (
+                        "ubuntu_native" if "recursoscockpit-linux" in ua_str.lower() else (
+                            "android_native" if "recursoscockpit-android" in ua_str.lower() else "web_browser"
+                        )
+                    )
+                    is_nat = c_type in ("ubuntu_native", "android_native") or bool(v.get("full_access") or tel.get("full_access"))
+                    c_label = v.get("client_label") or tel.get("client_label") or (
+                        "App Nativa Ubuntu (.deb)" if c_type == "ubuntu_native" else (
+                            "App Nativa Android (.apk)" if c_type == "android_native" else "Navegador Web"
+                        )
+                    )
                     dev_list.append({
                         "id": dev_id,
-                        "name": v.get("name", "Dispositivo"),
+                        "name": v.get("custom_alias") or v.get("name") or tel.get("name") or "Dispositivo",
+                        "auto_name": v.get("auto_name") or tel.get("name") or v.get("name") or "Dispositivo",
+                        "custom_alias": v.get("custom_alias", ""),
+                        "client_type": c_type,
+                        "client_label": c_label,
+                        "access_level": "FULL_NATIVE_ACCESS" if is_nat else (v.get("access_level") or "WEB_SANDBOX"),
+                        "full_access": is_nat,
+                        "app_version": v.get("app_version") or tel.get("app_version") or "",
+                        "hardware_id": v.get("hardware_id") or tel.get("hardware_id") or dev_id,
                         "first_seen": v.get("first_seen", ""),
                         "last_seen": v.get("last_seen", ""),
-                        "local_ip": v.get("local_ip", ""),
+                        "local_ip": v.get("local_ip") or tel.get("local_ip") or "",
                         "last_external_ip": v.get("last_external_ip", ""),
+                        "connection_mode": v.get("connection_mode", "LAN" if not v.get("last_external_ip") else "WAN"),
+                        "user_agent": ua_str,
                         "verified_in_lan": v.get("verified_in_lan", True),
                         "trusted": v.get("trusted", True),
-                        "is_current": (dev_id == caller_dev_id)
+                        "is_current": (dev_id == caller_dev_id),
+                        "device_telemetry": tel
                     })
-            resp = json.dumps(dev_list).encode('utf-8')
+                dev_list.sort(key=lambda x: (not x.get("is_current", False), not x.get("full_access", False), x.get("last_seen", "")), reverse=False)
+            resp = json.dumps(dev_list, ensure_ascii=False).encode('utf-8')
             self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_security_headers()
             if auth.get("new_token"):
                 self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
@@ -6989,6 +7149,139 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             resp = json.dumps({"success": True, "revoked_count": count_revoked}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 2c. Registro y sincronización de telemetría profunda del dispositivo (Apps Nativas y Web)
+        elif clean_path == "/api/auth/register-device":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 32768:
+                self.send_response(413)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            raw_post = self.rfile.read(content_length).decode('utf-8', errors='ignore') if content_length > 0 else "{}"
+            try:
+                body = json.loads(raw_post)
+            except Exception:
+                body = {}
+
+            telemetry = body.get("device_telemetry") if isinstance(body.get("device_telemetry"), dict) else body
+            caller_dev_id = auth.get("device_id")
+            ua = self.headers.get('User-Agent', '')
+            is_local = auth.get("is_local", True)
+            now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            issued_token = auth.get("token") or auth.get("new_token")
+
+            with TRUST_LOCK:
+                devices = load_trusted_devices()
+                target_id = caller_dev_id if (caller_dev_id and caller_dev_id != "cli_local") else None
+                hw_id = str(telemetry.get("hardware_id") or "").strip()
+
+                if hw_id:
+                    for existing_id, existing_dev in list(devices.items()):
+                        if existing_dev.get("hardware_id") == hw_id:
+                            if not target_id:
+                                target_id = existing_id
+                                issued_token = create_device_token(existing_id)
+                            elif existing_id != target_id:
+                                # Fusionar duplicado previo del mismo hardware_id
+                                if existing_dev.get("custom_alias") and not devices.get(target_id, {}).get("custom_alias"):
+                                    devices.setdefault(target_id, {})["custom_alias"] = existing_dev["custom_alias"]
+                                if existing_dev.get("first_seen") and target_id in devices:
+                                    devices[target_id]["first_seen"] = existing_dev["first_seen"]
+                                del devices[existing_id]
+
+                if not target_id:
+                    target_id = f"dev_{secrets.token_hex(6)}"
+                    issued_token = create_device_token(target_id)
+
+                entry = devices.get(target_id) or {
+                    "id": target_id,
+                    "name": parse_user_agent(ua),
+                    "first_seen": now_iso,
+                    "last_seen": now_iso,
+                    "local_ip": client_ip if is_local else "",
+                    "last_external_ip": "" if is_local else client_ip,
+                    "verified_in_lan": True,
+                    "trusted": True,
+                }
+                entry["id"] = target_id
+                entry["last_seen"] = now_iso
+                enrich_device_entry(entry, ua, telemetry, client_ip, is_local=is_local)
+                devices[target_id] = entry
+                save_trusted_devices(devices)
+
+            resp = json.dumps({
+                "success": True,
+                "device_id": target_id,
+                "token": issued_token,
+                "device": entry
+            }, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_security_headers()
+            if issued_token:
+                self.send_header('Set-Cookie', get_cookie_header_value(self, issued_token))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 2d. Renombrar alias personalizado de un dispositivo en el Panel de Seguridad
+        elif clean_path == "/api/auth/rename-device":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 4096:
+                self.send_response(413)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            raw_post = self.rfile.read(content_length).decode('utf-8', errors='ignore') if content_length > 0 else "{}"
+            try:
+                body = json.loads(raw_post)
+            except Exception:
+                body = {}
+
+            dev_id = str(body.get("id") or "").strip()
+            alias = str(body.get("alias") or body.get("name") or "").strip()[:80]
+
+            with TRUST_LOCK:
+                devices = load_trusted_devices()
+                target_dev = devices.get(dev_id)
+                if not target_dev:
+                    for k, v in devices.items():
+                        if v.get("id") == dev_id:
+                            target_dev = v
+                            break
+                if target_dev:
+                    target_dev["custom_alias"] = alias
+                    target_dev["name"] = alias if alias else (target_dev.get("auto_name") or "Dispositivo")
+                    save_trusted_devices(devices)
+                    resp = json.dumps({"success": True, "id": dev_id, "name": target_dev["name"]}, ensure_ascii=False).encode('utf-8')
+                else:
+                    resp = json.dumps({"success": False, "error": "Dispositivo no encontrado"}, ensure_ascii=False).encode('utf-8')
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_security_headers()
             self.send_header('Content-Length', str(len(resp)))
             self.end_headers()

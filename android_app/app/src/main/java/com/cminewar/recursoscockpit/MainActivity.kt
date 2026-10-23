@@ -23,7 +23,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         securePreferences = SecurePreferences(this)
-        apiService = ApiService(securePreferences)
+        apiService = ApiService(applicationContext, securePreferences)
         discoveryManager = DiscoveryManager(apiService, securePreferences)
 
         setContent {
@@ -45,6 +45,8 @@ class MainActivity : ComponentActivity() {
                             val (_, isRevoked) = apiService.fetchMetrics(endpoint.url)
                             if (isRevoked) {
                                 connectionMode = ConnectionMode.REVOKED
+                            } else {
+                                apiService.registerDeviceWithServer(endpoint.url)
                             }
                         }
                     }
@@ -58,6 +60,9 @@ class MainActivity : ComponentActivity() {
                     }
                     activeUrl = endpoint.url
                     connectionMode = endpoint.mode
+                    if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN) {
+                        apiService.registerDeviceWithServer(endpoint.url)
+                    }
 
                     while (isActive) {
                         if (connectionMode == ConnectionMode.REVOKED) {
@@ -76,6 +81,9 @@ class MainActivity : ComponentActivity() {
                                 }
                                 activeUrl = newEndpoint.url
                                 connectionMode = newEndpoint.mode
+                                if (newEndpoint.mode == ConnectionMode.CONNECTED_LAN || newEndpoint.mode == ConnectionMode.CONNECTED_WAN) {
+                                    apiService.registerDeviceWithServer(newEndpoint.url)
+                                }
                             }
                         }
                         delay(5000)
@@ -87,6 +95,7 @@ class MainActivity : ComponentActivity() {
                     connectionMode = connectionMode,
                     activeUrl = activeUrl,
                     scanningMessage = scanningMessage,
+                    deviceTelemetryProvider = { apiService.getDeviceTelemetryJson() },
                     onRefresh = { triggerDiscoveryAndRefresh() },
                     onOpenSettings = { showSettings = true }
                 )
