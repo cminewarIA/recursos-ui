@@ -74,7 +74,13 @@
        - *App Nativa de Ubuntu*: Al disponer de acceso directo a `/dev/uhid`, `scrcpy` y el subsistema USB, desbloquea dinámicamente el submenú de control DeX / Modo Escritorio Android con todos sus controles de resolución, tasa de refresco (60 FPS), auto-conexión y modo pantalla completa.
        - *Versión Web y Clientes Externos*: Todo submenú de DeX permanece estrictamente bloqueado y oculto, mostrando únicamente el mensaje pasivo: *"Esperando dispositivo para conectarse en su versión nativa"*.
 
-## 8. Publicación Automática en GitHub (`git push`)
+## 8. Principio de Simetría Total, Homogeneidad y Cohesión en Interfaces y Submenús (Web, Linux/Ubuntu y Android)
+- **Regla obligatoria**:
+  1. **Simetría y Homogeneidad Estricta en Todas las Interfaces**: Todos los componentes, vistas, tarjetas Bento, barras de herramientas, HUDs, paneles flotantes, modales y submenús (incluida la interfaz del mapa geoespacial, el catálogo de servicios, los selectores de subredes, gráficos y tablas) deben mantener una simetría visual y estructural rigurosa, limpia y equilibrada en cualquier resolución o factor de forma.
+  2. **Ecosistema Homogéneo Universal**: La experiencia visual entre la aplicación web y las aplicaciones nativas de Ubuntu (GTK 3/Cairo) y Android (Jetpack Compose) debe sentirse 100% homogénea y coherente, compartiendo idénticos principios de espaciado simétrico, radios de curvatura, tratamiento de cristal (*Apple Liquid Glass*), contraste, tipografía monoespaciada tabular y ergonomía táctil (*Tesla Touch Cockpit*).
+  3. **Simetría Contractual en Nuevas Funcionalidades**: Cualquier elemento, control, submenú o vista que se incorpore a futuro debe ceñirse sin excepción a esta simetría y homogeneidad, evitando componentes desalineados, estilos visuales dispares o menús secundarios asimétricos.
+
+## 9. Publicación Automática en GitHub (`git push`)
 - **Regla obligatoria**: Al finalizar cualquier modificación, tras compilar e instalar el paquete local y actualizar `README.md` y `planes/`, se deben confirmar los cambios con un commit semántico claro y ejecutar:
   ```bash
   git push origin main --tags
