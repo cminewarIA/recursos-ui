@@ -1603,6 +1603,30 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
           return;
         }
 
+        if (url?.startsWith('/download/recursos-cockpit') || url === '/download/app.deb' || url === '/download/app.apk') {
+          const isApk = url.endsWith('.apk');
+          const distDir = path.resolve(__dirname, 'dist');
+          const curVer = readAppVersion();
+          const localTarget = isApk
+            ? path.join(distDir, `recursos-cockpit_${curVer}.apk`)
+            : path.join(distDir, `recursos-cockpit_${curVer}_amd64.deb`);
+          if (fs.existsSync(localTarget)) {
+            const stat = fs.statSync(localTarget);
+            res.setHeader('Content-Type', isApk ? 'application/vnd.android.package-archive' : 'application/vnd.debian.binary-package');
+            res.setHeader('Content-Disposition', `attachment; filename="${path.basename(localTarget)}"`);
+            res.setHeader('Content-Length', stat.size);
+            const stream = fs.createReadStream(localTarget);
+            stream.pipe(res);
+            return;
+          }
+          const githubUrl = isApk
+            ? `https://github.com/cminewarIA/recursos-ui/releases/download/v${curVer}/recursos-cockpit_${curVer}.apk`
+            : `https://github.com/cminewarIA/recursos-ui/releases/download/v${curVer}/recursos-cockpit_${curVer}_amd64.deb`;
+          res.writeHead(302, { Location: githubUrl });
+          res.end();
+          return;
+        }
+
         if (url === '/api/auth/devices') {
           const net = sampleRealNetwork();
           res.setHeader('Content-Type', 'application/json');
@@ -1650,6 +1674,73 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
         if (url === '/api/dns/traffic') {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ clients: [], recent_queries: [] }));
+          return;
+        }
+
+        if (url?.startsWith('/api/net/history')) {
+          if (url === '/api/net/history/clear') {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true, message: 'Historial SQLite vaciado' }));
+            return;
+          }
+          const liveMap = buildLiveConnectionsMap(sampleRealNetwork().local_ip);
+          const conns = (liveMap && Array.isArray(liveMap.connections)) ? liveMap.connections : [];
+          const servicesMap: Record<string, { service: string; count: number; ips: Set<string>; devices: Set<string> }> = {};
+          const devicesMap: Record<string, { ip: string; name: string; count: number; services: Set<string> }> = {};
+
+          for (const c of conns) {
+            const svc = c.service || 'Conexión Directa';
+            const dev = c.local_ip || 'Servidor';
+            if (!servicesMap[svc]) {
+              servicesMap[svc] = { service: svc, count: 0, ips: new Set<string>(), devices: new Set<string>() };
+            }
+            servicesMap[svc].count++;
+            servicesMap[svc].ips.add(c.remote_ip);
+            servicesMap[svc].devices.add(dev);
+
+            if (!devicesMap[dev]) {
+              devicesMap[dev] = { ip: dev, name: dev, count: 0, services: new Set<string>() };
+            }
+            devicesMap[dev].count++;
+            devicesMap[dev].services.add(svc);
+          }
+
+          const servicesCatalog = Object.values(servicesMap).map((s) => ({
+            service: s.service,
+            hit_count: s.count,
+            unique_ips: s.ips.size,
+            device_count: s.devices.size,
+            last_seen: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          }));
+
+          const devicesCatalog = Object.values(devicesMap).map((d) => ({
+            ip: d.ip,
+            name: d.name,
+            total_hits: d.count,
+            services_count: d.services.size,
+            last_seen: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          }));
+
+          const historyPayload = {
+            status: 'ok',
+            services_catalog: servicesCatalog,
+            devices_catalog: devicesCatalog,
+            connections: conns.map((c) => ({
+              ...c,
+              hit_count: 1,
+              first_seen: new Date(Date.now() - 3600000).toISOString().slice(0, 19).replace('T', ' '),
+              last_seen: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            })),
+            summary: {
+              total_records: conns.length,
+              total_services: servicesCatalog.length,
+              total_unique_ips: conns.length,
+              total_devices: devicesCatalog.length,
+            },
+          };
+
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(historyPayload));
           return;
         }
 

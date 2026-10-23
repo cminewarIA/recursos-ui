@@ -1,61 +1,41 @@
-# Plan de Implementación v9.0.0: Rediseño Anti-AI Slop, Firma Criptográfica Permanente (.apk & .deb) y CI/CD Node 24
+# Plan de Implementación v9.1.1: Corrección de Errores en Frontend y Manejador de Historial en Servidor Dev
 
-## 1. Contexto y Objetivos
-El usuario solicitó cuatro mejoras fundamentales para el proyecto:
-1. **Enlaces de descarga directa de paquetes en `README.md`**: Proporcionar enlaces directos a las versiones oficiales (.deb y .apk) y al último release.
-2. **Corrección de advertencias de GitHub Actions**:
-   - `Node.js 20 is deprecated... forced to run on Node.js 24: actions/setup-java@v4, gradle/actions/setup-gradle@v4`.
-   - `setup-java v4 is deprecated and will no longer receive updates. Please migrate to actions/setup-java@v5`.
-3. **Rediseño completo de la interfaz para erradicar apariencia de IA (Anti-AI Slop)**:
-   - Erradicar las píldoras y cápsulas estáticas (`border-radius: 999px`) en metadatos, tags de versiones, barras y marcadores.
-   - Aplicar esquinas técnicas de silicio (`border-radius: 4px - 6px`), micro-LEDs de estado, canvas oscuro mate obsidiana (`#06070a`), contrastes de silicio y tipografía tabular monoespaciada (*JetBrains Mono* + *Outfit*).
-   - Según la **Regla 3.4**, un rediseño completo de la interfaz activa estrictamente un incremento de versión **`MAJOR`**: `v9.0.0` (reseteando a `0.0`).
-4. **Firma Criptográfica Permanente de Binarios (.apk & .deb)**:
-   - **Android (`.apk`)**: Evitar las alarmas de Google Play Protect y permitir actualizar la app directamente sin desinstalar previamente (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Requiere keystore de lanzamiento permanente y determinista (`recursos-release.jks`) configurado en Gradle con firmas V1, V2 y V3.
-   - **Ubuntu Linux (`.deb`)**: Permitir actualizaciones limpias con `dpkg` / `apt` sin bloqueos de ficheros en ejecución (*"Text file busy"*) mediante `packaging/debian/prerm` y directivas canónicas `Replaces: recursos-cockpit` y `Provides: recursos-cockpit` en `packaging/debian/control`.
+## 1. Contexto y Errores Detectados
+Se reportaron dos errores en tiempo de ejecución:
+1. `Error consultando /api/net/history: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON`
+   - **Causa raíz**: En el entorno de desarrollo y previsualización (Vite), la ruta `/api/net/history` no estaba interceptada por el middleware de telemetría. Al solicitarla, Vite devolvía la página SPA por defecto (`index.html`), comenzando por `<!DOCTYPE html>`. El frontend llamaba a `res.json()` de forma incondicional asumiendo JSON, lo que provocaba un `SyntaxError`.
+2. `ReferenceError: connectionsMapServiceDrawerOpen is not defined at HTMLDivElement.<anonymous> (:13444:13)`
+   - **Causa raíz**: En el listener global de clic del contenedor del mapa Leaflet (`container.addEventListener('click', ...)`), el código referenciaba el identificador obsoleto `connectionsMapServiceDrawerOpen` e invocaba `toggleMapServiceCatalogDrawer(false)`. Dicha variable no existía en el scope superior, produciendo una excepción `ReferenceError` no capturada al hacer clic sobre el mapa.
 
 ---
 
-## 2. Acciones y Modificaciones
+## 2. Acciones y Modificaciones Realizadas
 
-### A. CI/CD en GitHub Actions (`.github/workflows/build-deb.yml`)
-- Migrar de `actions/setup-java@v4` y `gradle/actions/setup-gradle@v4` a `actions/setup-java@v5` con `cache: 'gradle'`, ejecutándose de forma nativa en Node 24.
-- Resolver completamente las dos advertencias deprecadas de GitHub.
+### A. Corrección de `ReferenceError: connectionsMapServiceDrawerOpen`
+- En `index.html` (y `static/index.html`):
+  - Sustitución segura en el listener del contenedor del mapa por `connectionsMapDrawerOpen` y `toggleMapSideDrawer(false)`.
+  - Definición explícita de `connectionsMapServiceDrawerOpen` y función puente `toggleMapServiceCatalogDrawer(force)` en el scope global del mapa para compatibilidad total ante cualquier llamada residual.
+  - Sincronización continua de estado en `syncMapSideDrawerUI()`.
 
-### B. Firma Criptográfica Determinista de Android APK (`android_app/`)
-- Generación de Keystore permanente PKCS12 (`android_app/keystore/recursos-release.jks`) válido durante 30 años (hasta 2056), con alias `recursos` y contraseña segura.
-- Configuración en `android_app/app/build.gradle.kts`:
-  - `signingConfigs { create("release") { ... enableV1Signing = true, enableV2Signing = true, enableV3Signing = true } }`
-  - `buildTypes { getByName("release") { signingConfig = signingConfigs.getByName("release") } }`
-  - Incremento de versión canónica: `versionCode = 90000`, `versionName = "9.0.0"`.
+### B. Corrección de `SyntaxError` en `/api/net/history`
+- En `vite.config.ts`:
+  - Implementación del endpoint `/api/net/history` y `/api/net/history/clear` dentro del middleware de telemetría del servidor de desarrollo. Devuelve el catálogo estructurado de servicios, dispositivos, conexiones y resumen en JSON idéntico al backend de producción `server.py`.
+- En `index.html` (y `static/index.html`):
+  - En `NetworkConnectionsMapEngine.fetchHistoryData()` y `toggleDeviceInlineHistory()`, se incorporó validación estricta de la cabecera `content-type` (`cType.includes('application/json')`) previa al parseo con `res.json()`.
+  - En caso de respuestas no JSON o fallos transitorios, se maneja de forma no bloqueante (`console.warn`) sin arrojar errores en la consola.
 
-### C. Actualizaciones Transparentes e In-Place en Ubuntu Linux (`packaging/`)
-- Inclusión de `Replaces: recursos-cockpit` y `Provides: recursos-cockpit` en `packaging/debian/control`.
-- Creación de `packaging/debian/prerm` con permisos `755` para detener procesos activos antes del desempaquetado de nuevas versiones.
-- Actualización de `packaging/build_deb.sh` para incluir el script `prerm` y compilar `dist/recursos-cockpit_9.0.0_amd64.deb`.
-
-### D. Rediseño Anti-AI Slop en la Interfaz Web (`index.html` y `static/index.html`)
-- Sustitución de estilos píldora genéricos (`border-radius: 999px`) en `.version-tag`, `.route-chip`, `.header-center-telemetry`, `.nav-counter`, `.core-bar-track/fill`, `.legend-bw-alert-badge`, `.gmp-conn-marker`, `.group-count-pill`, `.adw-badge`, `.brand-badge` y `#usbWaitLiveStatusPill`.
-- Adopción de radio de curvatura técnico de 4px - 6px, micro-LEDs de estado y canvas oscuro obsidiana mate.
-
-### E. Centro de Descargas Directas y Documentación (`README.md`)
-- Incorporación de la sección `## 📥 Centro de Descargas Directas de Paquetes Oficiales (.deb Linux & .apk Android)`.
-- Enlaces directos a versiones fijas (`v9.0.0`), enlace a `latest`, instrucciones paso a paso para Android y Ubuntu, y tabla histórica de descargas.
-- Actualización de badges a `v9.0.0` y banner ASCII a `v9.0.0`.
-- Registro detallado en el Historial de Versiones (Regla 3.4).
-
-### F. Sincronización Canónica de Versión (`9.0.0`)
-- `./VERSION`: `9.0.0`
-- `package.json`: `"version": "9.0.0"`
-- `packaging/debian/control`: `Version: 9.0.0`
-- `android_app/app/build.gradle.kts`: `versionName = "9.0.0"`, `versionCode = 90000`
-- `README.md`: `v9.0.0`
+### C. Sincronización Canónica de Versiones (`9.1.1`)
+- `./VERSION`: `9.1.1`
+- `package.json`: `"version": "9.1.1"`
+- `packaging/debian/control`: `Version: 9.1.1`
+- `android_app/app/build.gradle.kts`: `versionName = "9.1.1"`, `versionCode = 90101`
+- `README.md`: Badges, banner ASCII, enlaces de descarga directa y tabla de historial de versiones actualizados.
+- Sincronización 100% idéntica entre `index.html` y `static/index.html`.
 
 ---
 
 ## 3. Plan de Verificación
-1. Compilar paquete Debian local: `bash packaging/build_deb.sh`.
-2. Verificar binarios generados en `dist/` y sumas `SHA256SUMS.txt`.
-3. Validar cliente nativo de escritorio: `python3 desktop_app/recursos_app.py --test-mode`.
-4. Ejecutar validación de TypeScript (`lint_applet`).
-5. Ejecutar `compile_applet`.
+1. Compilar el paquete Debian canónico: `bash packaging/build_deb.sh`.
+2. Validar que la aplicación nativa ejecute limpiamente: `python3 desktop_app/recursos_app.py --test-mode`.
+3. Validar TypeScript: `lint_applet` (`tsc --noEmit`).
+4. Compilar la aplicación web: `compile_applet`.

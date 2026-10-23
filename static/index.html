@@ -201,6 +201,26 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* OTA Web Direct Downloads: Exclusivo para la versión Web */
+    .ota-web-download-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .ota-web-downloads-card {
+      transition: border-color 0.22s ease, transform 0.22s ease;
+    }
+    .ota-web-downloads-card:hover {
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+    [data-runtime-env="native"] #otaWebDownloadButtons,
+    [data-runtime-env="native"] #otaWebDownloadsCard,
+    .is-native-env #otaWebDownloadButtons,
+    .is-native-env #otaWebDownloadsCard {
+      display: none !important;
+    }
+
     /* Custom Scrollbars */
     *::-webkit-scrollbar { width: 6px; height: 6px; }
     *::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.24); border-radius: 999px; }
@@ -5033,13 +5053,50 @@
                   Repositorio oficial <a href="https://github.com/cminewarIA/recursos-ui" target="_blank" rel="noopener" class="mono" style="color: var(--accent-cyan-bright); text-decoration: none;">cminewarIA/recursos-ui</a> · Rama <code class="mono">main</code>
                 </p>
               </div>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <!-- Botones de Descarga Directa Exclusivos para la Versión Web -->
+                <div class="ota-web-download-row" id="otaWebDownloadButtons" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_9.1.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Descargar .deb (Linux)</span>
+                  </a>
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_9.1.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    <span>Descargar .apk (Android)</span>
+                  </a>
+                </div>
                 <button class="action-btn" id="btnCheckVersionNow" onclick="checkSystemVersion(true)">
                   <span id="lblCheckVersionNow">Comprobar ahora</span>
                 </button>
                 <button class="action-btn primary-cta" id="btnUpdateGithub" onclick="triggerSystemUpdate()">
                   <span id="lblUpdateGithub">Actualizar desde GitHub</span>
                 </button>
+              </div>
+            </div>
+
+            <!-- Panel Exclusivo Web: Descarga Directa de Paquetes Nativos (.deb & .apk) -->
+            <div class="surface-panel ota-web-downloads-card" id="otaWebDownloadsCard" style="margin-top: 14px; padding: 14px 18px; border: 1px solid var(--border-subtle); background: var(--bg-surface-inset); border-radius: var(--radius-sm);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; flex-direction: column; gap: 3px;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">📦 Paquetes Oficiales Compilados</span>
+                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v9.1.0</span>
+                    <span class="adw-badge badge-purple" style="font-size: 10px; font-weight: 600;">Solo en la Web</span>
+                  </div>
+                  <div style="font-size: 12px; color: var(--text-muted);">
+                    Descarga directa de binarios canónicos firmados: cliente nativo GTK3 para Ubuntu Linux y APK nativo Jetpack Compose para Android.
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_9.1.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Descargar .deb (Linux amd64)</span>
+                  </a>
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_9.1.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    <span>Descargar .apk (Android)</span>
+                  </a>
+                </div>
               </div>
             </div>
 
@@ -7458,6 +7515,31 @@
       const verHeaderVersionBadge = document.getElementById('verHeaderVersionBadge');
       if (verHeaderVersionBadge) verHeaderVersionBadge.innerText = semVer;
 
+      const cleanSemVer = semVer.replace(/^v/, '');
+      const otaCardVer = document.getElementById('otaCardVersionBadge');
+      if (otaCardVer) otaCardVer.innerText = `v${cleanSemVer}`;
+
+      const btnOtaDeb = document.getElementById('btnOtaDownloadDeb');
+      if (btnOtaDeb) {
+        btnOtaDeb.download = `recursos-cockpit_${cleanSemVer}_amd64.deb`;
+        btnOtaDeb.href = `/download/recursos-cockpit_${cleanSemVer}_amd64.deb`;
+      }
+      const btnOtaCardDeb = document.getElementById('btnOtaCardDownloadDeb');
+      if (btnOtaCardDeb) {
+        btnOtaCardDeb.download = `recursos-cockpit_${cleanSemVer}_amd64.deb`;
+        btnOtaCardDeb.href = `/download/recursos-cockpit_${cleanSemVer}_amd64.deb`;
+      }
+      const btnOtaApk = document.getElementById('btnOtaDownloadApk');
+      if (btnOtaApk) {
+        btnOtaApk.download = `recursos-cockpit_${cleanSemVer}.apk`;
+        btnOtaApk.href = `/download/recursos-cockpit_${cleanSemVer}.apk`;
+      }
+      const btnOtaCardApk = document.getElementById('btnOtaCardDownloadApk');
+      if (btnOtaCardApk) {
+        btnOtaCardApk.download = `recursos-cockpit_${cleanSemVer}.apk`;
+        btnOtaCardApk.href = `/download/recursos-cockpit_${cleanSemVer}.apk`;
+      }
+
       const verStatusBadge = document.getElementById('verStatusBadge');
       if (verStatusBadge) {
         verStatusBadge.className = 'adw-badge ' + (hasUpdate ? 'badge-amber' : 'badge-green');
@@ -9807,6 +9889,13 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         const info = this.detect();
         document.documentElement.setAttribute('data-runtime-env', info.env);
         this.enforceNavigationPolicy();
+
+        // Botones y tarjeta de descarga en pestaña OTA: estrictamente exclusivos para la versión Web
+        const otaWebBtns = document.getElementById('otaWebDownloadButtons');
+        const otaWebCard = document.getElementById('otaWebDownloadsCard');
+        const isNative = info.isNative;
+        if (otaWebBtns) otaWebBtns.style.display = isNative ? 'none' : 'flex';
+        if (otaWebCard) otaWebCard.style.display = isNative ? 'none' : 'block';
 
         const waitScreen = document.getElementById('usbProjectionWaitScreen');
         const envBadge = document.getElementById('usbWaitEnvBadge');
@@ -12512,6 +12601,12 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
     let connectionsMapHistorySearch = '';
     let connectionsMapHistoryHours = '0';
     let connectionsMapDrawerOpen = false;
+    let connectionsMapServiceDrawerOpen = false;
+    function toggleMapServiceCatalogDrawer(force) {
+      if (typeof toggleMapSideDrawer === 'function') {
+        toggleMapSideDrawer(force);
+      }
+    }
     let _clearMapHistoryConfirmTimer = null;
     let expandedDeviceHistoryIp = null;
     let expandedDeviceHistoryName = '';
@@ -12541,6 +12636,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       const devChip = document.getElementById('btnMapClearDeviceQuick');
       const devChipLbl = document.getElementById('lblMapActiveDevice') || document.getElementById('lblMapActiveDeviceQuick');
 
+      connectionsMapServiceDrawerOpen = !!connectionsMapDrawerOpen;
       if (btn) btn.classList.toggle('open', !!connectionsMapDrawerOpen);
       if (drawer) drawer.classList.toggle('open', !!connectionsMapDrawerOpen);
       if (pip) pip.classList.toggle('history-mode', connectionsMapMode === 'history');
@@ -12934,7 +13030,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
 
       try {
         const res = await fetch(`/api/net/history?device=${encodeURIComponent(localIp)}&limit=250`);
-        if (res.ok) {
+        const cType = res.headers.get('content-type') || '';
+        if (res.ok && cType.includes('application/json')) {
           const data = await res.json();
           if (data && data.status === 'ok') {
             _deviceHistoryCache.set(localIp, data);
@@ -12942,7 +13039,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           }
         }
       } catch (e) {
-        console.error('Error cargando historial por dispositivo:', e);
+        console.warn('Error cargando historial por dispositivo:', e);
       }
     }
 
@@ -13093,7 +13190,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         try {
           const hoursParam = connectionsMapHistoryHours && connectionsMapHistoryHours !== '0' ? `&hours=${encodeURIComponent(connectionsMapHistoryHours)}` : '';
           const res = await fetch(`/api/net/history?limit=400${hoursParam}`);
-          if (res.ok) {
+          const cType = res.headers.get('content-type') || '';
+          if (res.ok && cType.includes('application/json')) {
             const data = await res.json();
             if (data && data.status === 'ok') {
               this._historyData = data;
@@ -13105,7 +13203,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             }
           }
         } catch (e) {
-          console.error('Error consultando /api/net/history:', e);
+          console.warn('Error consultando /api/net/history:', e);
         } finally {
           this._isFetchingHistory = false;
         }
@@ -13350,8 +13448,10 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           this.enforceMapWorldBounds();
 
           container.addEventListener('click', (e) => {
-            if (connectionsMapServiceDrawerOpen) {
-              toggleMapServiceCatalogDrawer(false);
+            if (typeof connectionsMapDrawerOpen !== 'undefined' && connectionsMapDrawerOpen) {
+              if (typeof toggleMapSideDrawer === 'function') {
+                toggleMapSideDrawer(false);
+              }
             }
             if (e.target && (e.target.classList.contains('leaflet-popup-close-button') || e.target.closest('.leaflet-popup-close-button'))) {
               this._activePopupState = null;

@@ -6771,10 +6771,59 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 except Exception as e:
                     print(f"[DOWNLOAD DEB ERROR] {e}")
 
-            self.send_response(404)
+            # Redirigir a la release oficial de GitHub si no está disponible localmente
+            github_deb = f"https://github.com/cminewarIA/recursos-ui/releases/download/v{current_ver}/recursos-cockpit_{current_ver}_amd64.deb"
+            self.send_response(302)
+            self.send_header('Location', github_deb)
             self.send_security_headers()
             self.end_headers()
-            self.wfile.write(b"Paquete .deb no encontrado en dist/. Por favor ejecuta packaging/build_deb.sh")
+            return
+
+        # 4c. DESCARGA DIRECTA DE LA APP NATIVA PARA ANDROID (.apk)
+        elif clean_path in ["/download/recursos-cockpit.apk", "/download/app.apk", "/api/download/app_apk"] or (
+            clean_path.startswith("/download/recursos-cockpit") and clean_path.endswith(".apk")
+        ):
+            dist_dir = os.path.join(BASE_DIR, "dist")
+            current_ver = get_app_version()
+            canonical_apk = os.path.join(dist_dir, f"recursos-cockpit_{current_ver}.apk")
+            requested_name = os.path.basename(clean_path)
+            apk_file = None
+            if requested_name in ["recursos-cockpit.apk", "app.apk", "app_apk"]:
+                if os.path.isfile(canonical_apk):
+                    apk_file = canonical_apk
+                else:
+                    candidates = sorted(glob.glob(os.path.join(dist_dir, "recursos-cockpit_*.apk")), reverse=True)
+                    apk_file = candidates[0] if candidates else None
+            else:
+                specific_file = os.path.join(dist_dir, requested_name)
+                if os.path.isfile(specific_file):
+                    apk_file = specific_file
+                elif os.path.isfile(canonical_apk):
+                    apk_file = canonical_apk
+
+            if apk_file and os.path.isfile(apk_file):
+                try:
+                    fsize = os.path.getsize(apk_file)
+                    out_fname = f"recursos-cockpit_{current_ver}.apk" if requested_name in ["recursos-cockpit.apk", "app.apk", "app_apk"] else os.path.basename(apk_file)
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/vnd.android.package-archive')
+                    self.send_header('Content-Disposition', f'attachment; filename="{out_fname}"')
+                    self.send_header('Content-Length', str(fsize))
+                    self.send_security_headers()
+                    self.end_headers()
+                    with open(apk_file, 'rb') as f:
+                        while chunk := f.read(65536):
+                            self.wfile.write(chunk)
+                    return
+                except Exception as e:
+                    print(f"[DOWNLOAD APK ERROR] {e}")
+
+            # Redirigir a la release oficial de GitHub si no está disponible localmente
+            github_apk = f"https://github.com/cminewarIA/recursos-ui/releases/download/v{current_ver}/recursos-cockpit_{current_ver}.apk"
+            self.send_response(302)
+            self.send_header('Location', github_apk)
+            self.send_security_headers()
+            self.end_headers()
             return
         else:
             self.send_response(404)
