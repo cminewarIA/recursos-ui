@@ -28,32 +28,34 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             RecursosCockpitTheme {
-                var metrics by remember { mutableStateOf<MetricsResponse?>(null) }
                 var connectionMode by remember { mutableStateOf(ConnectionMode.CONNECTING) }
                 var activeUrl by remember { mutableStateOf("") }
+                var scanningMessage by remember { mutableStateOf("Autodescubriendo nodo en red local (LAN)...") }
                 var showSettings by remember { mutableStateOf(false) }
 
                 fun triggerDiscoveryAndRefresh() {
                     lifecycleScope.launch {
                         connectionMode = ConnectionMode.SCANNING_LAN
-                        val endpoint = discoveryManager.resolveActiveNode()
+                        val endpoint = discoveryManager.resolveActiveNode { msg ->
+                            scanningMessage = msg
+                        }
                         activeUrl = endpoint.url
                         connectionMode = endpoint.mode
                         if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN) {
-                            val (data, isRevoked) = apiService.fetchMetrics(endpoint.url)
+                            val (_, isRevoked) = apiService.fetchMetrics(endpoint.url)
                             if (isRevoked) {
                                 connectionMode = ConnectionMode.REVOKED
-                            } else if (data != null) {
-                                metrics = data
                             }
                         }
                     }
                 }
 
-                // Autodescubrimiento en arranque y ciclo continuo de telemetría a 60 FPS
+                // Autodescubrimiento LAN/WAN en arranque y supervisión de enlace continuo
                 LaunchedEffect(Unit) {
                     connectionMode = ConnectionMode.SCANNING_LAN
-                    val endpoint = discoveryManager.resolveActiveNode()
+                    val endpoint = discoveryManager.resolveActiveNode { msg ->
+                        scanningMessage = msg
+                    }
                     activeUrl = endpoint.url
                     connectionMode = endpoint.mode
 
@@ -67,31 +69,24 @@ class MainActivity : ComponentActivity() {
                             val (data, isRevoked) = apiService.fetchMetrics(activeUrl)
                             if (isRevoked) {
                                 connectionMode = ConnectionMode.REVOKED
-                            } else if (data != null) {
-                                metrics = data
-                            } else {
-                                // Reconexión / Conmutación LAN ↔ WAN transparente
-                                val newEndpoint = discoveryManager.resolveActiveNode()
+                            } else if (data == null) {
+                                // Conmutación automática transparente LAN <-> WAN si el nodo cambia de red
+                                val newEndpoint = discoveryManager.resolveActiveNode { msg ->
+                                    scanningMessage = msg
+                                }
                                 activeUrl = newEndpoint.url
                                 connectionMode = newEndpoint.mode
-                                if (newEndpoint.mode == ConnectionMode.CONNECTED_LAN || newEndpoint.mode == ConnectionMode.CONNECTED_WAN) {
-                                    val (retryData, retryRevoked) = apiService.fetchMetrics(newEndpoint.url)
-                                    if (retryRevoked) {
-                                        connectionMode = ConnectionMode.REVOKED
-                                    } else if (retryData != null) {
-                                        metrics = retryData
-                                    }
-                                }
                             }
                         }
-                        delay(2000)
+                        delay(5000)
                     }
                 }
 
                 CockpitDashboard(
-                    metrics = metrics,
+                    securePreferences = securePreferences,
                     connectionMode = connectionMode,
                     activeUrl = activeUrl,
+                    scanningMessage = scanningMessage,
                     onRefresh = { triggerDiscoveryAndRefresh() },
                     onOpenSettings = { showSettings = true }
                 )

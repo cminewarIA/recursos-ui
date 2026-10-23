@@ -1,32 +1,33 @@
-# Plan de Implementación — v9.2.0: Visualización D3.js de Uso de CPU de los 10 Procesos Principales
+# Plan de Implementación v9.3.0 — Eliminación de la Normativa No-HTML y Reescritura de Apps Nativas (Ubuntu & Android) con Motor HTML5 Unificado
 
 ## 1. Objetivo
-Implementar en la vista de Procesos (`#viewProcesses`, ruta `/procesos`) una visualización vectorial interactiva con **D3.js v7** que muestre en tiempo real la distribución de uso de CPU de los **10 procesos principales del sistema** mediante un **gráfico de barras horizontal animado**, cumpliendo de forma estricta las reglas de `GEMINI.md` (Zero-Hardcoding, Simetría y Homogeneidad Visual *Apple Liquid Glass + Tesla Touch Cockpit*, Control de Versión Canónico `9.2.0` y Compilación Nativa `.deb`).
+- Eliminar la restricción en `GEMINI.md` (Reglas 7 y 8) que prohibía el uso de HTML y contenedores WebView/WebKit2 en las aplicaciones nativas de Linux/Ubuntu y Android.
+- Reescribir íntegramente tanto la **App Nativa de Ubuntu (`desktop_app/recursos_app.py`)** como la **App Nativa de Android (`android_app/`)** para que rendericen la interfaz canónica unificada HTML5/CSS3/D3.js v7/Leaflet (`index.html` / `static/index.html`) mediante contenedores nativos acelerados por hardware (`WebKit2.WebView` en GTK 3 y `android.webkit.WebView` en Jetpack Compose), acoplados con sus respectivos puentes nativos del sistema operativo (autodescubrimiento LAN `/24`, conmutación LAN ↔ WAN, persistencia criptográfica Zero-Trust y control físico de USB DeX `/dev/uhid` + `scrcpy` desbloqueado exclusivamente en Ubuntu).
 
-## 2. Arquitectura y Diseño Técnico
+## 2. Cambios Arquitectónicos
 
-### 2.1. Telemetría 100% Dinámica (Regla 2: Zero-Hardcoding)
-- **Origen de Datos**: Consumo directo de `latestMetrics.system_processes` proveniente de `/api/metrics` (`server.py` con `psutil` en producción y `sampleRealProcesses()` con lectura diferencial de `/proc/[pid]/stat` `utime + stime` en `vite.config.ts`).
-- **Filtrado Reactivo**: La visualización se alimenta de la lista filtrada por el buscador global (`filtered`), ordenando dinámicamente por `cpu_percent` descendente (con desempate por `priv_mb` y `pid`) y seleccionando los 10 primeros procesos activos.
+### 2.1. Reglas del Proyecto (`GEMINI.md`)
+- **Regla 7.1**: Sustitución de la prohibición de HTML/WebViews por la norma de **Motor de Interfaz HTML5 Unificado con Contenedores Nativos Acelerados por Hardware (Ubuntu WebKit2 & Android WebView)**.
+- **Regla 7.5 y Regla 8.2**: Paridad visual y funcional 100% exacta entre Web, Ubuntu y Android al compartir el mismo código fuente HTML5, manteniendo el desbloqueo exclusivo del submenú y controles de hardware DeX (`/dev/uhid` + `scrcpy`) en la App Nativa de Ubuntu.
 
-### 2.2. Motor D3.js v7 (`window.ProcessCpuBarChart`)
-- **Unión de Datos por Clave (`Keyed Data Join`)**: `barsLayer.selectAll('g.proc-d3-row').data(top10, d => String(d.pid))` para garantizar que cuando un proceso cambie de posición en el ranking Top 10, su fila se desplace verticalmente de forma animada a su nueva coordenada `yScale(String(d.pid))`.
-- **Transiciones Suaves**: `d3.transition().duration(550).ease(d3.easeCubicOut)` tanto en la posición vertical de cada barra como en su longitud horizontal (`xScale(d.cpu_percent)`) y en el eje superior (`d3.axisTop`).
-- **Interpolación Numérica Tabular**: Uso de `d3.interpolateNumber` en `.tween('text', ...)` sobre las etiquetas de valor para animar el porcentaje de CPU cuadro a cuadro con tipografía `tabular-nums`.
-- **Codificación Semántica por Carga**:
-  - `< 15%`: Gradiente Cian (`#0284c7` → `#38bdf8`).
-  - `15% – 45%`: Gradiente Ámbar (`#d97706` → `#fbbf24`).
-  - `> 45%`: Gradiente Rosa Coral (`#e11d48` → `#fb7185`).
-- **Modos de Escala e Interacción**:
-  - Selector segmentado entre **Escala Dinámica** (ajustada automáticamente al 115% del proceso líder con suelo mínimo de 5%) y **Escala 100%**.
-  - Tooltip flotante *Liquid Glass* con nombre del proceso, PID, usuario, % de CPU absoluto, cuota porcentual dentro del Top 10 y memoria RAM privada/RSS.
-  - Clic sobre cualquier barra del gráfico o fila de la tabla para resaltar el PID seleccionado y desplazar suavemente la lista de procesos.
+### 2.2. Motor HTML5 Unificado (`index.html` y `static/index.html`)
+- **Detección de Plataforma Nativa (`EnvironmentDetector`)**:
+  - Identificación automática de `ubuntu` (`window.__RECURSOS_UBUNTU_NATIVE__` / `RecursosCockpit-Ubuntu`) y `android` (`window.__RECURSOS_ANDROID_NATIVE__` / `window.RecursosAndroidBridge`).
+  - Ambas apps nativas despliegan las 12 vistas completas del Cockpit (con su barra lateral, Floating Touch Dock, mapas Leaflet y gráficas D3.js v7).
+  - La vista #13 (`#viewDex` / `#navDexLi` / `#dockDex`) y sus controles de hardware (`#dexSelectDevice`, `#dexSelectResolution`, `#dexSelectFps`, `#chkDexUhid`, `#chkDexFullscreen`, `#chkDexScreenOff`, `#chkUsbAutoProject`) se desbloquean **exclusivamente en la App Nativa de Ubuntu**, mostrando en la web el mensaje pasivo: *"Esperando dispositivo para conectarse en su versión nativa"*.
+  - Ocultación automática de los botones de descarga OTA `.deb` y `.apk` cuando se ejecuta dentro de las apps nativas.
+- **Puente de Sesión Nativa (`window.injectNativeSession`)**:
+  - Sincronización bidireccional del token `X-Device-Token` entre `localStorage` y `window.RecursosAndroidBridge` / `LocalHtmlBridgeServer`.
 
-## 3. Sincronización de Versión (`9.1.2` ➔ `9.2.0`)
-- Incremento `MINOR` (`0.X.0`) según la Regla 3.4 de `GEMINI.md` por añadir una nueva función visual en la vista de procesos:
-  - `./VERSION` ➔ `9.2.0`
-  - `package.json` ➔ `"version": "9.2.0"`
-  - `packaging/debian/control` ➔ `Version: 9.2.0`
-  - `android_app/app/build.gradle.kts` ➔ `versionCode = 90200`, `versionName = "9.2.0"`
-  - `index.html` y `static/index.html` sincronizados.
-  - Compilación de `dist/recursos-cockpit_9.2.0_amd64.deb` y actualización de `README.md`.
+### 2.3. App Nativa Ubuntu (`desktop_app/recursos_app.py` y `packaging/`)
+- **`LocalHtmlBridgeServer`**: Servidor HTTP loopback multi-hilo en `127.0.0.1:<puerto_efimero>` que:
+  1. Sirve `index.html` inyectando `window.__RECURSOS_UBUNTU_NATIVE__ = true` y la sesión Zero-Trust activa.
+  2. Intercepta localmente `/api/dex/status`, `/api/dex/start` y `/api/dex/stop` conectándolos directamente a `DexController` (`scrcpy` + `/dev/uhid` + `adb`).
+  3. Proxifica de forma transparente el resto de rutas `/api/*` hacia el servidor LAN/WAN descubierto por `ServerConnectionManager`, o sintetiza telemetría local en tiempo real mediante `psutil` si no hay servidor externo accesible.
+- **Ventana Nativa `Gtk.ApplicationWindow` + `WebKit2.WebView`**:
+  - Cabecera nativa `Gtk.HeaderBar` con estado de enlace LAN/WAN/Local, acceso directo a `📱 Estación USB DeX`, recarga y diálogo modal de configuración de nodo/token Zero-Trust.
+  - Empaquetado de `static/index.html` dentro de `/usr/lib/recursos-cockpit/static/index.html` en `packaging/build_deb.sh` y adición de `gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0` en `packaging/debian/control`.
+
+### 2.4. App Nativa Android (`android_app/`)
+- **`RecursosAndroidBridge` (`@JavascriptInterface`)**: Expone `getDeviceToken()`, `onTokenUpdated()`, `getConnectionMode()`, `getActiveNodeUrl()`, `openNativeSettings()` y `triggerNodeRescan()` al motor HTML5.
+- **`CockpitDashboard.kt` y `MainActivity.kt`**: Contenedor `AndroidView(WebView)` acelerado por hardware con User-Agent `RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (NativeHTML)`, inyección automática de `window.__RECURSOS_ANDROID_NATIVE__ = true` y token desde `EncryptedSharedPreferences`, soporte de navegación hacia atrás (`BackHandler`) y barra superior nativa compacta con estado LAN/WAN y acceso a `SettingsDialog`.

@@ -1,13 +1,13 @@
 Package: recursos-cockpit
-Version: 9.2.0
+Version: 9.3.0
 Section: utils
 Priority: optional
 Architecture: amd64
 Maintainer: cminewarIA <https://github.com/cminewarIA/recursos-ui>
-Depends: python3, python3-gi, python3-gi-cairo, python3-cairo, gir1.2-gtk-3.0, python3-psutil, scrcpy, adb
+Depends: python3, python3-gi, python3-gi-cairo, python3-cairo, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, python3-psutil, scrcpy, adb
 Replaces: recursos-cockpit
 Provides: recursos-cockpit
-Description: Recursos Cockpit - Monitor de Silicio Nativo GTK3 y Conexion de Dispositivos
- Aplicacion 100% nativa de escritorio para Linux construida en GTK 3 para
- monitorizacion en tiempo real del hardware del sistema y conexion interactiva
- por hardware con dispositivos moviles mediante Scrcpy y UHID.
+Description: Recursos Cockpit - Motor HTML5 Nativo Acelerado por Hardware y Control DeX
+ Aplicacion nativa de escritorio para Linux/Ubuntu construida en GTK 3 y WebKit2
+ con aceleracion por hardware que renderiza el motor unificado HTML5/CSS3/D3.js v7
+ en tiempo real e integra el puente de hardware local para DeX (Scrcpy + UHID).

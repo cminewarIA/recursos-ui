@@ -51,33 +51,31 @@
 
 ## 7. Arquitectura Contractual de Aplicaciones Nativas (Linux & Android)
 - **Regla obligatoria**: El diseño y desarrollo de cualquier aplicación cliente nativa (Linux/Ubuntu y Android) debe ajustarse de forma estricta y permanente a los siguientes principios:
-  1. **Interfaces 100% Nativas Puras (Cero WebApps / Cero Navegadores)**:
-     - Queda estrictamente prohibido utilizar WebViews embebidas (`WebKit`, `Chromium`, `Gecko`), frameworks híbridos basados en navegadores (`Electron`, `Tauri` web-view, `Cordova`, `Capacitor`) o convertir las apps nativas en clientes web camuflados.
-     - En Linux, la interfaz se construye exclusivamente con widgets nativos GTK 3 / GTK 4 y aceleración gráfica vectorial por hardware con Cairo.
-     - En Android, la interfaz se desarrolla en arquitectura nativa pura con Kotlin y Jetpack Compose.
-     - Pantallas, tarjetas y gráficos son componentes nativos que consumen datos estructurados (JSON/binario) del backend.
+  1. **Motor de Interfaz HTML5 Unificado con Contenedores Nativos (Ubuntu WebKit2 & Android WebView)**:
+     - Las aplicaciones nativas de Ubuntu Linux (`.deb`) y Android (`.apk`) renderizan directamente la interfaz canónica completa en HTML5, CSS3, D3.js v7 y OpenStreetMap/Leaflet mediante contenedores nativos acelerados por hardware (`WebKit2` integrado en GTK 3 en Linux, y `android.webkit.WebView` integrado en Kotlin/Jetpack Compose en Android).
+     - Cada contenedor nativo integra un puente del sistema operativo (*Native Bridge*) que gestiona en segundo plano el autodescubrimiento de red, la persistencia criptográfica de credenciales, la conmutación LAN ↔ WAN y el acceso a periféricos locales.
   2. **Autodescubrimiento y Enlace en Red Local (Wi-Fi / LAN)**:
      - Al conectarse a la red Wi-Fi o LAN local, las apps nativas implementan autodescubrimiento dinámico (mDNS/Zeroconf `_recursos._tcp`, SSDP o escaneo de subred) para localizar automáticamente el servidor sin introducir IPs manuales.
-     - Descubierto el nodo, se inicia el protocolo de enlace (*pairing handshake*) para vincular el dispositivo.
+     - Descubierto el nodo, se inicia el protocolo de enlace (*pairing handshake*) para vincular el dispositivo e inyectar la sesión en el motor HTML5.
   3. **Autenticación, Criptografía y Consumo Seguro de APIs**:
      - Las apps nativas se certifican con el sistema de tokens/certificados criptográficos del servidor.
-     - Durante el enlace, el servidor emite una credencial/token firmado que la app almacena en el gestor seguro del sistema (Secret Service / Keyring en Linux, Android KeyStore / EncryptedSharedPreferences en Android).
-     - Toda comunicación viaja 100% cifrada bajo TLS/HTTPS con verificación mutua de identidad mediante endpoints REST y WebSockets autenticados, con cero exposición de credenciales en texto plano.
+     - Durante el enlace, el servidor emite una credencial/token firmado que la app almacena en el gestor seguro del sistema (configuración protegida / Keyring en Linux, Android KeyStore / `EncryptedSharedPreferences` en Android) y sincroniza automáticamente con el cliente HTML5 (`X-Device-Token` / `Bearer`).
+     - Toda comunicación viaja 100% cifrada bajo TLS/HTTPS en WAN y canales autenticados en LAN, con cero exposición de credenciales en texto plano.
   4. **Acceso Dual Transparente y Conexión Automática (LAN / WAN Exterior)**:
      - **Conexión Inmediata al Abrir**: La app nativa se conecta instantánea y automáticamente al nodo enlazado sin solicitar credenciales repetitivas.
      - **Conmutación Inteligente LAN ↔ WAN**:
        - *En Red Local (Wi-Fi/LAN)*: Comunicación directa con la IP/puerto local a latencia mínima.
        - *Desde el Exterior (Red Móvil / Internet / WAN)*: Conmutación automática hacia el nodo público / DDNS (`cminewar.duckdns.org` o dominio configurado) utilizando la credencial criptográfica del emparejamiento.
   5. **Paridad Visual de Interfaz y Desbloqueo Exclusivo de DeX en Ubuntu**:
-     - **Paridad Estética y Estructural Absoluta**: Todas las interfaces (web y nativas) comparten la misma identidad visual, filosofía de diseño (*Apple Liquid Glass + Tesla Touch Cockpit*), paleta de colores, tarjetas, gráficos vectoriales a 60 FPS e iconografía.
+     - **Paridad Estética y Estructural Absoluta**: Al compartir el mismo motor de interfaz HTML5/CSS3/D3.js/Leaflet, todas las interfaces (web y nativas) mantienen idéntica identidad visual, filosofía de diseño (*Apple Liquid Glass + Tesla Touch Cockpit*), paleta de colores, tarjetas, gráficos vectoriales a 60 FPS e iconografía.
      - **Diferenciación Funcional Contractual (Desbloqueo de DeX)**:
-       - *App Nativa de Ubuntu*: Al disponer de acceso directo a `/dev/uhid`, `scrcpy` y el subsistema USB, desbloquea dinámicamente el submenú de control DeX / Modo Escritorio Android con todos sus controles de resolución, tasa de refresco (60 FPS), auto-conexión y modo pantalla completa.
-       - *Versión Web y Clientes Externos*: Todo submenú de DeX permanece estrictamente bloqueado y oculto, mostrando únicamente el mensaje pasivo: *"Esperando dispositivo para conectarse en su versión nativa"*.
+       - *App Nativa de Ubuntu*: Al disponer de acceso directo a `/dev/uhid`, `scrcpy` y el subsistema USB a través de su puente nativo local, desbloquea dinámicamente el submenú de control DeX / Modo Escritorio Android (`/dex`) con todos sus controles de resolución, tasa de refresco (60 FPS), auto-conexión y modo pantalla completa.
+       - *Versión Web y Clientes Externos (incluido Android)*: Todo submenú de DeX permanece estrictamente bloqueado y oculto en la navegación, mostrando únicamente el mensaje pasivo si se consulta: *"Esperando dispositivo para conectarse en su versión nativa"*.
 
 ## 8. Principio de Simetría Total, Homogeneidad y Cohesión en Interfaces y Submenús (Web, Linux/Ubuntu y Android)
 - **Regla obligatoria**:
   1. **Simetría y Homogeneidad Estricta en Todas las Interfaces**: Todos los componentes, vistas, tarjetas Bento, barras de herramientas, HUDs, paneles flotantes, modales y submenús (incluida la interfaz del mapa geoespacial, el catálogo de servicios, los selectores de subredes, gráficos y tablas) deben mantener una simetría visual y estructural rigurosa, limpia y equilibrada en cualquier resolución o factor de forma.
-  2. **Ecosistema Homogéneo Universal**: La experiencia visual entre la aplicación web y las aplicaciones nativas de Ubuntu (GTK 3/Cairo) y Android (Jetpack Compose) debe sentirse 100% homogénea y coherente, compartiendo idénticos principios de espaciado simétrico, radios de curvatura, tratamiento de cristal (*Apple Liquid Glass*), contraste, tipografía monoespaciada tabular y ergonomía táctil (*Tesla Touch Cockpit*).
+  2. **Ecosistema Homogéneo Universal**: La experiencia visual entre la aplicación web y las aplicaciones nativas de Ubuntu (GTK 3 + WebKit2 HTML5) y Android (Jetpack Compose + WebView HTML5) es 100% homogénea y coherente, compartiendo el mismo código HTML5/CSS3/D3.js/Leaflet, principios de espaciado simétrico, radios de curvatura, tratamiento de cristal (*Apple Liquid Glass*), contraste, tipografía monoespaciada tabular y ergonomía táctil (*Tesla Touch Cockpit*).
   3. **Simetría Contractual en Nuevas Funcionalidades**: Cualquier elemento, control, submenú o vista que se incorpore a futuro debe ceñirse sin excepción a esta simetría y homogeneidad, evitando componentes desalineados, estilos visuales dispares o menús secundarios asimétricos.
 
 ## 9. Publicación Automática en GitHub (`git push`)

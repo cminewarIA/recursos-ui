@@ -3745,6 +3745,15 @@
                 <span class="nav-counter" id="badgeNavVersion">...</span>
               </a>
             </li>
+            <li id="navDexLi" style="display: none;">
+              <a href="/dex" class="nav-link" id="navDex" onclick="return navigateTo(event, 'dex')">
+                <div class="nav-link-left">
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                  <span>Estación DeX (USB)</span>
+                </div>
+                <span class="nav-counter" id="badgeNavDex" style="color: var(--accent-cyan-bright);">USB</span>
+              </a>
+            </li>
           </ul>
         </div>
       </nav>
@@ -5219,11 +5228,11 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <!-- Botones de Descarga Directa Exclusivos para la Versión Web -->
                 <div class="ota-web-download-row" id="otaWebDownloadButtons" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_9.2.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_9.3.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_9.2.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_9.3.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5243,19 +5252,19 @@
                 <div style="display: flex; flex-direction: column; gap: 3px;">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">📦 Paquetes Oficiales Compilados</span>
-                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v9.2.0</span>
+                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v9.3.0</span>
                     <span class="adw-badge badge-purple" style="font-size: 10px; font-weight: 600;">Solo en la Web</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);">
-                    Descarga directa de binarios canónicos firmados: cliente nativo GTK3 para Ubuntu Linux y APK nativo Jetpack Compose para Android.
+                    Descarga directa de binarios canónicos firmados: cliente nativo Ubuntu Linux (.deb con motor HTML5 WebKit2 + DeX USB) y APK nativo Android (.apk con motor HTML5 WebView + KeyStore).
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_9.2.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_9.3.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux amd64)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_9.2.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_9.3.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5447,45 +5456,109 @@
           </div>
         </div>
 
-        <!-- PANTALLA DE ESPERA OPTIMIZADA PARA PROYECCIÓN USB (SAMSUNG DEX / ANDROID DESKTOP) EN ENTORNO MÓVIL O NATIVO -->
-        <div class="view-page" id="usbProjectionWaitScreen" data-non-web-view="true" style="display: none; min-height: calc(100vh - 150px); align-items: center; justify-content: center; padding: 24px 16px;">
-          <div class="surface-panel" style="max-width: 680px; width: 100%; padding: 36px 28px; text-align: center; border: 1px solid var(--border-highlight); box-shadow: var(--card-shadow), var(--specular-inset); border-radius: var(--radius-xl); display: flex; flex-direction: column; align-items: center; gap: 18px;">
-            <div style="display: inline-flex; align-items: center; gap: 12px; font-size: 38px; line-height: 1; padding: 16px 24px; border-radius: 22px; background: var(--accent-cyan-soft); border: 1px solid var(--border-highlight);">
-              <span>🔌</span>
-              <span>📱</span>
-              <span style="font-size: 22px; color: var(--accent-cyan-bright);">➔</span>
-              <span>🖥️</span>
+        <!-- ==================================================================
+             12. VISTA ESTACIÓN USB DEX / MODO ESCRITORIO ANDROID (RUTA /dex)
+                 Desbloqueada exclusivamente en la App Nativa de Ubuntu (Regla 7.5)
+             ================================================================== -->
+        <div class="view-page" id="viewDex" style="display: none;">
+          <!-- Panel Pasivo para Web y Clientes Externos (Regla 7.5) -->
+          <div class="surface-panel" id="dexPassiveWebBanner" style="max-width: 680px; margin: 40px auto; padding: 36px 28px; text-align: center; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); display: flex; flex-direction: column; align-items: center; gap: 14px;">
+            <div style="font-size: 32px; line-height: 1;">🔌 📱 ➔ 🖥️</div>
+            <div class="mono" style="font-size: 13px; color: var(--text-secondary); font-weight: 600;">
+              Esperando dispositivo para conectarse en su versión nativa
             </div>
+          </div>
 
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;">
-              <span class="adw-badge badge-blue mono" id="usbWaitEnvBadge">Entorno Nativo / Móvil Detectado</span>
-              <span class="adw-badge badge-green mono" id="usbWaitProtocolBadge">USB Video Projection · 60 FPS</span>
-            </div>
+          <!-- Panel Completo Desbloqueado Exclusivamente en la App Nativa de Ubuntu -->
+          <div id="usbProjectionWaitScreen" style="display: none; flex-direction: column; gap: 18px; width: 100%;">
+            <div class="hero-instrument-card">
+              <div class="instrument-header">
+                <div>
+                  <div class="instrument-kicker">Subsistema Hardware USB · /dev/uhid + Scrcpy Baja Latencia</div>
+                  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px;">
+                    <h2 id="usbWaitTitle" style="font-family: var(--font-display); font-size: 22px; font-weight: 800; color: var(--text-primary); margin: 0;">
+                      Estación de Proyección USB (Samsung DeX & Android Desktop)
+                    </h2>
+                    <span class="adw-badge badge-blue mono" id="usbWaitEnvBadge">Ubuntu Nativo · Desbloqueado</span>
+                    <span class="adw-badge badge-green mono" id="usbWaitProtocolBadge">60 FPS · UHID Hardware</span>
+                  </div>
+                  <p id="usbWaitDesc" style="font-size: 12.5px; color: var(--text-secondary); margin-top: 6px;">
+                    Conecta tu teléfono móvil mediante cable USB para proyectar el escritorio completo con aceleración por hardware y control nativo de teclado y ratón.
+                  </p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" class="action-btn" onclick="EnvironmentDetector.pollUsbStatusOnce()">
+                    🔄 Escanear Puerto USB
+                  </button>
+                </div>
+              </div>
 
-            <h2 id="usbWaitTitle" style="font-family: var(--font-display); font-size: 24px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; margin: 0;">
-              Esperando que conectes un dispositivo por USB
-            </h2>
+              <div id="usbWaitLiveStatusPill" style="margin-top: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 12px; color: var(--accent-cyan-bright);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span class="live-dot" id="usbWaitPulseDot"></span>
+                  <span id="usbWaitLiveStatusText">Escuchando puerto USB en tiempo real (Samsung DeX / Android Desktop)...</span>
+                </div>
+                <span id="dexHardwareDepsInfo" class="mono" style="font-size: 11px; color: var(--text-muted);">ADB + Scrcpy + /dev/uhid</span>
+              </div>
 
-            <p id="usbWaitDesc" style="font-size: 14px; color: var(--text-secondary); max-width: 540px; line-height: 1.6; margin: 0;">
-              Conecta tu teléfono móvil mediante cable USB para proyectar el vídeo en baja latencia con <strong>Samsung DeX</strong> o el <strong>Modo Escritorio de Android</strong>.
-            </p>
+              <!-- Controles de Hardware DeX Desbloqueados en Ubuntu -->
+              <div class="hw-spec-grid" style="margin-top: 16px;">
+                <div class="hw-spec-cell">
+                  <div class="hw-spec-label">Dispositivo USB Detectado</div>
+                  <select id="dexSelectDevice" style="margin-top: 6px; width: 100%; height: 36px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); font-size: 12px;">
+                    <option value="">Detección automática (Primer USB activo)</option>
+                  </select>
+                </div>
 
-            <div id="usbWaitLiveStatusPill" style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 12px; color: var(--accent-cyan-bright);">
-              <span class="live-dot" id="usbWaitPulseDot"></span>
-              <span id="usbWaitLiveStatusText">Escuchando puerto USB en tiempo real (Samsung DeX / Android Desktop)...</span>
-            </div>
+                <div class="hw-spec-cell">
+                  <div class="hw-spec-label">Resolución de Escritorio</div>
+                  <select id="dexSelectResolution" style="margin-top: 6px; width: 100%; height: 36px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); font-size: 12px;">
+                    <option value="1920x1080" selected>1920×1080 (Full HD · 16:9)</option>
+                    <option value="2560x1440">2560×1440 (QHD 2K · 16:9)</option>
+                    <option value="3840x2160">3840×2160 (4K UHD · 16:9)</option>
+                    <option value="1600x900">1600×900 (HD+ Compacto)</option>
+                  </select>
+                </div>
 
-            <div id="usbWaitDeviceActionContainer" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 4px;"></div>
+                <div class="hw-spec-cell">
+                  <div class="hw-spec-label">Tasa de Refresco</div>
+                  <select id="dexSelectFps" style="margin-top: 6px; width: 100%; height: 36px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); font-size: 12px;">
+                    <option value="60" selected>60 FPS (Fluidez Estándar)</option>
+                    <option value="120">120 FPS (Ultra Baja Latencia)</option>
+                    <option value="30">30 FPS (Bajo Consumo)</option>
+                  </select>
+                </div>
+              </div>
 
-            <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer; user-select: none; margin-top: 4px;">
-              <input type="checkbox" id="chkUsbAutoProject" checked style="accent-color: var(--accent-cyan-bright); width: 15px; height: 15px;">
-              <span>Iniciar proyección de vídeo automáticamente al detectar conexión USB</span>
-            </label>
+              <div style="display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; padding: 12px 16px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+                <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-primary); cursor: pointer;">
+                  <input type="checkbox" id="chkDexUhid" checked style="accent-color: var(--accent-cyan-bright);">
+                  <span>Teclado y Ratón Físicos UHID (<code class="mono">/dev/uhid</code>)</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-primary); cursor: pointer;">
+                  <input type="checkbox" id="chkDexFullscreen" style="accent-color: var(--accent-cyan-bright);">
+                  <span>Modo Pantalla Completa</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-primary); cursor: pointer;">
+                  <input type="checkbox" id="chkDexScreenOff" style="accent-color: var(--accent-cyan-bright);">
+                  <span>Apagar pantalla del teléfono durante la sesión</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-primary); cursor: pointer;">
+                  <input type="checkbox" id="chkUsbAutoProject" checked style="accent-color: var(--accent-cyan-bright);">
+                  <span>Auto-conexión al detectar cable USB</span>
+                </label>
+              </div>
 
-            <div id="usbWaitWebFallbackRow" style="display: none; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--border-subtle); width: 100%; justify-content: center; gap: 10px; flex-wrap: wrap;">
-              <button type="button" class="action-btn" onclick="EnvironmentDetector.dismissUsbWaitScreenToWeb()">
-                📊 Ver Telemetría del Servidor
-              </button>
+              <div id="usbWaitDeviceActionContainer" style="width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                  <button type="button" class="action-btn primary-cta" id="btnDexStartManual" onclick="EnvironmentDetector.triggerUsbProjection()">
+                    ⚡ Iniciar DeX / Proyección USB
+                  </button>
+                  <button type="button" class="btn-revoke" id="btnDexStopManual" onclick="EnvironmentDetector.stopUsbProjection()">
+                    ⏹ Detener Proyección
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -5517,6 +5590,7 @@
       <span class="swipe-dot" data-view="processes" onclick="navigateTo(event, 'processes')"></span>
       <span class="swipe-dot" data-view="dns" onclick="navigateTo(event, 'dns')"></span>
       <span class="swipe-dot" data-view="version" onclick="navigateTo(event, 'version')"></span>
+      <span class="swipe-dot" id="swipeDotDex" data-view="dex" style="display: none;" onclick="navigateTo(event, 'dex')"></span>
     </div>
 
     <nav class="floating-dock" id="floatingTouchDock" aria-label="Dock táctil principal">
@@ -5579,6 +5653,11 @@
       <a href="/version" class="dock-item" id="dockVersion" data-view="version" onclick="return navigateTo(event, 'version')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
         <span class="dock-label">OTA Git</span>
+        <span class="dock-dot"></span>
+      </a>
+      <a href="/dex" class="dock-item" id="dockDex" data-view="dex" style="display: none;" onclick="return navigateTo(event, 'dex')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        <span class="dock-label">DeX USB</span>
         <span class="dock-dot"></span>
       </a>
     </nav>
@@ -5872,13 +5951,29 @@
     function authHeaders(extra = {}) {
       const h = Object.assign({}, extra);
       try {
-        const token = localStorage.getItem('sysmon_device_token');
+        let token = localStorage.getItem('sysmon_device_token') || window.__RECURSOS_DEVICE_TOKEN__ || '';
+        if (!token && window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.getDeviceToken === 'function') {
+          token = window.RecursosAndroidBridge.getDeviceToken() || '';
+          if (token) localStorage.setItem('sysmon_device_token', token);
+        }
         if (token && !h['X-Device-Token'] && !h['Authorization']) {
           h['X-Device-Token'] = token;
         }
       } catch (e) {}
       return h;
     }
+
+    window.injectNativeSession = function(token, mode, nodeUrl) {
+      try {
+        if (token) {
+          window.__RECURSOS_DEVICE_TOKEN__ = token;
+          localStorage.setItem('sysmon_device_token', token);
+        }
+        if (mode) window.__RECURSOS_CONN_MODE__ = mode;
+        if (nodeUrl) window.__RECURSOS_NODE_URL__ = nodeUrl;
+        if (typeof updateMetrics === 'function') updateMetrics();
+      } catch (e) {}
+    };
 
     const VIEW_TO_PATH = {
       overview: '/',
@@ -9338,7 +9433,14 @@
           if (!data) return;
           perfMetrics.apiLatencyMs = Math.max(1, Math.round(performance.now() - tStart));
           if (data.auth_status && data.auth_status.token) {
-            try { localStorage.setItem('sysmon_device_token', data.auth_status.token); } catch (e) {}
+            try {
+              const newTok = data.auth_status.token;
+              localStorage.setItem('sysmon_device_token', newTok);
+              window.__RECURSOS_DEVICE_TOKEN__ = newTok;
+              if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.onTokenUpdated === 'function') {
+                window.RecursosAndroidBridge.onTokenUpdated(newTok);
+              }
+            } catch (e) {}
           }
           // Schedule DOM & Canvas synchronization inside requestAnimationFrame
           if (pendingRafRender) cancelAnimationFrame(pendingRafRender);
@@ -10290,10 +10392,10 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
     }
 
     // =========================================================================
-    // ENVIRONMENT DETECTION ENGINE (WEB vs MOBILE / NATIVE USB PROJECTION)
+    // ENVIRONMENT DETECTION ENGINE (WEB vs UBUNTU NATIVE vs ANDROID NATIVE)
     // =========================================================================
     const EnvironmentDetector = {
-      _envType: 'web', // 'web' | 'mobile' | 'native'
+      _envType: 'web', // 'web' | 'ubuntu' | 'android'
       _pollTimer: null,
       _autoLaunchedSerials: new Set(),
       _dismissedToWeb: false,
@@ -10301,30 +10403,31 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       detect() {
         const params = new URLSearchParams(window.location.search || '');
         const envParam = (params.get('env') || params.get('mode') || '').trim().toLowerCase();
+        const ua = String(navigator.userAgent || '');
+
         if (envParam === 'web') {
           this._envType = 'web';
           return this.getInfo();
         }
-        if (envParam === 'native' || envParam === 'dex' || window.__RECURSOS_NATIVE__ === true) {
-          this._envType = 'native';
+        if (
+          envParam === 'ubuntu' ||
+          envParam === 'ubuntu_native' ||
+          envParam === 'native' ||
+          envParam === 'dex' ||
+          window.__RECURSOS_UBUNTU_NATIVE__ === true ||
+          /RecursosCockpit-Linux|RecursosUbuntuNative/i.test(ua)
+        ) {
+          this._envType = 'ubuntu';
           return this.getInfo();
         }
-        if (envParam === 'mobile') {
-          this._envType = 'mobile';
-          return this.getInfo();
-        }
-
-        const ua = String(navigator.userAgent || '');
-        const isNativeShell = /RecursosNative|Electron|WebKitGTK|pywebview|; wv\)/i.test(ua);
-        if (isNativeShell) {
-          this._envType = 'native';
-          return this.getInfo();
-        }
-
-        const uaMobile = Boolean(navigator.userAgentData && navigator.userAgentData.mobile);
-        const isMobileUa = uaMobile || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|SamsungBrowser|DeX/i.test(ua);
-        if (isMobileUa) {
-          this._envType = 'mobile';
+        if (
+          envParam === 'android' ||
+          envParam === 'android_native' ||
+          window.__RECURSOS_ANDROID_NATIVE__ === true ||
+          typeof window.RecursosAndroidBridge !== 'undefined' ||
+          /RecursosCockpit-Android/i.test(ua)
+        ) {
+          this._envType = 'android';
           return this.getInfo();
         }
 
@@ -10333,115 +10436,89 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       },
 
       getInfo() {
-        const isNative = this._envType === 'native';
-        const isMobile = this._envType === 'mobile';
+        const isUbuntuNative = this._envType === 'ubuntu';
+        const isAndroidNative = this._envType === 'android';
+        const isNative = isUbuntuNative || isAndroidNative;
         const isWeb = this._envType === 'web';
         return {
           env: this._envType,
+          isUbuntuNative,
+          isAndroidNative,
           isNative,
-          isMobile,
+          isMobile: isAndroidNative,
           isWeb,
-          isNativeOrMobile: isNative || isMobile
+          isNativeOrMobile: isNative
         };
       },
 
       enforceNavigationPolicy() {
-        // Garantizar que la pestaña 'Dispositivo' (o cualquier pestaña no web) no exista jamás en la navegación
-        const nonWebSelectors = [
-          '#navDex',
-          '#dockDex',
-          '#navDevice',
-          '#dockDevice',
-          '#navDispositivo',
-          '#dockDispositivo',
-          '#btnHeaderNativeApp',
-          '[data-view="dex"]',
-          '[data-view="device"]',
-          '[data-view="dispositivo"]',
-          '[data-non-web-tab="true"]'
-        ];
-        nonWebSelectors.forEach(sel => {
-          document.querySelectorAll(sel).forEach(el => {
-            el.style.display = 'none';
-            el.setAttribute('aria-hidden', 'true');
-            if (el.parentElement && el.parentElement.tagName === 'LI') {
-              el.parentElement.style.display = 'none';
-            }
-          });
-        });
+        const info = this.getInfo();
+        const navDexLi = document.getElementById('navDexLi');
+        const navDex = document.getElementById('navDex');
+        const dockDex = document.getElementById('dockDex');
+        const swipeDotDex = document.getElementById('swipeDotDex');
+        const passiveBanner = document.getElementById('dexPassiveWebBanner');
+        const unlockedPanel = document.getElementById('usbProjectionWaitScreen');
 
-        delete VIEW_TO_PATH.dex;
-        delete VIEW_TO_PATH.device;
-        delete VIEW_TO_PATH.dispositivo;
-        delete PATH_TO_VIEW['/dex'];
-        delete PATH_TO_VIEW['/device'];
-        delete PATH_TO_VIEW['/dispositivo'];
+        if (info.isUbuntuNative) {
+          // Desbloqueo contractual exclusivo en la App Nativa de Ubuntu (Regla 7.5)
+          VIEW_TO_PATH.dex = '/dex';
+          PATH_TO_VIEW['/dex'] = 'dex';
+          PATH_TO_VIEW['/dispositivo'] = 'dex';
+          VIEW_TITLES.dex = 'Estación de Proyección USB (Samsung DeX)';
+          if (navDexLi) navDexLi.style.display = 'list-item';
+          if (navDex) navDex.style.display = 'flex';
+          if (dockDex) dockDex.style.display = 'flex';
+          if (swipeDotDex) swipeDotDex.style.display = 'inline-block';
+          if (passiveBanner) passiveBanner.style.display = 'none';
+          if (unlockedPanel) unlockedPanel.style.display = 'flex';
+          this.startUsbPolling();
+        } else {
+          // En Web y Clientes Externos (incl. Android): submenú DeX bloqueado y oculto (Regla 7.5)
+          delete VIEW_TO_PATH.dex;
+          delete VIEW_TO_PATH.device;
+          delete VIEW_TO_PATH.dispositivo;
+          delete PATH_TO_VIEW['/dex'];
+          delete PATH_TO_VIEW['/device'];
+          delete PATH_TO_VIEW['/dispositivo'];
+          if (navDexLi) navDexLi.style.display = 'none';
+          if (navDex) navDex.style.display = 'none';
+          if (dockDex) dockDex.style.display = 'none';
+          if (swipeDotDex) swipeDotDex.style.display = 'none';
+          if (passiveBanner) passiveBanner.style.display = 'flex';
+          if (unlockedPanel) unlockedPanel.style.display = 'none';
+          this.stopUsbPolling();
+        }
       },
 
       applyEnvironmentLayout() {
         const info = this.detect();
-        document.documentElement.setAttribute('data-runtime-env', info.env);
+        document.documentElement.setAttribute('data-runtime-env', info.isNative ? 'native' : 'web');
+        document.documentElement.setAttribute('data-native-platform', info.env);
         this.enforceNavigationPolicy();
 
-        // Botones y tarjeta de descarga en pestaña OTA: estrictamente exclusivos para la versión Web
+        // Sincronizar token inicial si viene desde puente nativo Android o Ubuntu
+        try {
+          if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.getDeviceToken === 'function') {
+            const tok = window.RecursosAndroidBridge.getDeviceToken();
+            if (tok) localStorage.setItem('sysmon_device_token', tok);
+          } else if (window.__RECURSOS_DEVICE_TOKEN__) {
+            localStorage.setItem('sysmon_device_token', window.__RECURSOS_DEVICE_TOKEN__);
+          }
+        } catch (e) {}
+
+        // Botones de descarga en pestaña OTA: exclusivos para la versión Web
         const otaWebBtns = document.getElementById('otaWebDownloadButtons');
         const otaWebCard = document.getElementById('otaWebDownloadsCard');
-        const isNative = info.isNative;
-        if (otaWebBtns) otaWebBtns.style.display = isNative ? 'none' : 'flex';
-        if (otaWebCard) otaWebCard.style.display = isNative ? 'none' : 'block';
+        if (otaWebBtns) otaWebBtns.style.display = info.isNative ? 'none' : 'flex';
+        if (otaWebCard) otaWebCard.style.display = info.isNative ? 'none' : 'block';
 
-        const waitScreen = document.getElementById('usbProjectionWaitScreen');
-        const envBadge = document.getElementById('usbWaitEnvBadge');
-        const fallbackRow = document.getElementById('usbWaitWebFallbackRow');
-        const sidebar = document.getElementById('appSidebar');
-        const dockShell = document.getElementById('floatingDockShell');
-
-        if (info.isNativeOrMobile && !this._dismissedToWeb) {
-          if (envBadge) {
-            envBadge.textContent = info.isNative
-              ? 'Entorno Nativo Detectado · USB Directo'
-              : 'Entorno Móvil Detectado · Proyección USB';
-          }
-          if (fallbackRow) {
-            fallbackRow.style.display = info.isMobile ? 'flex' : 'none';
-          }
-          if (info.isNative) {
-            if (sidebar) sidebar.style.display = 'none';
-            if (dockShell) dockShell.style.display = 'none';
-          }
-          this.showUsbProjectionWaitScreen();
-          this.startUsbPolling();
-          return true;
-        } else {
-          if (waitScreen) waitScreen.style.display = 'none';
-          this.stopUsbPolling();
-          return false;
-        }
-      },
-
-      showUsbProjectionWaitScreen() {
-        const allViews = Object.keys(VIEW_TO_PATH);
-        allViews.forEach(v => {
-          const cap = v.charAt(0).toUpperCase() + v.slice(1);
-          const viewEl = document.getElementById('view' + cap);
-          if (viewEl) viewEl.style.display = 'none';
-        });
-        const waitScreen = document.getElementById('usbProjectionWaitScreen');
-        if (waitScreen) {
-          waitScreen.style.display = 'flex';
-        }
-        const titleEl = document.getElementById('currentViewTitle');
-        if (titleEl) titleEl.innerText = 'Proyección por USB (Samsung DeX / Android Desktop)';
-        const routeTagEl = document.getElementById('currentRouteBadge');
-        if (routeTagEl) routeTagEl.innerText = 'USB';
+        // Tanto en Web como en las Apps Nativas (Ubuntu y Android) se muestra la interfaz HTML5 completa
+        return false;
       },
 
       dismissUsbWaitScreenToWeb() {
-        this._dismissedToWeb = true;
-        this.stopUsbPolling();
-        const waitScreen = document.getElementById('usbProjectionWaitScreen');
-        if (waitScreen) waitScreen.style.display = 'none';
-        switchView('overview', false);
+        switchView('overview', true);
       },
 
       startUsbPolling() {
@@ -10473,17 +10550,40 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         const titleEl = document.getElementById('usbWaitTitle');
         const descEl = document.getElementById('usbWaitDesc');
         const statusTxt = document.getElementById('usbWaitLiveStatusText');
-        const actionBox = document.getElementById('usbWaitDeviceActionContainer');
+        const selectDev = document.getElementById('dexSelectDevice');
+        const badgeNavDex = document.getElementById('badgeNavDex');
+        const depsInfo = document.getElementById('dexHardwareDepsInfo');
         const autoChk = document.getElementById('chkUsbAutoProject');
-        if (!titleEl || !descEl || !statusTxt || !actionBox) return;
+        if (!titleEl || !descEl || !statusTxt) return;
+
+        if (depsInfo && data && data.dependencies) {
+          const d = data.dependencies;
+          depsInfo.textContent = `ADB: ${d.adb_installed ? 'OK' : 'Falta'} · Scrcpy ${d.scrcpy_version || (d.scrcpy_installed ? 'OK' : 'Falta')} · UHID Hardware`;
+        }
 
         const devices = Array.isArray(data && data.devices) ? data.devices : [];
+        if (badgeNavDex) {
+          badgeNavDex.textContent = data && data.session_running ? 'ACTIVO' : (devices.length > 0 ? `${devices.length} USB` : 'USB');
+        }
+
+        if (selectDev) {
+          const currentVal = selectDev.value;
+          const optionsHtml = ['<option value="">Detección automática (Primer USB activo)</option>'].concat(
+            devices.map(dv => `<option value="${escapeHtml(dv.serial || dv.id || '')}">${escapeHtml(dv.model || 'Android')} (${escapeHtml(dv.serial || dv.id || '')})</option>`)
+          ).join('');
+          if (selectDev.innerHTML !== optionsHtml) {
+            selectDev.innerHTML = optionsHtml;
+            if (currentVal) selectDev.value = currentVal;
+          }
+        }
+
         if (devices.length === 0) {
           this._autoLaunchedSerials.clear();
-          titleEl.textContent = 'Esperando que conectes un dispositivo por USB';
+          titleEl.textContent = 'Estación de Proyección USB (Samsung DeX & Android Desktop)';
           descEl.innerHTML = 'Conecta tu teléfono móvil mediante cable USB para proyectar el vídeo en baja latencia con <strong>Samsung DeX</strong> o el <strong>Modo Escritorio de Android</strong>.';
-          statusTxt.textContent = 'Escuchando puerto USB en tiempo real (Samsung DeX / Android Desktop)...';
-          actionBox.innerHTML = '';
+          statusTxt.textContent = data && data.session_running
+            ? '🟢 Sesión de proyección DeX en ejecución'
+            : 'Escuchando puerto USB en tiempo real (Samsung DeX / Android Desktop)...';
           return;
         }
 
@@ -10491,46 +10591,54 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         const serial = dev.serial || dev.id || '';
         const model = dev.model || 'Dispositivo Android';
         const modeLabel = dev.desktop_mode_label || 'Samsung DeX / Modo Escritorio de Android';
-        const state = dev.state || 'unknown';
+        const state = dev.state || 'device';
 
         if (state === 'device') {
           titleEl.textContent = `📱 ${model} conectado por USB`;
-          descEl.textContent = `Modo preparado: ${modeLabel} (Serie USB: ${serial})`;
-          statusTxt.textContent = `Dispositivo USB listo para proyectar vídeo (${modeLabel})`;
-          actionBox.innerHTML = `
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-              <button type="button" class="action-btn primary-cta" onclick="EnvironmentDetector.triggerUsbProjection('${escapeHtml(serial)}')">
-                🚀 Proyectar Vídeo por USB (${escapeHtml(modeLabel)})
-              </button>
-              ${data.session_running ? `
-                <button type="button" class="btn-revoke" onclick="EnvironmentDetector.stopUsbProjection()">
-                  ⏹ Detener Proyección
-                </button>
-              ` : ''}
-            </div>
-          `;
-          if (autoChk && autoChk.checked && serial && !this._autoLaunchedSerials.has(serial) && !data.session_running) {
+          descEl.textContent = `Modo preparado: ${modeLabel} · Serie USB: ${serial}`;
+          statusTxt.textContent = data && data.session_running
+            ? `🟢 Proyección activa en ${model} (${serial})`
+            : `🟢 Dispositivo USB listo para proyectar vídeo (${modeLabel})`;
+
+          if (autoChk && autoChk.checked && serial && !this._autoLaunchedSerials.has(serial) && !(data && data.session_running)) {
             this._autoLaunchedSerials.add(serial);
             this.triggerUsbProjection(serial);
           }
         } else {
           titleEl.textContent = `Autorización USB pendiente en ${model}`;
           descEl.textContent = 'Desbloquea la pantalla de tu móvil y acepta el diálogo de Depuración USB para iniciar la proyección de vídeo.';
-          statusTxt.textContent = `Esperando confirmación en pantalla del móvil (${serial})...`;
-          actionBox.innerHTML = '';
+          statusTxt.textContent = `⏳ Esperando confirmación RSA en pantalla del móvil (${serial})...`;
         }
       },
 
-      async triggerUsbProjection(serial) {
+      async triggerUsbProjection(explicitSerial) {
         try {
+          const selectDev = document.getElementById('dexSelectDevice');
+          const selectRes = document.getElementById('dexSelectResolution');
+          const selectFps = document.getElementById('dexSelectFps');
+          const chkUhid = document.getElementById('chkDexUhid');
+          const chkFs = document.getElementById('chkDexFullscreen');
+          const chkOff = document.getElementById('chkDexScreenOff');
+
+          const payload = {
+            serial: explicitSerial || (selectDev ? selectDev.value : '') || null,
+            resolution: selectRes ? selectRes.value : '1920x1080',
+            max_fps: selectFps ? parseInt(selectFps.value, 10) || 60 : 60,
+            use_uhid: chkUhid ? Boolean(chkUhid.checked) : true,
+            fullscreen: chkFs ? Boolean(chkFs.checked) : false,
+            turn_screen_off: chkOff ? Boolean(chkOff.checked) : false
+          };
+
           const res = await fetch('/api/dex/start', {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({ serial })
+            body: JSON.stringify(payload)
           });
           const data = await res.json();
-          if (data && data.success) {
+          if (data && (data.success || data.ok)) {
             showToast('Proyección de vídeo por USB iniciada', 'success');
+          } else {
+            showToast((data && (data.message || data.error)) || 'Verifica la conexión USB del dispositivo', 'error');
           }
           this.pollUsbStatusOnce();
         } catch (e) {
@@ -10545,6 +10653,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({})
           });
+          showToast('Sesión de proyección USB detenida', 'info');
           this.pollUsbStatusOnce();
         } catch (e) {}
       }
@@ -10566,21 +10675,20 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         }, { passive: false });
       }
 
-      // Ejecutar detección de entorno:
-      // - En versión web: garantiza que la pestaña 'Dispositivo' no esté presente en la navegación.
-      // - En entorno móvil o nativo: oculta cualquier pestaña no web y muestra la pantalla de espera de proyección USB.
-      const isShowingUsbWaitScreen = EnvironmentDetector.applyEnvironmentLayout();
+      EnvironmentDetector.applyEnvironmentLayout();
 
-      if (!isShowingUsbWaitScreen) {
-        const initialView = resolveViewFromLocation();
-        navStack = [initialView];
-        navPointer = 0;
-        const canonicalPath = VIEW_TO_PATH[initialView] || '/';
-        try {
-          window.history.replaceState({ view: initialView, path: canonicalPath }, '', canonicalPath);
-        } catch (e) {}
-        switchView(initialView, false);
-      }
+      const params = new URLSearchParams(window.location.search || '');
+      const requestedView = (params.get('view') || '').trim().toLowerCase();
+      const initialView = (requestedView && VIEW_TO_PATH[requestedView])
+        ? requestedView
+        : resolveViewFromLocation();
+      navStack = [initialView];
+      navPointer = 0;
+      const canonicalPath = VIEW_TO_PATH[initialView] || '/';
+      try {
+        window.history.replaceState({ view: initialView, path: canonicalPath }, '', canonicalPath + (window.location.search || ''));
+      } catch (e) {}
+      switchView(initialView, false);
 
       updateMetrics();
       setInterval(updateMetrics, 2000);

@@ -27,6 +27,7 @@ mkdir -p "$PKG_DIR/DEBIAN"
 mkdir -p "$PKG_DIR/usr/bin"
 mkdir -p "$PKG_DIR/usr/lib/$PKG_NAME"
 mkdir -p "$PKG_DIR/usr/lib/$PKG_NAME/assets"
+mkdir -p "$PKG_DIR/usr/lib/$PKG_NAME/static"
 mkdir -p "$PKG_DIR/usr/share/applications"
 mkdir -p "$PKG_DIR/usr/share/icons/hicolor/scalable/apps"
 
@@ -40,13 +41,15 @@ chmod 755 "$PKG_DIR/DEBIAN/postinst" "$PKG_DIR/DEBIAN/prerm" "$PKG_DIR/DEBIAN/po
 # Ajustar versión en DEBIAN/control
 sed -i "s/^Version:.*/Version: $VERSION/" "$PKG_DIR/DEBIAN/control"
 
-# 2. Copiar archivos de la aplicación y punto único de verdad de versión
+# 2. Copiar archivos de la aplicación, motor HTML5 unificado y punto único de verdad de versión
 cp "$PROJECT_ROOT/desktop_app/recursos_app.py" "$PKG_DIR/usr/lib/$PKG_NAME/recursos_app.py"
 cp "$PROJECT_ROOT/desktop_app/dex_controller.py" "$PKG_DIR/usr/lib/$PKG_NAME/dex_controller.py"
+cp "$PROJECT_ROOT/index.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"
 cp "$PROJECT_ROOT/desktop_app/assets/"* "$PKG_DIR/usr/lib/$PKG_NAME/assets/"
 cp "$PROJECT_ROOT/VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/VERSION"
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/*.py
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/VERSION
+chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/assets"/*
 
 # 3. Crear lanzador en /usr/bin/recursos-cockpit

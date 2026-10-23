@@ -3,18 +3,18 @@
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
 ### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v9.2.0-0A84FF?style=for-the-badge)](./VERSION)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v9.3.0-0A84FF?style=for-the-badge)](./VERSION)
 [![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white)](#-filosof%C3%ADa-de-dise%C3%B1o)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
-[![App Nativa Linux](https://img.shields.io/badge/App_Linux-Nativa_GTK3_.deb-AF52DE?style=for-the-badge&logo=debian&logoColor=white)](#-app-nativa-linux-deb--proyecci%C3%B3n-usb-dex--modo-escritorio-android)
-[![App Nativa Android](https://img.shields.io/badge/App_Android-APK_Nativo_Compose-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-app-nativa-android-apk--jetpack-compose)
+[![App Nativa Linux](https://img.shields.io/badge/App_Linux-HTML5_WebKit2_.deb-AF52DE?style=for-the-badge&logo=debian&logoColor=white)](#-8-apps-nativas-linux-deb--android-apk-con-motor-html5-unificado--dex-por-hardware)
+[![App Nativa Android](https://img.shields.io/badge/App_Android-HTML5_WebView_.apk-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-8-apps-nativas-linux-deb--android-apk-con-motor-html5-unificado--dex-por-hardware)
 [![CI/CD Releases](https://img.shields.io/badge/CI%2FCD-Releases_.deb_%2B_.apk-5856D6?style=for-the-badge&logo=githubactions&logoColor=white)](#-compilación-continua-en-github-actions)
 [![Rendimiento](https://img.shields.io/badge/Rendimiento-60_FPS_HiDPI_Retina-FF9F0A?style=for-the-badge&logo=speedtest&logoColor=white)](#-rendimiento-y-motor-desacoplado)
 [![Ciberseguridad](https://img.shields.io/badge/Ciberdefensa-Fail2ban_IPS_%2B_Pi--hole_DNS-FF453A?style=for-the-badge&logo=shield&logoColor=white)](#-ciberdefensa-activa-ips-y-seguridad-zero-trust)
 [![Licencia](https://img.shields.io/badge/Licencia-MIT-64D2FF?style=for-the-badge)](#-licencia)
 
 <p align="center">
-  <b>System Cockpit</b> es una plataforma integral de monitorización y ciberdefensa en tiempo real que transforma la gestión de servidores Linux y entornos homelab en una experiencia táctil fluida, combinando la óptica multicapa de <b>Apple Liquid Glass</b> con la ergonomía automotriz de <b>Tesla Touch Cockpit</b> y un cliente 100% nativo para Linux en GTK3 con soporte interactivo de dispositivos por hardware.
+  <b>System Cockpit</b> es una plataforma integral de monitorización y ciberdefensa en tiempo real que transforma la gestión de servidores Linux y entornos homelab en una experiencia táctil fluida, combinando la óptica multicapa de <b>Apple Liquid Glass</b> con la ergonomía automotriz de <b>Tesla Touch Cockpit</b> y aplicaciones nativas para <b>Linux/Ubuntu (GTK 3 + WebKit2)</b> y <b>Android (Kotlin + WebView acelerado por hardware)</b> que ejecutan el motor visual HTML5/CSS3/D3.js v7/Leaflet 100% unificado con soporte de estación USB DeX en Ubuntu.
 </p>
 
 </div>
@@ -23,7 +23,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v9.2.0 ║
+║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v9.3.0 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                              ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
@@ -48,12 +48,12 @@
 
 Descarga directamente los binarios compilados y firmados oficialmente para cada plataforma, sin intermediarios:
 
-### 🚀 Última Versión Canónica (`v9.2.0`)
+### 🚀 Última Versión Canónica (`v9.3.0`)
 
 | Paquete Oficial | Plataforma / Arquitectura | Enlace de Descarga Directa | Firma & Verificación |
 | :--- | :--- | :--- | :--- |
-| **🐧 Recursos Cockpit (`.deb`)** | Linux Ubuntu / Debian 64-bit (`amd64`) | [**`recursos-cockpit_9.2.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/recursos-cockpit_9.2.0_amd64.deb) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/SHA256SUMS.txt) |
-| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ (ARM64 / x86_64 / Tablets & Móviles) | [**`recursos-cockpit_9.2.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/recursos-cockpit_9.2.0.apk) | Firmado con Keystore Oficial Permanente |
+| **🐧 Recursos Cockpit (`.deb`)** | Linux Ubuntu / Debian 64-bit (`amd64`) | [**`recursos-cockpit_9.3.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.3.0/recursos-cockpit_9.3.0_amd64.deb) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.3.0/SHA256SUMS.txt) |
+| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ (ARM64 / x86_64 / Tablets & Móviles) | [**`recursos-cockpit_9.3.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.3.0/recursos-cockpit_9.3.0.apk) | Firmado con Keystore Oficial Permanente |
 | **⚡ Symlink Última Release (`latest`)** | Paquete Debian canónico | [**`recursos-cockpit.deb` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) | Canonical Release Asset |
 | **⚡ Symlink Última Release (`latest`)** | Paquete Android canónico | [**`recursos-cockpit.apk` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Canonical Release Asset |
 
@@ -66,7 +66,7 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 * **Actualización en un Clic**: Al compartir el mismo certificado criptográfico en todas las versiones, Android permite instalar nuevas versiones directamente sobre la existente **sin desinstalar primero**, preservando intactas las configuraciones, credenciales de emparejamiento y tokens guardados sin advertencias de conflicto de firma (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`).
 * **Instalación vía terminal o ADB**:
   ```bash
-  adb install -r dist/recursos-cockpit_9.2.0.apk
+  adb install -r dist/recursos-cockpit_9.3.0.apk
   ```
   O descarga el archivo directamente desde el navegador de tu tablet o móvil y pulsa **Actualizar**.
 
@@ -75,11 +75,11 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 * **Directivas de Reemplazo Limpio**: El metadato `DEBIAN/control` declara `Replaces: recursos-cockpit` y `Provides: recursos-cockpit`, garantizando que `dpkg` y `apt` gestionen la actualización sin conflictos de dependencia ni advertencias residuales.
 * **Comando recomendado de actualización limpia**:
   ```bash
-  sudo apt-get install --reinstall -y ./dist/recursos-cockpit_9.2.0_amd64.deb
+  sudo apt-get install --reinstall -y ./dist/recursos-cockpit_9.3.0_amd64.deb
   ```
   O con `dpkg`:
   ```bash
-  sudo dpkg -i --force-overwrite ./dist/recursos-cockpit_9.2.0_amd64.deb
+  sudo dpkg -i --force-overwrite ./dist/recursos-cockpit_9.3.0_amd64.deb
   ```
 
 ---
@@ -88,6 +88,7 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 
 | Versión | Paquete Linux (`.deb`) | Paquete Android (`.apk`) | Sumas Criptográficas |
 | :---: | :--- | :--- | :--- |
+| **`v9.3.0`** | [recursos-cockpit_9.3.0_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v9.3.0/recursos-cockpit_9.3.0_amd64.deb) | [recursos-cockpit_9.3.0.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v9.3.0/recursos-cockpit_9.3.0.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.3.0/SHA256SUMS.txt) |
 | **`v9.2.0`** | [recursos-cockpit_9.2.0_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/recursos-cockpit_9.2.0_amd64.deb) | [recursos-cockpit_9.2.0.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/recursos-cockpit_9.2.0.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.2.0/SHA256SUMS.txt) |
 | **`v9.1.2`** | [recursos-cockpit_9.1.2_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.2/recursos-cockpit_9.1.2_amd64.deb) | [recursos-cockpit_9.1.2.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.2/recursos-cockpit_9.1.2.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.2/SHA256SUMS.txt) |
 | **`v9.1.1`** | [recursos-cockpit_9.1.1_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.1/recursos-cockpit_9.1.1_amd64.deb) | [recursos-cockpit_9.1.1.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.1/recursos-cockpit_9.1.1.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.1.1/SHA256SUMS.txt) |
@@ -234,11 +235,11 @@ System Cockpit rompe con la estética tradicional de paneles de administración 
   - Tarjeta Bento colapsable (`#systemLogsCenterCard`) con filtros por categoría (`🐳 Apps & Docker`, `⚙️ Servicios`, `🐧 Kernel`), búsqueda en vivo y cambio de severidad.
   - Visor nativo HTML5 `<dialog>` a pantalla completa para auditorías exhaustivas.
 
-### 8. App Nativa Linux (.deb) & Proyección USB DeX / Modo Escritorio Android
-* **Separación Estricta Web vs. Nativa**: La pestaña de **Dispositivo** NO aparece en la versión web (ni en el menú lateral, ni en la cabecera, ni en la Vista General, ni en el Touch Dock). Existe **exclusivamente en la App Nativa para Linux (`recursos-cockpit`)**.
-* **Interfaz de Espera y Proyección Directa por USB**: En la aplicación nativa GTK 3, la pestaña **📱 Dispositivo (USB DeX)** presenta una interfaz limpia y enfocada que permanece esperando la conexión por cable USB de un teléfono móvil compatible con **Samsung DeX** o el **Modo Escritorio de Android**, iniciando automáticamente (o con 1 clic) la proyección de vídeo e interfaz de escritorio por USB mediante `scrcpy` y periféricos físicos `/dev/uhid`.
-* **Rendimiento 100% Nativo (GTK3 Puro)**: Construida sobre la pila nativa del sistema en Python y GNOME con widgets nativos reales (sin WebKit ni navegadores embebidos), pesando **~11 KB** empaquetada en formato Debian y consumiendo **< 30 MB de RAM**.
-* **Compilación CI/CD en GitHub**: Infraestructura de empaquetado reproducible en `packaging/debian/` y workflow automatizado en `.github/workflows/build-deb.yml` para compilar paquetes `.deb` auditados y publicarlos como artefactos en cada release.
+### 8. Apps Nativas Linux (.deb) & Android (.apk) con Motor HTML5 Unificado & DeX por Hardware
+* **Motor de Interfaz HTML5 Unificado con Contenedores Nativos Acelerados por Hardware**: Tanto la aplicación nativa de Ubuntu (`desktop_app/recursos_app.py`) como la aplicación nativa de Android (`android_app/`) renderizan directamente el motor visual canónico HTML5/CSS3/D3.js v7/Leaflet (`index.html`), garantizando paridad píxel a píxel del 100% en las 12 vistas operativas del Cockpit (incluyendo el mapa geoespacial interactivo OpenStreetMap + Leaflet, el anillo de ancho de banda D3.js y el gráfico horizontal animado D3.js de Top 10 CPU).
+* **Puente Local Loopback + WebKit2 en Ubuntu (`LocalHtmlBridgeServer`)**: En Linux/Ubuntu, la ventana GTK 3 embebe `WebKit2.WebView` acelerado por GPU conectado a un servidor puente HTTP local en `127.0.0.1` que inyecta automáticamente las credenciales Zero-Trust, proxifica las llamadas `/api/*` hacia el nodo LAN/WAN autodescubierto (con fallback a telemetría local `psutil` si opera sin red) e intercepta localmente `/api/dex/*` para controlar el hardware físico USB (`/dev/uhid`, `scrcpy`, `adb`).
+* **Puente Nativo `JavascriptInterface` + `AndroidView(WebView)` en Android (`RecursosAndroidBridge`)**: En Android, Jetpack Compose aloja un contenedor `android.webkit.WebView` acelerado por hardware acoplado con `DiscoveryManager` (autodescubrimiento concurrente de subred `/24` y conmutación automática LAN ↔ WAN) y `SecurePreferences` (`EncryptedSharedPreferences` AES256-GCM), sincronizando bidireccionalmente el token criptográfico `X-Device-Token` con el runtime HTML5.
+* **Desbloqueo Contractual Exclusivo de DeX en Ubuntu**: La 13.ª vista (`📱 DeX USB`) y sus controles de resolución (`1920x1080`, `2560x1440`, `2960x1848`), tasa de refresco (`60/90/120 FPS`), teclado/ratón físico UHID y auto-proyección se desbloquean dinámicamente **solo en la App Nativa de Ubuntu**, permaneciendo ocultos/bloqueados en navegadores web y clientes externos con el mensaje pasivo *"Esperando dispositivo para conectarse en su versión nativa"*.
 
 ---
 
@@ -373,6 +374,7 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v9.3.0`** | `MINOR` | **Eliminación de la Normativa de No-HTML en Apps Nativas (`GEMINI.md`) y Reescritura Integral de las Aplicaciones Nativas de Ubuntu (`.deb`) y Android (`.apk`) con Motor HTML5 Unificado Acelerado por Hardware**: (1) **Actualización Normativa en `GEMINI.md` (Reglas 7 y 8)**: Eliminación de la prohibición de HTML/WebViews en clientes nativos y establecimiento de la arquitectura de **Motor de Interfaz HTML5 Unificado con Contenedores Nativos** (`WebKit2` en GTK 3 para Linux/Ubuntu y `android.webkit.WebView` en Kotlin/Jetpack Compose para Android), garantizando paridad visual y funcional del 100% en las 12 vistas del Cockpit (cartografía Leaflet, gráficos vectoriales D3.js v7 y Bento Grid *Apple Liquid Glass + Tesla Touch Cockpit*); (2) **Reescritura de la App Nativa Ubuntu (`desktop_app/recursos_app.py`)**: Integración de `WebKit2.WebView` acelerado por hardware junto al servidor puente local `LocalHtmlBridgeServer` (`127.0.0.1:<puerto>`) que sirve el motor HTML5 unificado (`index.html`), inyecta banderas nativas (`window.__RECURSOS_UBUNTU_NATIVE__ = true`) y credenciales Zero-Trust, proxifica transparente y dinámicamente `/api/*` hacia el nodo LAN/WAN autodescubierto (con síntesis local `psutil` de respaldo) y ejecuta localmente `/api/dex/*` mediante `DexController` (`/dev/uhid`, `scrcpy`, `adb`); (3) **Reescritura de la App Nativa Android (`android_app/`)**: Reescritura de `CockpitDashboard.kt` y `MainActivity.kt` con contenedor `AndroidView(WebView)` acelerado por GPU, puente `@JavascriptInterface class RecursosAndroidBridge` acoplado con `SecurePreferences` (`EncryptedSharedPreferences`) y `DiscoveryManager` (autodescubrimiento LAN `/24` y failover automático LAN ↔ WAN), inyección de sesión (`window.injectNativeSession`) y barra superior nativa compacta de estado y ajustes; (4) **Desbloqueo Exclusivo de Estación USB DeX en Ubuntu (`index.html` y `static/index.html`)**: Incorporación de la 13.ª vista (`#viewDex`) con controles de hardware para resolución, FPS y `/dev/uhid` desbloqueada exclusivamente cuando se ejecuta dentro de la App Nativa de Ubuntu (Regla 7.5), manteniendo el mensaje pasivo en navegadores web y ocultando las descargas `.deb`/`.apk` dentro de los contenedores nativos; (5) **Sincronización Canónica y Paquete Debian (Reglas 3 y 6)**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control` (con dependencia `gir1.2-webkit2-4.1 \| gir1.2-webkit2-4.0`) y `android_app/app/build.gradle.kts` a `9.3.0`, empaquetado de `static/index.html` en `packaging/build_deb.sh` y compilación verificada de `dist/recursos-cockpit_9.3.0_amd64.deb`. |
 | **`v9.2.0`** | `MINOR` | **Visualización D3.js v7 de Distribución de Uso de CPU de los 10 Procesos Principales (Gráfico de Barras Horizontal Animado en `/procesos`) y Telemetría Delta de CPU en `/proc/[pid]/stat`**: (1) **Motor Vectorial D3.js v7 (`window.ProcessCpuBarChart` en `index.html` y `static/index.html`)**: Implementación en `#viewProcesses` (`#procCpuD3Section`) de un gráfico de barras horizontal animado con D3.js v7 que muestra en tiempo real la distribución de uso de CPU de los 10 procesos más activos del sistema, utilizando unión de datos por clave única (`data(top10, d => String(d.pid))`), transiciones cúbicas fluidas (`d3.easeCubicOut`, 550 ms) para el reordenamiento vertical de filas (`scaleBand`) y anchura de barras (`scaleLinear`), interpolación numérica cuadro a cuadro (`d3.interpolateNumber`) en las etiquetas de porcentaje y gradientes cromáticos semánticos por nivel de carga (`<15%` cian, `15–45%` ámbar, `>45%` rosa coral); (2) **Conmutador de Escala e Interacción Bidireccional con la Tabla de Procesos**: Selector segmentado entre **Escala Dinámica** (ajustada al proceso líder para máxima resolución visual en cargas bajas/medias) y **Escala 100%**, tira superior de resumen con tipografía monoespaciada tabular (`Carga Top 10`, `Proceso Líder` y `RAM Privada Top 10`), tooltip flotante *Liquid Glass* con cuota relativa sobre el Top 10 y selección interactiva al hacer clic en cualquier barra para resaltar y desplazar suavemente hasta el PID correspondiente en `#processesList`; (3) **Muestreo Instantáneo de Ticks de CPU por Proceso en Dev Server (`vite.config.ts`)**: Lectura directa de `/proc/[pid]/stat` (`utime + stime`) con cálculo diferencial entre intervalos de muestreo en `sampleRealProcesses()`, proporcionando porcentajes decimales exactos en tiempo real 100% *Zero-Hardcoding*; (4) **Sincronización Canónica y Paquete Nativo (Reglas 3 y 6)**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control` y `android_app/app/build.gradle.kts` a `9.2.0`, y compilación verificada de `dist/recursos-cockpit_9.2.0_amd64.deb`. |
 | **`v9.1.2`** | `PATCH` | **Auditoría Integral Línea a Línea de Interfaces Nativas (Android & Ubuntu), Purga Estricta de Versiones Hardcodeadas y Blindaje de Variables Globales**: (1) **Auditoría Exhaustiva de la App Android (`android_app/`)**: En `ApiService.kt`, sustitución del valor estático hardcodeado `RecursosCockpit-Android/8.5.0` por `BuildConfig.VERSION_NAME` dinámico; en `Models.kt`, erradicación del valor predeterminado estático en `VersionInfo` (cumplimiento estricto de las Reglas 2 y 3); verificación de ausencia total de WebViews y menús DeX (Regla 7.5); (2) **Auditoría de la App Nativa Ubuntu (`desktop_app/recursos_app.py`)**: Validación con `--test-mode` sin fallos, verificación de lectura dinámica de versión canónica, aceleración por hardware con gráficos vectoriales Cairo a 60 FPS y control de estación USB DeX con UHID y Scrcpy; (3) **Sincronización Web y Blindaje de Variables (`index.html` & `static/index.html`)**: Actualización de atributos iniciales `download` y badges en la pestaña OTA a `v9.1.2` y blindaje de las variables de estado `window.connectionsMapDrawerOpen` y `window.connectionsMapServiceDrawerOpen` para prevenir errores de ámbito; (4) **Compilación e Instalación Automática (Regla 6)**: Generación del paquete Debian canónico `dist/recursos-cockpit_9.1.2_amd64.deb` con sumas SHA256 e instalación verificada en el sistema; (5) **Sincronización Canónica**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control` y `app/build.gradle.kts` a `9.1.2`. |
 | **`v9.1.1`** | `PATCH` | **Corrección de Errores de Ejecución en Frontend (ReferenceError en Clic del Mapa) y Manejador de Historial /api/net/history en Dev Server**: (1) **Corrección de `ReferenceError: connectionsMapServiceDrawerOpen is not defined`**: Sustitución segura en el listener de clic del contenedor del mapa por `connectionsMapDrawerOpen` y `toggleMapSideDrawer(false)`, añadiendo variables y funciones puente de compatibilidad retrospectiva; (2) **Solución a `SyntaxError: Unexpected token '<'` en `/api/net/history`**: Implementación del endpoint `/api/net/history` y `/api/net/history/clear` en `vite.config.ts` para el dev server sirviendo JSON nativo, e incorporación de validación estricta de cabecera `content-type: application/json` antes de parsear `res.json()` en `fetchHistoryData()` y `toggleDeviceInlineHistory()`; (3) **Sincronización Canónica**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control`, `android_app/app/build.gradle.kts` y [`README.md`](./README.md) a `9.1.1`. |
