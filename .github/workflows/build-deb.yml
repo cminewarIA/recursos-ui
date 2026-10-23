@@ -18,7 +18,9 @@ jobs:
 
     steps:
       - name: 📥 Clonar Repositorio
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 🛠️ Instalar Dependencias Linux (.deb) (Offline-First)
         run: |
@@ -49,8 +51,16 @@ jobs:
           ./gradlew assembleRelease
           cd ..
           VERSION=$(cat VERSION | tr -d '[:space:]')
-          cp android_app/app/build/outputs/apk/release/app-release.apk dist/recursos-cockpit_${VERSION}.apk
-          cp android_app/app/build/outputs/apk/release/app-release.apk dist/recursos-cockpit.apk
+          mkdir -p dist
+          APK_FILE=$(find android_app/app/build/outputs/apk/release/ -type f -name "*.apk" | head -n 1)
+          if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
+            cp "$APK_FILE" "dist/recursos-cockpit_${VERSION}.apk"
+            cp "$APK_FILE" "dist/recursos-cockpit.apk"
+            echo "✅ APK copiado: dist/recursos-cockpit_${VERSION}.apk"
+          else
+            echo "❌ Error: No se encontró APK compilado en release"
+            exit 1
+          fi
 
       - name: 🔐 Calcular Sumas SHA256 de Todos los Paquetes
         run: |
@@ -63,9 +73,10 @@ jobs:
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=v$VERSION" >> $GITHUB_OUTPUT
 
       - name: 📤 Subir Artefactos de Compilación
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: recursos-cockpit-${{ steps.pkg_info.outputs.version }}-binaries
           path: |
@@ -75,8 +86,20 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: 🏷️ Publicar en GitHub Releases (Público y Descargable)
-        uses: softprops/action-gh-release@v3
+      - name: 🏷️ Asegurar Etiqueta Git para la Release
+        run: |
+          TAG_NAME="v${{ steps.pkg_info.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Creando etiqueta local $TAG_NAME..."
+            git tag -a "$TAG_NAME" -m "Recursos Cockpit $TAG_NAME"
+          fi
+          echo "Sincronizando etiqueta $TAG_NAME con origin..."
+          git push origin "$TAG_NAME" || true
+
+      - name: 🚀 Publicar en GitHub Releases (Público y Descargable)
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.pkg_info.outputs.version }}
           name: Recursos Cockpit v${{ steps.pkg_info.outputs.version }}
@@ -87,3 +110,5 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

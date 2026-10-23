@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cminewar.recursoscockpit.BuildConfig
 import com.cminewar.recursoscockpit.data.ConnectionMode
 import com.cminewar.recursoscockpit.data.MetricsResponse
 import com.cminewar.recursoscockpit.theme.*
@@ -90,7 +91,7 @@ fun CockpitDashboard(
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
                                     Text(
-                                        text = "v8.5.0",
+                                        text = "v${BuildConfig.VERSION_NAME}",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = NeonCyan

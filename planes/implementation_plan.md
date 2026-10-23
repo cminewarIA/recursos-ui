@@ -1,36 +1,24 @@
-# Plan de Implementación v8.5.2: Formalización Contractual de Simetría Total, Homogeneidad y Cohesión en Interfaces y Submenús (Regla 8 en GEMINI.md)
+# Plan de Implementación v8.5.3: CI/CD Dual Automatizado en GitHub Actions y Auditoría de Normas en Apps Nativas
 
 ## Objetivo
-Formalizar de manera contractual e irrevocable en las directrices maestras del proyecto ([`GEMINI.md`](../GEMINI.md)) la exigencia de **simetría total, homogeneidad y cohesión visual/estructural** en todas las interfaces y submenús:
-1. **Interfaces Web y Submenús**: Todos los componentes, tarjetas Bento, modales, barras flotantes, menús laterales, el mapa geoespacial y subapartados deben proyectar una simetría y coherencia rigurosa y limpia.
-2. **Ecosistema Homogéneo Universal**: Paridad estética y dimensional absoluta entre la versión web y las aplicaciones nativas de Ubuntu (GTK 3/Cairo) y Android (Jetpack Compose).
-3. **Proyección hacia el Futuro**: Cualquier elemento, control, submenú o vista que se agregue en sucesivas versiones deberá ceñirse sin excepciones a esta directriz.
-4. **Criterio de Incremento (`PATCH` ➔ `8.5.2`)**: De acuerdo a la Regla 3.4 de `GEMINI.md`, la actualización de reglas de ingeniería y documentación corresponde a un incremento de tipo `PATCH` (`8.5.1` ➔ `8.5.2`).
-
----
-
-## Cambios Propuestos
-
-### Componente 1: Reglas Maestras de Ingeniería (`GEMINI.md`)
-- Incorporar la **Regla 8**: *"Principio de Simetría Total, Homogeneidad y Cohesión en Interfaces y Submenús (Web, Linux/Ubuntu y Android)"*.
-- Renumerar la directiva de publicación remota a **Regla 9**: *"Publicación Automática en GitHub (`git push`)"*.
-- Reafirmar la paridad estética en la Regla 7.5 (*Apple Liquid Glass + Tesla Touch Cockpit*).
-
-### Componente 2: Sincronización Canónica de Versiones (`v8.5.2`)
-- `./VERSION`: `8.5.2`
-- `package.json`: `"version": "8.5.2"`
-- `packaging/debian/control`: `Version: 8.5.2`
-- `android_app/app/build.gradle.kts`: `versionCode = 80502`, `versionName = "8.5.2"`
-- `README.md`: Badges, banner ASCII y tabla de historial de versiones actualizada con `v8.5.2`.
-
-### Componente 3: Compilación y Empaquetado Canónico
-- Compilar el paquete Debian canónico mediante `packaging/build_deb.sh`.
-- Verificar la instalación local en el sistema mediante `/usr/bin/recursos-cockpit --test-mode`.
+1. **Compilación y Publicación Automática de Binarios (.deb y .apk) en GitHub Actions**:
+   - Ajustar el workflow `.github/workflows/build-deb.yml` a las versiones oficiales vigentes (`actions/checkout@v4`, `actions/setup-java@v4`, `gradle/actions/setup-gradle@v4`, `actions/upload-artifact@v4`, `softprops/action-gh-release@v2`).
+   - Automatizar el etiquetado Git (`git tag v$VERSION` y push a `origin`) en segundo plano para que cualquier push a `main` genere/actualice la Release correspondiente de manera desatendida.
+   - Asegurar la copia y vinculación de ambos paquetes: Linux Debian (`recursos-cockpit_${VERSION}_amd64.deb` + symlink `.deb`) y Android APK (`recursos-cockpit_${VERSION}.apk` + symlink `.apk`) junto con `SHA256SUMS.txt`.
+2. **Auditoría Integral de Apps Nativas (Linux GTK3 & Android Jetpack Compose)**:
+   - **Android (`android_app/`)**: Habilitar `buildConfig = true` e inyectar `BuildConfig.VERSION_NAME` en la cabecera de `CockpitDashboard.kt` eliminando cualquier número estático en código fuente (Regla 2 y Regla 3). Confirmar exclusión estricta de menús DeX (Regla 7.5), navegación paritaria Bento Grid y simetría total (Regla 8).
+   - **Linux Ubuntu (`desktop_app/recursos_app.py`)**: Corregir shebang duplicado, verificar inicialización y dibujo de gráficas Cairo a 60 FPS, autodescubrimiento en LAN con persistencia criptográfica Zero-Trust y estación de proyección DeX por hardware desbloqueada.
+3. **Sincronización Canónica de Versiones (`8.5.3`)**:
+   - `./VERSION`: `8.5.3`
+   - `package.json`: `"version": "8.5.3"`
+   - `packaging/debian/control`: `Version: 8.5.3`
+   - `android_app/app/build.gradle.kts`: `versionCode = 80503`, `versionName = "8.5.3"`
+   - `README.md`: Badges, banner y tabla de versiones actualizada.
 
 ---
 
 ## Plan de Verificación
-1. Validar que la Regla 8 figure íntegra y explícita en `GEMINI.md`.
-2. Validar consistencia estricta de la versión `8.5.2` en todos los puntos de verdad.
-3. Compilar el paquete Debian canónico `dist/recursos-cockpit_8.5.2_amd64.deb`.
-4. Ejecutar `compile_applet` y `lint_applet` para confirmar que el entorno compila limpiamente sin advertencias ni errores.
+1. Validar sintaxis y lógica en `.github/workflows/build-deb.yml`.
+2. Ejecutar prueba nativa de `recursos_app.py --test-mode`.
+3. Compilar el paquete Debian canónico: `bash packaging/build_deb.sh`.
+4. Ejecutar `lint_applet` y `compile_applet` para garantizar que la plataforma web y el proyecto compilen sin errores.
