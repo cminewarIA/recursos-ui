@@ -1,36 +1,34 @@
-# Plan de Implementación - v8.3.6 a v8.3.7: Formalización de Paridad Visual de Interfaces y Desbloqueo Exclusivo del Submenú DeX en la App de Ubuntu
+# Plan de Implementación - Versión 8.3.8
 
-## 📌 Solicitud del Usuario
-> *"y las interfaces se tienen que ver igual la unica diferencia es que desde la app de ubuntu se desbloquea el submeno de dex"*
+## Objetivo
+Optimizar, consolidar y limpiar las reglas del proyecto en `GEMINI.md`, eliminando redundancias, duplicaciones verbales y repetición innecesaria de rutas físicas, mientras se preserva al 100% el rigor contractual de todas las normas (sincronización git pull/push, compatibilidad de rutas, zero-hardcoding, versionado semántico MAJOR.MINOR.PATCH, almacenamiento en planes/, README, empaquetado/instalación local del .deb y arquitectura de apps nativas con paridad visual y desbloqueo de DeX en Ubuntu).
 
----
+## Cambios Propuestos
 
-## 🏛️ Directrices a Incorporar en GEMINI.md (Regla 9, Punto 6)
+### Documentación y Reglas
+- **[MODIFY] `GEMINI.md`**:
+  - Reorganizar en 8 directrices ordenadas según el ciclo de desarrollo.
+  - Eliminar menciones redundantes de rutas absolutas locales (`/home/servidor/...`) en las reglas 1, 3 y 5, delegando la política de rutas a la regla universal de rutas relativas y zero-hardcoding.
+  - Consolidar los puntos de seguridad criptográfica y consumo de APIs en la arquitectura de apps nativas (anteriormente 9.3 y 9.5).
+  - Incluir `packaging/debian/control` explícitamente en la lista de sincronización de versiones.
+  - Eliminar párrafos redundantes de "Objetivo" que duplican el texto normativo.
+- **[MODIFY] `VERSION`**:
+  - Incrementar de `8.3.7` a `8.3.8` (criterio PATCH por ajuste de reglas y documentación).
+- **[MODIFY] `package.json`**:
+  - Sincronizar `"version": "8.3.8"`.
+- **[MODIFY] `packaging/debian/control`**:
+  - Sincronizar `Version: 8.3.8`.
+- **[MODIFY] `README.md`**:
+  - Actualizar badges, banner ASCII y tabla de versiones a `v8.3.8`.
+- **[NEW] `planes/implementation_plan_v8.3.8.md`** y **`planes/walkthrough_v8.3.8.md`**:
+  - Registro canónico de la tarea.
 
-Se amplía la **Regla 9** de [`GEMINI.md`](file:///home/servidor/servicios/dashboard/GEMINI.md) con el apartado específico de paridad visual y desbloqueo de DeX:
+### Empaquetado y Verificación Local
+- Compilar `dist/recursos-cockpit_8.3.8_amd64.deb` con `packaging/build_deb.sh`.
+- Instalar localmente con `sudo apt-get install -y ./dist/recursos-cockpit_8.3.8_amd64.deb`.
+- Verificar con `/usr/bin/recursos-cockpit --test-mode`.
+- Verificar servicio backend en `http://127.0.0.1:8085/api/version`.
 
-1. **Paridad Visual y Estructural Idéntica**:
-   - Todas las interfaces del ecosistema (interfaz web, app nativa de Linux/Ubuntu y app nativa de Android) deben lucir con la misma identidad estética (Apple Liquid Glass + Tesla Touch Cockpit), colores, disposición bento, gráficas y elegancia visual.
-2. **Desbloqueo Exclusivo del Submenú de DeX en Ubuntu**:
-   - La única divergencia permitida entre la interfaz web y la app de Ubuntu es que **en la app nativa de Ubuntu se desbloquea el submenú de DeX / Modo Escritorio por hardware USB** (`scrcpy` + UHID + pantalla virtual).
-   - En la web y clientes no autorizados, cualquier control o mención de DeX se mantiene estrictamente bloqueado/oculto, mostrando únicamente el estado pasivo *"Esperando dispositivo para conectarse en su versión nativa"*.
-   - En la app de Ubuntu, al tener acceso nativo al kernel y `/dev/uhid`, el submenú de DeX se desbloquea dinámicamente con sus opciones de proyección, resolución, FPS y conmutación de pantalla.
-
----
-
-## 🛠️ Tareas de Implementación y Despliegue
-
-1. **Actualizar `GEMINI.md`**: Añadir el punto 6 a la Regla 9.
-2. **Sincronización Canónica de Versión (`8.3.7`)**:
-   - `VERSION`: `8.3.7`.
-   - `package.json`: `"version": "8.3.7"`.
-   - `packaging/debian/control`: `Version: 8.3.7`.
-   - `README.md`: Badges, banner y fila `v8.3.7` en la tabla de versiones.
-3. **Compilación e Instalación Local (Regla 8)**:
-   - `bash packaging/build_deb.sh`.
-   - `sudo apt-get install -y ./dist/recursos-cockpit_8.3.7_amd64.deb`.
-   - Comprobar con `dpkg -l | grep recursos-cockpit` y `/usr/bin/recursos-cockpit --test-mode`.
-4. **Documentación**:
-   - Crear `planes/walkthrough_v8.3.7.md` y actualizar `planes/walkthrough.md`.
-5. **Git y GitHub (Regla 2)**:
-   - `git add`, `git commit`, `git tag v8.3.7`, `git push origin main --tags`.
+### Sincronización Remota
+- Commit semántico: `docs(v8.3.8): optimizar y consolidar reglas del proyecto en GEMINI.md eliminando redundancias`
+- Tag `v8.3.8` y `git push origin main --tags`.
