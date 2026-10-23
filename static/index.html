@@ -29,7 +29,7 @@
 
   <style>
     /* ==========================================================================
-       RECURSOS — INFRASTRUCTURE & TELEMETRY ENGINEERING CONSOLE (v10.0.0)
+       RECURSOS — INFRASTRUCTURE & TELEMETRY ENGINEERING CONSOLE (v10.1.0)
        High-Craft Dark/Light UI · Hairline Grid Architecture · Zero-Hardcoding
        ========================================================================== */
     :root,
@@ -4688,23 +4688,23 @@
           </div>
 
           <!-- ==================================================================
-               INVENTARIO DE DISPOSITIVOS ZERO-TRUST & TELEMETRÍA NATIVA TOTAL
+               INVENTARIO DE DISPOSITIVOS ZERO-TRUST & CERTIFICADOS POR EQUIPO FÍSICO
                ================================================================== -->
           <div class="section-block" id="secZeroTrustDevicesSection">
             <div class="section-header-bar" style="flex-wrap: wrap; gap: 10px;">
               <div>
-                <div class="section-title">Dispositivos Vinculados & Identificación de Hardware Zero-Trust (<span id="secTrustedDevicesCount">0</span>)</div>
-                <div class="section-subtitle">Auditoría de permisos para Apps Nativas (Full Access al Silicio) vs Clientes Web (Sandbox) y exportación de reportes JSON</div>
+                <div class="section-title">Certificados Zero-Trust por Dispositivo Físico & Agrupación de Clientes (<span id="secTrustedDevicesCount">0</span>)</div>
+                <div class="section-subtitle">1 certificado HMAC-SHA256 único por equipo físico · Agrupación automática de clientes (App Nativa Full Access + Navegadores Sandbox) y auditoría JSON</div>
               </div>
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <div class="segmented-control" title="Filtrar dispositivos por tipo de contenedor y nivel de permiso">
-                  <button type="button" class="seg-btn active" id="btnSecDevFilterAll" onclick="setSecDeviceFilter('all')">Todos (<span id="secDevCntAll">0</span>)</button>
+                <div class="segmented-control" title="Filtrar dispositivos físicos por nivel de privilegio y tipo de contenedor">
+                  <button type="button" class="seg-btn active" id="btnSecDevFilterAll" onclick="setSecDeviceFilter('all')">Equipos (<span id="secDevCntAll">0</span>)</button>
                   <button type="button" class="seg-btn" id="btnSecDevFilterNative" onclick="setSecDeviceFilter('native')">Full Access (<span id="secDevCntNative">0</span>)</button>
                   <button type="button" class="seg-btn" id="btnSecDevFilterWeb" onclick="setSecDeviceFilter('web')">Sandbox (<span id="secDevCntWeb">0</span>)</button>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 2px 6px; height: 30px;">
                   <span style="font-size: 11px; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Dispositivo:</span>
-                  <select id="secSelectedAuditDevice" onchange="onSelectSecAuditDevice(this.value)" style="height: 24px; padding: 0 6px; background: transparent; border: none; color: var(--text-primary); font-family: var(--font-mono); font-size: 11.5px; outline: none; max-width: 210px; cursor: pointer;" title="Seleccionar dispositivo para descargar su reporte de auditoría JSON">
+                  <select id="secSelectedAuditDevice" onchange="onSelectSecAuditDevice(this.value)" style="height: 24px; padding: 0 6px; background: transparent; border: none; color: var(--text-primary); font-family: var(--font-mono); font-size: 11.5px; outline: none; max-width: 210px; cursor: pointer;" title="Seleccionar dispositivo físico para descargar su reporte de auditoría JSON">
                     <option value="">Seleccionando...</option>
                   </select>
                   <button type="button" class="action-btn" id="btnDownloadSelectedDeviceAudit" onclick="downloadSelectedDeviceAuditReport()" style="height: 24px; min-height: 24px; padding: 0 10px; font-size: 11px; border-color: rgba(56, 189, 248, 0.45); color: var(--accent-cyan-bright); background: rgba(56, 189, 248, 0.12); font-weight: 700;" title="Descargar reporte de auditoría completo en formato JSON para el dispositivo seleccionado">
@@ -4712,20 +4712,20 @@
                     <span>Descargar Reporte JSON</span>
                   </button>
                 </div>
-                <button type="button" class="action-btn" onclick="syncCurrentDeviceTelemetry(true)" style="height: 30px; min-height: 30px; padding: 0 10px; font-size: 11.5px;" title="Sincronizar todos los sensores y datos de hardware de este dispositivo">
+                <button type="button" class="action-btn" onclick="syncCurrentDeviceTelemetry(true)" style="height: 30px; min-height: 30px; padding: 0 10px; font-size: 11.5px;" title="Sincronizar todos los sensores y unificar el certificado de este dispositivo físico">
                   Identificar Este Dispositivo
                 </button>
                 <button type="button" class="btn-revoke" onclick="revokeAllOtherDevices()" style="height: 30px; padding: 0 10px; font-size: 11.5px;">
-                  Revocar demás sesiones
+                  Revocar demás equipos
                 </button>
               </div>
             </div>
 
             <div class="hw-spec-grid" style="margin-bottom: 12px;">
               <div class="hw-spec-cell">
-                <span class="hw-spec-label">Dispositivos Autorizados</span>
+                <span class="hw-spec-label">Certificados por Dispositivo</span>
                 <span class="hw-spec-value mono" style="font-size: 20px; color: var(--accent-cyan-bright);" id="secTrustedTotalVal">0</span>
-                <span style="font-size: 11px; color: var(--text-muted);" id="secTrustedTotalSub">Certificados HMAC activos</span>
+                <span style="font-size: 11px; color: var(--text-muted);" id="secTrustedTotalSub">1 certificado único por equipo físico</span>
               </div>
               <div class="hw-spec-cell">
                 <span class="hw-spec-label">Permisos (Full Access vs Sandbox)</span>
@@ -4738,7 +4738,7 @@
                 <span style="font-size: 11px; color: var(--text-muted);" class="mono" id="secCurrentDeviceHwSub">Sondeando silicio...</span>
               </div>
               <div class="hw-spec-cell">
-                <span class="hw-spec-label">Canal & Nivel de Privilegio</span>
+                <span class="hw-spec-label">Certificado & Nivel de Privilegio</span>
                 <span class="hw-spec-value mono" style="font-size: 15px; color: var(--accent-violet-bright);" id="secCurrentChannelVal">LAN / Zero-Trust</span>
                 <span style="font-size: 11px; color: var(--text-muted);" class="mono" id="secCurrentIpSub">IP: --</span>
               </div>
@@ -4746,7 +4746,7 @@
 
             <div class="surface-panel" id="secTrustedDevicesList">
               <div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 24px;">
-                Sincronizando inventario criptográfico de dispositivos e identificando hardware...
+                Sincronizando certificados por dispositivo físico y agrupando clientes...
               </div>
             </div>
           </div>
@@ -5178,11 +5178,11 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <!-- Botones de Descarga Directa Exclusivos para la Versión Web -->
                 <div class="ota-web-download-row" id="otaWebDownloadButtons" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_10.0.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_10.1.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_10.0.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_10.1.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5202,7 +5202,7 @@
                 <div style="display: flex; flex-direction: column; gap: 3px;">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Paquetes Oficiales Compilados</span>
-                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v10.0.0</span>
+                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v10.1.0</span>
                     <span class="adw-badge badge-purple" style="font-size: 10px; font-weight: 600;">Solo en la Web</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);">
@@ -5210,11 +5210,11 @@
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_10.0.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_10.1.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux amd64)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_10.0.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_10.1.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5769,10 +5769,10 @@
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap;">
-          <span style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Dispositivos Autorizados (<span id="trustDeviceCount">0</span>)</span>
+          <span style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Certificados de Dispositivo (<span id="trustDeviceCount">0</span>)</span>
           <div style="display: flex; gap: 8px;">
-            <button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="syncCurrentDeviceTelemetry(true)">🔄 Re-identificar Hardware</button>
-            <button class="btn-revoke" onclick="revokeAllOtherDevices()">Revocar demás sesiones</button>
+            <button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="syncCurrentDeviceTelemetry(true)">Re-identificar Hardware</button>
+            <button class="btn-revoke" onclick="revokeAllOtherDevices()">Revocar demás equipos</button>
           </div>
         </div>
 
@@ -8174,18 +8174,17 @@
       let hwId = baseTel.hardware_id || '';
       if (!hwId) {
         try {
-          hwId = localStorage.getItem('sysmon_hw_fingerprint') || '';
-          if (!hwId) {
-            const rawSeed = `${clientType}:${uaPlatform}:${uaArch}:${scrW}x${scrH}:${navigator.hardwareConcurrency || 0}:${gpuWebGl}`;
-            let hash = 0;
-            for (let i = 0; i < rawSeed.length; i++) {
-              hash = ((hash << 5) - hash) + rawSeed.charCodeAt(i);
-              hash |= 0;
-            }
-            hwId = `web_${Math.abs(hash).toString(16)}_${Date.now().toString(16).slice(-6)}`;
-            localStorage.setItem('sysmon_hw_fingerprint', hwId);
+          const rawSeed = `${uaPlatform}:${uaArch}:${scrW}x${scrH}:${navigator.hardwareConcurrency || 0}:${gpuWebGl}`;
+          let hash = 0;
+          for (let i = 0; i < rawSeed.length; i++) {
+            hash = ((hash << 5) - hash) + rawSeed.charCodeAt(i);
+            hash |= 0;
           }
+          hwId = `hw_${Math.abs(hash).toString(16)}`;
+          localStorage.setItem('sysmon_hw_fingerprint', hwId);
         } catch (e) {}
+      } else if (/^web_([0-9a-f]+)_[0-9a-f]+$/i.test(hwId)) {
+        hwId = `web_${RegExp.$1}`;
       }
 
       return Object.assign({}, baseTel, {
@@ -8229,7 +8228,7 @@
             } catch (e) {}
           }
           if (showFeedback && typeof showToast === 'function') {
-            showToast('Datos completos de hardware del dispositivo sincronizados', 'success');
+            showToast('Certificado de dispositivo físico y telemetría de hardware sincronizados', 'success');
           }
           loadTrustedDevicesList();
         }
@@ -8258,12 +8257,12 @@
       if (auth.is_local) {
         if (dot) dot.style.background = 'var(--accent-emerald)';
         if (title) title.innerText = 'Conectado en Red Local (LAN)';
-        if (sub) sub.innerText = `IP Cliente: ${auth.client_ip || '--'} · Emparejamiento automático`;
-        if (badge) { badge.className = 'adw-badge badge-green'; badge.innerText = 'Red Local Confiable'; }
+        if (sub) sub.innerText = `IP Dispositivo: ${auth.client_ip || '--'} · Certificado único por equipo físico`;
+        if (badge) { badge.className = 'adw-badge badge-green'; badge.innerText = 'Certificado de Equipo Activo'; }
       } else {
         if (dot) dot.style.background = 'var(--accent-cyan-bright)';
         if (title) title.innerText = 'Conexión Remota Autorizada (WAN)';
-        if (sub) sub.innerText = `IP Externa: ${auth.client_ip || '--'} · Token HMAC verificado`;
+        if (sub) sub.innerText = `IP Externa: ${auth.client_ip || '--'} · Certificado HMAC de dispositivo verificado`;
         if (badge) { badge.className = 'adw-badge badge-blue'; badge.innerText = 'Acceso Remoto Seguro'; }
       }
     }
@@ -8286,12 +8285,102 @@
       renderTrustedDevices(cachedTrustedDevicesList);
     }
 
+    function groupDevicesByPhysicalHardware(rawList) {
+      if (!Array.isArray(rawList) || rawList.length === 0) return [];
+      const groupedMap = new Map();
+
+      const extractOsFam = (d, tel) => {
+        const s = `${tel.os_distro || ''} ${d.client_type || ''} ${d.user_agent || ''}`.toLowerCase();
+        if (s.includes('android')) return 'android';
+        if (s.includes('iphone') || s.includes('ipad') || s.includes('ios')) return 'ios';
+        if (s.includes('mac')) return 'macos';
+        if (s.includes('win')) return 'windows';
+        if (s.includes('ubuntu') || s.includes('linux') || s.includes('debian')) return 'linux';
+        return 'other';
+      };
+
+      const buildFallbackClient = (d, tel) => {
+        const ct = d.client_type || tel.client_type || 'web_browser';
+        const isNat = Boolean(d.full_access || tel.full_access || ct === 'ubuntu_native' || ct === 'android_native');
+        const cLabel = d.active_client_label || d.client_label || tel.client_label || (
+          ct === 'ubuntu_native' ? 'App Nativa Ubuntu (.deb)' : (ct === 'android_native' ? 'App Nativa Android (.apk)' : 'Navegador Web')
+        );
+        const cKey = d.active_client_key || (ct === 'web_browser' ? `web_${(cLabel.toLowerCase().match(/chrome|firefox|safari|edge|opera/) || ['browser'])[0]}` : ct);
+        return {
+          client_key: cKey,
+          client_type: ct,
+          client_label: cLabel,
+          access_level: isNat ? 'FULL_NATIVE_ACCESS' : 'WEB_SANDBOX',
+          full_access: isNat,
+          connection_mode: d.connection_mode || (d.last_external_ip ? 'WAN' : 'LAN'),
+          ip: d.local_ip || d.last_external_ip || '--',
+          user_agent: d.user_agent || '',
+          last_seen: d.last_seen || '--',
+          is_current_client: Boolean(d.is_current)
+        };
+      };
+
+      for (const item of rawList) {
+        if (!item || typeof item !== 'object') continue;
+        const tel = (item.device_telemetry && typeof item.device_telemetry === 'object') ? item.device_telemetry : {};
+        const mac = String(tel.mac_address || '').trim().toLowerCase();
+        const lanIp = String(item.local_ip || tel.local_ip || '').trim();
+        const osFam = extractOsFam(item, tel);
+        const normHw = String(item.hardware_id || tel.hardware_id || '').replace(/^web_([0-9a-f]+)_[0-9a-f]+$/i, 'web_$1');
+        const physKey = item.physical_key
+          || (mac && mac !== '00:00:00:00:00:00' ? `phys_mac_${mac.replace(/[^0-9a-f]/g, '')}` : '')
+          || (lanIp && !lanIp.startsWith('Externo') && osFam !== 'other' ? `phys_lan_${lanIp}_${osFam}` : '')
+          || (normHw && !normHw.startsWith('dev_') ? `phys_hw_${normHw}` : `phys_id_${item.id}`);
+
+        const incomingClients = Array.isArray(item.clients) && item.clients.length > 0
+          ? item.clients
+          : [buildFallbackClient(item, tel)];
+
+        if (!groupedMap.has(physKey)) {
+          const clone = Object.assign({}, item, {
+            physical_key: physKey,
+            certificate_serial: item.certificate_serial || `ZT-${String(item.id || 'DEV').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8)}`,
+            certificate_scope: 'PER_PHYSICAL_DEVICE',
+            clients: incomingClients.map(c => Object.assign({}, c))
+          });
+          clone.clients_count = clone.clients.length;
+          groupedMap.set(physKey, clone);
+        } else {
+          const existing = groupedMap.get(physKey);
+          if (item.is_current) existing.is_current = true;
+          if (item.full_access) {
+            existing.full_access = true;
+            existing.access_level = 'FULL_NATIVE_ACCESS';
+            existing.client_type = item.client_type;
+            existing.client_label = item.client_label;
+            existing.device_telemetry = Object.assign({}, existing.device_telemetry || {}, tel);
+          }
+          const cMap = new Map();
+          for (const c of (existing.clients || [])) {
+            if (c && c.client_key) cMap.set(c.client_key, c);
+          }
+          for (const c of incomingClients) {
+            if (c && c.client_key) {
+              const prev = cMap.get(c.client_key);
+              if (!prev || c.is_current_client || String(c.last_seen || '') >= String(prev.last_seen || '')) {
+                cMap.set(c.client_key, Object.assign({}, prev || {}, c));
+              }
+            }
+          }
+          existing.clients = Array.from(cMap.values());
+          existing.clients_count = existing.clients.length;
+        }
+      }
+
+      return Array.from(groupedMap.values());
+    }
+
     function loadTrustedDevicesList() {
       lastSecDevicesFetchTs = Date.now();
       fetch('/api/auth/devices', { headers: authHeaders() })
         .then(r => r.ok ? r.json() : [])
         .then(devs => {
-          cachedTrustedDevicesList = Array.isArray(devs) ? devs : [];
+          cachedTrustedDevicesList = groupDevicesByPhysicalHardware(Array.isArray(devs) ? devs : []);
           renderTrustedDevices(cachedTrustedDevicesList);
         })
         .catch(() => {
@@ -8354,6 +8443,7 @@
       const isNative = Boolean(d.full_access || tel.full_access || isUbuntuNative || isAndroidNative);
       const sys = (latestMetrics && latestMetrics.system) ? latestMetrics.system : {};
       const verInfo = latestVersionInfo || {};
+      const groupedClients = Array.isArray(d.clients) ? d.clients : [];
 
       const capabilitiesGranted = isUbuntuNative
         ? [
@@ -8393,8 +8483,8 @@
 
       return {
         audit_metadata: {
-          report_type: 'ZERO_TRUST_DEVICE_SECURITY_AND_HARDWARE_AUDIT',
-          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '10.0.0',
+          report_type: 'ZERO_TRUST_PHYSICAL_DEVICE_CERTIFICATE_AND_GROUPED_CLIENTS_AUDIT',
+          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '10.1.0',
           generated_at_iso: new Date().toISOString(),
           generated_at_local: new Date().toLocaleString('es-ES'),
           server_node: {
@@ -8405,15 +8495,24 @@
             public_domain: sys.public_domain || verInfo.public_domain || window.location.hostname || '--'
           }
         },
+        device_certificate: {
+          certificate_serial: d.certificate_serial || `ZT-${String(d.id || 'DEV').toUpperCase()}`,
+          certificate_scope: 'PER_PHYSICAL_DEVICE',
+          authentication_protocol: 'HMAC-SHA256 Zero-Trust Physical Device Certificate',
+          physical_device_key: d.physical_key || d.hardware_id || d.id,
+          canonical_device_id: d.id,
+          unified_alias_ids: d.alias_ids || [d.id],
+          grouped_clients_count: groupedClients.length || 1
+        },
         device_identity: {
           id: d.id,
           hardware_id: d.hardware_id || tel.hardware_id || d.id,
           display_name: d.name || d.auto_name || 'Dispositivo',
           custom_alias: d.custom_alias || null,
           auto_detected_name: d.auto_name || d.name || null,
-          is_current_session: Boolean(d.is_current),
-          client_type: cType,
-          client_container_label: isUbuntuNative
+          is_current_device: Boolean(d.is_current),
+          primary_client_type: cType,
+          primary_container_label: isUbuntuNative
             ? 'App Nativa Ubuntu Linux (.deb / GTK3 + WebKit2)'
             : (isAndroidNative ? 'App Nativa Android (.apk / Kotlin + WebView)' : 'Navegador Web Estándar (HTML5 Sandbox)'),
           app_version: d.app_version || tel.app_version || (latestMetrics && latestMetrics.version) || null
@@ -8428,16 +8527,26 @@
           capabilities_granted: capabilitiesGranted,
           capabilities_restricted: capabilitiesRestricted
         },
+        grouped_clients_on_device: groupedClients.map(c => ({
+          client_key: c.client_key || c.client_type || 'client',
+          client_type: c.client_type || 'web_browser',
+          client_label: c.client_label || 'Cliente',
+          permission_tier: c.full_access ? 'FULL_ACCESS' : 'SANDBOX',
+          access_level: c.access_level || (c.full_access ? 'FULL_NATIVE_ACCESS' : 'WEB_SANDBOX'),
+          connection_mode: c.connection_mode || 'LAN',
+          ip: c.ip || d.local_ip || null,
+          last_seen: c.last_seen || d.last_seen || null,
+          is_current_client: Boolean(c.is_current_client),
+          user_agent: c.user_agent || null
+        })),
         zero_trust_session: {
-          authentication_protocol: 'HMAC-SHA256 Zero-Trust Signed Device Token',
           connection_mode: d.connection_mode || (d.last_external_ip ? 'WAN' : 'LAN'),
           local_ip: d.local_ip || tel.local_ip || null,
           external_wan_ip: d.last_external_ip || null,
           network_interface: tel.interface_name || null,
           mac_address: tel.mac_address || null,
           first_paired_at: d.first_seen || null,
-          last_activity_at: d.last_seen || null,
-          user_agent: d.user_agent || navigator.userAgent || null
+          last_activity_at: d.last_seen || null
         },
         hardware_telemetry: {
           manufacturer: tel.manufacturer || tel.brand || null,
@@ -8483,7 +8592,7 @@
 
       const reportObj = buildDeviceAuditPayload(targetDev);
       const jsonString = JSON.stringify(reportObj, null, 2);
-      const cleanHwId = String(targetDev.hardware_id || targetDev.id || 'device')
+      const cleanHwId = String(targetDev.certificate_serial || targetDev.hardware_id || targetDev.id || 'device')
         .replace(/[^a-zA-Z0-9_-]/g, '-')
         .slice(0, 36);
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -8524,6 +8633,18 @@
       const isUbuntuNative = cType === 'ubuntu_native';
       const isAndroidNative = cType === 'android_native';
       const isNative = Boolean(d.full_access || tel.full_access || isUbuntuNative || isAndroidNative);
+      const clientsList = Array.isArray(d.clients) && d.clients.length > 0 ? d.clients : [{
+        client_key: cType,
+        client_type: cType,
+        client_label: d.client_label || (isUbuntuNative ? 'App Nativa Ubuntu (.deb)' : (isAndroidNative ? 'App Nativa Android (.apk)' : 'Navegador Web')),
+        access_level: isNative ? 'FULL_NATIVE_ACCESS' : 'WEB_SANDBOX',
+        full_access: isNative,
+        connection_mode: d.connection_mode || 'LAN',
+        last_seen: d.last_seen || '--',
+        is_current_client: isCurrent
+      }];
+
+      const certSerial = d.certificate_serial || `ZT-${String(d.id || 'DEV').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8)}`;
 
       const devIconSvg = isUbuntuNative
         ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>'
@@ -8531,13 +8652,11 @@
           ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>'
           : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
 
-      const typeBadgeHtml = isUbuntuNative
-        ? '<span class="adw-badge badge-green mono">APP NATIVA UBUNTU (.DEB)</span>'
-        : isAndroidNative
-          ? '<span class="adw-badge badge-green mono">APP NATIVA ANDROID (.APK)</span>'
-          : '<span class="adw-badge badge-amber mono">CLIENTE NAVEGADOR WEB</span>';
+      const certBadgeHtml = `<span class="adw-badge mono" style="background: rgba(56, 189, 248, 0.14); color: var(--accent-cyan-bright); border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 700;">CERTIFICADO EQUIPO: ${escapeHtml(certSerial)}</span>`;
 
-      // Indicador visual explícito de tipo de permiso (Full Access vs Sandbox)
+      const clientsCountBadgeHtml = `<span class="adw-badge mono" style="background: rgba(167, 139, 250, 0.14); color: #C4B5FD; border: 1px solid rgba(167, 139, 250, 0.35); font-weight: 700;">${clientsList.length} ${clientsList.length === 1 ? 'CLIENTE VINCULADO' : 'CLIENTES AGRUPADOS'}</span>`;
+
+      // Indicador visual explícito de tipo de permiso del dispositivo (Full Access vs Sandbox)
       const permPillHtml = isNative
         ? `<span class="adw-badge mono" style="background: rgba(16, 185, 129, 0.16); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.45); font-weight: 700; letter-spacing: 0.03em;">PERMISO: FULL ACCESS</span>`
         : `<span class="adw-badge mono" style="background: rgba(245, 158, 11, 0.16); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.45); font-weight: 700; letter-spacing: 0.03em;">PERMISO: SANDBOX</span>`;
@@ -8553,7 +8672,7 @@
       const manufacturer = tel.manufacturer || tel.brand || '';
       const model = tel.model || '';
       const board = tel.board || tel.product || tel.device_codename || '';
-      const chassis = tel.chassis_type || (isAndroidNative ? 'Android Mobile / Tablet' : (isUbuntuNative ? 'Linux Workstation' : 'Cliente Web'));
+      const chassis = tel.chassis_type || (isAndroidNative ? 'Android Mobile / Tablet' : (isUbuntuNative ? 'Linux Workstation' : 'Equipo Cliente'));
       const hwTitle = [manufacturer, model].filter(Boolean).join(' ') || d.auto_name || d.name || 'Dispositivo';
       const hwSub = [board ? `Placa/Codename: ${board}` : '', chassis].filter(Boolean).join(' · ') || 'Identificación dinámica Zero-Trust';
 
@@ -8596,15 +8715,15 @@
               <span style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; flex-shrink: 0;"></span>
               <div>
                 <div class="mono" style="font-size: 11px; font-weight: 700; color: #34D399; letter-spacing: 0.02em;">
-                  NIVEL DE PERMISO: FULL ACCESS · PUENTE NATIVO (${isUbuntuNative ? 'GTK3 / WebKit2 + /sys/class/dmi' : 'Kotlin / Android Native Bridge'})
+                  CERTIFICADO DE DISPOSITIVO CON FULL ACCESS · PUENTE NATIVO (${isUbuntuNative ? 'GTK3 / WebKit2 + /sys/class/dmi' : 'Kotlin / Android Native Bridge'})
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 1px;">
-                  Acceso directo al silicio, sensores físicos, persistencia criptográfica en ${isUbuntuNative ? 'Keyring del SO y proyección USB DeX (/dev/uhid)' : 'Android KeyStore y telemetría SoC/Batería'}
+                  Certificado único por dispositivo físico con acceso al silicio, sensores y ${isUbuntuNative ? 'Keyring del SO + proyección USB DeX (/dev/uhid)' : 'Android KeyStore + telemetría SoC/Batería'}
                 </div>
               </div>
             </div>
             <div class="mono" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 10.5px;">
-              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(16,185,129,0.14); color: #34D399; border: 1px solid rgba(16,185,129,0.28);">Silicio Directo</span>
+              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(16,185,129,0.14); color: #34D399; border: 1px solid rgba(16,185,129,0.28);">1 Cert / Dispositivo</span>
               <span style="padding: 2px 7px; border-radius: 4px; background: rgba(16,185,129,0.14); color: #34D399; border: 1px solid rgba(16,185,129,0.28);">Auto LAN↔WAN</span>
               <span style="padding: 2px 7px; border-radius: 4px; background: rgba(56,189,248,0.14); color: var(--accent-cyan-bright); border: 1px solid rgba(56,189,248,0.28);">${isUbuntuNative ? 'DeX / USB Activo' : 'Sensores SoC'}</span>
             </div>
@@ -8616,20 +8735,66 @@
               <span style="width: 8px; height: 8px; border-radius: 50%; background: #F59E0B; flex-shrink: 0;"></span>
               <div>
                 <div class="mono" style="font-size: 11px; font-weight: 700; color: #FBBF24; letter-spacing: 0.02em;">
-                  NIVEL DE PERMISO: SANDBOX · AISLAMIENTO DE NAVEGADOR WEB (WEB_SANDBOX)
+                  CERTIFICADO DE DISPOSITIVO EN MODO SANDBOX · AISLAMIENTO DE NAVEGADOR WEB
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 1px;">
-                  Ejecución confinada al sandbox del navegador web. Sin acceso directo a DMI/SMBIOS, sensores del kernel ni subsistema USB/DeX
+                  Certificado unificado por dispositivo físico. Los clientes web en este equipo operan en Sandbox sin acceso directo a DMI/SMBIOS ni USB/DeX
                 </div>
               </div>
             </div>
             <div class="mono" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 10.5px;">
-              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(245,158,11,0.14); color: #FBBF24; border: 1px solid rgba(245,158,11,0.28);">Telemetría WebGL/UA</span>
+              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(245,158,11,0.14); color: #FBBF24; border: 1px solid rgba(245,158,11,0.28);">1 Cert / Dispositivo</span>
               <span style="padding: 2px 7px; border-radius: 4px; background: rgba(148,163,184,0.12); color: var(--text-muted); border: 1px solid var(--border-subtle);">Sin Puente OS</span>
               <span style="padding: 2px 7px; border-radius: 4px; background: rgba(148,163,184,0.12); color: var(--text-muted); border: 1px solid var(--border-subtle);">DeX Bloqueado</span>
             </div>
           </div>
         `;
+
+      // Desglose agrupado de clientes / contenedores vinculados a este dispositivo físico
+      const groupedClientsHtml = `
+        <div style="padding: 10px 12px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+            <span style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">
+              Clientes & Contenedores Agrupados bajo el Certificado ${escapeHtml(certSerial)} (${clientsList.length})
+            </span>
+            <span class="mono" style="font-size: 10.5px; color: var(--text-muted);">
+              Emisión por Dispositivo Físico · Unificación Automática de Clientes
+            </span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 6px;">
+            ${clientsList.map(c => {
+              const cIsNat = Boolean(c.full_access || c.client_type === 'ubuntu_native' || c.client_type === 'android_native');
+              const cPermBadge = cIsNat
+                ? '<span class="adw-badge mono" style="background: rgba(16,185,129,0.15); color: #34D399; border: 1px solid rgba(16,185,129,0.35); font-size: 10px;">FULL ACCESS</span>'
+                : '<span class="adw-badge mono" style="background: rgba(245,158,11,0.15); color: #FBBF24; border: 1px solid rgba(245,158,11,0.35); font-size: 10px;">SANDBOX</span>';
+              const cActiveBadge = c.is_current_client
+                ? '<span class="adw-badge badge-blue mono" style="font-size: 10px;">CLIENTE ACTIVO</span>'
+                : '';
+              const safeClientKey = escapeHtml(c.client_key || c.client_type || 'client');
+              const safeClientLabel = escapeHtml(c.client_label || 'Cliente');
+              const detachBtnHtml = clientsList.length > 1
+                ? `<button type="button" class="action-btn" style="height: 22px; min-height: 22px; padding: 0 7px; font-size: 10px; color: var(--accent-rose-bright); border-color: rgba(239,68,68,0.3);" onclick="event.stopPropagation(); revokeDeviceClient('${safeId}', '${safeClientKey}', '${safeClientLabel}')" title="Desvincular únicamente este contenedor cliente manteniendo el certificado del dispositivo">Quitar cliente</button>`
+                : '';
+              return `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; background: var(--bg-surface); border: 1px solid ${c.is_current_client ? 'rgba(56,189,248,0.35)' : 'var(--border-subtle)'}; border-radius: 5px;">
+                  <div style="min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: ${cIsNat ? '#10B981' : '#F59E0B'}; flex-shrink: 0;"></span>
+                      <span class="mono" style="font-size: 11.5px; font-weight: 600; color: var(--text-primary);">${safeClientLabel}</span>
+                      ${cPermBadge}
+                      ${cActiveBadge}
+                    </div>
+                    <div class="mono" style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
+                      ${escapeHtml(c.connection_mode || connMode)} · Última act: ${escapeHtml(c.last_seen || d.last_seen || '--')}
+                    </div>
+                  </div>
+                  ${detachBtnHtml}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
 
       return `
         <div class="data-row" onclick="selectSecDeviceCard('${safeId}', event)" style="flex-direction: column; align-items: stretch; gap: 10px; padding: ${isCompactModal ? '12px 14px' : '16px 18px'}; cursor: pointer; background: ${isSelectedForAudit ? 'rgba(56, 189, 248, 0.04)' : 'transparent'}; box-shadow: ${isSelectedForAudit ? 'inset 0 0 0 1px rgba(56, 189, 248, 0.32)' : 'none'};">
@@ -8643,34 +8808,37 @@
                   <span class="row-label" style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${safeName}</span>
                   ${isCurrent ? '<span class="adw-badge badge-blue mono">ESTE DISPOSITIVO</span>' : ''}
                   ${isSelectedForAudit ? '<span class="adw-badge mono" style="background: rgba(56,189,248,0.15); color: var(--accent-cyan-bright); border: 1px solid rgba(56,189,248,0.35);">SELECCIONADO</span>' : ''}
+                  ${certBadgeHtml}
                   ${permPillHtml}
-                  ${typeBadgeHtml}
+                  ${clientsCountBadgeHtml}
                   ${connBadgeHtml}
                   ${verBadgeHtml}
                 </div>
                 <div class="row-sublabel mono" style="margin-top: 3px; font-size: 11px; color: var(--text-secondary);">
-                  ID: ${escapeHtml(hwFp)} · Emparejado: ${escapeHtml(d.first_seen || '--')} · Última actividad: ${escapeHtml(d.last_seen || '--')}
+                  HW ID: ${escapeHtml(hwFp)} · Emparejado: ${escapeHtml(d.first_seen || '--')} · Última actividad: ${escapeHtml(d.last_seen || '--')}
                 </div>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <button type="button" class="action-btn" style="height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px; border-color: rgba(56, 189, 248, 0.4); color: var(--accent-cyan-bright);" onclick="event.stopPropagation(); downloadDeviceAuditReport('${safeId}')" title="Descargar reporte de auditoría completo en formato JSON para este dispositivo">
+              <button type="button" class="action-btn" style="height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px; border-color: rgba(56, 189, 248, 0.4); color: var(--accent-cyan-bright);" onclick="event.stopPropagation(); downloadDeviceAuditReport('${safeId}')" title="Descargar reporte de auditoría completo en formato JSON para este dispositivo físico y sus clientes agrupados">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span>Auditoría JSON</span>
               </button>
-              <button type="button" class="action-btn" style="height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px;" onclick="event.stopPropagation(); openRenameDeviceInline('${safeId}')" title="Personalizar alias del dispositivo">
+              <button type="button" class="action-btn" style="height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px;" onclick="event.stopPropagation(); openRenameDeviceInline('${safeId}')" title="Personalizar alias del dispositivo físico">
                 Alias
               </button>
               <button type="button" class="btn-revoke" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="event.stopPropagation(); revokeDevice('${safeId}', '${safeName}', ${isCurrent})">
-                ${isCurrent ? 'Cerrar sesión' : 'Revocar'}
+                ${isCurrent ? 'Revocar este equipo' : 'Revocar certificado'}
               </button>
             </div>
           </div>
 
           ${permissionBannerHtml}
 
+          ${groupedClientsHtml}
+
           <div id="renameBox_${safeId}" style="display: none; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px;">
-            <input type="text" id="renameInput_${safeId}" value="${escapeHtml(d.custom_alias || d.name || '')}" placeholder="Alias personalizado (vacío para nombre de hardware automático)" style="flex: 1; height: 30px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-primary); font-size: 12px; font-family: var(--font-mono); outline: none;">
+            <input type="text" id="renameInput_${safeId}" value="${escapeHtml(d.custom_alias || d.name || '')}" placeholder="Alias personalizado del dispositivo físico (vacío para nombre de hardware automático)" style="flex: 1; height: 30px; padding: 0 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-primary); font-size: 12px; font-family: var(--font-mono); outline: none;">
             <button type="button" class="action-btn primary-cta" style="height: 30px; padding: 0 12px; font-size: 11.5px;" onclick="submitRenameDevice('${safeId}')">Guardar</button>
           </div>
 
@@ -8711,7 +8879,7 @@
     }
 
     function renderTrustedDevices(devs) {
-      const allDevs = Array.isArray(devs) ? devs : [];
+      const allDevs = groupDevicesByPhysicalHardware(Array.isArray(devs) ? devs : []);
       cachedTrustedDevicesList = allDevs;
 
       const nativeDevs = allDevs.filter(d => {
@@ -8720,6 +8888,7 @@
         return Boolean(d.full_access || tel.full_access || ct === 'ubuntu_native' || ct === 'android_native');
       });
       const webDevs = allDevs.filter(d => !nativeDevs.includes(d));
+      const totalClientsGrouped = allDevs.reduce((acc, d) => acc + ((Array.isArray(d.clients) && d.clients.length) ? d.clients.length : 1), 0);
 
       setText('trustDeviceCount', String(allDevs.length));
       setText('secTrustedDevicesCount', String(allDevs.length));
@@ -8727,6 +8896,7 @@
       setText('secDevCntNative', String(nativeDevs.length));
       setText('secDevCntWeb', String(webDevs.length));
       setText('secTrustedTotalVal', String(allDevs.length));
+      setText('secTrustedTotalSub', `${allDevs.length} ${allDevs.length === 1 ? 'certificado de equipo' : 'certificados de equipo'} · ${totalClientsGrouped} ${totalClientsGrouped === 1 ? 'cliente' : 'clientes agrupados'}`);
       setText('secTrustedNativeVal', `${nativeDevs.length} Full · ${webDevs.length} Sandbox`);
 
       const currentDev = allDevs.find(d => d.is_current) || allDevs[0] || null;
@@ -8744,8 +8914,9 @@
             const ct = d.client_type || tel.client_type || '';
             const isNat = Boolean(d.full_access || tel.full_access || ct === 'ubuntu_native' || ct === 'android_native');
             const tierTag = isNat ? 'FULL ACCESS' : 'SANDBOX';
+            const cCnt = (Array.isArray(d.clients) && d.clients.length) ? d.clients.length : 1;
             const curTag = d.is_current ? ' ★' : '';
-            const label = `${d.name || d.id}${curTag} [${tierTag}]`;
+            const label = `${d.name || d.id}${curTag} [${tierTag} · ${cCnt} cli]`;
             const isSel = String(d.id) === String(selectedSecAuditDeviceId) ? 'selected' : '';
             return `<option value="${escapeHtml(d.id)}" ${isSel}>${escapeHtml(label)}</option>`;
           }).join('');
@@ -8754,11 +8925,12 @@
 
       if (currentDev) {
         const tel = currentDev.device_telemetry || {};
-        setText('secCurrentDeviceTypeVal', currentDev.name || tel.name || 'Sesión Activa');
+        setText('secCurrentDeviceTypeVal', currentDev.name || tel.name || 'Dispositivo Activo');
         const subSpec = [tel.os_distro, tel.cpu_model, tel.ram_total_gb ? `${tel.ram_total_gb} GB` : ''].filter(Boolean).join(' · ');
-        setText('secCurrentDeviceHwSub', subSpec || currentDev.client_label || 'Certificado verificado');
+        setText('secCurrentDeviceHwSub', subSpec || currentDev.client_label || 'Certificado de equipo verificado');
         const isNat = Boolean(currentDev.full_access || tel.full_access);
-        setText('secCurrentChannelVal', `${currentDev.connection_mode || 'LAN'} · ${isNat ? 'FULL ACCESS' : 'SANDBOX'}`);
+        const certTag = currentDev.certificate_serial || 'CERT-ACTIVO';
+        setText('secCurrentChannelVal', `${certTag} · ${isNat ? 'FULL ACCESS' : 'SANDBOX'}`);
         setText('secCurrentIpSub', `LAN: ${currentDev.local_ip || '--'}${currentDev.last_external_ip ? ' · WAN: ' + currentDev.last_external_ip : ''}`);
       }
 
@@ -8766,7 +8938,7 @@
       const modalList = document.getElementById('trustDevicesCard');
       if (modalList) {
         if (allDevs.length === 0) {
-          modalList.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 22px;">No hay dispositivos emparejados registrados.</div>';
+          modalList.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 22px;">No hay certificados de dispositivos registrados.</div>';
         } else {
           modalList.innerHTML = allDevs.map(d => buildDeviceIdentityCardHtml(d, true)).join('');
         }
@@ -8780,17 +8952,39 @@
         else if (currentSecDeviceFilter === 'web') filtered = webDevs;
 
         if (filtered.length === 0) {
-          secList.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 24px;">No hay dispositivos registrados que coincidan con el filtro seleccionado.</div>';
+          secList.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 24px;">No hay dispositivos físicos registrados que coincidan con el filtro seleccionado.</div>';
         } else {
           secList.innerHTML = filtered.map(d => buildDeviceIdentityCardHtml(d, false)).join('');
         }
       }
     }
 
+    function revokeDeviceClient(devId, clientKey, clientLabel) {
+      showConfirmModal(
+        'Desvincular contenedor cliente del dispositivo',
+        `¿Deseas desvincular el cliente "${clientLabel}" conservando el certificado principal del dispositivo físico?`,
+        () => {
+          fetch('/api/auth/revoke', {
+            method: 'POST',
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ id: devId, client_key: clientKey })
+          })
+          .then(r => r.json())
+          .then(res => {
+            if (res.success) {
+              showToast(`Cliente "${clientLabel}" desvinculado del dispositivo`, 'success');
+              loadTrustedDevicesList();
+            }
+          });
+        },
+        true
+      );
+    }
+
     function revokeDevice(devId, devName, isCurrent = false) {
       showConfirmModal(
-        isCurrent ? 'Cerrar sesión en este dispositivo' : 'Revocar acceso de dispositivo',
-        `¿Deseas revocar la autorización Zero-Trust de "${devName}"?`,
+        isCurrent ? 'Revocar certificado de este dispositivo' : 'Revocar certificado de dispositivo físico',
+        `¿Deseas revocar el certificado Zero-Trust completo del dispositivo "${devName}" y todos sus clientes agrupados?`,
         () => {
           fetch('/api/auth/revoke', {
             method: 'POST',
@@ -8804,7 +8998,7 @@
                 try { localStorage.removeItem('sysmon_device_token'); } catch (e) {}
                 window.location.reload();
               } else {
-                showToast(`Acceso revocado para ${devName}`, 'success');
+                showToast(`Certificado revocado para ${devName}`, 'success');
                 loadTrustedDevicesList();
               }
             }
@@ -8816,8 +9010,8 @@
 
     function revokeAllOtherDevices() {
       showConfirmModal(
-        'Revocar demás sesiones',
-        '¿Deseas cerrar la sesión remota de todos los demás dispositivos excepto este?',
+        'Revocar certificados de los demás equipos',
+        '¿Deseas revocar los certificados Zero-Trust de todos los demás dispositivos físicos excepto este equipo?',
         () => {
           fetch('/api/auth/revoke_all_others', {
             method: 'POST',
@@ -8826,7 +9020,7 @@
           .then(r => r.json())
           .then(res => {
             if (res.success) {
-              showToast('Se han revocado las demás sesiones activas', 'success');
+              showToast('Se han revocado los certificados de los demás dispositivos físicos', 'success');
               loadTrustedDevicesList();
             }
           });
