@@ -1,5 +1,5 @@
 Package: recursos-cockpit
-Version: 8.5.0
+Version: 8.5.1
 Section: utils
 Priority: optional
 Architecture: amd64
