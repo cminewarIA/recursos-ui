@@ -1,10 +1,12 @@
 Package: recursos-cockpit
-Version: 8.5.3
+Version: 9.0.0
 Section: utils
 Priority: optional
 Architecture: amd64
 Maintainer: cminewarIA <https://github.com/cminewarIA/recursos-ui>
 Depends: python3, python3-gi, python3-gi-cairo, python3-cairo, gir1.2-gtk-3.0, python3-psutil, scrcpy, adb
+Replaces: recursos-cockpit
+Provides: recursos-cockpit
 Description: Recursos Cockpit - Monitor de Silicio Nativo GTK3 y Conexion de Dispositivos
  Aplicacion 100% nativa de escritorio para Linux construida en GTK 3 para
  monitorizacion en tiempo real del hardware del sistema y conexion interactiva

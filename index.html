@@ -314,12 +314,13 @@
     .version-tag {
       font-family: var(--font-mono);
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 700;
       color: var(--accent-cyan-bright);
-      background: var(--accent-cyan-soft);
-      border: 1px solid var(--border-highlight);
-      padding: 2px 8px;
-      border-radius: 999px;
+      background: rgba(10, 132, 255, 0.12);
+      border: 1px solid rgba(10, 132, 255, 0.28);
+      padding: 2px 7px;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
     }
 
     .sidebar-scroll {
@@ -394,12 +395,14 @@
     }
 
     .nav-counter {
+      font-family: var(--font-mono);
       font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
-      background: rgba(148, 163, 184, 0.1);
-      padding: 2px 7px;
-      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.12);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-variant-numeric: tabular-nums;
     }
 
     .sidebar-footer {
@@ -557,21 +560,22 @@
     .route-chip {
       font-family: var(--font-mono);
       font-size: 11px;
+      font-weight: 600;
       color: var(--accent-cyan-bright);
-      background: var(--accent-cyan-soft);
-      border: 1px solid var(--border-highlight);
-      padding: 2px 8px;
-      border-radius: 999px;
+      background: rgba(10, 132, 255, 0.12);
+      border: 1px solid rgba(10, 132, 255, 0.28);
+      padding: 2px 7px;
+      border-radius: 6px;
     }
 
-    /* Center Telemetry Pulse Pill (Tesla Cockpit Status) */
+    /* Center Telemetry Status Cluster (Mission Control Cockpit) */
     .header-center-telemetry {
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 6px 14px;
-      border-radius: 999px;
-      background: var(--bg-surface);
+      border-radius: 10px;
+      background: var(--bg-surface-elevated);
       border: 1px solid var(--border-subtle);
       box-shadow: var(--specular-inset);
       font-size: 12px;
@@ -1263,14 +1267,14 @@
       width: 100%;
       height: 5px;
       background: rgba(148, 163, 184, 0.14);
-      border-radius: 999px;
+      border-radius: 3px;
       overflow: hidden;
     }
 
     .core-bar-fill {
       height: 100%;
       background: var(--accent-cyan-bright);
-      border-radius: 999px;
+      border-radius: 3px;
       transition: width 0.25s ease, background-color 0.25s ease;
     }
 
@@ -2107,8 +2111,8 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 3px 9px;
-      border-radius: 999px;
+      padding: 3px 8px;
+      border-radius: 6px;
       font-family: var(--font-mono);
       font-size: 10.5px;
       font-weight: 700;
@@ -2224,13 +2228,13 @@
       align-items: center;
       gap: 5px;
       padding: 4px 8px;
-      border-radius: 999px;
+      border-radius: 6px;
       font-family: var(--font-mono);
       font-size: 10.5px;
       font-weight: 700;
       color: #ffffff;
-      background: rgba(15, 23, 42, 0.92);
-      border: 1.5px solid #38bdf8;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid #38bdf8;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
       cursor: pointer;
       transition: transform 0.16s ease, box-shadow 0.16s ease;
@@ -2279,8 +2283,8 @@
     .gmp-conn-marker .group-count-pill {
       background: #a855f7;
       color: #ffffff;
-      border-radius: 999px;
-      padding: 1px 6px;
+      border-radius: 4px;
+      padding: 1px 5px;
       font-size: 10px;
       font-weight: 800;
     }
@@ -2794,12 +2798,12 @@
       width: 100%;
       height: 4px;
       background: rgba(148, 163, 184, 0.12);
-      border-radius: 999px;
+      border-radius: 3px;
       overflow: hidden;
     }
     .bw-pie-legend-bar-fill {
       height: 100%;
-      border-radius: 999px;
+      border-radius: 3px;
       transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.35s ease;
     }
     .bw-pie-legend-sub {
@@ -2887,22 +2891,24 @@
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
 
-    /* Semantic Status Indicators */
+    /* Semantic Status Indicators - Clean Architectural Design (Anti-AI Slop) */
     .adw-badge {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 3px 9px;
-      border-radius: 999px;
+      gap: 6px;
+      padding: 2px 7px;
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 600;
       white-space: nowrap;
+      font-family: var(--font-sans);
+      letter-spacing: 0.01em;
     }
-    .badge-blue { background: var(--accent-cyan-soft); color: var(--accent-cyan-bright); border: 1px solid rgba(41, 151, 255, 0.28); }
-    .badge-purple { background: var(--accent-violet-soft); color: var(--accent-violet-bright); border: 1px solid rgba(191, 90, 242, 0.28); }
-    .badge-green { background: var(--accent-emerald-soft); color: var(--accent-emerald-bright); border: 1px solid rgba(48, 209, 88, 0.28); }
-    .badge-amber { background: var(--accent-amber-soft); color: var(--accent-amber-bright); border: 1px solid rgba(255, 159, 10, 0.28); }
-    .badge-red { background: var(--accent-rose-soft); color: var(--accent-rose-bright); border: 1px solid rgba(255, 69, 58, 0.28); }
+    .badge-blue { background: rgba(10, 132, 255, 0.12); color: #2997ff; border: 1px solid rgba(41, 151, 255, 0.25); }
+    .badge-purple { background: rgba(191, 90, 242, 0.12); color: #da8fff; border: 1px solid rgba(191, 90, 242, 0.25); }
+    .badge-green { background: rgba(48, 209, 88, 0.12); color: #30d158; border: 1px solid rgba(48, 209, 88, 0.25); }
+    .badge-amber { background: rgba(255, 159, 10, 0.12); color: #ff9f0a; border: 1px solid rgba(255, 159, 10, 0.25); }
+    .badge-red { background: rgba(255, 69, 58, 0.12); color: #ff453a; border: 1px solid rgba(255, 69, 58, 0.25); }
 
     .device-circle,
     .nic-logo-box {
@@ -2931,12 +2937,13 @@
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      padding: 2px 8px;
-      border-radius: 999px;
+      padding: 2px 7px;
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 600;
       border: 1px solid var(--border-subtle);
-      background: rgba(148, 163, 184, 0.06);
+      background: var(--bg-surface-elevated);
+      color: var(--text-secondary);
       white-space: nowrap;
     }
     .brand-logo-svg { width: 13px; height: 13px; flex-shrink: 0; object-fit: contain; }
@@ -5243,7 +5250,7 @@
               Conecta tu teléfono móvil mediante cable USB para proyectar el vídeo en baja latencia con <strong>Samsung DeX</strong> o el <strong>Modo Escritorio de Android</strong>.
             </p>
 
-            <div id="usbWaitLiveStatusPill" style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 999px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 12px; color: var(--accent-cyan-bright);">
+            <div id="usbWaitLiveStatusPill" style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 12px; color: var(--accent-cyan-bright);">
               <span class="live-dot" id="usbWaitPulseDot"></span>
               <span id="usbWaitLiveStatusText">Escuchando puerto USB en tiempo real (Samsung DeX / Android Desktop)...</span>
             </div>
@@ -13509,7 +13516,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             <button type="button" class="action-btn" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #1e293b; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;" onclick="window.showConnListInGroupPopup('${groupKey}')">
               <span>◀</span> <span>Ver lista (${groupLength} IPs)</span>
             </button>
-            <span style="font-size: 10px; font-weight: 700; color: #7e22ce; background: rgba(168, 85, 247, 0.12); padding: 2px 7px; border-radius: 999px;">${groupLength} IPs en zona</span>
+            <span style="font-size: 10px; font-weight: 700; color: #7e22ce; background: rgba(168, 85, 247, 0.12); padding: 2px 7px; border-radius: 4px;">${groupLength} IPs en zona</span>
           </div>
         ` : '';
 
@@ -13656,7 +13663,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         wrap.innerHTML = `
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #a855f7; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
             <span>🔀 ${group.length} CONEXIONES AGRUPADAS</span>
-            <span style="background: rgba(168, 85, 247, 0.15); color: #7e22ce; padding: 2px 7px; border-radius: 999px; font-weight: 700;">${group.length} flujos</span>
+            <span style="background: rgba(168, 85, 247, 0.15); color: #7e22ce; padding: 2px 7px; border-radius: 4px; font-weight: 700;">${group.length} flujos</span>
           </div>
           <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
             📍 ${escapeHtml(locHeader)}

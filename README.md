@@ -3,7 +3,7 @@
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
 ### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v8.5.3-0A84FF?style=for-the-badge)](./VERSION)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v9.0.0-0A84FF?style=for-the-badge)](./VERSION)
 [![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Apple_Liquid_Glass_%2B_Tesla_UI-30D158?style=for-the-badge&logo=tesla&logoColor=white)](#-filosof%C3%ADa-de-dise%C3%B1o)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-BF5AF2?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
 [![App Nativa Linux](https://img.shields.io/badge/App_Linux-Nativa_GTK3_.deb-AF52DE?style=for-the-badge&logo=debian&logoColor=white)](#-app-nativa-linux-deb--proyecci%C3%B3n-usb-dex--modo-escritorio-android)
@@ -23,7 +23,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v8.5.3 ║
+║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ 60 FPS RAF  │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │ v9.0.0 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                              ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
@@ -41,6 +41,61 @@
 ║                                     ▲ FLOATING TOUCH DOCK (TESLA UI)                                         ║
 ╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
 ```
+
+---
+
+## 📥 Centro de Descargas Directas de Paquetes Oficiales (.deb Linux & .apk Android)
+
+Descarga directamente los binarios compilados y firmados oficialmente para cada plataforma, sin intermediarios:
+
+### 🚀 Última Versión Canónica (`v9.0.0`)
+
+| Paquete Oficial | Plataforma / Arquitectura | Enlace de Descarga Directa | Firma & Verificación |
+| :--- | :--- | :--- | :--- |
+| **🐧 Recursos Cockpit (`.deb`)** | Linux Ubuntu / Debian 64-bit (`amd64`) | [**`recursos-cockpit_9.0.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.0.0/recursos-cockpit_9.0.0_amd64.deb) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.0.0/SHA256SUMS.txt) |
+| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ (ARM64 / x86_64 / Tablets & Móviles) | [**`recursos-cockpit_9.0.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v9.0.0/recursos-cockpit_9.0.0.apk) | Firmado con Keystore Oficial Permanente |
+| **⚡ Symlink Última Release (`latest`)** | Paquete Debian canónico | [**`recursos-cockpit.deb` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) | Canonical Release Asset |
+| **⚡ Symlink Última Release (`latest`)** | Paquete Android canónico | [**`recursos-cockpit.apk` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Canonical Release Asset |
+
+---
+
+### 🛡️ Guía de Actualización Fluida Sin Advertencias ni Conflictos
+
+#### 🤖 En Dispositivos Android (Actualización Directa Sin Desinstalar)
+* **Firma Criptográfica Oficial Permanente**: Todas las compilaciones del APK se firman de manera consistente y determinista con el **Release Keystore Oficial** (`recursos-release.jks` con esquema v1, v2 y v3).
+* **Actualización en un Clic**: Al compartir el mismo certificado criptográfico en todas las versiones, Android permite instalar nuevas versiones directamente sobre la existente **sin desinstalar primero**, preservando intactas las configuraciones, credenciales de emparejamiento y tokens guardados sin advertencias de conflicto de firma (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`).
+* **Instalación vía terminal o ADB**:
+  ```bash
+  adb install -r dist/recursos-cockpit_9.0.0.apk
+  ```
+  O descarga el archivo directamente desde el navegador de tu tablet o móvil y pulsa **Actualizar**.
+
+#### 🐧 En Ubuntu y Debian Linux (Actualización Limpia Sin Bloqueos de Archivo)
+* **Gestión de Procesos en `prerm`**: El paquete Debian canónico incluye control previo a la instalación que detiene de forma limpia cualquier instancia activa antes de sobrescribir archivos, erradicando errores de archivo ocupado (*text file busy*).
+* **Directivas de Reemplazo Limpio**: El metadato `DEBIAN/control` declara `Replaces: recursos-cockpit` y `Provides: recursos-cockpit`, garantizando que `dpkg` y `apt` gestionen la actualización sin conflictos de dependencia ni advertencias residuales.
+* **Comando recomendado de actualización limpia**:
+  ```bash
+  sudo apt-get install --reinstall -y ./dist/recursos-cockpit_9.0.0_amd64.deb
+  ```
+  O con `dpkg`:
+  ```bash
+  sudo dpkg -i --force-overwrite ./dist/recursos-cockpit_9.0.0_amd64.deb
+  ```
+
+---
+
+### 📜 Histórico de Descargas Directas por Versión
+
+| Versión | Paquete Linux (`.deb`) | Paquete Android (`.apk`) | Sumas Criptográficas |
+| :---: | :--- | :--- | :--- |
+| **`v9.0.0`** | [recursos-cockpit_9.0.0_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v9.0.0/recursos-cockpit_9.0.0_amd64.deb) | [recursos-cockpit_9.0.0.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v9.0.0/recursos-cockpit_9.0.0.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v9.0.0/SHA256SUMS.txt) |
+| **`v8.5.3`** | [recursos-cockpit_8.5.3_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v8.5.3/recursos-cockpit_8.5.3_amd64.deb) | [recursos-cockpit_8.5.3.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v8.5.3/recursos-cockpit_8.5.3.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v8.5.3/SHA256SUMS.txt) |
+| **`v8.5.2`** | [recursos-cockpit_8.5.2_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v8.5.2/recursos-cockpit_8.5.2_amd64.deb) | [recursos-cockpit_8.5.2.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v8.5.2/recursos-cockpit_8.5.2.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v8.5.2/SHA256SUMS.txt) |
+| **`v8.5.0`** | [recursos-cockpit_8.5.0_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v8.5.0/recursos-cockpit_8.5.0_amd64.deb) | [recursos-cockpit_8.5.0.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v8.5.0/recursos-cockpit_8.5.0.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v8.5.0/SHA256SUMS.txt) |
+| **`v8.4.1`** | [recursos-cockpit_8.4.1_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v8.4.1/recursos-cockpit_8.4.1_amd64.deb) | [recursos-cockpit_8.4.1.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v8.4.1/recursos-cockpit_8.4.1.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v8.4.1/SHA256SUMS.txt) |
+| **`v8.4.0`** | [recursos-cockpit_8.4.0_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v8.4.0/recursos-cockpit_8.4.0_amd64.deb) | [recursos-cockpit_8.4.0.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v8.4.0/recursos-cockpit_8.4.0.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v8.4.0/SHA256SUMS.txt) |
+| **`v8.3.1`** | [recursos-cockpit_8.3.1_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v8.3.1/recursos-cockpit_8.3.1_amd64.deb) | — | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v8.3.1/SHA256SUMS.txt) |
+| **`v6.0.2`** | [recursos-cockpit_6.0.2_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v6.0.2/recursos-cockpit_6.0.2_amd64.deb) | — | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v6.0.2/SHA256SUMS.txt) |
 
 ---
 
@@ -313,6 +368,7 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v9.0.0`** | `MAJOR` | **Rediseño Completo Anti-AI Slop (Zero-Pills, Obsidian Dark Canvas & Tipografía Tabular de Silicio), Firma Criptográfica Permanente de Binarios (.deb & .apk con Actualizaciones In-Place sin Desinstalar) y Migración a Node 24 / Setup-Java v5 en CI/CD**: (1) **Rediseño Integral de la Interfaz Anti-AI Slop**: Eliminación radical de cápsulas y píldoras flotantes genéricas (`border-radius: 999px`) en badges de versión, chips de rutas, contadores de navegación, barras de núcleos y marcadores geoespaciales, sustituyéndolas por esquinas técnicas de precisión (`border-radius: 4px - 6px`), micro-LEDs de estado de pulso limpio, canvas oscuro obsidiana mate (`#06070a`), contrastes acentuados de laboratorio y tipografía tabular monoespaciada de alta legibilidad (*JetBrains Mono* + *Outfit*); (2) **Firma Criptográfica Permanente y Actualización In-Place sin Alertas de Google**: Generación de almacén criptográfico permanente de 30 años en `android_app/keystore/recursos-release.jks` con esquema de firmas V1, V2 y V3 integrado en Gradle; firma determinista de cada compilación evitando la advertencia de Google Play Protect y permitiendo actualizar la app directamente sin desinstalar previamente; (3) **Actualizaciones Limpias en Ubuntu sin Advertencias ni Bloqueos de Ficheros**: Inclusión de directivas de reemplazo canónicas (`Replaces: recursos-cockpit` y `Provides: recursos-cockpit`) en `packaging/debian/control` y script de pre-desinstalación (`packaging/debian/prerm`) que detiene limpiamente instancias en ejecución antes del despliegue, previniendo errores de *"Text file busy"* en `dpkg` y `apt`; (4) **Resolución de Advertencias en CI/CD de GitHub Actions**: Migración a `actions/setup-java@v5` con soporte nativo de Node 24 y caché automatizada de Gradle, erradicando advertencias de obsolescencia de Node 20; (5) **Centro de Descargas Directas en README**: Adición de sección de descarga directa con enlaces permanentes, sumas de verificación e instrucciones paso a paso para Android y Ubuntu. |
 | **`v8.5.3`** | `PATCH` | **CI/CD Dual Automatizado en GitHub Actions (Compilación y Publicación Pública de .deb & .apk en Releases) y Auditoría de Normas en Apps Nativas**: (1) **Automatización Integral de CI/CD (`.github/workflows/build-deb.yml`)**: Corrección de acciones canónicas a versiones oficiales (`actions/checkout@v4`, `actions/setup-java@v4`, `gradle/actions/setup-gradle@v4`, `actions/upload-artifact@v4` y `softprops/action-gh-release@v2`), integración de paso automatizado para asegurar la creación y sincronización de etiquetas Git en `origin` ante cualquier push a `main`, compilación desatendida del paquete Debian `recursos-cockpit_${VERSION}_amd64.deb` y del APK nativo `recursos-cockpit_${VERSION}.apk`, generación de sumas SHA256 unificadas y publicación pública automática como Release descargable con `GITHUB_TOKEN`; (2) **Auditoría de Normas y Zero-Hardcoding en Apps Nativas**: En Android (`android_app/`), habilitación de `buildConfig = true` en `build.gradle.kts` e inyección dinámica de `BuildConfig.VERSION_NAME` en la cabecera de `CockpitDashboard.kt` eliminando versiones estáticas (Reglas 2 y 3); verificación del Bento Grid simétrico y ausencia estricta de menús DeX (Regla 7.5); en Ubuntu (`desktop_app/recursos_app.py`), depuración de shebang inicial, verificación de gráficos vectoriales Cairo a 60 FPS, autodescubrimiento LAN resiliente y estación DeX por hardware desbloqueada; (3) **Sincronización Canónica**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control`, `android_app/app/build.gradle.kts` y [`README.md`](./README.md) a `8.5.3`. |
 | **`v8.5.2`** | `PATCH` | **Formalización Contractual de Simetría Total, Homogeneidad y Cohesión en Interfaces y Submenús (Regla 8 en `GEMINI.md`)**: (1) **Principio de Simetría y Homogeneidad Estricta en Todas las Interfaces (Regla 8)**: Inclusión contractual obligatoria de la Regla 8 en [`GEMINI.md`](./GEMINI.md) exigiendo que todos los componentes, vistas, tarjetas Bento, barras de herramientas, HUDs, paneles flotantes, modales y submenús (incluyendo la interfaz cartográfica geoespacial, catálogo de servicios, selectores de subredes, gráficos y tablas) mantengan una simetría visual y estructural rigurosa, limpia y equilibrada en cualquier resolución; (2) **Ecosistema Homogéneo Universal**: Cohesión absoluta de diseño entre la plataforma web y los clientes nativos de Ubuntu (GTK 3/Cairo) y Android (Jetpack Compose), compartiendo alineación simétrica, radios de curvatura, estética *Apple Liquid Glass*, contraste, tipografía monoespaciada tabular y ergonomía táctil *Tesla Touch Cockpit*; (3) **Simetría Contractual en Nuevas Funcionalidades**: Obligatoriedad de simetría y coherencia visual para cualquier función, control o vista añadida a futuro; (4) **Sincronización Canónica**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control`, `android_app/app/build.gradle.kts` y [`README.md`](./README.md) a `8.5.2`. |
 | **`v8.5.1`** | `PATCH` | **Supresión del Logotipo de Apple en el Badge de Versión Canónica de README.md**: (1) **Eliminación del Logo de Apple**: Supresión de los parámetros `&logo=apple&logoColor=white` en el badge principal de versión canónica en la cabecera de [`README.md`](./README.md); (2) **Sincronización Canónica**: Actualización de `./VERSION`, `package.json`, `packaging/debian/control` y `app/build.gradle.kts` a `8.5.1`. |

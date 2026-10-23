@@ -33,8 +33,9 @@ mkdir -p "$PKG_DIR/usr/share/icons/hicolor/scalable/apps"
 # 1. Copiar metadatos de DEBIAN
 cp "$SCRIPT_DIR/debian/control" "$PKG_DIR/DEBIAN/control"
 cp "$SCRIPT_DIR/debian/postinst" "$PKG_DIR/DEBIAN/postinst"
+cp "$SCRIPT_DIR/debian/prerm" "$PKG_DIR/DEBIAN/prerm"
 cp "$SCRIPT_DIR/debian/postrm" "$PKG_DIR/DEBIAN/postrm"
-chmod 755 "$PKG_DIR/DEBIAN/postinst" "$PKG_DIR/DEBIAN/postrm"
+chmod 755 "$PKG_DIR/DEBIAN/postinst" "$PKG_DIR/DEBIAN/prerm" "$PKG_DIR/DEBIAN/postrm"
 
 # Ajustar versión en DEBIAN/control
 sed -i "s/^Version:.*/Version: $VERSION/" "$PKG_DIR/DEBIAN/control"
