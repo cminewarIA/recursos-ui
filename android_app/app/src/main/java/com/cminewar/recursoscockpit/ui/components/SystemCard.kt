@@ -53,7 +53,9 @@ fun SystemCard(
                 val (badgeText, badgeColor) = when (mode) {
                     ConnectionMode.CONNECTED_LAN -> "🟢 LAN (BAJA LATENCIA)" to NeonGreen
                     ConnectionMode.CONNECTED_WAN -> "🌐 WAN (DDNS)" to NeonBlue
+                    ConnectionMode.SCANNING_LAN -> "📡 ESCANEANDO RED..." to NeonOrange
                     ConnectionMode.CONNECTING -> "🔍 ENLAZANDO..." to NeonOrange
+                    ConnectionMode.REVOKED -> "🔒 CERTIFICADO REVOCADO" to NeonRed
                     ConnectionMode.ERROR -> "🔴 SIN NODO" to NeonRed
                     ConnectionMode.DISCONNECTED -> "⚪ DESCONECTADO" to TextSecondary
                 }

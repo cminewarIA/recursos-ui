@@ -1,63 +1,95 @@
-# Plan de Implementación v8.4.1: Carpeta de Paquetes de Compilación Offline y Aceleración de CI/CD
+# Plan de Implementación v8.5.0: Paridad Total de Interfaz, Autodescubrimiento de Red y Persistencia Criptográfica (Android & Ubuntu)
 
-El usuario ha solicitado añadir una carpeta al proyecto con todos los paquetes necesarios para compilar, con el objetivo de agilizar tanto la compilación local como la de GitHub Actions.
-
-## Diagnóstico y Objetivos
-1. **Compilación Linux (.deb)**: Actualmente en GitHub Actions se ejecuta `sudo apt-get update && sudo apt-get install -y dpkg-dev binutils`, lo que actualiza todos los repositorios remotos y descarga paquetes por red cada vez (~15-20 segundos). Disponer de los paquetes `.deb` predescargados en una carpeta dedicada `packages/debian/` permite una instalación offline inmediata (<1 segundo).
-2. **Compilación Android (.apk)**: En GitHub Actions se descargan repetidamente la distribución completa de Gradle 8.5 (~126 MB) y más de 550 dependencias Maven (~345 MB), tomando 3 minutos y 19 segundos por ejecución. Al incorporar `gradle/actions/setup-gradle@v4` y flags de build-cache en `gradle.properties`, las dependencias quedan cacheadas y la compilación se reduce a segundos.
-3. **Estructura Portátil y Cero Bloat**: Mantener los archivos binarios por debajo de 100 MB (estricto cumplimiento del límite de GitHub), asegurando que el repositorio sea ligero para clonar en entornos móviles / Google AI Studio.
+## Objetivo
+Cumplir estrictamente con la solicitud del usuario y las directrices maestras de [`GEMINI.md`](file:///home/servidor/servicios/dashboard/GEMINI.md):
+1. **App Android (`android_app`)**:
+   - **Sincronización Automática con Escaneo de Red**: Escaneo dinámico autónomo de la subred local (Wi-Fi/LAN) al abrir la app para localizar el servidor en el puerto 8085 sin solicitar IPs manuales al usuario.
+   - **Paridad Visual y de Características con el Servidor**: Interfaz nativa completa en Jetpack Compose con todas las pestañas y vistas del servidor web (Cockpit Resumen, CPU con desglose de núcleos y GHz, Memoria con ZRAM y buffers, Discos, Red con caudal RX/TX e interfaces, Seguridad/Fail2ban IPS, Contenedores Docker y Tabla de Procesos).
+   - **Modo DeX Estrictamente Desactivado**: Ausente de toda la navegación de Android.
+   - **Persistencia de Certificado Zero-Trust**: Al conectarse por primera vez en LAN, el servidor expide el token HMAC-SHA256 (`auth_status.token`), el cliente lo almacena en `EncryptedSharedPreferences` y lo mantiene de forma permanente (tanto en LAN como en WAN) hasta que sea revocado por el servidor (HTTP 403 / `locked`).
+2. **App de Ubuntu (`desktop_app/recursos_app.py`)**:
+   - **Misma Interfaz y Características**: Interfaz nativa completa GTK3 + Cairo con todas las tarjetas de silicio, telemetría del servidor, procesos, Docker, seguridad e interfaces de red.
+   - **Primera Autoconexión con Escaneo de Red**: Al arrancar, sondea automáticamente el servidor local en la red (o WAN como respaldo), se enlaza y persiste su certificado en `~/.config/recursos-cockpit/client_config.json`.
+   - **Persistencia y Control de Revocación**: Mantiene la conexión automática de forma permanente hasta que el certificado sea revocado en el servidor.
+   - **Desbloqueo Exclusivo de DeX**: Mantiene operativo el submenú de proyección por hardware USB (Scrcpy / UHID).
 
 ---
 
 ## Cambios Propuestos
 
-### 1. Nueva Carpeta de Paquetes de Compilación (`packages/`)
-- **`packages/debian/`**: Archivos `.deb` descargados para la suite de empaquetado y compilación Linux:
-  - `dpkg-dev`
-  - `binutils`
-  - `binutils-common`
-  - `binutils-x86-64-linux-gnu`
-  - `libbinutils`
-  - `libdpkg-perl`
-  - `make`
-  - `patch`
-  - `fakeroot`
-- **`packages/scripts/install_packages.sh`**: Script para instalar o verificar los paquetes de compilación de forma instantánea sin requerir descargas de internet.
-- **`packages/scripts/verify_packages.sh`**: Script de comprobación de salud de las herramientas de compilación (.deb y .apk).
-- **`packages/README.md`**: Guía técnica de la carpeta de paquetes offline y su funcionamiento.
+### Componente 1: App Nativa Android (`android_app/`)
 
-### 2. Aceleración de Compilación Android
-- **`android_app/gradle.properties`**:
-  - `org.gradle.caching=true` (Build cache activo)
-  - `org.gradle.parallel=true` (Compilación paralela de módulos)
-  - `org.gradle.vfs.watch=true` (VFS watcher para detección de cambios instantánea)
-  - `org.gradle.daemon=true`
+#### [MODIFY] [`DiscoveryManager.kt`](file:///home/servidor/servicios/dashboard/android_app/app/src/main/java/com/cminewar/recursoscockpit/data/DiscoveryManager.kt)
+- Implementar escaneo de subred local dinámico en segundo plano (corutinas paralelas con timeout ágil de 250ms).
+- Detección dinámica de subred local desde interfaces de red activas (cero IPs hardcodeadas).
+- Sonda a `/api/version` y `/api/metrics` con cabeceras `X-Device-Token` y `Authorization: Bearer`.
+- Conmutación inteligente a WAN (`recursos.cminewar.duckdns.org`) si la red local no está disponible.
+- Detección explícita de revocación de certificado (HTTP 403 ➔ `ConnectionMode.REVOKED`).
 
-### 3. Optimización del Flujo CI/CD (`.github/workflows/build-deb.yml`)
-- Sustituir la descarga lenta de paquetes por la instalación offline desde `packages/debian/`.
-- Integrar `gradle/actions/setup-gradle@v4` para caché permanente de Gradle, plugins y librerías Maven en GitHub Actions.
+#### [MODIFY] [`ApiService.kt`](file:///home/servidor/servicios/dashboard/android_app/app/src/main/java/com/cminewar/recursoscockpit/data/ApiService.kt)
+- Captura automática de `auth_status.token` retornado por el servidor y almacenamiento en `SecurePreferences`.
+- Gestión de excepciones para certificados revocados.
 
-### 4. Versionado Canónico v8.4.1 y Documentación
-- Actualizar a `8.4.1`:
-  - `VERSION`
-  - `package.json`
-  - `packaging/debian/control`
-  - `android_app/app/build.gradle.kts`
-  - `README.md`
-- Persistir planes en `planes/implementation_plan_v8.4.1.md` y `planes/walkthrough_v8.4.1.md`.
+#### [MODIFY] [`Models.kt`](file:///home/servidor/servicios/dashboard/android_app/app/src/main/java/com/cminewar/recursoscockpit/data/Models.kt)
+- Modelar todas las estructuras completas del servidor: `GpuData`, `ProcessItem`, `DockerContainerItem`, `Fail2banData`, `AuthStatusData`.
+- Añadir estado `REVOKED` al enum `ConnectionMode`.
+
+#### [MODIFY] [`CockpitDashboard.kt`](file:///home/servidor/servicios/dashboard/android_app/app/src/main/java/com/cminewar/recursoscockpit/ui/CockpitDashboard.kt)
+- Incorporar sistema de navegación de pestañas paritario con el servidor (Material 3 NavigationBar / NavigationRail en tablets):
+  - 🏠 **Cockpit** (Resumen general Bento Grid)
+  - 🧠 **CPU** (Detalle de núcleos, frecuencias GHz, carga y temperaturas)
+  - 💾 **Memoria** (RAM, Swap, ZRAM, buffers y caché)
+  - 💿 **Discos** (Particiones del servidor, I/O y espacio libre/usado)
+  - 🌐 **Red** (Caudal en vivo RX/TX, interfaces activas)
+  - 🛡️ **Seguridad** (Fail2ban, IPs bloqueadas, estado IPS)
+  - 🐳 **Docker** (Contenedores en ejecución, consumo de CPU y RAM)
+  - ⚙️ **Procesos** (Tabla de procesos del kernel)
+- Banner de estado superior con indicación clara: `🟢 LAN (<1ms)`, `🌐 WAN (Cifrado TLS)`, `📡 ESCANEANDO RED...` o `🔒 CERTIFICADO REVOCADO`.
+- Modo DeX estrictamente desactivado (cero elementos de proyección USB en Android).
+
+---
+
+### Componente 2: App Nativa Linux / Ubuntu (`desktop_app/`)
+
+#### [MODIFY] [`recursos_app.py`](file:///home/servidor/servicios/dashboard/desktop_app/recursos_app.py)
+- Incorporar cliente de red HTTP nativo en segundo plano (`ServerConnectionManager`):
+  - Autodescubrimiento en red local escaneando subred y candidatos comunes en puerto 8085.
+  - Almacenamiento seguro del certificado/token emitido por el servidor en `~/.config/recursos-cockpit/client_config.json`.
+  - Envío automático de cabeceras `Authorization: Bearer <token>` y `X-Device-Token`.
+  - Detección de revocación de certificado (HTTP 403) con advertencia visual en el HeaderBar.
+  - Sincronización continua de métricas remotas con `/api/metrics` y fallback a `psutil` si no hay conectividad.
+- Ampliación de la interfaz GTK3 para paridad completa con el servidor:
+  - Pestañas completas en `Gtk.Stack`: Cockpit/Silicio, CPU/Memoria, Red/Seguridad, Docker/Apps, Procesos, y **Conexión USB / Samsung DeX (desbloqueado exclusivamente en Ubuntu)**.
+  - Indicador de estado de conexión en tiempo real en el HeaderBar (LAN, WAN, Revocado, Local).
+
+---
+
+### Componente 3: Versionado Canónico v8.5.0, Compilación y Publicación
+
+#### [MODIFY] [`VERSION`](file:///home/servidor/servicios/dashboard/VERSION), [`package.json`](file:///home/servidor/servicios/dashboard/package.json), [`packaging/debian/control`](file:///home/servidor/servicios/dashboard/packaging/debian/control), [`build.gradle.kts`](file:///home/servidor/servicios/dashboard/android_app/app/build.gradle.kts), [`README.md`](file:///home/servidor/servicios/dashboard/README.md)
+- Incrementar a versión canónica **`8.5.0`** (`MINOR` por adición de sincronización de red automática, arquitectura de paridad completa y persistencia Zero-Trust).
+- Almacenar planes en `planes/implementation_plan_v8.5.0.md` y `planes/walkthrough_v8.5.0.md`.
 
 ---
 
 ## Plan de Verificación
 
-### Compilación y Verificación Local
-1. Comprobar que `packages/scripts/install_packages.sh` verifique e instale correctamente.
-2. Compilar paquete Debian local: `bash packaging/build_deb.sh`.
-3. Instalar paquete Debian: `sudo apt-get install -y ./dist/recursos-cockpit_8.4.1_amd64.deb`.
-4. Verificar app nativa: `/usr/bin/recursos-cockpit --test-mode` y `dpkg -l | grep recursos-cockpit`.
-5. Compilar APK local: `cd android_app && ./gradlew assembleRelease` y medir reducción de tiempo.
+### 1. Verificación App Nativa Ubuntu (.deb)
+- Compilar: `bash packaging/build_deb.sh`.
+- Instalar: `sudo apt-get install -y ./dist/recursos-cockpit_8.5.0_amd64.deb`.
+- Validar: `/usr/bin/recursos-cockpit --test-mode`.
+- Comprobar que autoconecta al servidor local, almacena el token y mantiene la pestaña DeX desbloqueada.
 
-### Publicación y Validación CI/CD
-1. Confirmar con commit semántico: `feat(v8.4.1): carpeta packages de compilacion offline y aceleracion ci/cd`.
-2. Crear etiqueta `v8.4.1` y ejecutar `git push origin main --tags`.
-3. Monitorear el workflow en GitHub Actions para verificar que la compilación es notablemente más rápida y exitosa.
+### 2. Verificación App Nativa Android (Tab S9)
+- Compilar: `cd android_app && ./gradlew assembleRelease`.
+- Instalar vía ADB en Tab S9 (`192.168.50.16:5555`).
+- Lanzar y verificar mediante capturas de pantalla:
+  - Autodescubrimiento escaneando la red y enlace automático sin diálogos manuales.
+  - Almacenamiento seguro del token.
+  - Navegación por todas las pestañas paritarias del servidor (Cockpit, CPU, RAM, Discos, Red, Seguridad, Docker, Procesos).
+  - Modo DeX desactivado y ausente.
+
+### 3. Publicación y CI/CD en GitHub
+- `git commit -m "feat(v8.5.0): paridad total de interfaz, autodescubrimiento lan y persistencia criptografica android y ubuntu"`
+- `git tag v8.5.0`
+- `git push origin main --tags`

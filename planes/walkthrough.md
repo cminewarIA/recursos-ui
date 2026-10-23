@@ -1,53 +1,74 @@
-# Recorrido de Verificación v8.4.1: Carpeta de Paquetes Offline y Aceleración de Compilación
+# Recorrido de Verificación y Cierre v8.5.0
 
-## Resumen de Cambios
-Se ha implementado una suite de herramientas y paquetes offline en el proyecto para acelerar tanto la compilación local como la ejecución en GitHub Actions:
+## Resumen Ejecutivo
 
-1. **Carpeta de Paquetes de Compilación (`packages/`)**:
-   - `packages/debian/`: Paquetes `.deb` predescargados para el toolchain de Linux (`dpkg-dev`, `binutils`, `binutils-common`, `binutils-x86-64-linux-gnu`, `libbinutils`, `libdpkg-perl`, `make`, `patch`, `fakeroot`) con un tamaño total de solo 3.8 MB.
-   - `packages/scripts/install_packages.sh`: Script de instalación offline-first con detección de estado (`<0.01s` si ya están instalados).
-   - `packages/scripts/verify_packages.sh`: Auditoría automática del estado de las herramientas de compilación.
-   - `packages/README.md`: Documentación técnica de uso.
-2. **Aceleración de Compilación Android**:
-   - `android_app/gradle.properties`: Directivas de compilación paralela, daemon, watch VFS y build-cache (`org.gradle.caching=true`, `org.gradle.parallel=true`, `org.gradle.vfs.watch=true`).
-   - Resultado local: Tiempo de compilación reducido de minutos a **5 segundos** (`assembleRelease`).
-3. **Flujo de CI/CD en GitHub Actions (`.github/workflows/build-deb.yml`)**:
-   - Instalación offline-first de paquetes Linux mediante `packages/scripts/install_packages.sh`.
-   - Incorporación de `gradle/actions/setup-gradle@v4` para caché permanente de Gradle y dependencias Maven.
-4. **Despliegue y Pruebas**:
-   - Compilación del paquete Debian `dist/recursos-cockpit_8.4.1_amd64.deb` e instalación local en el servidor validada con `--test-mode` (OK).
-   - Compilación del APK `dist/recursos-cockpit_8.4.1.apk` e instalación directa en Samsung Galaxy Tab S9 Ultra (`SM-X916B`) vía ADB (ejecución activa en primer plano).
+En la versión **v8.5.0** se implementó la arquitectura contractual completa de aplicaciones nativas (Android y Ubuntu Linux) según las directrices y normas del proyecto:
+1. **Autodescubrimiento LAN Dinámico**: Escaneo concurrente de subred `/24` sin IPs fijas ni hardcodeadas.
+2. **Persistencia Criptográfica Zero-Trust**: Almacenamiento seguro del token criptográfico del dispositivo en Android KeyStore (`EncryptedSharedPreferences`) y configuración de escritorio de Ubuntu, manteniendo la sesión hasta la revocación explícita (`HTTP 403 / locked`).
+3. **Paridad Total de Interfaz en Android**: Vistas completas de Cockpit Bento Grid, CPU, Memoria, Discos, Red, Seguridad Fail2ban, Docker y Procesos en Jetpack Compose 100% nativo.
+4. **Diferenciación Contractual de Modo DeX**: Submenú de proyección por hardware DeX estrictamente desactivado y ausente en Android y web, y desbloqueado exclusivamente en la app nativa de Ubuntu con soporte `/dev/uhid` y `scrcpy`.
 
-## Resultados de Pruebas
+---
 
-### 1. Diagnóstico de Herramientas de Compilación
-```bash
-$ bash packages/scripts/verify_packages.sh
-============================================================
-🔍 Verificando Herramientas de Compilación del Sistema
-============================================================
-  -> dpkg-deb: OK (Versión `dpkg-deb' del sistema de gestión de paquetes de Debian `1.23.7 (amd64)'.)
-  -> dpkg-architecture: OK (amd64)
-  -> binutils (as/ld): OK (GNU ld (GNU Binutils for Ubuntu) 2.46)
-  -> Java JDK: OK (openjdk version "17.0.20.1" 2026-08-18)
-  -> Gradle Wrapper: OK (android_app/gradlew presente)
-============================================================
-✅ Diagnóstico de Compilación Finalizado
-============================================================
-```
+## Cambios Implementados
 
-### 2. Prueba de la App Nativa Linux (.deb)
-```bash
-$ /usr/bin/recursos-cockpit --test-mode
-[OK] Recursos Native GTK3 App v8.4.1 validated successfully.
-[OK] Runtime Environment Detection: {'mode': 'native', 'is_native': True, 'is_mobile': False, 'is_web': False, 'is_native_or_mobile': True, 'hide_device_tab': True, 'render_usb_projection_wait_screen': True}
-[OK] DeX / Android Desktop USB Controller Ready: {'adb_installed': True, 'scrcpy_installed': True, ...}
-$ dpkg -l | grep recursos-cockpit
-ii  recursos-cockpit 8.4.1 amd64 Recursos Cockpit - Monitor de Silicio Nativo GTK3 y Conexion de Dispositivos
-```
+### 1. Sincronización Canónica de Versión (`8.5.0`)
+- `./VERSION`: Actualizado a `8.5.0`.
+- `package.json`: `"version": "8.5.0"`.
+- `packaging/debian/control`: `Version: 8.5.0`.
+- `android_app/app/build.gradle.kts`: `versionCode = 80500`, `versionName = "8.5.0"`.
+- `README.md`: Badges, banner ASCII y tabla de historial de versiones actualizados con el registro completo de `v8.5.0`.
 
-### 3. Prueba de la App Nativa Android (Tab S9)
-```bash
-$ adb -s 192.168.50.16:5555 shell "dumpsys activity activities | grep -E 'topResumedActivity'"
-topResumedActivity=ActivityRecord{235122118 u0 com.cminewar.recursoscockpit/.MainActivity t344}
-```
+### 2. Cliente Nativo Android (`android_app/`)
+- [`Models.kt`](../android_app/app/src/main/java/com/cminewar/recursoscockpit/data/Models.kt): Modelos de datos para telemetría completa (`GpuData`, `AuthStatusData`, `ConnectionMode.SCANNING_LAN`, `ConnectionMode.REVOKED`).
+- [`SecurePreferences.kt`](../android_app/app/src/main/java/com/cminewar/recursoscockpit/data/SecurePreferences.kt): Persistencia cifrada de `savedHost`, `deviceToken` y `isCertRevoked` en `EncryptedSharedPreferences`.
+- [`ApiService.kt`](../android_app/app/src/main/java/com/cminewar/recursoscockpit/data/ApiService.kt): Inyección de cabeceras `X-Device-Token` y `Authorization: Bearer`, autoguardado del token emitido por el servidor y detección de revocación `HTTP 403`.
+- [`DiscoveryManager.kt`](../android_app/app/src/main/java/com/cminewar/recursoscockpit/data/DiscoveryManager.kt): Detección dinámica de subred local por interfaces de red activas, sondeo concurrente a puertos LAN (`8085`, `8080`, `80`) y conmutación hacia WAN (`recursos.cminewar.duckdns.org`).
+- [`CockpitDashboard.kt`](../android_app/app/src/main/java/com/cminewar/recursoscockpit/ui/CockpitDashboard.kt): Navegación nativa por pestañas (Cockpit, CPU, Memoria, Discos, Red, Seguridad, Docker, Procesos), banner de bloqueo de certificado revocado y **modo DeX 100% ausente**.
+- Componentes nativos modulares:
+  - [`SecurityCard.kt`](../android_app/app/src/main/java/com/cminewar/recursoscockpit/ui/components/SecurityCard.kt): Ciberdefensa IPS Fail2ban.
+  - [`DockerCard.kt`](../android_app/app/src/main/java/com/cminewar/recursoscockpit/ui/components/DockerCard.kt): Contenedores activos y estado UP/DOWN.
+  - [`ProcessesCard.kt`](../android_app/app/src/main/java/com/cminewar/recursoscockpit/ui/components/ProcessesCard.kt): Procesos del kernel y ordenamiento.
+  - [`SystemCard.kt`](../android_app/app/src/main/java/com/cminewar/recursoscockpit/ui/components/SystemCard.kt): Identificación del nodo, kernel y uptime.
+
+### 3. Cliente Nativo Ubuntu Linux (`desktop_app/recursos_app.py`)
+- `ServerConnectionManager`: Autodescubrimiento en red local, persistencia local de token en `~/.config/recursos-cockpit/client_config.json`, detección de revocación (HTTP 403), y consumo de métricas del servidor con fallback a silicio local `psutil`.
+- HeaderBar con indicador dinámico de conexión (`🟢 LAN`, `🌐 WAN`, `🔒 Certificado Revocado`, `💻 Silicio Local`).
+- Submenú de proyección por cable USB / Samsung DeX (`📱 Conexión USB (DeX)`) mantenido y desbloqueado exclusivamente en Ubuntu con soporte `/dev/uhid` y `scrcpy`.
+
+---
+
+## Verificación y Pruebas Realizadas
+
+### 1. App Nativa de Ubuntu (.deb)
+- **Compilación**: `bash packaging/build_deb.sh` generó `dist/recursos-cockpit_8.5.0_amd64.deb` y `dist/SHA256SUMS.txt`.
+- **Instalación Local**: `sudo apt-get install -y ./dist/recursos-cockpit_8.5.0_amd64.deb` completada con éxito.
+- **Validación CLI**:
+  ```bash
+  /usr/bin/recursos-cockpit --test-mode
+  ```
+  Salida:
+  - `[OK] Recursos Native GTK3 App v8.5.0 validated successfully.`
+  - `[OK] Runtime Environment Detection: {'mode': 'native', ...}`
+  - `[OK] DeX / Android Desktop USB Controller Ready: {'ready': True, ...}`
+  - `[OK] Server Auto-Discovery & Zero-Trust Engine Ready: active='http://127.0.0.1:8085', mode='LAN'`
+- **Comprobación de Paquetes**: `dpkg -l | grep recursos-cockpit` confirmó la versión `8.5.0`.
+
+### 2. App Nativa de Android (APK) y Samsung Galaxy Tab S9
+- **Compilación Release**: `cd android_app && ./gradlew assembleRelease` compiló limpiamente en 12 segundos.
+- **Distribución**: Binarios copiados a `dist/recursos-cockpit_8.5.0.apk` y `dist/recursos-cockpit.apk` con cálculo de sumas en `dist/SHA256SUMS.txt`.
+- **Instalación en Tablet**:
+  ```bash
+  adb -s 192.168.50.16:5555 install -r dist/recursos-cockpit_8.5.0.apk
+  ```
+  Resultado: `Success`.
+- **Verificación de Autodescubrimiento y Persistencia Criptográfica**:
+  Logcat capturó:
+  ```
+  I RecursosCockpit: Subred local detectada para autodescubrimiento: 192.168.50
+  I RecursosCockpit: Nuevo token certificado recibido y persistido en KeyStore: dev_f8eff166b2d9.1792717109...
+  ```
+- **Verificación Visual en Pantalla 2960×1848**:
+  - Pestañas operativas y Bento Grid con telemetría en tiempo real: CPU, RAM, NVMe, Red, IPS Fail2ban, Docker y Procesos.
+  - Modo DeX ausente.
+  - Navegación fluida entre pestañas (`Cockpit`, `CPU`, `Docker`) verificada mediante capturas de pantalla.

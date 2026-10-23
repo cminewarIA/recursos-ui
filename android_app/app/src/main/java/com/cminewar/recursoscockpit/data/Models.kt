@@ -5,27 +5,43 @@ import com.google.gson.annotations.SerializedName
 enum class ConnectionMode {
     DISCONNECTED,
     CONNECTING,
+    SCANNING_LAN,
     CONNECTED_LAN,
     CONNECTED_WAN,
+    REVOKED,
     ERROR
 }
 
 data class VersionInfo(
-    @SerializedName("version") val version: String = "8.4.0",
+    @SerializedName("version") val version: String = "8.5.0",
     @SerializedName("repo") val repo: String? = null,
     @SerializedName("local_hash") val localHash: String? = null,
     @SerializedName("public_domain") val publicDomain: String? = null,
-    @SerializedName("local_ip") val localIp: String? = null
+    @SerializedName("local_ip") val localIp: String? = null,
+    @SerializedName("app") val app: String? = null
 )
 
 data class MetricsResponse(
     @SerializedName("system") val system: SystemData? = null,
     @SerializedName("cpu") val cpu: CpuData? = null,
     @SerializedName("ram") val ram: RamData? = null,
+    @SerializedName("gpu") val gpu: GpuData? = null,
     @SerializedName("disks") val disks: List<DiskData>? = null,
     @SerializedName("net") val net: NetData? = null,
     @SerializedName("security") val security: SecurityData? = null,
-    @SerializedName("docker_activities") val dockerActivities: List<Map<String, Any>>? = null
+    @SerializedName("docker_activities") val dockerActivities: List<Map<String, Any>>? = null,
+    @SerializedName("system_processes") val systemProcesses: List<Map<String, Any>>? = null,
+    @SerializedName("auth_status") val authStatus: AuthStatusData? = null
+)
+
+data class AuthStatusData(
+    @SerializedName("is_local") val isLocal: Boolean? = true,
+    @SerializedName("is_trusted") val isTrusted: Boolean? = true,
+    @SerializedName("client_ip") val clientIp: String? = null,
+    @SerializedName("public_domain") val publicDomain: String? = null,
+    @SerializedName("local_ip") val localIp: String? = null,
+    @SerializedName("token") val token: String? = null,
+    @SerializedName("device_name") val deviceName: String? = null
 )
 
 data class SystemData(
@@ -34,8 +50,8 @@ data class SystemData(
     @SerializedName("kernel") val kernel: String? = "",
     @SerializedName("uptime_str") val uptimeStr: String? = "",
     @SerializedName("uptime_seconds") val uptimeSeconds: Long? = 0L,
-    @SerializedName("local_ip") val localIp: String? = "192.168.50.2",
-    @SerializedName("public_domain") val publicDomain: String? = "recursos.cminewar.duckdns.org"
+    @SerializedName("local_ip") val localIp: String? = null,
+    @SerializedName("public_domain") val publicDomain: String? = null
 )
 
 data class CpuData(
@@ -57,7 +73,18 @@ data class RamData(
     @SerializedName("swap_percent") val swapPercent: Float? = 0f,
     @SerializedName("swap_total_bytes") val swapTotalBytes: Long? = 0L,
     @SerializedName("swap_used_bytes") val swapUsedBytes: Long? = 0L,
-    @SerializedName("zram_active") val zramActive: Boolean? = false
+    @SerializedName("zram_active") val zramActive: Boolean? = false,
+    @SerializedName("cached_bytes") val cachedBytes: Long? = 0L,
+    @SerializedName("buffers_bytes") val buffersBytes: Long? = 0L
+)
+
+data class GpuData(
+    @SerializedName("active") val active: Boolean? = false,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("usage_percent") val usagePercent: Float? = null,
+    @SerializedName("temperature") val temperature: Float? = null,
+    @SerializedName("memory_used") val memoryUsed: Long? = null,
+    @SerializedName("memory_total") val memoryTotal: Long? = null
 )
 
 data class DiskData(

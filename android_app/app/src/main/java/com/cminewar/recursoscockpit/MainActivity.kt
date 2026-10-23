@@ -35,38 +35,56 @@ class MainActivity : ComponentActivity() {
 
                 fun triggerDiscoveryAndRefresh() {
                     lifecycleScope.launch {
-                        connectionMode = ConnectionMode.CONNECTING
+                        connectionMode = ConnectionMode.SCANNING_LAN
                         val endpoint = discoveryManager.resolveActiveNode()
                         activeUrl = endpoint.url
                         connectionMode = endpoint.mode
-                        if (endpoint.mode != ConnectionMode.ERROR) {
-                            metrics = apiService.fetchMetrics(endpoint.url)
+                        if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN) {
+                            val (data, isRevoked) = apiService.fetchMetrics(endpoint.url)
+                            if (isRevoked) {
+                                connectionMode = ConnectionMode.REVOKED
+                            } else if (data != null) {
+                                metrics = data
+                            }
                         }
                     }
                 }
 
-                // Ciclo continuo de telemetría a 60 FPS / polling cada 2.5s
+                // Autodescubrimiento en arranque y ciclo continuo de telemetría a 60 FPS
                 LaunchedEffect(Unit) {
+                    connectionMode = ConnectionMode.SCANNING_LAN
                     val endpoint = discoveryManager.resolveActiveNode()
                     activeUrl = endpoint.url
                     connectionMode = endpoint.mode
 
                     while (isActive) {
+                        if (connectionMode == ConnectionMode.REVOKED) {
+                            delay(5000)
+                            continue
+                        }
+
                         if (activeUrl.isNotEmpty()) {
-                            val data = apiService.fetchMetrics(activeUrl)
-                            if (data != null) {
+                            val (data, isRevoked) = apiService.fetchMetrics(activeUrl)
+                            if (isRevoked) {
+                                connectionMode = ConnectionMode.REVOKED
+                            } else if (data != null) {
                                 metrics = data
                             } else {
                                 // Reconexión / Conmutación LAN ↔ WAN transparente
                                 val newEndpoint = discoveryManager.resolveActiveNode()
                                 activeUrl = newEndpoint.url
                                 connectionMode = newEndpoint.mode
-                                if (newEndpoint.mode != ConnectionMode.ERROR) {
-                                    metrics = apiService.fetchMetrics(newEndpoint.url)
+                                if (newEndpoint.mode == ConnectionMode.CONNECTED_LAN || newEndpoint.mode == ConnectionMode.CONNECTED_WAN) {
+                                    val (retryData, retryRevoked) = apiService.fetchMetrics(newEndpoint.url)
+                                    if (retryRevoked) {
+                                        connectionMode = ConnectionMode.REVOKED
+                                    } else if (retryData != null) {
+                                        metrics = retryData
+                                    }
                                 }
                             }
                         }
-                        delay(2500)
+                        delay(2000)
                     }
                 }
 
