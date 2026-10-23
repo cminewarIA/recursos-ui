@@ -29,70 +29,70 @@
 
   <style>
     /* ==========================================================================
-       APPLE LIQUID GLASS & TESLA TOUCH COCKPIT — DESIGN SYSTEM (v4.0)
-       Zero-Hardcoding · Specular Liquid Glass · Titanium Light/Dark · Touch First
+       RECURSOS — INFRASTRUCTURE & TELEMETRY ENGINEERING CONSOLE (v10.0.0)
+       High-Craft Dark/Light UI · Hairline Grid Architecture · Zero-Hardcoding
        ========================================================================== */
     :root,
     html[data-theme="dark"] {
       color-scheme: dark;
-      /* 60% Space Black / Obsidian Titanium Canvas */
-      --bg-canvas: #07080C;
-      --bg-canvas-glow-1: rgba(41, 151, 255, 0.13);
-      --bg-canvas-glow-2: rgba(48, 209, 88, 0.07);
-      --bg-sidebar: rgba(14, 16, 22, 0.82);
-      --bg-header: rgba(14, 16, 22, 0.72);
-      --bg-dock: rgba(18, 20, 28, 0.74);
+      /* 60% Deep Carbon-Slate Canvas */
+      --bg-canvas: #090D16;
+      --bg-canvas-glow-1: transparent;
+      --bg-canvas-glow-2: transparent;
+      --bg-sidebar: #0C111D;
+      --bg-header: rgba(12, 17, 29, 0.88);
+      --bg-dock: rgba(15, 23, 42, 0.92);
 
-      /* 30% Liquid Glass & Brushed Titanium Surfaces */
-      --bg-surface: rgba(22, 25, 34, 0.68);
-      --bg-surface-elevated: rgba(30, 34, 46, 0.78);
-      --bg-surface-hover: rgba(38, 43, 58, 0.84);
-      --bg-surface-inset: rgba(8, 10, 15, 0.72);
+      /* 30% Architectural Elevated Surfaces (Hairline Border Hierarchy) */
+      --bg-surface: #111827;
+      --bg-surface-elevated: #161F33;
+      --bg-surface-hover: #1E293B;
+      --bg-surface-inset: #0B0F19;
 
-      --border-subtle: rgba(255, 255, 255, 0.085);
-      --border-strong: rgba(255, 255, 255, 0.18);
-      --border-highlight: rgba(41, 151, 255, 0.48);
-      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06);
-      --card-shadow: 0 20px 45px -15px rgba(0, 0, 0, 0.65), 0 4px 14px rgba(0, 0, 0, 0.35);
+      --border-subtle: rgba(255, 255, 255, 0.075);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --border-highlight: rgba(56, 189, 248, 0.42);
+      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+      --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
 
-      /* High-Contrast Apple/Tesla Optical Typography */
-      --text-primary: #F5F5F7;
-      --text-secondary: #D2D2D7;
-      --text-muted: #86868B;
-      --text-dim: #58585E;
+      /* High-Contrast Optical Typography */
+      --text-primary: #F8FAFC;
+      --text-secondary: #CBD5E1;
+      --text-muted: #64748B;
+      --text-dim: #475569;
 
-      /* 10% Semantic Telemetry Accents (Apple/Tesla HMI Palette) */
-      --accent-cyan: #0071E3;
-      --accent-cyan-bright: #2997FF;
-      --accent-cyan-soft: rgba(41, 151, 255, 0.15);
+      /* 10% Semantic Telemetry Accents */
+      --accent-cyan: #0284C7;
+      --accent-cyan-bright: #38BDF8;
+      --accent-cyan-soft: rgba(56, 189, 248, 0.12);
 
-      --accent-violet: #BF5AF2;
-      --accent-violet-bright: #DA8FFF;
-      --accent-violet-soft: rgba(191, 90, 242, 0.15);
+      --accent-violet: #7C3AED;
+      --accent-violet-bright: #A78BFA;
+      --accent-violet-soft: rgba(167, 139, 250, 0.12);
       --accent-purple: var(--accent-violet);
       --accent-purple-bright: var(--accent-violet-bright);
       --glass-shadow: var(--card-shadow);
 
-      --accent-emerald: #30D158;
-      --accent-emerald-bright: #30D158;
-      --accent-emerald-soft: rgba(48, 209, 88, 0.15);
+      --accent-emerald: #10B981;
+      --accent-emerald-bright: #34D399;
+      --accent-emerald-soft: rgba(16, 185, 129, 0.12);
 
-      --accent-amber: #FF9F0A;
-      --accent-amber-bright: #FFD60A;
-      --accent-amber-soft: rgba(255, 159, 10, 0.16);
+      --accent-amber: #D97706;
+      --accent-amber-bright: #FBBF24;
+      --accent-amber-soft: rgba(245, 158, 11, 0.12);
 
-      --accent-rose: #FF453A;
-      --accent-rose-bright: #FF6961;
-      --accent-rose-soft: rgba(255, 69, 58, 0.16);
+      --accent-rose: #E11D48;
+      --accent-rose-bright: #FB7185;
+      --accent-rose-soft: rgba(244, 63, 94, 0.12);
 
-      --chart-grid: rgba(255, 255, 255, 0.06);
-      --chart-fade-bottom: rgba(7, 8, 12, 0);
+      --chart-grid: rgba(255, 255, 255, 0.05);
+      --chart-fade-bottom: rgba(9, 13, 22, 0);
 
-      /* Spatial Radii (Apple Squircle Geometry) */
-      --radius-xl: 26px;
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --radius-sm: 12px;
+      /* Crisp Architectural Radii (No Bloated Squircles) */
+      --radius-xl: 12px;
+      --radius-lg: 10px;
+      --radius-md: 8px;
+      --radius-sm: 6px;
 
       /* 2+1 Font Stack Discipline */
       --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -100,73 +100,73 @@
       --font-mono: 'JetBrains Mono', monospace;
     }
 
-    /* Lunar Silver / Natural Titanium Finish (Light Mode) */
+    /* High-Craft Daylight Engineering Surface (Light Mode) */
     html[data-theme="light"] {
       color-scheme: light;
-      --bg-canvas: #EEF1F6;
-      --bg-canvas-glow-1: rgba(0, 113, 227, 0.09);
-      --bg-canvas-glow-2: rgba(40, 205, 65, 0.06);
-      --bg-sidebar: rgba(245, 247, 250, 0.85);
-      --bg-header: rgba(248, 249, 252, 0.76);
-      --bg-dock: rgba(255, 255, 255, 0.80);
+      --bg-canvas: #F1F5F9;
+      --bg-canvas-glow-1: transparent;
+      --bg-canvas-glow-2: transparent;
+      --bg-sidebar: #FFFFFF;
+      --bg-header: rgba(255, 255, 255, 0.90);
+      --bg-dock: rgba(255, 255, 255, 0.94);
 
-      --bg-surface: rgba(255, 255, 255, 0.76);
-      --bg-surface-elevated: rgba(255, 255, 255, 0.92);
-      --bg-surface-hover: rgba(255, 255, 255, 0.98);
-      --bg-surface-inset: rgba(232, 236, 242, 0.75);
+      --bg-surface: #FFFFFF;
+      --bg-surface-elevated: #F8FAFC;
+      --bg-surface-hover: #F1F5F9;
+      --bg-surface-inset: #F8FAFC;
 
-      --border-subtle: rgba(15, 23, 42, 0.08);
+      --border-subtle: rgba(15, 23, 42, 0.085);
       --border-strong: rgba(15, 23, 42, 0.16);
-      --border-highlight: rgba(0, 113, 227, 0.42);
-      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
-      --card-shadow: 0 16px 36px -12px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+      --border-highlight: rgba(2, 132, 199, 0.40);
+      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+      --card-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
 
-      --text-primary: #111318;
+      --text-primary: #0F172A;
       --text-secondary: #334155;
       --text-muted: #64748B;
       --text-dim: #94A3B8;
 
-      --accent-cyan: #0066CC;
-      --accent-cyan-bright: #0071E3;
-      --accent-cyan-soft: rgba(0, 113, 227, 0.11);
+      --accent-cyan: #0369A1;
+      --accent-cyan-bright: #0284C7;
+      --accent-cyan-soft: rgba(2, 132, 199, 0.10);
 
-      --accent-violet: #8944AB;
-      --accent-violet-bright: #9333EA;
-      --accent-violet-soft: rgba(147, 51, 234, 0.11);
+      --accent-violet: #6D28D9;
+      --accent-violet-bright: #7C3AED;
+      --accent-violet-soft: rgba(124, 58, 237, 0.10);
       --accent-purple: var(--accent-violet);
       --accent-purple-bright: var(--accent-violet-bright);
       --glass-shadow: var(--card-shadow);
 
-      --accent-emerald: #1D9E41;
-      --accent-emerald-bright: #16A34A;
-      --accent-emerald-soft: rgba(22, 163, 74, 0.11);
+      --accent-emerald: #059669;
+      --accent-emerald-bright: #059669;
+      --accent-emerald-soft: rgba(5, 150, 105, 0.10);
 
-      --accent-amber: #D97706;
+      --accent-amber: #B45309;
       --accent-amber-bright: #D97706;
-      --accent-amber-soft: rgba(217, 119, 6, 0.12);
+      --accent-amber-soft: rgba(217, 119, 6, 0.10);
 
-      --accent-rose: #DC2626;
+      --accent-rose: #BE123C;
       --accent-rose-bright: #E11D48;
-      --accent-rose-soft: rgba(225, 29, 72, 0.11);
+      --accent-rose-soft: rgba(225, 29, 72, 0.10);
 
       --chart-grid: rgba(15, 23, 42, 0.06);
-      --chart-fade-bottom: rgba(238, 241, 246, 0);
+      --chart-fade-bottom: rgba(241, 245, 249, 0);
     }
 
-    /* Native HTML5 View Transitions API Smooth Cross-Fade & Scale */
+    /* Native HTML5 View Transitions API Smooth Cross-Fade */
     @keyframes vtFadeIn {
-      from { opacity: 0; transform: scale(0.985) translateY(6px); }
-      to { opacity: 1; transform: scale(1) translateY(0); }
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
     @keyframes vtFadeOut {
-      from { opacity: 1; transform: scale(1); }
-      to { opacity: 0; transform: scale(0.99); }
+      from { opacity: 1; }
+      to { opacity: 0; }
     }
     ::view-transition-old(root) {
-      animation: 150ms cubic-bezier(0.22, 1, 0.36, 1) both vtFadeOut;
+      animation: 120ms ease-out both vtFadeOut;
     }
     ::view-transition-new(root) {
-      animation: 210ms cubic-bezier(0.22, 1, 0.36, 1) both vtFadeIn;
+      animation: 160ms ease-out both vtFadeIn;
     }
 
     * {
@@ -182,16 +182,13 @@
       width: 100%;
       height: 100%;
       background-color: var(--bg-canvas);
-      background-image:
-        radial-gradient(ellipse 80% 50% at 50% -15%, var(--bg-canvas-glow-1), transparent),
-        radial-gradient(ellipse 55% 45% at 92% 105%, var(--bg-canvas-glow-2), transparent);
       color: var(--text-primary);
       font-family: var(--font-sans);
-      font-size: 14px;
-      line-height: 1.5;
+      font-size: 13.5px;
+      line-height: 1.45;
       letter-spacing: -0.005em;
       overflow: hidden;
-      transition: background-color 0.28s ease, color 0.28s ease;
+      transition: background-color 0.2s ease, color 0.2s ease;
     }
 
     /* Enforce tabular numerals on all telemetry data */
@@ -209,10 +206,10 @@
       align-items: center;
     }
     .ota-web-downloads-card {
-      transition: border-color 0.22s ease, transform 0.22s ease;
+      transition: border-color 0.16s ease;
     }
     .ota-web-downloads-card:hover {
-      border-color: rgba(56, 189, 248, 0.35);
+      border-color: var(--border-strong);
     }
     [data-runtime-env="native"] #otaWebDownloadButtons,
     [data-runtime-env="native"] #otaWebDownloadsCard,
@@ -223,8 +220,8 @@
 
     /* Custom Scrollbars */
     *::-webkit-scrollbar { width: 6px; height: 6px; }
-    *::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.24); border-radius: 999px; }
-    *::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.42); }
+    *::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.22); border-radius: 3px; }
+    *::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.38); }
     *::-webkit-scrollbar-track { background: transparent; }
 
     /* ==========================================================================
@@ -232,7 +229,7 @@
        ========================================================================== */
     @keyframes pulseShimmer {
       0% { opacity: 0.45; }
-      50% { opacity: 0.88; }
+      50% { opacity: 0.85; }
       100% { opacity: 0.45; }
     }
 
@@ -242,7 +239,7 @@
     }
 
     /* ==========================================================================
-       TESLA / VISIONOS FULL-BLEED COCKPIT SHELL
+       ENTERPRISE WORKSPACE SHELL (DOCKED SIDEBAR ON DESKTOP, DRAWER ON MOBILE)
        ========================================================================== */
     .app-shell {
       display: flex;
@@ -257,48 +254,61 @@
       overflow: hidden !important;
     }
 
-    /* Collapsible Quick-Drawer Sidebar (Accessible via All-Modules trigger) */
     .sidebar {
       position: fixed;
-      top: 68px;
-      left: 16px;
-      bottom: 24px;
-      max-height: calc(100vh - 92px);
-      width: 288px;
-      max-width: calc(100vw - 32px);
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 248px;
+      max-width: calc(100vw - 48px);
       background: var(--bg-sidebar);
-      backdrop-filter: blur(30px) saturate(190%);
-      -webkit-backdrop-filter: blur(30px) saturate(190%);
-      border: 1px solid var(--border-strong);
-      box-shadow: var(--card-shadow), var(--specular-inset), 0 24px 60px rgba(0, 0, 0, 0.55);
-      border-radius: var(--radius-lg);
+      border-right: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
       user-select: none;
-      z-index: 100; /* Top-most layer at 100 */
-      transform: translateX(-340px);
+      z-index: 100;
+      transform: translateX(-100%);
       opacity: 0;
       pointer-events: none;
-      transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
     }
 
     .sidebar.open {
       transform: translateX(0);
       opacity: 1;
       pointer-events: auto;
+      box-shadow: 12px 0 36px rgba(0, 0, 0, 0.45);
     }
 
-    /* Dimmed spatial backdrop overlay for drawer */
+    @media (min-width: 1120px) {
+      .sidebar {
+        position: relative;
+        top: auto;
+        left: auto;
+        bottom: auto;
+        width: 244px;
+        flex-shrink: 0;
+        transform: none;
+        opacity: 1;
+        pointer-events: auto;
+        box-shadow: none;
+        z-index: 20;
+      }
+      .sidebar-backdrop {
+        display: none !important;
+      }
+    }
+
     .sidebar-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(4, 6, 12, 0.62);
-      backdrop-filter: blur(10px) saturate(160%);
-      -webkit-backdrop-filter: blur(10px) saturate(160%);
+      background: rgba(5, 8, 15, 0.65);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
       z-index: 90;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.24s ease;
+      transition: opacity 0.2s ease;
     }
 
     .sidebar-backdrop.open {
@@ -307,25 +317,26 @@
     }
 
     .sidebar-brand {
-      height: 58px;
-      padding: 0 18px;
+      height: 54px;
+      padding: 0 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid var(--border-subtle);
       text-decoration: none;
       color: var(--text-primary);
+      flex-shrink: 0;
     }
 
     .brand-lockup {
       display: flex;
       align-items: center;
-      gap: 11px;
+      gap: 10px;
     }
 
     .brand-title {
       font-family: var(--font-display);
-      font-size: 17px;
+      font-size: 15.5px;
       font-weight: 700;
       letter-spacing: -0.02em;
       color: var(--text-primary);
@@ -333,79 +344,79 @@
 
     .version-tag {
       font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--accent-cyan-bright);
-      background: rgba(10, 132, 255, 0.12);
-      border: 1px solid rgba(10, 132, 255, 0.28);
-      padding: 2px 7px;
-      border-radius: 6px;
-      letter-spacing: 0.02em;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.01em;
     }
 
     .sidebar-scroll {
       flex: 1;
       overflow-y: auto;
-      padding: 14px 10px;
+      padding: 12px 8px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
 
     .nav-group-label {
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.07em;
       color: var(--text-muted);
-      padding: 0 10px 6px;
+      padding: 0 10px 4px;
     }
 
     .nav-list {
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
     }
 
     .nav-link {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      min-height: 44px;
-      padding: 8px 12px;
+      min-height: 36px;
+      padding: 6px 10px;
       border-radius: var(--radius-sm);
       color: var(--text-secondary);
       text-decoration: none;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 500;
       border: 1px solid transparent;
-      transition: all 0.16s ease;
+      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
       cursor: pointer;
     }
 
     .nav-link:hover {
-      background: rgba(148, 163, 184, 0.1);
+      background: var(--bg-surface-hover);
       color: var(--text-primary);
     }
 
     .nav-link.active {
       background: var(--accent-cyan-soft);
       color: var(--accent-cyan-bright);
-      border-color: var(--border-highlight);
+      border-color: rgba(56, 189, 248, 0.25);
       font-weight: 600;
     }
 
     .nav-link-left {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 9px;
       min-width: 0;
     }
 
     .nav-icon {
-      width: 17px;
-      height: 17px;
+      width: 15px;
+      height: 15px;
       color: var(--text-muted);
       flex-shrink: 0;
     }
@@ -416,59 +427,64 @@
 
     .nav-counter {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 600;
       color: var(--text-muted);
-      background: rgba(148, 163, 184, 0.12);
-      padding: 1px 6px;
+      background: rgba(148, 163, 184, 0.10);
+      padding: 1px 5px;
       border-radius: 4px;
       font-variant-numeric: tabular-nums;
     }
 
     .sidebar-footer {
-      padding: 12px 14px;
+      padding: 10px 12px;
       border-top: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
+      background: var(--bg-surface-inset);
     }
 
     .sidebar-meta-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 11.5px;
+      font-size: 11px;
       color: var(--text-muted);
       gap: 8px;
     }
 
     .trust-button {
       width: 100%;
-      min-height: 42px;
+      min-height: 36px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 12px;
+      padding: 6px 10px;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm);
       color: var(--text-primary);
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
       cursor: pointer;
+      transition: border-color 0.14s ease, background 0.14s ease;
+    }
+    .trust-button:hover {
+      border-color: var(--border-strong);
+      background: var(--bg-surface-elevated);
     }
 
     .live-dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: var(--accent-emerald);
-      box-shadow: 0 0 10px var(--accent-emerald);
       flex-shrink: 0;
     }
 
     /* ==========================================================================
-       TESLA 3-ZONE TOP STATUS COCKPIT BAR
+       TOP WORKSPACE HEADER BAR (3-ZONE COMPACT BAR)
        ========================================================================== */
     .main-pane {
       flex: 1;
@@ -479,41 +495,49 @@
     }
 
     .top-header {
-      height: 62px;
-      padding: 0 22px;
+      height: 54px;
+      padding: 0 20px;
       background: var(--bg-header);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 14px;
+      gap: 12px;
       z-index: 40;
+      flex-shrink: 0;
     }
 
     .header-left {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       min-width: 0;
     }
 
     .cockpit-drawer-btn {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--specular-inset);
       color: var(--text-primary);
-      width: 42px;
-      height: 42px;
-      border-radius: 13px;
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius-sm);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: transform 0.14s ease, border-color 0.14s ease;
+      transition: background 0.14s ease, border-color 0.14s ease;
     }
-    .cockpit-drawer-btn:active { transform: scale(0.94); }
+    .cockpit-drawer-btn:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--border-strong);
+    }
+    @media (min-width: 1120px) {
+      .cockpit-drawer-btn {
+        display: none;
+      }
+    }
 
     .history-nav-group {
       display: inline-flex;
@@ -521,17 +545,17 @@
       gap: 2px;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: 13px;
-      padding: 3px;
+      border-radius: var(--radius-sm);
+      padding: 2px;
     }
 
     .history-btn {
       background: transparent;
       border: none;
       color: var(--text-secondary);
-      width: 34px;
-      height: 34px;
-      border-radius: 10px;
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -550,7 +574,7 @@
     .breadcrumb-trail {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       min-width: 0;
       white-space: nowrap;
     }
@@ -558,8 +582,11 @@
     .breadcrumb-home {
       color: var(--text-muted);
       text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+    .breadcrumb-home:hover {
+      color: var(--text-primary);
     }
 
     .breadcrumb-slash {
@@ -569,65 +596,63 @@
 
     .breadcrumb-current {
       font-family: var(--font-display);
-      font-size: 16.5px;
+      font-size: 15px;
       font-weight: 700;
       color: var(--text-primary);
-      letter-spacing: -0.02em;
+      letter-spacing: -0.015em;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .route-chip {
       font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--accent-cyan-bright);
-      background: rgba(10, 132, 255, 0.12);
-      border: 1px solid rgba(10, 132, 255, 0.28);
-      padding: 2px 7px;
-      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      padding: 1px 6px;
+      border-radius: 4px;
     }
 
-    /* Center Telemetry Status Cluster (Mission Control Cockpit) */
     .header-center-telemetry {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 6px 14px;
-      border-radius: 10px;
-      background: var(--bg-surface-elevated);
+      gap: 8px;
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--specular-inset);
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--text-secondary);
     }
 
     .header-right {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-shrink: 0;
     }
 
     .search-box {
       display: flex;
       align-items: center;
-      background: var(--bg-surface);
+      background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
-      border-radius: 13px;
-      padding: 0 12px;
-      height: 40px;
-      width: 220px;
+      border-radius: var(--radius-sm);
+      padding: 0 10px;
+      height: 32px;
+      width: 200px;
       transition: border-color 0.15s ease;
     }
     .search-box:focus-within {
       border-color: var(--accent-cyan-bright);
     }
     .search-box svg {
-      width: 15px;
-      height: 15px;
+      width: 14px;
+      height: 14px;
       color: var(--text-muted);
-      margin-right: 8px;
+      margin-right: 7px;
       flex-shrink: 0;
     }
     .search-box input {
@@ -635,116 +660,99 @@
       border: none;
       outline: none;
       color: var(--text-primary);
-      font-size: 13px;
+      font-size: 12.5px;
       width: 100%;
       font-family: var(--font-sans);
     }
 
-    /* Touch-First Action Buttons (Minimum 40-48px Target) */
+    /* Architectural Action Buttons */
     .action-btn {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--specular-inset);
       color: var(--text-primary);
-      min-height: 40px;
-      padding: 0 14px;
-      border-radius: 13px;
-      font-size: 12.5px;
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
       font-weight: 600;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 7px;
+      gap: 6px;
       cursor: pointer;
       text-decoration: none;
       white-space: nowrap;
-      transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), background 0.14s ease, border-color 0.14s ease;
+      transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
     }
     .action-btn:hover:not(:disabled) {
       background: var(--bg-surface-hover);
       border-color: var(--border-strong);
-    }
-    .action-btn:active:not(:disabled) {
-      transform: scale(0.96);
     }
     .action-btn:disabled {
       opacity: 0.45;
       cursor: not-allowed;
     }
     .action-btn.primary-cta {
-      background: linear-gradient(135deg, #0071E3, #2997FF);
-      border-color: rgba(255, 255, 255, 0.28);
+      background: var(--accent-cyan);
+      border-color: rgba(255, 255, 255, 0.15);
       color: #FFFFFF;
-      box-shadow: 0 6px 20px rgba(0, 113, 227, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+    .action-btn.primary-cta:hover:not(:disabled) {
+      background: var(--accent-cyan-bright);
+      color: #090D16;
     }
 
-    /* Titanium Finish Theme Switcher Pill */
     .theme-cycle-btn {
-      min-width: 42px;
-      padding: 0 12px;
+      min-width: 36px;
+      padding: 0 10px;
     }
 
     /* ==========================================================================
-       PANORAMIC BENTO VIEWPORT & APPLE LIQUID GLASS CONTAINERS
+       VIEWPORT & ARCHITECTURAL PANELS
        ========================================================================== */
     .viewport-scroll {
       flex: 1;
       overflow-y: auto;
-      padding: 22px 26px 118px;
+      padding: 20px 24px 104px;
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
     }
 
     .view-page {
-      max-width: 1360px;
+      max-width: 1400px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
     }
 
-    /* Tesla Node Identity Cockpit Banner */
+    /* Node Identity Header Bar */
     .command-banner {
       background: var(--bg-surface);
-      backdrop-filter: blur(28px) saturate(190%);
-      -webkit-backdrop-filter: blur(28px) saturate(190%);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--card-shadow), var(--specular-inset);
-      border-radius: var(--radius-xl);
-      padding: 22px 26px;
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 18px;
+      gap: 16px;
       position: relative;
-      overflow: hidden;
-    }
-
-    .command-banner::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 12% 50%, var(--bg-canvas-glow-1), transparent 55%);
-      pointer-events: none;
     }
 
     .command-banner-left {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 14px;
       min-width: 0;
-      position: relative;
-      z-index: 1;
     }
 
     .server-emblem {
-      width: 60px;
-      height: 60px;
-      border-radius: 18px;
-      background: var(--bg-surface-elevated);
-      border: 1px solid var(--border-strong);
-      box-shadow: var(--specular-inset), 0 8px 20px rgba(0, 0, 0, 0.25);
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -753,24 +761,19 @@
       position: relative;
       cursor: pointer;
       overflow: hidden;
-      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease;
+      transition: border-color 0.16s ease;
     }
     .server-emblem:hover {
-      transform: scale(1.05);
       border-color: var(--accent-cyan-bright);
-    }
-    .server-emblem:active {
-      transform: scale(0.95);
     }
 
     .server-emblem img,
     .device-circle img,
     .nic-logo-box img {
-      width: 72%;
-      height: 72%;
+      width: 70%;
+      height: 70%;
       object-fit: contain;
       display: block;
-      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
     }
 
     .server-emblem img.custom-cover,
@@ -785,16 +788,16 @@
     .logo-edit-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(7, 8, 12, 0.78);
-      color: #F5F5F7;
-      font-size: 10px;
+      background: rgba(9, 13, 22, 0.82);
+      color: #F8FAFC;
+      font-size: 9.5px;
       font-weight: 700;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       opacity: 0;
-      transition: opacity 0.16s ease;
+      transition: opacity 0.14s ease;
       text-align: center;
       line-height: 1.1;
       pointer-events: none;
@@ -808,26 +811,26 @@
     .host-headline {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
     }
 
     .host-headline h1 {
       font-family: var(--font-display);
-      font-size: clamp(1.25rem, 2vw, 1.55rem);
-      font-weight: 800;
+      font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+      font-weight: 700;
       color: var(--text-primary);
-      letter-spacing: -0.03em;
+      letter-spacing: -0.02em;
     }
 
     .unboxed-meta {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       flex-wrap: wrap;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--text-muted);
-      margin-top: 5px;
+      margin-top: 3px;
     }
 
     .meta-sep {
@@ -836,30 +839,27 @@
     }
 
     /* ==========================================================================
-       APPLE BENTO 12-COLUMN GRID & EXPANDABLE TOUCH CARDS
+       12-COLUMN TELEMETRY PILLARS GRID
        ========================================================================== */
     .telemetry-pillars-grid {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
-      gap: 16px;
+      gap: 12px;
     }
 
     .pillar-card {
       grid-column: span 3;
       background: var(--bg-surface);
-      backdrop-filter: blur(26px) saturate(185%);
-      -webkit-backdrop-filter: blur(26px) saturate(185%);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--card-shadow), var(--specular-inset);
       border-radius: var(--radius-lg);
-      padding: 20px 22px;
+      padding: 16px 18px;
       text-decoration: none;
       color: inherit;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 14px;
-      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, background 0.2s ease;
+      gap: 12px;
+      transition: border-color 0.16s ease, background 0.16s ease;
       position: relative;
       overflow: hidden;
       cursor: pointer;
@@ -873,28 +873,23 @@
     }
 
     .pillar-card:hover {
-      transform: translateY(-3px);
       background: var(--bg-surface-elevated);
       border-color: var(--border-strong);
-    }
-
-    .pillar-card:active {
-      transform: scale(0.985);
     }
 
     .pillar-top {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
     }
 
     .pillar-label {
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.05em;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -902,52 +897,39 @@
 
     .pillar-value {
       font-family: var(--font-mono);
-      font-size: clamp(1.45rem, 2.1vw, 1.75rem);
+      font-size: clamp(1.35rem, 1.9vw, 1.65rem);
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: -0.03em;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     .pillar-spec {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--text-muted);
-      margin-top: 4px;
-      line-height: 1.4;
+      margin-top: 3px;
+      line-height: 1.35;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
 
-    .bento-expand-btn {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      width: 28px;
-      height: 28px;
-      border-radius: 999px;
-      background: rgba(148, 163, 184, 0.12);
-      border: 1px solid var(--border-subtle);
-      color: var(--text-secondary);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      opacity: 0.72;
-      transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
-      z-index: 3;
+    .bento-expand-hint {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.14s ease;
     }
-    .pillar-card:hover .bento-expand-btn {
-      opacity: 1;
-      background: var(--accent-cyan-soft);
+    .bento-expand-hint:hover {
       color: var(--accent-cyan-bright);
     }
 
-    /* Tesla Radial Instrument Gauge */
+    /* Radial Instrument Gauge */
     .radial-gauge {
-      width: 62px;
-      height: 62px;
+      width: 56px;
+      height: 56px;
       flex-shrink: 0;
       position: relative;
       display: flex;
@@ -963,13 +945,13 @@
 
     .radial-track {
       fill: none;
-      stroke: rgba(148, 163, 184, 0.14);
-      stroke-width: 5.2;
+      stroke: rgba(148, 163, 184, 0.12);
+      stroke-width: 4.5;
     }
 
     .radial-progress {
       fill: none;
-      stroke-width: 5.2;
+      stroke-width: 4.5;
       stroke-linecap: round;
       stroke-dasharray: 138.2;
       stroke-dashoffset: 138.2;
@@ -979,13 +961,13 @@
     .radial-center-text {
       position: absolute;
       font-family: var(--font-mono);
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 700;
       color: var(--text-primary);
     }
 
     .mini-oscilloscope {
-      height: 52px;
+      height: 48px;
       width: 100%;
       margin-top: 2px;
       position: relative;
@@ -998,38 +980,31 @@
     }
 
     /* ==========================================================================
-       OVERVIEW SECONDARY BENTO MODULES
+       OVERVIEW SECONDARY OPERATIONAL MODULES
        ========================================================================== */
     .modules-bento-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 12px;
     }
 
     .module-card {
       background: var(--bg-surface);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--card-shadow), var(--specular-inset);
       border-radius: var(--radius-lg);
-      padding: 20px 22px;
+      padding: 16px 18px;
       text-decoration: none;
       color: inherit;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 12px;
-      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, background 0.2s ease;
+      gap: 10px;
+      transition: border-color 0.16s ease, background 0.16s ease;
     }
 
     .module-card:hover {
-      transform: translateY(-3px);
       background: var(--bg-surface-elevated);
       border-color: var(--border-strong);
-    }
-    .module-card:active {
-      transform: scale(0.985);
     }
 
     .module-header {
@@ -1042,9 +1017,9 @@
     .module-title-group {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: -0.01em;
@@ -1052,13 +1027,13 @@
 
     .module-arrow {
       color: var(--text-muted);
-      font-size: 15px;
-      transition: transform 0.16s ease, color 0.16s ease;
+      font-size: 14px;
+      transition: transform 0.15s ease, color 0.15s ease;
     }
 
     .module-card:hover .module-arrow {
       color: var(--accent-cyan-bright);
-      transform: translateX(4px);
+      transform: translateX(3px);
     }
 
     /* ==========================================================================
@@ -1066,34 +1041,31 @@
        ========================================================================== */
     .hero-instrument-card {
       background: var(--bg-surface);
-      backdrop-filter: blur(26px) saturate(180%);
-      -webkit-backdrop-filter: blur(26px) saturate(180%);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--card-shadow), var(--specular-inset);
-      border-radius: var(--radius-xl);
-      padding: 24px 26px;
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
     }
 
     .instrument-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 16px;
+      gap: 14px;
       flex-wrap: wrap;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .instrument-kicker {
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.07em;
+      letter-spacing: 0.06em;
       color: var(--text-muted);
     }
 
     .instrument-big-readout {
       font-family: var(--font-mono);
-      font-size: clamp(1.8rem, 3vw, 2.35rem);
+      font-size: clamp(1.6rem, 2.6vw, 2.1rem);
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: -0.03em;
@@ -1105,19 +1077,19 @@
 
     .instrument-sub-readout {
       font-family: var(--font-mono);
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 500;
       color: var(--text-muted);
     }
 
     .oscilloscope-stage {
       width: 100%;
-      height: 190px;
+      height: 180px;
       position: relative;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 10px;
+      padding: 8px;
       overflow: hidden;
       cursor: crosshair;
       touch-action: none;
@@ -1132,25 +1104,22 @@
     /* Hardware Specification Grid (Zero-Hardcoding Dynamic Cells) */
     .hw-spec-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
     }
 
     .hw-spec-cell {
       background: var(--bg-surface);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--specular-inset);
       border-radius: var(--radius-md);
-      padding: 16px 18px;
+      padding: 13px 15px;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 4px;
     }
 
     .hw-spec-label {
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -1159,7 +1128,7 @@
 
     .hw-spec-value {
       font-family: var(--font-mono);
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 600;
       color: var(--text-primary);
       word-break: break-word;
@@ -1169,36 +1138,33 @@
     .section-block {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
 
     .section-header-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
     .section-title {
       font-family: var(--font-display);
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       color: var(--text-primary);
-      letter-spacing: -0.015em;
+      letter-spacing: -0.01em;
     }
 
     .section-subtitle {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--text-muted);
     }
 
     .surface-panel {
       background: var(--bg-surface);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--card-shadow), var(--specular-inset);
       border-radius: var(--radius-lg);
       overflow: hidden;
     }
@@ -1207,10 +1173,10 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 20px;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border-subtle);
-      gap: 14px;
-      transition: background 0.14s ease;
+      gap: 12px;
+      transition: background 0.12s ease;
     }
 
     .data-row:last-child, .adw-action-row:last-child {
@@ -1218,31 +1184,31 @@
     }
 
     .data-row:hover, .adw-action-row:hover {
-      background: rgba(148, 163, 184, 0.05);
+      background: rgba(148, 163, 184, 0.04);
     }
 
     .row-title-box {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       min-width: 0;
     }
 
     .row-label {
       font-weight: 600;
       color: var(--text-primary);
-      font-size: 13.5px;
+      font-size: 13px;
     }
 
     .row-sublabel {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--text-muted);
       margin-top: 2px;
     }
 
     .row-value {
       font-family: var(--font-mono);
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
       color: var(--text-secondary);
       text-align: right;
@@ -1252,13 +1218,11 @@
     /* Logical CPU Cores Matrix */
     .cores-matrix-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
-      gap: 10px;
-      padding: 18px;
+      grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+      gap: 8px;
+      padding: 14px;
       background: var(--bg-surface);
-      backdrop-filter: blur(22px);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--specular-inset);
       border-radius: var(--radius-lg);
     }
 
@@ -1266,10 +1230,10 @@
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm);
-      padding: 11px 10px;
+      padding: 9px 9px;
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 6px;
     }
 
     .core-tile-top {
@@ -1277,7 +1241,7 @@
       align-items: center;
       justify-content: space-between;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 10.5px;
     }
 
     .core-id { color: var(--text-muted); }
@@ -1285,36 +1249,34 @@
 
     .core-bar-track {
       width: 100%;
-      height: 5px;
+      height: 4px;
       background: rgba(148, 163, 184, 0.14);
-      border-radius: 3px;
+      border-radius: 2px;
       overflow: hidden;
     }
 
     .core-bar-fill {
       height: 100%;
       background: var(--accent-cyan-bright);
-      border-radius: 3px;
+      border-radius: 2px;
       transition: width 0.25s ease, background-color 0.25s ease;
     }
 
     /* Active Network Interface Cards (NIC Hardware Inspector) */
     .nic-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(295px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 12px;
     }
 
     .nic-card {
       background: var(--bg-surface);
-      backdrop-filter: blur(22px);
       border: 1px solid var(--border-subtle);
-      box-shadow: var(--specular-inset);
       border-radius: var(--radius-md);
-      padding: 18px 20px;
+      padding: 16px 18px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
 
     /* NIC 2-Hour Bandwidth Sparkline & Temporal Telemetry */
@@ -2995,35 +2957,35 @@
       transform: translateY(0);
     }
     .data-row.proc-row-highlighted {
-      background: rgba(56, 189, 248, 0.12) !important;
-      border-left: 3px solid var(--accent-cyan-bright);
+      background: rgba(56, 189, 248, 0.10) !important;
+      box-shadow: inset 2px 0 0 var(--accent-cyan-bright);
     }
 
-    /* Interactive Segmented Filter Controls (Apple iOS Style) */
+    /* Interactive Segmented Filter Controls */
     .segmented-control {
       display: inline-flex;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
-      border-radius: 12px;
-      padding: 3px;
-      gap: 3px;
+      border-radius: var(--radius-md);
+      padding: 2px;
+      gap: 2px;
     }
 
     .seg-btn, .pill-btn {
       background: transparent;
-      border: none;
+      border: 1px solid transparent;
       color: var(--text-muted);
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
-      min-height: 34px;
-      padding: 5px 13px;
-      border-radius: 9px;
+      min-height: 28px;
+      padding: 4px 10px;
+      border-radius: 5px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       white-space: nowrap;
-      transition: background 0.15s ease, color 0.15s ease;
+      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
     }
 
     .seg-btn:hover, .pill-btn:hover {
@@ -3032,34 +2994,34 @@
 
     .seg-btn.active, .pill-btn.active {
       background: var(--bg-surface-elevated);
+      border-color: var(--border-subtle);
       color: var(--text-primary);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
 
-    /* Semantic Status Indicators - Clean Architectural Design (Anti-AI Slop) */
+    /* Semantic Status Indicators — Clean Architectural Design */
     .adw-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       padding: 2px 7px;
-      border-radius: 6px;
-      font-size: 11px;
+      border-radius: 4px;
+      font-size: 10.5px;
       font-weight: 600;
       white-space: nowrap;
-      font-family: var(--font-sans);
+      font-family: var(--font-mono);
       letter-spacing: 0.01em;
     }
-    .badge-blue { background: rgba(10, 132, 255, 0.12); color: #2997ff; border: 1px solid rgba(41, 151, 255, 0.25); }
-    .badge-purple { background: rgba(191, 90, 242, 0.12); color: #da8fff; border: 1px solid rgba(191, 90, 242, 0.25); }
-    .badge-green { background: rgba(48, 209, 88, 0.12); color: #30d158; border: 1px solid rgba(48, 209, 88, 0.25); }
-    .badge-amber { background: rgba(255, 159, 10, 0.12); color: #ff9f0a; border: 1px solid rgba(255, 159, 10, 0.25); }
-    .badge-red { background: rgba(255, 69, 58, 0.12); color: #ff453a; border: 1px solid rgba(255, 69, 58, 0.25); }
+    .badge-blue { background: rgba(56, 189, 248, 0.10); color: var(--accent-cyan-bright); border: 1px solid rgba(56, 189, 248, 0.24); }
+    .badge-purple { background: rgba(167, 139, 250, 0.10); color: var(--accent-violet-bright); border: 1px solid rgba(167, 139, 250, 0.24); }
+    .badge-green { background: rgba(16, 185, 129, 0.10); color: var(--accent-emerald-bright); border: 1px solid rgba(16, 185, 129, 0.24); }
+    .badge-amber { background: rgba(245, 158, 11, 0.10); color: var(--accent-amber-bright); border: 1px solid rgba(245, 158, 11, 0.24); }
+    .badge-red { background: rgba(244, 63, 94, 0.10); color: var(--accent-rose-bright); border: 1px solid rgba(244, 63, 94, 0.24); }
 
     .device-circle,
     .nic-logo-box {
-      width: 44px;
-      height: 44px;
-      border-radius: 13px;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-md);
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       display: flex;
@@ -3068,35 +3030,34 @@
       flex-shrink: 0;
       position: relative;
       overflow: hidden;
-      transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+      transition: border-color 0.15s ease, background 0.15s ease;
     }
 
     .interactive-logo { cursor: pointer; }
     .interactive-logo:hover {
       border-color: var(--accent-cyan-bright);
       background: var(--bg-surface-elevated);
-      transform: scale(1.06);
     }
 
     .brand-badge {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      padding: 2px 7px;
-      border-radius: 6px;
-      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10.5px;
       font-weight: 600;
       border: 1px solid var(--border-subtle);
       background: var(--bg-surface-elevated);
       color: var(--text-secondary);
       white-space: nowrap;
     }
-    .brand-logo-svg { width: 13px; height: 13px; flex-shrink: 0; object-fit: contain; }
+    .brand-logo-svg { width: 12px; height: 12px; flex-shrink: 0; object-fit: contain; }
 
     .logo-search-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(125px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
       max-height: 240px;
       overflow-y: auto;
       padding: 4px 2px;
@@ -3113,26 +3074,25 @@
       gap: 6px;
       cursor: pointer;
       text-align: center;
-      transition: border-color 0.14s ease, background 0.14s ease, transform 0.14s ease;
+      transition: border-color 0.14s ease, background 0.14s ease;
     }
 
     .logo-candidate-tile:hover {
       border-color: var(--accent-cyan-bright);
       background: var(--bg-surface-elevated);
-      transform: translateY(-2px);
     }
 
     .logo-candidate-tile img {
-      width: 34px;
-      height: 34px;
+      width: 32px;
+      height: 32px;
       object-fit: contain;
     }
 
     .upload-dropzone {
-      border: 1.5px dashed var(--border-highlight);
+      border: 1px dashed var(--border-highlight);
       background: var(--accent-cyan-soft);
       border-radius: var(--radius-md);
-      padding: 16px;
+      padding: 14px;
       text-align: center;
       cursor: pointer;
       transition: background 0.15s ease, border-color 0.15s ease;
@@ -3143,32 +3103,37 @@
       align-items: center;
       gap: 6px;
       background: var(--accent-rose-soft);
-      border: 1px solid rgba(255, 69, 58, 0.28);
+      border: 1px solid rgba(244, 63, 94, 0.25);
       color: var(--accent-rose-bright);
       font-family: var(--font-mono);
-      font-size: 11.5px;
-      padding: 5px 10px;
-      border-radius: 8px;
+      font-size: 11px;
+      padding: 4px 9px;
+      border-radius: 5px;
     }
 
     .btn-revoke {
       background: var(--accent-rose-soft);
-      border: 1px solid rgba(255, 69, 58, 0.3);
+      border: 1px solid rgba(244, 63, 94, 0.28);
       color: var(--accent-rose-bright);
-      border-radius: 9px;
-      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      padding: 5px 10px;
       font-size: 11.5px;
       font-weight: 600;
       cursor: pointer;
+      transition: background 0.14s ease, border-color 0.14s ease;
+    }
+    .btn-revoke:hover {
+      background: rgba(244, 63, 94, 0.20);
+      border-color: rgba(244, 63, 94, 0.45);
     }
 
     .terminal-box {
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 14px 16px;
+      padding: 12px 14px;
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--text-secondary);
       max-height: 240px;
       overflow-y: auto;
@@ -3176,19 +3141,17 @@
     }
 
     /* ==========================================================================
-       CENTRO UNIFICADO DE REGISTRO DE FALLOS DEL SISTEMA (APPS, SERVICIOS, KERNEL)
+       CENTRO UNIFICADO DE REGISTRO DE FALLOS DEL SISTEMA
        ========================================================================== */
     .system-logs-center-card {
-      background: var(--bg-surface-inset);
+      background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-lg);
       overflow: hidden;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-      transition: all 0.25s ease;
+      transition: border-color 0.2s ease;
     }
     .system-logs-center-card.has-active-errors {
       border-color: rgba(244, 63, 94, 0.45);
-      box-shadow: 0 0 24px rgba(244, 63, 94, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
     .system-logs-bar {
       display: flex;
@@ -3197,25 +3160,23 @@
       flex-wrap: wrap;
       gap: 10px;
       padding: 10px 14px;
-      background: rgba(15, 23, 42, 0.55);
+      background: var(--bg-surface-inset);
       border-bottom: 1px solid var(--border-subtle);
-    }
-    [data-theme="light"] .system-logs-bar {
-      background: rgba(241, 245, 249, 0.9);
     }
     .system-logs-title-group {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
       min-width: 0;
     }
     .system-logs-title {
       font-family: var(--font-mono);
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 700;
       color: var(--text-primary);
-      letter-spacing: 0.02em;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
     }
     .system-logs-actions {
       display: flex;
@@ -3226,59 +3187,45 @@
     .system-logs-viewport {
       max-height: 280px;
       overflow-y: auto;
-      padding: 10px 14px;
+      padding: 8px 12px;
       font-family: var(--font-mono);
       font-size: 11px;
       line-height: 1.5;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      background: rgba(2, 6, 23, 0.45);
-    }
-    [data-theme="light"] .system-logs-viewport {
-      background: rgba(15, 23, 42, 0.04);
+      gap: 4px;
+      background: var(--bg-surface-inset);
     }
     .system-log-row {
       display: flex;
       align-items: flex-start;
       gap: 10px;
-      padding: 7px 10px;
-      border-radius: 7px;
-      background: rgba(15, 23, 42, 0.5);
-      border-left: 3px solid #f43f5e;
+      padding: 6px 10px;
+      border-radius: 5px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
       color: var(--text-primary);
       word-break: break-word;
-      transition: background 0.15s ease;
-    }
-    [data-theme="light"] .system-log-row {
-      background: rgba(255, 255, 255, 0.85);
-      border: 1px solid rgba(226, 232, 240, 0.9);
-      border-left: 3px solid #e11d48;
+      transition: background 0.12s ease, border-color 0.12s ease;
     }
     .system-log-row:hover {
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--bg-surface-elevated);
+      border-color: var(--border-strong);
     }
-    [data-theme="light"] .system-log-row:hover {
-      background: rgba(255, 255, 255, 1);
-    }
-    .system-log-row.cat-docker { border-left-color: #38bdf8; }
-    .system-log-row.cat-service { border-left-color: #c084fc; }
-    .system-log-row.cat-kernel { border-left-color: #f59e0b; }
-    .system-log-row.cat-system { border-left-color: #94a3b8; }
     .sys-cat-pill {
       display: inline-flex;
       align-items: center;
       padding: 1px 6px;
       border-radius: 4px;
       font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.03em;
+      font-weight: 700;
+      letter-spacing: 0.02em;
       flex-shrink: 0;
     }
-    .sys-cat-pill.docker { background: rgba(14, 165, 233, 0.2); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); }
-    .sys-cat-pill.service { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
-    .sys-cat-pill.kernel { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
-    .sys-cat-pill.system { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4); }
+    .sys-cat-pill.docker { background: rgba(14, 165, 233, 0.14); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.32); }
+    .sys-cat-pill.service { background: rgba(168, 85, 247, 0.14); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.32); }
+    .sys-cat-pill.kernel { background: rgba(245, 158, 11, 0.14); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.32); }
+    .sys-cat-pill.system { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.32); }
     .sys-prio-pill {
       display: inline-flex;
       align-items: center;
@@ -3289,52 +3236,56 @@
       flex-shrink: 0;
     }
     .sys-prio-pill.prio-emerg,
-    .sys-prio-pill.prio-crit { background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.45); }
-    .sys-prio-pill.prio-err { background: rgba(244, 63, 94, 0.2); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.4); }
-    .sys-prio-pill.prio-warn { background: rgba(245, 158, 11, 0.2); color: #fde047; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .sys-prio-pill.prio-crit { background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.38); }
+    .sys-prio-pill.prio-err { background: rgba(244, 63, 94, 0.16); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.34); }
+    .sys-prio-pill.prio-warn { background: rgba(245, 158, 11, 0.16); color: #fde047; border: 1px solid rgba(245, 158, 11, 0.34); }
     .system-logs-empty-state {
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 8px;
-      padding: 12px 10px;
+      padding: 10px 8px;
       color: var(--accent-emerald-bright);
       font-size: 11.5px;
     }
 
     /* ==========================================================================
-       FLOATING APPLE/TESLA TOUCH DOCK (THUMB-ZONE ERGONOMICS)
+       COMPACT BOTTOM QUICK-NAVIGATION DOCK
        ========================================================================== */
     .floating-dock-shell,
     .floating-touch-dock-wrap {
       position: fixed;
       left: 50%;
-      bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       transform: translateX(-50%);
       z-index: 99;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       width: fit-content;
       max-width: calc(100vw - 20px);
       min-width: 0;
       pointer-events: none;
-      transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1), transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    @media (min-width: 1120px) {
+      .floating-dock-shell,
+      .floating-touch-dock-wrap {
+        left: calc(50% + 122px);
+        max-width: calc(100vw - 280px);
+      }
     }
 
     .swipe-pagination-dots {
       display: none;
       align-items: center;
       gap: 5px;
-      padding: 4px 10px;
+      padding: 3px 8px;
       background: var(--bg-surface-elevated);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--border-subtle);
       border-radius: 999px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       pointer-events: auto;
     }
 
@@ -3350,7 +3301,7 @@
       border-radius: 50%;
       background: var(--text-dim);
       cursor: pointer;
-      transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease, transform 0.2s ease;
+      transition: width 0.2s ease, background 0.2s ease;
     }
 
     .swipe-dot:hover {
@@ -3358,10 +3309,9 @@
     }
 
     .swipe-dot.active {
-      width: 15px;
+      width: 14px;
       border-radius: 999px;
       background: var(--accent-cyan-bright);
-      box-shadow: 0 0 8px var(--accent-cyan-bright);
     }
 
     .floating-dock,
@@ -3374,21 +3324,21 @@
       flex-wrap: nowrap;
       align-items: center;
       justify-content: flex-start;
-      gap: 5px;
-      padding: 0 12px;
-      height: 60px;
-      min-height: 60px;
-      max-height: 60px;
+      gap: 4px;
+      padding: 0 8px;
+      height: 52px;
+      min-height: 52px;
+      max-height: 52px;
       box-sizing: border-box;
       background: var(--bg-dock);
-      backdrop-filter: blur(32px) saturate(210%);
-      -webkit-backdrop-filter: blur(32px) saturate(210%);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--border-strong);
-      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.48), 0 2px 10px rgba(0, 0, 0, 0.25), var(--specular-inset);
-      border-radius: 9999px; /* Iconic continuous pill shape */
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      border-radius: 10px;
       width: fit-content;
       max-width: 100%;
-      min-width: 0; /* CRITICAL: Enables overflow-x in flexbox without shape expansion */
+      min-width: 0;
       overflow-x: auto;
       overflow-y: hidden;
       overscroll-behavior-x: contain;
@@ -3396,30 +3346,15 @@
       -webkit-overflow-scrolling: touch;
       touch-action: pan-x;
       scroll-behavior: smooth;
-      scroll-padding: 0 14px;
-      scroll-snap-type: x proximity;
     }
     .floating-dock::-webkit-scrollbar,
     .floating-touch-dock::-webkit-scrollbar { display: none; }
 
-    /* Pill edge spacers to prevent first/last items from clipping against circular ends */
-    .floating-dock::before,
-    .floating-dock::after,
-    .floating-touch-dock::before,
-    .floating-touch-dock::after {
-      content: "";
-      width: 4px;
-      height: 100%;
-      flex: 0 0 4px;
-      flex-shrink: 0;
-      pointer-events: none;
-    }
-
     .dock-divider {
       width: 1px;
-      height: 22px;
-      background: var(--border-strong);
-      margin: 0 3px;
+      height: 20px;
+      background: var(--border-subtle);
+      margin: 0 2px;
       flex: 0 0 1px;
       flex-shrink: 0;
     }
@@ -3427,10 +3362,10 @@
     .dock-item {
       flex: 0 0 auto;
       flex-shrink: 0;
-      min-width: 52px;
-      height: 48px;
-      padding: 3px 8px;
-      border-radius: 14px;
+      min-width: 48px;
+      height: 40px;
+      padding: 2px 7px;
+      border-radius: 6px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--text-muted);
@@ -3445,49 +3380,30 @@
       user-select: none;
       -webkit-user-select: none;
       white-space: nowrap;
-      scroll-snap-align: center;
-      scroll-margin: 0 8px;
-      transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
     }
 
     .dock-item:hover {
       color: var(--text-primary);
-      background: rgba(148, 163, 184, 0.12);
-      transform: translateY(-2px);
-    }
-
-    .dock-item:active {
-      transform: scale(0.92);
+      background: var(--bg-surface-hover);
     }
 
     .dock-item.active {
       background: var(--accent-cyan-soft);
       color: var(--accent-cyan-bright);
-      border-color: var(--border-highlight);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-    }
-
-    .dock-item.active::after {
-      content: "";
-      position: absolute;
-      bottom: 2px;
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: var(--accent-cyan-bright);
-      box-shadow: 0 0 6px var(--accent-cyan-bright);
+      border-color: rgba(56, 189, 248, 0.28);
     }
 
     .dock-item svg {
-      width: 18px;
-      height: 18px;
+      width: 16px;
+      height: 16px;
       flex-shrink: 0;
     }
 
     .dock-label {
-      font-size: 9.5px;
-      font-weight: 700;
-      letter-spacing: -0.01em;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0;
       white-space: nowrap;
       line-height: 1;
     }
@@ -3496,74 +3412,48 @@
       display: none;
     }
 
-    /* Small Screen Graceful Overflow & Shape Preservation */
-    @media (max-width: 768px) {
-      .floating-dock,
-      .floating-touch-dock {
-        mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
-        -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
-      }
-    }
-
     @media (max-width: 680px) {
       .floating-dock-shell,
       .floating-touch-dock-wrap {
-        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(8px + env(safe-area-inset-bottom, 0px));
         max-width: calc(100vw - 16px);
       }
       .floating-dock,
       .floating-touch-dock {
-        height: 52px;
-        min-height: 52px;
-        max-height: 52px;
-        padding: 0 8px;
-        gap: 3px;
-        border-radius: 9999px;
+        height: 48px;
+        min-height: 48px;
+        max-height: 48px;
+        padding: 0 6px;
+        gap: 2px;
       }
       .dock-item {
-        min-width: 46px;
-        height: 42px;
-        padding: 2px 6px;
-        border-radius: 12px;
+        min-width: 44px;
+        height: 38px;
+        padding: 2px 5px;
       }
       .dock-item svg {
-        width: 16px;
-        height: 16px;
+        width: 15px;
+        height: 15px;
       }
       .dock-label {
         font-size: 8.5px;
       }
-      .dock-divider {
-        height: 18px;
-        margin: 0 2px;
-      }
-      .swipe-pagination-dots {
-        gap: 4px;
-        padding: 3px 8px;
-      }
-      .swipe-dot {
-        width: 4px;
-        height: 4px;
-      }
-      .swipe-dot.active {
-        width: 12px;
-      }
     }
 
-    /* Modals & Native Liquid Glass Inspector Dialog */
+    /* Modals & Dialogs */
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(4, 6, 12, 0.72);
-      backdrop-filter: blur(16px) saturate(160%);
-      -webkit-backdrop-filter: blur(16px) saturate(160%);
+      background: rgba(5, 8, 15, 0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1200; /* Modal overlay sits comfortably above floating dock (99) and sidebar (100) */
+      z-index: 1200;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.2s ease;
+      transition: opacity 0.18s ease;
       padding: 16px;
     }
     .modal-overlay.open {
@@ -3571,35 +3461,35 @@
       pointer-events: auto;
     }
     .modal-card {
-      background: var(--bg-surface-elevated);
-      backdrop-filter: blur(30px);
+      background: var(--bg-surface);
       border: 1px solid var(--border-strong);
-      box-shadow: var(--card-shadow), var(--specular-inset);
-      border-radius: var(--radius-xl);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      border-radius: var(--radius-lg);
       width: 100%;
       max-width: 620px;
       max-height: calc(100vh - 40px);
       overflow-y: auto;
     }
     .modal-header {
-      padding: 18px 22px;
+      padding: 14px 18px;
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      background: var(--bg-surface-inset);
     }
     .modal-body {
-      padding: 22px;
+      padding: 18px;
       max-height: 78vh;
       overflow-y: auto;
     }
 
     @media (max-width: 960px) {
       .header-center-telemetry { display: none; }
-      .viewport-scroll { padding: 16px 14px 115px; }
+      .viewport-scroll { padding: 14px 12px 96px; }
       .search-box { width: 145px; }
-      .top-header { padding: 0 14px; }
-      .command-banner { padding: 18px; }
+      .top-header { padding: 0 12px; }
+      .command-banner { padding: 14px 16px; }
     }
   </style>
 </head>
@@ -3853,18 +3743,17 @@
                   <img id="hostOsLogoImg" src="https://cdn.simpleicons.org/linux/FCC624" alt="OS Logo" onerror="this.onerror=null; this.src='https://www.google.com/s2/favicons?sz=128&domain=kernel.org';">
                 </div>
                 <div class="logo-edit-overlay">
-                  <span>🖼️</span>
                   <span>Logo</span>
                 </div>
               </div>
               <div>
                 <div class="host-headline">
                   <h1 id="ovHostTitle">Detectando nodo...</h1>
-                  <button class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px; border-radius: 999px;" onclick="openHostOsLogoPicker()" title="Cambiar el logo del sistema por búsqueda web o archivo local">
-                    🖼️ Logo SO
+                  <button class="action-btn" style="min-height: 26px; height: 26px; padding: 0 9px; font-size: 11px;" onclick="openHostOsLogoPicker()" title="Cambiar el logo del sistema por búsqueda web o archivo local">
+                    Logo SO
                   </button>
                   <span class="meta-sep">·</span>
-                  <a href="/dns" onclick="return navigateTo(event, 'dns')" id="ovPublicDomainBadge" class="mono" style="font-size: 13px; color: var(--accent-cyan-bright); text-decoration: none;">Detectando DNS...</a>
+                  <a href="/dns" onclick="return navigateTo(event, 'dns')" id="ovPublicDomainBadge" class="mono" style="font-size: 12.5px; color: var(--accent-cyan-bright); text-decoration: none;">Detectando DNS...</a>
                 </div>
                 <div class="unboxed-meta">
                   <span id="ovSysOs" class="hw-detecting">Detectando sistema operativo...</span>
@@ -3878,12 +3767,14 @@
               </div>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1;">
-              <button class="action-btn" style="min-height: 30px; height: 30px; padding: 0 12px; font-size: 11.5px;" onclick="SystemLogsCenter.toggleCenter()" id="ovSystemLogsToggleBtn" title="Abrir/ocultar Centro Unificado de Registro de Fallos (Apps, Servicios y Kernel)">
-                📋 <span id="ovSystemLogsBadgeText" class="mono">Logs: verificando...</span>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative; z-index: 1;">
+              <button class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.toggleCenter()" id="ovSystemLogsToggleBtn" title="Abrir/ocultar Centro Unificado de Registro de Fallos (Apps, Servicios y Kernel)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                <span id="ovSystemLogsBadgeText" class="mono">Logs: verificando...</span>
               </button>
-              <button class="action-btn" style="min-height: 30px; height: 30px; padding: 0 12px; font-size: 11.5px;" onclick="openPerfAuditDialog()" title="Ver auditoría de rendimiento y optimización en tiempo real">
-                ⚡ <span id="ovPerfBadgeText">Auditoría 60fps</span>
+              <button class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="openPerfAuditDialog()" title="Ver auditoría de rendimiento y optimización en tiempo real">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <span id="ovPerfBadgeText">Auditoría 60fps</span>
               </button>
               <span class="adw-badge badge-green" id="ovBadgeStatus">Telemetría Activa</span>
               <span class="adw-badge badge-blue" id="ovBadgeTrust" onclick="openTrustDialog()" style="cursor: pointer;">Verificando red...</span>
@@ -3894,45 +3785,41 @@
           <div class="system-logs-center-card" id="systemLogsCenterCard" style="display: none; margin-bottom: 16px;">
             <div class="system-logs-bar">
               <div class="system-logs-title-group">
-                <span class="node-terminal-lights" aria-hidden="true">
-                  <span class="tl-red"></span>
-                  <span class="tl-amber"></span>
-                  <span class="tl-green"></span>
-                </span>
-                <span class="system-logs-title">📋 CENTRO UNIFICADO DE FALLOS DEL SISTEMA · APPS, SERVICIOS &amp; KERNEL</span>
+                <span class="live-dot" style="width: 7px; height: 7px;"></span>
+                <span class="system-logs-title">CENTRO UNIFICADO DE FALLOS DEL SISTEMA · APPS, SERVICIOS &amp; KERNEL</span>
                 <span class="adw-badge badge-green mono" id="sysLogsStatusBadge">0 fallos detectados</span>
                 <span class="adw-badge badge-red mono" id="sysLogsFailedUnitsBadge" style="display: none;">0 servicios caídos</span>
               </div>
               <div class="system-logs-actions">
                 <div class="segmented-control">
                   <button type="button" class="seg-btn active" id="btnSysCatAll" onclick="SystemLogsCenter.setCategory('all')">Todos (<span id="cntSysErrAll">0</span>)</button>
-                  <button type="button" class="seg-btn" id="btnSysCatDocker" onclick="SystemLogsCenter.setCategory('docker')">🐳 Apps &amp; Docker (<span id="cntSysErrDocker">0</span>)</button>
-                  <button type="button" class="seg-btn" id="btnSysCatService" onclick="SystemLogsCenter.setCategory('service')">⚙️ Servicios (<span id="cntSysErrService">0</span>)</button>
-                  <button type="button" class="seg-btn" id="btnSysCatKernel" onclick="SystemLogsCenter.setCategory('kernel')">🐧 Kernel (<span id="cntSysErrKernel">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSysCatDocker" onclick="SystemLogsCenter.setCategory('docker')">Apps &amp; Docker (<span id="cntSysErrDocker">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSysCatService" onclick="SystemLogsCenter.setCategory('service')">Servicios (<span id="cntSysErrService">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSysCatKernel" onclick="SystemLogsCenter.setCategory('kernel')">Kernel (<span id="cntSysErrKernel">0</span>)</button>
                 </div>
                 <div class="segmented-control">
                   <button type="button" class="seg-btn active" id="btnSysLevelErr" onclick="SystemLogsCenter.setLevel('err')">Solo Errores</button>
                   <button type="button" class="seg-btn" id="btnSysLevelWarn" onclick="SystemLogsCenter.setLevel('warn')">+ Advertencias</button>
                 </div>
-                <button type="button" class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.refreshLive()" title="Recargar eventos del sistema en vivo">
-                  🔄 Actualizar
+                <button type="button" class="action-btn" style="min-height: 26px; height: 26px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.refreshLive()" title="Recargar eventos del sistema en vivo">
+                  Actualizar
                 </button>
-                <button type="button" class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.openModal()" title="Abrir visor completo de fallos en pantalla completa">
-                  ⛶ Pantalla completa
+                <button type="button" class="action-btn" style="min-height: 26px; height: 26px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.openModal()" title="Abrir visor completo de fallos en pantalla completa">
+                  Pantalla completa
                 </button>
               </div>
             </div>
             
             <div style="padding: 8px 14px; border-bottom: 1px solid var(--border-subtle); display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
               <div style="flex: 1; min-width: 200px; position: relative;">
-                <input type="text" id="sysLogsSearchInput" placeholder="🔍 Filtrar por nombre de app, servicio o texto del error..." style="width: 100%; height: 28px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0 10px; font-size: 11px; color: var(--text-primary); outline: none;" oninput="SystemLogsCenter.setFilterQuery(this.value)">
+                <input type="text" id="sysLogsSearchInput" placeholder="Filtrar por nombre de app, servicio o texto del error..." style="width: 100%; height: 28px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0 10px; font-size: 11px; color: var(--text-primary); outline: none;" oninput="SystemLogsCenter.setFilterQuery(this.value)">
               </div>
               <span id="sysLogsMetaCount" class="mono" style="font-size: 11px; color: var(--text-muted);">Cargando eventos...</span>
             </div>
 
             <div class="system-logs-viewport" id="systemLogsViewport" role="log" aria-live="polite">
               <div class="system-logs-empty-state">
-                <span>✔ [OK] Consultando eventos de fallos y errores del sistema en tiempo real...</span>
+                <span>[OK] Consultando eventos de fallos y errores del sistema en tiempo real...</span>
               </div>
             </div>
           </div>
@@ -3960,7 +3847,7 @@
                 <canvas id="ovCanvasCpu"></canvas>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                <span class="bento-expand-hint" onclick="openBentoSheet('processor', event)" title="Expandir tarjeta interactiva con gráfica táctil">⤢ Inspector Táctil</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('processor', event)" title="Expandir tarjeta interactiva con gráfica táctil">Inspector Táctil</span>
                 <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver núcleos →</span>
               </div>
             </a>
@@ -3985,7 +3872,7 @@
                 <canvas id="ovCanvasRam"></canvas>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                <span class="bento-expand-hint" onclick="openBentoSheet('memory', event)" title="Expandir tarjeta interactiva con gráfica táctil">⤢ Inspector Táctil</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('memory', event)" title="Expandir tarjeta interactiva con gráfica táctil">Inspector Táctil</span>
                 <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver RAM/Swap →</span>
               </div>
             </a>
@@ -4010,7 +3897,7 @@
                 <canvas id="ovCanvasGpu"></canvas>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                <span class="bento-expand-hint" onclick="openBentoSheet('gpu', event)" title="Expandir tarjeta interactiva con gráfica táctil">⤢ Inspector Táctil</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('gpu', event)" title="Expandir tarjeta interactiva con gráfica táctil">Inspector Táctil</span>
                 <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver sensores →</span>
               </div>
             </a>
@@ -4041,7 +3928,7 @@
                 </div>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                <span class="bento-expand-hint" onclick="openBentoSheet('drives', event)" title="Expandir tarjeta interactiva con gráfica táctil">⤢ Inspector Táctil</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('drives', event)" title="Expandir tarjeta interactiva con gráfica táctil">Inspector Táctil</span>
                 <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver discos →</span>
               </div>
             </a>
@@ -4055,14 +3942,14 @@
             <a href="/red" class="module-card" onclick="return navigateTo(event, 'network')">
               <div class="module-header">
                 <div class="module-title-group">
-                  <span style="color: var(--accent-cyan-bright);">🌐</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
                   <span>Red, Interfaces & Clientes</span>
                 </div>
-                <span class="bento-expand-hint" onclick="openBentoSheet('network', event)">⤢ Expandir</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('network', event)">Expandir</span>
               </div>
               <div>
-                <div class="mono" style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="ovNetSpeed">Detectando tráfico...</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovNetSub">Sondeando interfaces de red activas...</div>
+                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovNetSpeed">Detectando tráfico...</div>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="ovNetSub">Sondeando interfaces de red activas...</div>
               </div>
               <div class="mini-oscilloscope" style="height: 44px;">
                 <canvas id="ovCanvasNet"></canvas>
@@ -4073,48 +3960,48 @@
             <a href="/aplicaciones" class="module-card" onclick="return navigateTo(event, 'apps')">
               <div class="module-header">
                 <div class="module-title-group">
-                  <span style="color: var(--accent-emerald-bright);">🐳</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-emerald-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
                   <span>Contenedores Docker & Servicios</span>
                 </div>
                 <span class="module-arrow">→</span>
               </div>
               <div>
-                <div class="mono" style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="ovDockerCount">Sondeando...</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovDockerSub">Consultando daemon Docker y unidades systemd...</div>
+                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovDockerCount">Sondeando...</div>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="ovDockerSub">Consultando daemon Docker y unidades systemd...</div>
               </div>
-              <div style="font-size: 12px; color: var(--text-secondary);" id="ovSystemdSummary">Verificando estado de servicios...</div>
+              <div style="font-size: 11.5px; color: var(--text-secondary);" id="ovSystemdSummary">Verificando estado de servicios...</div>
             </a>
 
             <!-- 7. SEGURIDAD & DNS -->
             <a href="/seguridad" class="module-card" onclick="return navigateTo(event, 'security')">
               <div class="module-header">
                 <div class="module-title-group">
-                  <span style="color: var(--accent-rose-bright);">🛡️</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-rose-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                   <span>Seguridad Activa (Pi-hole & Fail2ban)</span>
                 </div>
                 <span class="module-arrow">→</span>
               </div>
               <div>
                 <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovSecPihole">Consultando Pi-hole FTL...</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovSecF2b">Consultando jaulas Fail2ban...</div>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="ovSecF2b">Consultando jaulas Fail2ban...</div>
               </div>
-              <div style="font-size: 12px; color: var(--text-secondary);">Auditoría DNS Sinkhole y cortafuegos IPS</div>
+              <div style="font-size: 11.5px; color: var(--text-secondary);">Auditoría DNS Sinkhole y cortafuegos IPS</div>
             </a>
 
             <!-- 8. DESCARGAS & VIDEOTECA -->
             <a href="/descargas" class="module-card" onclick="return navigateTo(event, 'torrents')">
               <div class="module-header">
                 <div class="module-title-group">
-                  <span style="color: var(--accent-violet-bright);">📥</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-violet-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   <span>Descargas Torrent & Emby Media</span>
                 </div>
                 <span class="module-arrow">→</span>
               </div>
               <div>
                 <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovTorrentSpeed">↓ 0.0 KB/s · ↑ 0.0 KB/s</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovTorrentSub">Conectando con qBittorrent y biblioteca Emby...</div>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="ovTorrentSub">Conectando con qBittorrent y biblioteca Emby...</div>
               </div>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                 <span class="adw-badge badge-blue" id="ovTorrentBadge">qBittorrent</span>
                 <span class="adw-badge badge-purple" id="ovEmbyBadge">Emby SQLite</span>
               </div>
@@ -4124,32 +4011,32 @@
             <a href="/dns" class="module-card" onclick="return navigateTo(event, 'dns')">
               <div class="module-header">
                 <div class="module-title-group">
-                  <span style="color: var(--accent-cyan-bright);">📡</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                   <span>Dominio Dinámico & Tráfico DNS</span>
                 </div>
                 <span class="module-arrow">→</span>
               </div>
               <div>
                 <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovDnsDomainTitle">Detectando dominio...</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovDnsSub">Autodetección desde proxy inverso, DuckDNS y sistema</div>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="ovDnsSub">Autodetección desde proxy inverso, DuckDNS y sistema</div>
               </div>
-              <div style="font-size: 12px; color: var(--accent-cyan-bright);">Inspección de consultas DNS por dispositivo →</div>
+              <div style="font-size: 11.5px; color: var(--accent-cyan-bright);">Inspección de consultas DNS por dispositivo →</div>
             </a>
 
             <!-- 10. VERSIÓN & GITHUB OTA -->
             <a href="/version" class="module-card" onclick="return navigateTo(event, 'version')">
               <div class="module-header">
                 <div class="module-title-group">
-                  <span style="color: var(--accent-emerald-bright);">🔄</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-emerald-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
                   <span>Control de Versión & GitHub OTA</span>
                 </div>
                 <span class="module-arrow">→</span>
               </div>
               <div>
                 <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovVersionCommit">Sincronizando versión...</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="ovVersionSub">Comparación en vivo con cminewarIA/recursos-ui</div>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="ovVersionSub">Comparación en vivo con cminewarIA/recursos-ui</div>
               </div>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                 <span class="adw-badge badge-green" id="ovVersionBadge">Comprobando...</span>
                 <span class="adw-badge badge-purple" id="ovBadgeGitVersion">OTA 1-Clic</span>
               </div>
@@ -4430,7 +4317,7 @@
               </div>
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <div class="bw-threshold-control-pill" title="Configura el límite de caudal entrante (RX) o saliente (TX) por tarjeta de red (NIC) para activar la alerta visual en la leyenda del mapa">
-                  <span style="font-weight: 700;">⚡ Umbral NIC:</span>
+                  <span style="font-weight: 700;">Umbral NIC:</span>
                   <input type="number" id="nicBwThresholdInput" class="bw-threshold-input" min="0.01" step="0.5" value="5" onchange="updateNicBandwidthThresholdFromUI()" oninput="updateNicBandwidthThresholdFromUI()">
                   <select id="nicBwThresholdUnit" class="bw-threshold-select" onchange="updateNicBandwidthThresholdFromUI()">
                     <option value="KB">KB/s</option>
@@ -4438,11 +4325,10 @@
                   </select>
                 </div>
                 <button type="button" class="geoip-worker-badge" id="geoIpWorkerStatusBadge" onclick="GeoIpBackgroundWorker.forceSyncNow()" title="Worker GeoIP asíncrono (ip-api.com + ipwho.is + SQLite) con caché multinivel. Pulsa para sincronizar y auditar estado de la caché.">
-                  <span id="geoIpWorkerStatusIcon">🌐</span>
+                  <span id="geoIpWorkerStatusIcon">●</span>
                   <span id="geoIpWorkerStatusText">GeoIP Caché: 0 IPs</span>
                 </button>
                 <div class="adw-badge badge-green" style="font-size: 11px; padding: 5px 10px; display: inline-flex; align-items: center; gap: 5px;" title="Motor geoespacial autónomo y libre basado en OpenStreetMap con base de datos SQLite local">
-                  <span>🗺️</span>
                   <span>OpenStreetMap · SQLite GeoIP</span>
                 </div>
               </div>
@@ -4619,17 +4505,17 @@
                 </aside>
 
                 <div class="connections-map-status-overlay" id="networkConnectionsMapStatus">
-                  <div style="font-size: 24px;">🗺️</div>
-                  <div style="font-weight: 700; color: var(--text-primary); font-size: 14px;" id="networkConnectionsMapStatusTitle">Inicializando Mapa Geoespacial de Red...</div>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  <div style="font-weight: 700; color: var(--text-primary); font-size: 13.5px;" id="networkConnectionsMapStatusTitle">Inicializando Mapa Geoespacial de Red...</div>
                   <div style="font-size: 12px; max-width: 440px;" id="networkConnectionsMapStatusDesc">Cargando mapa interactivo de conexiones entrantes y salientes en tiempo real.</div>
                 </div>
                 <div class="connections-map-overlay-legend" id="networkConnectionsMapLegend">
-                  <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: #38bdf8; display: inline-block; box-shadow: 0 0 6px #38bdf8;"></span> Nodo Host</span>
-                  <span id="mapLegendItemIncoming" style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: #10B981; display: inline-block;"></span> ↓ Conexión Entrante</span>
-                  <span id="mapLegendItemOutgoing" style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: #06B6D4; display: inline-block;"></span> ↑ Conexión Saliente</span>
-                  <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: #F43F5E; display: inline-block;"></span> 🛡️ IP Bloqueada (IPS)</span>
+                  <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; display: inline-block;"></span> Nodo Host</span>
+                  <span id="mapLegendItemIncoming" style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; display: inline-block;"></span> ↓ Conexión Entrante</span>
+                  <span id="mapLegendItemOutgoing" style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #06B6D4; display: inline-block;"></span> ↑ Conexión Saliente</span>
+                  <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #F43F5E; display: inline-block;"></span> IP Bloqueada (IPS)</span>
                   <span class="legend-bw-alert-badge normal" id="mapLegendBandwidthAlert" onclick="const inp=document.getElementById('nicBwThresholdInput'); if(inp){inp.focus(); inp.select();}" title="Pulsa para ajustar el umbral de alerta de caudal de red">
-                    <span id="mapLegendBandwidthAlertIcon">⚡</span>
+                    <span id="mapLegendBandwidthAlertIcon">●</span>
                     <span id="mapLegendBandwidthAlertText">Umbral NIC: Normal (&lt; 5.0 MB/s)</span>
                   </span>
                   <span id="lblMapProviderAttribution" style="font-family: var(--font-mono); font-size: 10px; opacity: 0.8;">OpenStreetMap · Precisión Dual GeoIP + SQLite</span>
@@ -4662,14 +4548,14 @@
               </div>
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <div class="segmented-control" title="Agrupar distribución de ancho de banda por subredes, grupos de enlace, categorías o dispositivos de red">
-                  <button class="seg-btn active" id="btnPieGroupSubnets" onclick="setNetBandwidthPieGroup('subnets')">🌐 Subredes IP</button>
-                  <button class="seg-btn" id="btnPieGroupGroups" onclick="setNetBandwidthPieGroup('groups')">📶 Grupos de Enlace</button>
-                  <button class="seg-btn" id="btnPieGroupCategories" onclick="setNetBandwidthPieGroup('categories')">🖥️ Categorías</button>
-                  <button class="seg-btn" id="btnPieGroupDevices" onclick="setNetBandwidthPieGroup('devices')">📱 Dispositivos</button>
+                  <button class="seg-btn active" id="btnPieGroupSubnets" onclick="setNetBandwidthPieGroup('subnets')">Subredes IP</button>
+                  <button class="seg-btn" id="btnPieGroupGroups" onclick="setNetBandwidthPieGroup('groups')">Grupos de Enlace</button>
+                  <button class="seg-btn" id="btnPieGroupCategories" onclick="setNetBandwidthPieGroup('categories')">Categorías</button>
+                  <button class="seg-btn" id="btnPieGroupDevices" onclick="setNetBandwidthPieGroup('devices')">Dispositivos</button>
                 </div>
                 <div class="segmented-control" title="Cambiar entre tráfico total acumulado y caudal en tiempo real">
-                  <button class="seg-btn active" id="btnPieMetricTotal" onclick="setNetBandwidthPieMetric('total_bytes')">📊 Tráfico Acumulado</button>
-                  <button class="seg-btn" id="btnPieMetricLive" onclick="setNetBandwidthPieMetric('live_speed')">⚡ Caudal en Vivo</button>
+                  <button class="seg-btn active" id="btnPieMetricTotal" onclick="setNetBandwidthPieMetric('total_bytes')">Tráfico Acumulado</button>
+                  <button class="seg-btn" id="btnPieMetricLive" onclick="setNetBandwidthPieMetric('live_speed')">Caudal en Vivo</button>
                 </div>
               </div>
             </div>
@@ -4813,22 +4699,23 @@
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <div class="segmented-control" title="Filtrar dispositivos por tipo de contenedor y nivel de permiso">
                   <button type="button" class="seg-btn active" id="btnSecDevFilterAll" onclick="setSecDeviceFilter('all')">Todos (<span id="secDevCntAll">0</span>)</button>
-                  <button type="button" class="seg-btn" id="btnSecDevFilterNative" onclick="setSecDeviceFilter('native')">🔓 Full Access (<span id="secDevCntNative">0</span>)</button>
-                  <button type="button" class="seg-btn" id="btnSecDevFilterWeb" onclick="setSecDeviceFilter('web')">🔒 Sandbox (<span id="secDevCntWeb">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSecDevFilterNative" onclick="setSecDeviceFilter('native')">Full Access (<span id="secDevCntNative">0</span>)</button>
+                  <button type="button" class="seg-btn" id="btnSecDevFilterWeb" onclick="setSecDeviceFilter('web')">Sandbox (<span id="secDevCntWeb">0</span>)</button>
                 </div>
-                <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 2px 6px; height: 32px;">
+                <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 2px 6px; height: 30px;">
                   <span style="font-size: 11px; color: var(--text-muted); font-weight: 600; white-space: nowrap;">Dispositivo:</span>
-                  <select id="secSelectedAuditDevice" onchange="onSelectSecAuditDevice(this.value)" style="height: 26px; padding: 0 6px; background: transparent; border: none; color: var(--text-primary); font-family: var(--font-mono); font-size: 11.5px; outline: none; max-width: 210px; cursor: pointer;" title="Seleccionar dispositivo para descargar su reporte de auditoría JSON">
+                  <select id="secSelectedAuditDevice" onchange="onSelectSecAuditDevice(this.value)" style="height: 24px; padding: 0 6px; background: transparent; border: none; color: var(--text-primary); font-family: var(--font-mono); font-size: 11.5px; outline: none; max-width: 210px; cursor: pointer;" title="Seleccionar dispositivo para descargar su reporte de auditoría JSON">
                     <option value="">Seleccionando...</option>
                   </select>
-                  <button type="button" class="action-btn" id="btnDownloadSelectedDeviceAudit" onclick="downloadSelectedDeviceAuditReport()" style="height: 26px; padding: 0 10px; font-size: 11px; border-color: rgba(56, 189, 248, 0.45); color: var(--accent-cyan-bright); background: rgba(56, 189, 248, 0.12); font-weight: 700;" title="Descargar reporte de auditoría completo en formato JSON para el dispositivo seleccionado">
-                    📥 Descargar Reporte JSON
+                  <button type="button" class="action-btn" id="btnDownloadSelectedDeviceAudit" onclick="downloadSelectedDeviceAuditReport()" style="height: 24px; min-height: 24px; padding: 0 10px; font-size: 11px; border-color: rgba(56, 189, 248, 0.45); color: var(--accent-cyan-bright); background: rgba(56, 189, 248, 0.12); font-weight: 700;" title="Descargar reporte de auditoría completo en formato JSON para el dispositivo seleccionado">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Descargar Reporte JSON</span>
                   </button>
                 </div>
-                <button type="button" class="action-btn" onclick="syncCurrentDeviceTelemetry(true)" style="height: 32px; padding: 0 10px; font-size: 11.5px;" title="Sincronizar todos los sensores y datos de hardware de este dispositivo">
-                  🔄 Identificar Este Dispositivo
+                <button type="button" class="action-btn" onclick="syncCurrentDeviceTelemetry(true)" style="height: 30px; min-height: 30px; padding: 0 10px; font-size: 11.5px;" title="Sincronizar todos los sensores y datos de hardware de este dispositivo">
+                  Identificar Este Dispositivo
                 </button>
-                <button type="button" class="btn-revoke" onclick="revokeAllOtherDevices()" style="height: 32px; padding: 0 10px; font-size: 11.5px;">
+                <button type="button" class="btn-revoke" onclick="revokeAllOtherDevices()" style="height: 30px; padding: 0 10px; font-size: 11.5px;">
                   Revocar demás sesiones
                 </button>
               </div>
@@ -4968,16 +4855,16 @@
           <div class="section-block" id="secTelegramBot">
             <div class="section-header-bar">
               <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 20px;">🤖</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 <div>
                   <div class="section-title">Bot de Telegram Integrado (qBittorrent & Vigilancia LAN)</div>
                   <div style="font-size: 11px; color: var(--text-muted);">Servicio nativo 24/7 ejecutándose dentro del backend de Recursos</div>
                 </div>
               </div>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="adw-badge badge-green" id="tgBotStatusBadge">🟢 En Ejecución</span>
+                <span class="adw-badge badge-green" id="tgBotStatusBadge">En Ejecución</span>
                 <button class="action-btn" id="btnTgSendPing" onclick="sendTelegramTestPing(this)" style="font-size: 11px; padding: 4px 10px;">
-                  📨 Enviar Ping de Prueba
+                  Enviar Ping de Prueba
                 </button>
               </div>
             </div>
@@ -5005,20 +4892,20 @@
                 </div>
               </div>
               <div style="font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
-                <span>💬 Mensajes procesados por el bot: <strong id="tgBotMsgCount">0</strong></span>
+                <span>Mensajes procesados por el bot: <strong id="tgBotMsgCount">0</strong></span>
                 <span id="tgBotPingStatus" style="font-size: 11.5px; color: var(--text-muted);"></span>
               </div>
 
-              <!-- PESTAÑAS DE CONTROL DEL BOT (APPLE / ADWAITA SEGMENTED CONTROL) -->
-              <div style="display: flex; gap: 6px; padding: 4px; background: rgba(0,0,0,0.22); border-radius: 12px; margin-top: 16px; border: 1px solid var(--border-subtle); flex-wrap: wrap;">
-                <button type="button" class="action-btn tg-subtab-btn active" id="btnTgTabHistory" onclick="switchTgBotTab('history')" style="min-height: 32px; height: 32px; font-size: 11.5px; padding: 0 14px; border-radius: 9px; flex: 1; border: none; background: var(--bg-surface-active, rgba(255,255,255,0.12)); box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
-                  📋 Historial de Mensajes
+              <!-- PESTAÑAS DE CONTROL DEL BOT -->
+              <div style="display: flex; gap: 6px; padding: 4px; background: var(--bg-surface-inset); border-radius: 8px; margin-top: 14px; border: 1px solid var(--border-subtle); flex-wrap: wrap;">
+                <button type="button" class="action-btn tg-subtab-btn active" id="btnTgTabHistory" onclick="switchTgBotTab('history')" style="min-height: 30px; height: 30px; font-size: 11.5px; padding: 0 14px; border-radius: 6px; flex: 1; border: none; background: var(--bg-surface-active, rgba(255,255,255,0.12));">
+                  Historial de Mensajes
                 </button>
-                <button type="button" class="action-btn tg-subtab-btn" id="btnTgTabSettings" onclick="switchTgBotTab('settings')" style="min-height: 32px; height: 32px; font-size: 11.5px; padding: 0 14px; border-radius: 9px; flex: 1; border: none; background: transparent; opacity: 0.75;">
-                  ⚙️ Ajustes & Admins
+                <button type="button" class="action-btn tg-subtab-btn" id="btnTgTabSettings" onclick="switchTgBotTab('settings')" style="min-height: 30px; height: 30px; font-size: 11.5px; padding: 0 14px; border-radius: 6px; flex: 1; border: none; background: transparent; opacity: 0.75;">
+                  Ajustes & Admins
                 </button>
-                <button type="button" class="action-btn tg-subtab-btn" id="btnTgTabSend" onclick="switchTgBotTab('send')" style="min-height: 32px; height: 32px; font-size: 11.5px; padding: 0 14px; border-radius: 9px; flex: 1; border: none; background: transparent; opacity: 0.75;">
-                  📢 Enviar a Telegram
+                <button type="button" class="action-btn tg-subtab-btn" id="btnTgTabSend" onclick="switchTgBotTab('send')" style="min-height: 30px; height: 30px; font-size: 11.5px; padding: 0 14px; border-radius: 6px; flex: 1; border: none; background: transparent; opacity: 0.75;">
+                  Enviar a Telegram
                 </button>
               </div>
 
@@ -5291,11 +5178,11 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <!-- Botones de Descarga Directa Exclusivos para la Versión Web -->
                 <div class="ota-web-download-row" id="otaWebDownloadButtons" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_9.5.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_10.0.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_9.5.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_10.0.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5314,8 +5201,8 @@
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div style="display: flex; flex-direction: column; gap: 3px;">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">📦 Paquetes Oficiales Compilados</span>
-                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v9.5.0</span>
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Paquetes Oficiales Compilados</span>
+                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v10.0.0</span>
                     <span class="adw-badge badge-purple" style="font-size: 10px; font-weight: 600;">Solo en la Web</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);">
@@ -5323,11 +5210,11 @@
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_9.5.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_10.0.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux amd64)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_9.5.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_10.0.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5526,7 +5413,7 @@
         <div class="view-page" id="viewDex" style="display: none;">
           <!-- Panel Pasivo para Web y Clientes Externos (Regla 7.5) -->
           <div class="surface-panel" id="dexPassiveWebBanner" style="max-width: 680px; margin: 40px auto; padding: 36px 28px; text-align: center; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); display: flex; flex-direction: column; align-items: center; gap: 14px;">
-            <div style="font-size: 32px; line-height: 1;">🔌 📱 ➔ 🖥️</div>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan-bright)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             <div class="mono" style="font-size: 13px; color: var(--text-secondary); font-weight: 600;">
               Esperando dispositivo para conectarse en su versión nativa
             </div>
@@ -5551,7 +5438,7 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                   <button type="button" class="action-btn" onclick="EnvironmentDetector.pollUsbStatusOnce()">
-                    🔄 Escanear Puerto USB
+                    Escanear Puerto USB
                   </button>
                 </div>
               </div>
@@ -8507,7 +8394,7 @@
       return {
         audit_metadata: {
           report_type: 'ZERO_TRUST_DEVICE_SECURITY_AND_HARDWARE_AUDIT',
-          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '9.5.0',
+          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '10.0.0',
           generated_at_iso: new Date().toISOString(),
           generated_at_local: new Date().toLocaleString('es-ES'),
           server_node: {
@@ -8638,27 +8525,27 @@
       const isAndroidNative = cType === 'android_native';
       const isNative = Boolean(d.full_access || tel.full_access || isUbuntuNative || isAndroidNative);
 
-      const devIcon = isUbuntuNative
-        ? '🐧'
+      const devIconSvg = isUbuntuNative
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>'
         : isAndroidNative
-          ? '🤖'
-          : (/android|iphone|ipad|mobile/i.test(d.user_agent || '') ? '📱' : '💻');
+          ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>'
+          : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
 
       const typeBadgeHtml = isUbuntuNative
-        ? '<span class="adw-badge badge-green mono">🐧 APP NATIVA UBUNTU (.DEB)</span>'
+        ? '<span class="adw-badge badge-green mono">APP NATIVA UBUNTU (.DEB)</span>'
         : isAndroidNative
-          ? '<span class="adw-badge badge-green mono">🤖 APP NATIVA ANDROID (.APK)</span>'
-          : '<span class="adw-badge badge-amber mono">🌐 CLIENTE NAVEGADOR WEB</span>';
+          ? '<span class="adw-badge badge-green mono">APP NATIVA ANDROID (.APK)</span>'
+          : '<span class="adw-badge badge-amber mono">CLIENTE NAVEGADOR WEB</span>';
 
       // Indicador visual explícito de tipo de permiso (Full Access vs Sandbox)
       const permPillHtml = isNative
-        ? `<span class="adw-badge mono" style="background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 800; letter-spacing: 0.03em;">🔓 PERMISO: FULL ACCESS</span>`
-        : `<span class="adw-badge mono" style="background: rgba(245, 158, 11, 0.18); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.45); font-weight: 800; letter-spacing: 0.03em;">🔒 PERMISO: SANDBOX</span>`;
+        ? `<span class="adw-badge mono" style="background: rgba(16, 185, 129, 0.16); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.45); font-weight: 700; letter-spacing: 0.03em;">PERMISO: FULL ACCESS</span>`
+        : `<span class="adw-badge mono" style="background: rgba(245, 158, 11, 0.16); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.45); font-weight: 700; letter-spacing: 0.03em;">PERMISO: SANDBOX</span>`;
 
       const connMode = d.connection_mode || (d.last_external_ip ? 'WAN' : 'LAN');
       const connBadgeHtml = connMode === 'WAN'
-        ? '<span class="adw-badge badge-purple mono">🌐 WAN TLS</span>'
-        : '<span class="adw-badge badge-blue mono">🟢 LAN DIRECTA</span>';
+        ? '<span class="adw-badge badge-purple mono">WAN TLS</span>'
+        : '<span class="adw-badge badge-blue mono">LAN DIRECTA</span>';
 
       const verStr = d.app_version || tel.app_version || '';
       const verBadgeHtml = verStr ? `<span class="adw-badge mono" style="background: rgba(148,163,184,0.14); color: var(--text-secondary);">v${escapeHtml(verStr)}</span>` : '';
@@ -8694,7 +8581,7 @@
 
       const screenStr = tel.screen_resolution || 'Resolución estándar';
       const batStr = (tel.battery_percent !== null && tel.battery_percent !== undefined)
-        ? `Batería ${tel.battery_percent}% ${tel.battery_charging ? '⚡ Cargando' : '🔋'}`
+        ? `Batería ${tel.battery_percent}% ${tel.battery_charging ? '(Cargando)' : ''}`
         : 'Alimentación CA Directa';
       const hwFp = d.hardware_id || tel.hardware_id || d.id;
 
@@ -8704,11 +8591,11 @@
       // Bloque visual dedicado de Auditoría de Permisos (Full Access vs Sandbox)
       const permissionBannerHtml = isNative
         ? `
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 9px 12px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.34); border-radius: 7px;">
-            <div style="display: flex; align-items: center; gap: 9px; min-width: 0;">
-              <span style="font-size: 16px;">🛡️</span>
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 9px 12px; background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: 6px;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; flex-shrink: 0;"></span>
               <div>
-                <div class="mono" style="font-size: 11.5px; font-weight: 800; color: #34D399; letter-spacing: 0.02em;">
+                <div class="mono" style="font-size: 11px; font-weight: 700; color: #34D399; letter-spacing: 0.02em;">
                   NIVEL DE PERMISO: FULL ACCESS · PUENTE NATIVO (${isUbuntuNative ? 'GTK3 / WebKit2 + /sys/class/dmi' : 'Kotlin / Android Native Bridge'})
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 1px;">
@@ -8717,18 +8604,18 @@
               </div>
             </div>
             <div class="mono" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 10.5px;">
-              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(16,185,129,0.16); color: #34D399; border: 1px solid rgba(16,185,129,0.3);">✔ Silicio Directo</span>
-              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(16,185,129,0.16); color: #34D399; border: 1px solid rgba(16,185,129,0.3);">✔ Auto LAN↔WAN</span>
-              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(56,189,248,0.16); color: var(--accent-cyan-bright); border: 1px solid rgba(56,189,248,0.3);">${isUbuntuNative ? '✔ DeX / USB Activo' : '✔ Sensores SoC'}</span>
+              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(16,185,129,0.14); color: #34D399; border: 1px solid rgba(16,185,129,0.28);">Silicio Directo</span>
+              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(16,185,129,0.14); color: #34D399; border: 1px solid rgba(16,185,129,0.28);">Auto LAN↔WAN</span>
+              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(56,189,248,0.14); color: var(--accent-cyan-bright); border: 1px solid rgba(56,189,248,0.28);">${isUbuntuNative ? 'DeX / USB Activo' : 'Sensores SoC'}</span>
             </div>
           </div>
         `
         : `
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 9px 12px; background: rgba(245, 158, 11, 0.07); border: 1px solid rgba(245, 158, 11, 0.32); border-radius: 7px;">
-            <div style="display: flex; align-items: center; gap: 9px; min-width: 0;">
-              <span style="font-size: 16px;">🔒</span>
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 9px 12px; background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.28); border-radius: 6px;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #F59E0B; flex-shrink: 0;"></span>
               <div>
-                <div class="mono" style="font-size: 11.5px; font-weight: 800; color: #FBBF24; letter-spacing: 0.02em;">
+                <div class="mono" style="font-size: 11px; font-weight: 700; color: #FBBF24; letter-spacing: 0.02em;">
                   NIVEL DE PERMISO: SANDBOX · AISLAMIENTO DE NAVEGADOR WEB (WEB_SANDBOX)
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 1px;">
@@ -8737,41 +8624,42 @@
               </div>
             </div>
             <div class="mono" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 10.5px;">
-              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(245,158,11,0.15); color: #FBBF24; border: 1px solid rgba(245,158,11,0.3);">⚠️ Telemetría WebGL/UA</span>
-              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(148,163,184,0.14); color: var(--text-muted); border: 1px solid var(--border-subtle);">🔒 Sin Puente OS</span>
-              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(148,163,184,0.14); color: var(--text-muted); border: 1px solid var(--border-subtle);">🔒 DeX Bloqueado</span>
+              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(245,158,11,0.14); color: #FBBF24; border: 1px solid rgba(245,158,11,0.28);">Telemetría WebGL/UA</span>
+              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(148,163,184,0.12); color: var(--text-muted); border: 1px solid var(--border-subtle);">Sin Puente OS</span>
+              <span style="padding: 2px 7px; border-radius: 4px; background: rgba(148,163,184,0.12); color: var(--text-muted); border: 1px solid var(--border-subtle);">DeX Bloqueado</span>
             </div>
           </div>
         `;
 
       return `
-        <div class="data-row" onclick="selectSecDeviceCard('${safeId}', event)" style="flex-direction: column; align-items: stretch; gap: 10px; padding: ${isCompactModal ? '12px 14px' : '16px 18px'}; cursor: pointer; border-left: 3px solid ${isSelectedForAudit ? 'var(--accent-cyan-bright)' : (isCurrent ? 'var(--accent-cyan-bright)' : (isNative ? 'var(--accent-emerald)' : 'rgba(245,158,11,0.55)'))}; background: ${isSelectedForAudit ? 'rgba(56, 189, 248, 0.05)' : 'transparent'};">
+        <div class="data-row" onclick="selectSecDeviceCard('${safeId}', event)" style="flex-direction: column; align-items: stretch; gap: 10px; padding: ${isCompactModal ? '12px 14px' : '16px 18px'}; cursor: pointer; background: ${isSelectedForAudit ? 'rgba(56, 189, 248, 0.04)' : 'transparent'}; box-shadow: ${isSelectedForAudit ? 'inset 0 0 0 1px rgba(56, 189, 248, 0.32)' : 'none'};">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-              <div style="width: 38px; height: 38px; border-radius: 6px; background: ${isNative ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)'}; border: 1px solid ${isNative ? 'rgba(16,185,129,0.35)' : 'rgba(245,158,11,0.35)'}; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
-                ${devIcon}
+              <div style="width: 36px; height: 36px; border-radius: 6px; background: ${isNative ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)'}; border: 1px solid ${isNative ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                ${devIconSvg}
               </div>
               <div>
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                  <span class="row-label" style="font-size: 14.5px; font-weight: 700; color: var(--text-primary);">${safeName}</span>
+                <div style="display: flex; align-items: center; gap: 7px; flex-wrap: wrap;">
+                  <span class="row-label" style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${safeName}</span>
                   ${isCurrent ? '<span class="adw-badge badge-blue mono">ESTE DISPOSITIVO</span>' : ''}
-                  ${isSelectedForAudit ? '<span class="adw-badge mono" style="background: rgba(56,189,248,0.18); color: var(--accent-cyan-bright); border: 1px solid rgba(56,189,248,0.4);">🎯 SELECCIONADO</span>' : ''}
+                  ${isSelectedForAudit ? '<span class="adw-badge mono" style="background: rgba(56,189,248,0.15); color: var(--accent-cyan-bright); border: 1px solid rgba(56,189,248,0.35);">SELECCIONADO</span>' : ''}
                   ${permPillHtml}
                   ${typeBadgeHtml}
                   ${connBadgeHtml}
                   ${verBadgeHtml}
                 </div>
-                <div class="row-sublabel mono" style="margin-top: 3px; font-size: 11.5px; color: var(--text-secondary);">
+                <div class="row-sublabel mono" style="margin-top: 3px; font-size: 11px; color: var(--text-secondary);">
                   ID: ${escapeHtml(hwFp)} · Emparejado: ${escapeHtml(d.first_seen || '--')} · Última actividad: ${escapeHtml(d.last_seen || '--')}
                 </div>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <button type="button" class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px; border-color: rgba(56, 189, 248, 0.4); color: var(--accent-cyan-bright);" onclick="event.stopPropagation(); downloadDeviceAuditReport('${safeId}')" title="Descargar reporte de auditoría completo en formato JSON para este dispositivo">
-                📥 Auditoría JSON
+              <button type="button" class="action-btn" style="height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px; border-color: rgba(56, 189, 248, 0.4); color: var(--accent-cyan-bright);" onclick="event.stopPropagation(); downloadDeviceAuditReport('${safeId}')" title="Descargar reporte de auditoría completo en formato JSON para este dispositivo">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Auditoría JSON</span>
               </button>
-              <button type="button" class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="event.stopPropagation(); openRenameDeviceInline('${safeId}')" title="Personalizar alias del dispositivo">
-                ✏️ Alias
+              <button type="button" class="action-btn" style="height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px;" onclick="event.stopPropagation(); openRenameDeviceInline('${safeId}')" title="Personalizar alias del dispositivo">
+                Alias
               </button>
               <button type="button" class="btn-revoke" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="event.stopPropagation(); revokeDevice('${safeId}', '${safeName}', ${isCurrent})">
                 ${isCurrent ? 'Cerrar sesión' : 'Revocar'}
@@ -8787,32 +8675,32 @@
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(${isCompactModal ? '195px' : '220px'}, 1fr)); gap: 8px;">
-            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+            <div style="padding: 8px 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px;">
               <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Equipo & Fabricante</div>
               <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${escapeHtml(hwTitle)}</div>
               <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(hwSub)}</div>
             </div>
-            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+            <div style="padding: 8px 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px;">
               <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Sistema Operativo & Kernel</div>
               <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan-bright); margin-top: 2px;">${escapeHtml(osDistro)}</div>
               <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(kernel)} · ${escapeHtml(arch)}</div>
             </div>
-            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+            <div style="padding: 8px 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px;">
               <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Silicio (CPU / SoC & GPU)</div>
               <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${escapeHtml(cpuModel)} ${coresText ? `(${escapeHtml(coresText)})` : ''}</div>
               <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(gpuModel || (isNative ? 'Aceleración Hardware Nativa' : 'Renderizador WebGL'))}</div>
             </div>
-            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+            <div style="padding: 8px 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px;">
               <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Memoria & Almacenamiento</div>
               <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--accent-emerald-bright); margin-top: 2px;">${escapeHtml(ramGb)}</div>
               <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">${escapeHtml(storGb)}</div>
             </div>
-            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+            <div style="padding: 8px 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px;">
               <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Red & Direccionamiento</div>
               <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">LAN: ${escapeHtml(lanIp)} · Host: ${escapeHtml(hostStr)}</div>
               <div class="mono" style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">WAN: ${escapeHtml(wanIp)} · ${escapeHtml(ifaceStr)}</div>
             </div>
-            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); border-radius: 6px;">
+            <div style="padding: 8px 10px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px;">
               <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em;">Pantalla, Energía & Permiso</div>
               <div class="mono" style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${escapeHtml(screenStr)}</div>
               <div class="mono" style="font-size: 11px; color: ${isNative ? '#34D399' : '#FBBF24'}; margin-top: 1px;">${escapeHtml(batStr)} · ${isNative ? 'Full Access OS' : 'Sandbox Web'}</div>
