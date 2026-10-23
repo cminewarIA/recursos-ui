@@ -167,8 +167,9 @@ fun CockpitDashboard(
                             ConnectionMode.CONNECTED_LAN -> NeonGreen
                             ConnectionMode.CONNECTED_WAN -> NeonCyan
                             ConnectionMode.REVOKED -> NeonRed
-                            ConnectionMode.SCANNING_LAN, ConnectionMode.CONNECTING -> NeonAmber
-                            ConnectionMode.ERROR -> NeonRed
+                            ConnectionMode.SCANNING_LAN, ConnectionMode.CONNECTING -> NeonOrange
+                            ConnectionMode.DISCONNECTED, ConnectionMode.ERROR -> NeonRed
+                            else -> NeonOrange
                         }
                         Box(
                             modifier = Modifier
@@ -184,7 +185,9 @@ fun CockpitDashboard(
                                 ConnectionMode.REVOKED -> "CERT REVOCADO"
                                 ConnectionMode.SCANNING_LAN -> "AUTODESCUBRIENDO..."
                                 ConnectionMode.CONNECTING -> "CONECTANDO..."
+                                ConnectionMode.DISCONNECTED -> "DESCONECTADO"
                                 ConnectionMode.ERROR -> "SIN CONEXIÓN"
+                                else -> "CONECTANDO..."
                             },
                             color = statusColor,
                             fontSize = 11.sp,
