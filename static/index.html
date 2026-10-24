@@ -29,7 +29,7 @@
 
   <style>
     /* ==========================================================================
-       RECURSOS — INFRASTRUCTURE & TELEMETRY ENGINEERING CONSOLE (v10.1.0)
+       RECURSOS — INFRASTRUCTURE & TELEMETRY ENGINEERING CONSOLE (v10.2.0)
        High-Craft Dark/Light UI · Hairline Grid Architecture · Zero-Hardcoding
        ========================================================================== */
     :root,
@@ -181,10 +181,11 @@
     html, body {
       width: 100%;
       height: 100%;
+      height: 100dvh;
       background-color: var(--bg-canvas);
       color: var(--text-primary);
       font-family: var(--font-sans);
-      font-size: 13.5px;
+      font-size: clamp(12.5px, 0.2vw + 12px, 14px);
       line-height: 1.45;
       letter-spacing: -0.005em;
       overflow: hidden;
@@ -712,18 +713,23 @@
        ========================================================================== */
     .viewport-scroll {
       flex: 1;
+      width: 100%;
+      min-width: 0;
       overflow-y: auto;
-      padding: 20px 24px 104px;
+      overflow-x: hidden;
+      padding: clamp(12px, 1.8vw, 24px) clamp(10px, 2.2vw, 32px) calc(98px + env(safe-area-inset-bottom, 0px));
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
     }
 
     .view-page {
-      max-width: 1400px;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: clamp(12px, 1.4vw, 20px);
     }
 
     /* Node Identity Header Bar */
@@ -843,16 +849,17 @@
        ========================================================================== */
     .telemetry-pillars-grid {
       display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+      gap: clamp(10px, 1.2vw, 16px);
+      width: 100%;
     }
 
     .pillar-card {
-      grid-column: span 3;
+      min-width: 0;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
-      padding: 16px 18px;
+      padding: clamp(14px, 1.4vw, 18px) clamp(14px, 1.6vw, 20px);
       text-decoration: none;
       color: inherit;
       display: flex;
@@ -863,13 +870,6 @@
       position: relative;
       overflow: hidden;
       cursor: pointer;
-    }
-
-    @media (max-width: 1200px) {
-      .pillar-card { grid-column: span 6; }
-    }
-    @media (max-width: 680px) {
-      .pillar-card { grid-column: span 12; }
     }
 
     .pillar-card:hover {
@@ -984,15 +984,17 @@
        ========================================================================== */
     .modules-bento-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 285px), 1fr));
+      gap: clamp(10px, 1.2vw, 16px);
+      width: 100%;
     }
 
     .module-card {
+      min-width: 0;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
-      padding: 16px 18px;
+      padding: clamp(14px, 1.4vw, 18px) clamp(14px, 1.6vw, 20px);
       text-decoration: none;
       color: inherit;
       display: flex;
@@ -1084,7 +1086,7 @@
 
     .oscilloscope-stage {
       width: 100%;
-      height: 180px;
+      height: clamp(140px, 21dvh, 250px);
       position: relative;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
@@ -1104,15 +1106,17 @@
     /* Hardware Specification Grid (Zero-Hardcoding Dynamic Cells) */
     .hw-spec-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+      gap: clamp(8px, 1vw, 14px);
+      width: 100%;
     }
 
     .hw-spec-cell {
+      min-width: 0;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 13px 15px;
+      padding: clamp(11px, 1.2vw, 15px) clamp(12px, 1.4vw, 16px);
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -1218,15 +1222,17 @@
     /* Logical CPU Cores Matrix */
     .cores-matrix-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
-      gap: 8px;
-      padding: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 92px), 1fr));
+      gap: clamp(6px, 0.8vw, 10px);
+      padding: clamp(10px, 1.2vw, 16px);
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
+      width: 100%;
     }
 
     .core-tile {
+      min-width: 0;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm);
@@ -1265,15 +1271,17 @@
     /* Active Network Interface Cards (NIC Hardware Inspector) */
     .nic-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+      gap: clamp(10px, 1.2vw, 16px);
+      width: 100%;
     }
 
     .nic-card {
+      min-width: 0;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 16px 18px;
+      padding: clamp(14px, 1.4vw, 18px) clamp(14px, 1.6vw, 20px);
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -1412,10 +1420,12 @@
     }
     .connections-map-kpi-strip {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr));
+      gap: clamp(8px, 1vw, 12px);
+      width: 100%;
     }
     .connections-map-kpi-cell {
+      min-width: 0;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
       border-radius: 10px;
@@ -1450,8 +1460,8 @@
     .connections-map-stage-wrap {
       position: relative;
       width: 100%;
-      height: 500px;
-      min-height: 500px;
+      height: clamp(340px, 54dvh, 720px);
+      min-height: clamp(320px, 48dvh, 680px);
       border-radius: 12px;
       overflow: hidden;
       border: 1px solid var(--border-subtle);
@@ -1507,8 +1517,8 @@
     /* Explicit height on #networkConnectionsMapCanvas to satisfy CF2 (never collapse to 0x0) */
     #networkConnectionsMapCanvas {
       width: 100%;
-      height: 500px;
-      min-height: 500px;
+      height: 100%;
+      min-height: clamp(320px, 48dvh, 680px);
       position: relative;
       z-index: 0;
       isolation: isolate; /* Los panes de Leaflet (z-index 200-1000) quedan contenidos dentro del canvas */
@@ -2311,7 +2321,7 @@
       filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(92%);
     }
     .conn-table-wrap {
-      max-height: 480px;
+      max-height: clamp(280px, 46dvh, 560px);
       overflow-y: auto;
       border: 1px solid var(--border-subtle);
       border-radius: 11px;
@@ -2321,7 +2331,7 @@
     }
     .conn-capsules-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 265px), 1fr));
       gap: 8px;
       align-items: stretch;
     }
@@ -2568,15 +2578,15 @@
 
     /* Bandwidth Distribution Pie Chart Component (Vista Red) */
     .bw-pie-card {
-      padding: 20px;
+      padding: clamp(14px, 1.8vw, 22px);
     }
     .bw-pie-layout {
       display: grid;
-      grid-template-columns: 300px 1fr;
-      gap: 24px;
+      grid-template-columns: minmax(min(100%, 240px), 310px) minmax(0, 1fr);
+      gap: clamp(14px, 2vw, 24px);
       align-items: flex-start;
     }
-    @media (max-width: 900px) {
+    @media (max-width: 860px) {
       .bw-pie-layout {
         grid-template-columns: 1fr;
       }
@@ -3454,7 +3464,7 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.18s ease;
-      padding: 16px;
+      padding: clamp(10px, 2vw, 20px);
     }
     .modal-overlay.open {
       opacity: 1;
@@ -3466,8 +3476,8 @@
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
       border-radius: var(--radius-lg);
       width: 100%;
-      max-width: 620px;
-      max-height: calc(100vh - 40px);
+      max-width: min(96vw, 680px);
+      max-height: calc(100dvh - 32px);
       overflow-y: auto;
     }
     .modal-header {
@@ -3476,20 +3486,94 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
       background: var(--bg-surface-inset);
     }
     .modal-body {
-      padding: 18px;
-      max-height: 78vh;
+      padding: clamp(12px, 1.8vw, 18px);
+      max-height: 80dvh;
       overflow-y: auto;
     }
 
+    /* Native HTML5 <dialog class="bento-dialog"> Dynamic Screen Adaptation */
+    dialog.bento-dialog {
+      margin: auto;
+      width: min(94vw, 940px);
+      max-width: min(94vw, 940px);
+      max-height: min(88dvh, 860px);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+      padding: 0;
+      overflow: hidden;
+    }
+    dialog.bento-dialog[open] {
+      display: flex;
+      flex-direction: column;
+    }
+    dialog.bento-dialog::backdrop {
+      background: rgba(5, 8, 15, 0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .bento-dialog-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-surface-inset);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .bento-dialog-body {
+      padding: clamp(14px, 2vw, 20px);
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Dynamic Responsive Breakpoints Across All Internal Sections */
     @media (max-width: 960px) {
       .header-center-telemetry { display: none; }
-      .viewport-scroll { padding: 14px 12px 96px; }
-      .search-box { width: 145px; }
+      .viewport-scroll { padding: 12px 12px calc(94px + env(safe-area-inset-bottom, 0px)); }
+      .search-box { width: clamp(120px, 26vw, 180px); }
       .top-header { padding: 0 12px; }
       .command-banner { padding: 14px 16px; }
+    }
+
+    @media (max-width: 680px) {
+      .data-row, .adw-action-row {
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        gap: 8px;
+      }
+      .row-value {
+        white-space: normal;
+        word-break: break-word;
+      }
+      .instrument-header,
+      .section-header-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .segmented-control {
+        width: 100%;
+        overflow-x: auto;
+        justify-content: flex-start;
+      }
+      .seg-btn, .pill-btn {
+        flex: 1 0 auto;
+        justify-content: center;
+      }
+      .proc-d3-panel {
+        padding: 14px 12px 12px;
+      }
     }
   </style>
 </head>
@@ -5178,11 +5262,11 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <!-- Botones de Descarga Directa Exclusivos para la Versión Web -->
                 <div class="ota-web-download-row" id="otaWebDownloadButtons" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_10.1.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_10.2.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_10.1.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_10.2.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5202,7 +5286,7 @@
                 <div style="display: flex; flex-direction: column; gap: 3px;">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Paquetes Oficiales Compilados</span>
-                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v10.1.0</span>
+                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v10.2.0</span>
                     <span class="adw-badge badge-purple" style="font-size: 10px; font-weight: 600;">Solo en la Web</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);">
@@ -5210,11 +5294,11 @@
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_10.1.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_10.2.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux amd64)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_10.1.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_10.2.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -8484,7 +8568,7 @@
       return {
         audit_metadata: {
           report_type: 'ZERO_TRUST_PHYSICAL_DEVICE_CERTIFICATE_AND_GROUPED_CLIENTS_AUDIT',
-          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '10.1.0',
+          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '10.2.0',
           generated_at_iso: new Date().toISOString(),
           generated_at_local: new Date().toLocaleString('es-ES'),
           server_node: {
@@ -9559,9 +9643,21 @@
           if (!this.init(svgEl)) return;
         }
 
+        const wrapElMeasure = document.getElementById('procCpuD3Wrap');
+        const measuredW = wrapElMeasure && wrapElMeasure.clientWidth > 0 ? wrapElMeasure.clientWidth : 920;
+        this.width = Math.max(320, measuredW);
+        this.margin.left = this.width < 520 ? 128 : (this.width < 760 ? 168 : 215);
+        this.margin.right = this.width < 520 ? 94 : (this.width < 760 ? 114 : 138);
+        svgEl.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
+
         const d3 = window.d3;
         const svg = d3.select(svgEl);
-        const innerW = this.width - this.margin.left - this.margin.right;
+        svg.select('.proc-d3-grid').attr('transform', `translate(${this.margin.left}, ${this.margin.top})`);
+        svg.select('.proc-d3-axis').attr('transform', `translate(${this.margin.left}, ${this.margin.top})`);
+        svg.select('.proc-d3-bars-layer').attr('transform', `translate(${this.margin.left}, ${this.margin.top})`);
+        svg.select('.proc-d3-empty').attr('x', this.width / 2).attr('y', this.height / 2);
+
+        const innerW = Math.max(80, this.width - this.margin.left - this.margin.right);
         const innerH = this.height - this.margin.top - this.margin.bottom;
 
         const normalized = (Array.isArray(processes) ? processes : []).map(p => ({
@@ -9754,7 +9850,8 @@
           .attr('y', yScale.bandwidth() / 2)
           .html((d, i) => {
             const rank = String(i + 1).padStart(2, '0');
-            const truncName = d.name.length > 16 ? d.name.slice(0, 15) + '…' : d.name;
+            const maxChars = this.margin.left <= 135 ? 10 : (this.margin.left <= 175 ? 13 : 16);
+            const truncName = d.name.length > maxChars ? d.name.slice(0, maxChars - 1) + '…' : d.name;
             return `<tspan fill="var(--text-muted)" font-weight="500">${rank}.</tspan> <tspan fill="var(--text-primary)">${escapeHtml(truncName)}</tspan> <tspan fill="var(--text-muted)" font-size="10px">#${d.pid}</tspan>`;
           });
 
@@ -11506,7 +11603,37 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       checkSystemVersion(false);
       setInterval(() => checkSystemVersion(false), 300000);
 
-      window.addEventListener('resize', () => renderActiveView());
+      let _resizeRafId = null;
+      const handleDynamicViewportReflow = () => {
+        if (_resizeRafId) cancelAnimationFrame(_resizeRafId);
+        _resizeRafId = requestAnimationFrame(() => {
+          _resizeRafId = null;
+          renderActiveView();
+          if (activeView === 'network' && window.ConnectionsGeoMap && window.ConnectionsGeoMap._leafletMap) {
+            try {
+              window.ConnectionsGeoMap._leafletMap.invalidateSize({ animate: false });
+              if (typeof window.ConnectionsGeoMap.enforceMapWorldBounds === 'function') {
+                window.ConnectionsGeoMap.enforceMapWorldBounds();
+              }
+            } catch (e) {}
+          }
+        });
+      };
+
+      window.addEventListener('resize', handleDynamicViewportReflow, { passive: true });
+      window.addEventListener('orientationchange', handleDynamicViewportReflow, { passive: true });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleDynamicViewportReflow, { passive: true });
+      }
+      if (typeof ResizeObserver !== 'undefined') {
+        const viewportRo = new ResizeObserver(() => handleDynamicViewportReflow());
+        const mainScrollEl = document.getElementById('mainScrollContainer');
+        const mapStageEl = document.getElementById('networkConnectionsMapStageWrap');
+        const procD3WrapEl = document.getElementById('procCpuD3Wrap');
+        if (mainScrollEl) viewportRo.observe(mainScrollEl);
+        if (mapStageEl) viewportRo.observe(mapStageEl);
+        if (procD3WrapEl) viewportRo.observe(procD3WrapEl);
+      }
 
       // Soporte de Drag & Drop de archivos locales en el modal de personalización de logos
       const dropzone = document.getElementById('logoUploadDropzone');
