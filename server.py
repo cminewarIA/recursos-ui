@@ -184,7 +184,60 @@ MAX_HISTORY = 60
 # Rolling 2-Hour per-NIC Bandwidth History Buffer (100% OS-driven from /proc/net/dev)
 NIC_BANDWIDTH_HISTORY_2H = {}  # { nic_name: [ {"t": ms_epoch, "rx": float_bytes_sec, "tx": float_bytes_sec}, ... ] }
 NIC_BANDWIDTH_LOCK = threading.Lock()
-MAX_NIC_HISTORY_SECONDS = 7200  # 2 hours
+MAX_NIC_HISTORY_SECONDS = 7200  # 2 hours (120 minutes)
+NIC_BUCKET_INTERVAL_MS = 15000  # 15-second quantized buckets (480 buckets across 2 hours)
+NIC_HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nic_history_2h.json")
+_LAST_NIC_HISTORY_SAVE_TS = 0.0
+
+def _load_nic_history_2h():
+    if not os.path.exists(NIC_HISTORY_FILE):
+        return
+    try:
+        with open(NIC_HISTORY_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        if not isinstance(raw, dict):
+            return
+        now_ms = int(time.time() * 1000)
+        cutoff_ms = now_ms - (MAX_NIC_HISTORY_SECONDS * 1000)
+        with NIC_BANDWIDTH_LOCK:
+            for nic_name, pts in raw.items():
+                if not isinstance(pts, list):
+                    continue
+                bucket_map = {}
+                for pt in pts:
+                    if not isinstance(pt, dict):
+                        continue
+                    t_val = int(pt.get("t", 0))
+                    if t_val < cutoff_ms:
+                        continue
+                    b_ts = (t_val // NIC_BUCKET_INTERVAL_MS) * NIC_BUCKET_INTERVAL_MS
+                    rx_v = max(0.0, float(pt.get("rx", 0.0)))
+                    tx_v = max(0.0, float(pt.get("tx", 0.0)))
+                    if b_ts in bucket_map:
+                        bucket_map[b_ts]["rx"] = max(bucket_map[b_ts]["rx"], rx_v)
+                        bucket_map[b_ts]["tx"] = max(bucket_map[b_ts]["tx"], tx_v)
+                    else:
+                        bucket_map[b_ts] = {"t": b_ts, "rx": rx_v, "tx": tx_v}
+                NIC_BANDWIDTH_HISTORY_2H[nic_name] = sorted(bucket_map.values(), key=lambda x: x["t"])
+    except Exception:
+        pass
+
+def _save_nic_history_2h_if_needed(now_sec):
+    global _LAST_NIC_HISTORY_SAVE_TS
+    if now_sec - _LAST_NIC_HISTORY_SAVE_TS < 30.0:
+        return
+    _LAST_NIC_HISTORY_SAVE_TS = now_sec
+    try:
+        with NIC_BANDWIDTH_LOCK:
+            snapshot = {k: list(v) for k, v in NIC_BANDWIDTH_HISTORY_2H.items()}
+        tmp_path = NIC_HISTORY_FILE + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f)
+        os.replace(tmp_path, NIC_HISTORY_FILE)
+    except Exception:
+        pass
+
+_load_nic_history_2h()
 
 # Load environment variables from .env if present (never hardcode keys)
 def _load_dotenv_file():
@@ -6451,23 +6504,23 @@ def background_collector():
             tx_bytes_sec = max(0, (curr_tx - last_tx) / dt)
             last_rx, last_tx = curr_rx, curr_tx
 
-            # Accumulate rolling 2-hour bandwidth history per NIC (at least every 10-15s, pruned to 7200s)
+            # Accumulate rolling 2-hour bandwidth history per NIC (15s fixed buckets, 480 buckets across 7200s)
             with NIC_BANDWIDTH_LOCK:
-                cutoff_ms = int((now - MAX_NIC_HISTORY_SECONDS) * 1000)
                 now_ms = int(now * 1000)
+                bucket_ms = (now_ms // NIC_BUCKET_INTERVAL_MS) * NIC_BUCKET_INTERVAL_MS
+                cutoff_ms = bucket_ms - (MAX_NIC_HISTORY_SECONDS * 1000)
                 for nic_item in interfaces_list:
                     n_name = nic_item["name"]
                     n_hist = NIC_BANDWIDTH_HISTORY_2H.setdefault(n_name, [])
-                    if not n_hist or (now_ms - n_hist[-1]["t"] >= 10000):
+                    if not n_hist or n_hist[-1]["t"] < bucket_ms:
                         n_hist.append({
-                            "t": now_ms,
+                            "t": bucket_ms,
                             "rx": nic_item["rx_bytes_sec"],
                             "tx": nic_item["tx_bytes_sec"]
                         })
                     else:
                         n_hist[-1]["rx"] = max(n_hist[-1]["rx"], nic_item["rx_bytes_sec"])
                         n_hist[-1]["tx"] = max(n_hist[-1]["tx"], nic_item["tx_bytes_sec"])
-                        n_hist[-1]["t"] = now_ms
                     
                     while n_hist and n_hist[0]["t"] < cutoff_ms:
                         n_hist.pop(0)
@@ -6476,6 +6529,7 @@ def background_collector():
                     nic_item["history_2h"] = list(n_hist)
                     if n_name in interfaces:
                         interfaces[n_name] = {k: v for k, v in nic_item.items() if k != "history_2h"}
+            _save_nic_history_2h_if_needed(now)
             
             curr_r, curr_w = get_real_disk()
             read_bytes_sec = max(0, (curr_r - last_r) / dt)

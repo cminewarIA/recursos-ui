@@ -239,13 +239,13 @@ function sampleRealNetwork() {
     }
 
     const nHist = nicHistory2h[name] || (nicHistory2h[name] = []);
-    const cutoffMs = now - 7200 * 1000;
-    if (nHist.length === 0 || now - nHist[nHist.length - 1].t >= 10000) {
-      nHist.push({ t: now, rx: Math.round(rxSec), tx: Math.round(txSec) });
+    const bucketMs = Math.floor(now / 15000) * 15000;
+    const cutoffMs = bucketMs - 7200 * 1000;
+    if (nHist.length === 0 || nHist[nHist.length - 1].t < bucketMs) {
+      nHist.push({ t: bucketMs, rx: Math.round(rxSec), tx: Math.round(txSec) });
     } else {
       nHist[nHist.length - 1].rx = Math.max(nHist[nHist.length - 1].rx, Math.round(rxSec));
       nHist[nHist.length - 1].tx = Math.max(nHist[nHist.length - 1].tx, Math.round(txSec));
-      nHist[nHist.length - 1].t = now;
     }
     while (nHist.length > 0 && nHist[0].t < cutoffMs) {
       nHist.shift();
