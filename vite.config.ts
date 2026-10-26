@@ -12,6 +12,53 @@ import { defineConfig, loadEnv, Plugin } from 'vite';
 let prevCpuTimes: { idle: number; total: number }[] = [];
 let prevNetStats: Record<string, { rx: number; tx: number; ts: number }> = {};
 const nicHistory2h: Record<string, { t: number; rx: number; tx: number }[]> = {};
+const nicHistoryFilePath = path.resolve(__dirname, 'nic_history_2h.json');
+let lastNicHistorySaveMs = 0;
+
+function loadNicHistory2hFromDisk() {
+  try {
+    if (!fs.existsSync(nicHistoryFilePath)) return;
+    const raw = JSON.parse(fs.readFileSync(nicHistoryFilePath, 'utf-8'));
+    if (!raw || typeof raw !== 'object') return;
+    const cutoffMs = Date.now() - 7200 * 1000;
+    for (const [nicName, pts] of Object.entries(raw)) {
+      if (!Array.isArray(pts)) continue;
+      const bucketMap = new Map<number, { t: number; rx: number; tx: number }>();
+      for (const pt of pts) {
+        if (!pt || typeof pt !== 'object') continue;
+        const tVal = Number((pt as { t?: number }).t || 0);
+        if (tVal < cutoffMs) continue;
+        const bTs = Math.floor(tVal / 15000) * 15000;
+        const rxVal = Math.max(0, Number((pt as { rx?: number }).rx || 0));
+        const txVal = Math.max(0, Number((pt as { tx?: number }).tx || 0));
+        const prev = bucketMap.get(bTs);
+        if (prev) {
+          prev.rx = Math.max(prev.rx, rxVal);
+          prev.tx = Math.max(prev.tx, txVal);
+        } else {
+          bucketMap.set(bTs, { t: bTs, rx: rxVal, tx: txVal });
+        }
+      }
+      nicHistory2h[nicName] = Array.from(bucketMap.values()).sort((a, b) => a.t - b.t);
+    }
+  } catch {
+    // Ignore corrupt or missing file
+  }
+}
+
+function saveNicHistory2hToDiskIfNeeded(nowMs: number) {
+  if (nowMs - lastNicHistorySaveMs < 15000) return;
+  lastNicHistorySaveMs = nowMs;
+  try {
+    const tmpPath = `${nicHistoryFilePath}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(nicHistory2h), 'utf-8');
+    fs.renameSync(tmpPath, nicHistoryFilePath);
+  } catch {
+    // Ignore write errors
+  }
+}
+
+loadNicHistory2hFromDisk();
 const historyBuffer: Record<string, (number | string)[]> = {
   timestamps: [],
   cpu: [],
@@ -271,6 +318,7 @@ function sampleRealNetwork() {
     interfacesList.push(nicObj);
   }
 
+  saveNicHistory2hToDiskIfNeeded(now);
   triggerAsyncGeoSync();
 
   return {

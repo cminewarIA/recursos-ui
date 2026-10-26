@@ -6867,7 +6867,7 @@
       _scheduleSave() {
         this._dirty = true;
         if (!this._saveTimer) {
-          this._saveTimer = setTimeout(() => this.flush(), 15000);
+          this._saveTimer = setTimeout(() => this.flush(), 3000);
         }
       },
 
@@ -6894,14 +6894,6 @@
     };
 
     const nicSparkScrubState = {};
-
-    function formatMinutesAgoLabel(minAgo) {
-      if (minAgo <= 0) return 'Ahora';
-      if (minAgo < 60) return `-${minAgo} min`;
-      const hrs = Math.floor(minAgo / 60);
-      const mins = minAgo % 60;
-      return mins === 0 ? `-${hrs}h 00m` : `-${hrs}h ${String(mins).padStart(2, '0')}m`;
-    }
 
     function bindNicSparklineScrubbing(canvas, nicName, tip) {
       if (canvas.dataset.scrubBound === 'true') return;
@@ -6972,7 +6964,7 @@
 
       const isLight = document.documentElement.getAttribute('data-theme') === 'light';
 
-      // Horizontal subtle horizon gridlines
+      // Subtle horizon gridlines
       ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.06)' : 'rgba(148, 163, 184, 0.07)';
       ctx.lineWidth = 1;
       for (let i = 1; i <= 3; i++) {
@@ -6983,17 +6975,7 @@
         ctx.stroke();
       }
 
-      // Vertical 30-minute interval gridlines across the 2-hour window (-90m at 25%, -60m at 50%, -30m at 75%)
-      ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.05)' : 'rgba(148, 163, 184, 0.06)';
-      for (let q = 1; q <= 3; q++) {
-        const vx = Math.round((w / 4) * q);
-        ctx.beginPath();
-        ctx.moveTo(vx, 0);
-        ctx.lineTo(vx, h);
-        ctx.stroke();
-      }
-
-      const timeline = NicBandwidthStorageManager.getFullTwoHourTimeline(nicName);
+      const history = NicBandwidthStorageManager.getHistory(nicName);
       const peak = NicBandwidthStorageManager.getPeak(nicName);
       const peakEl = document.getElementById('nicSparkPeak_' + nicName);
       if (peakEl) {
@@ -7001,33 +6983,42 @@
       }
       const metaEl = document.getElementById('nicSparkMeta_' + nicName);
       if (metaEl) {
-        metaEl.innerText = `2h (120m) · ${peak.count} pts`;
+        metaEl.innerText = `${peak.count} pts`;
       }
 
+      if (!history || history.length === 0) {
+        ctx.restore();
+        return;
+      }
+
+      const pts = history.length === 1
+        ? [{ t: history[0].t - 15000, rx: history[0].rx, tx: history[0].tx }, history[0]]
+        : history;
+
       const maxVal = Math.max(peak.maxRx, peak.maxTx, 1024 * 50) * 1.15;
-      const totalPts = timeline.length;
+      const totalPts = pts.length;
       const rxPoints = new Array(totalPts);
       const txPoints = new Array(totalPts);
 
       for (let i = 0; i < totalPts; i++) {
-        const pt = timeline[i];
+        const pt = pts[i];
         const x = (i / (totalPts - 1)) * w;
         const yRx = h - (Math.min(pt.rx, maxVal) / maxVal) * (h - 10) - 5;
         const yTx = h - (Math.min(pt.tx, maxVal) / maxVal) * (h - 10) - 5;
-        rxPoints[i] = { x, y: yRx, val: pt.rx, t: pt.t, idx: i };
-        txPoints[i] = { x, y: yTx, val: pt.tx, t: pt.t, idx: i };
+        rxPoints[i] = { x, y: yRx, val: pt.rx, t: pt.t };
+        txPoints[i] = { x, y: yTx, val: pt.tx, t: pt.t };
       }
 
-      function renderSpline(pts, strokeColor, fillColor) {
-        if (pts.length < 2) return;
+      function renderSpline(splinePts, strokeColor, fillColor) {
+        if (splinePts.length < 2) return;
         ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 0; i < pts.length - 1; i++) {
-          const xc = (pts[i].x + pts[i + 1].x) / 2;
-          const yc = (pts[i].y + pts[i + 1].y) / 2;
-          ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+        ctx.moveTo(splinePts[0].x, splinePts[0].y);
+        for (let i = 0; i < splinePts.length - 1; i++) {
+          const xc = (splinePts[i].x + splinePts[i + 1].x) / 2;
+          const yc = (splinePts[i].y + splinePts[i + 1].y) / 2;
+          ctx.quadraticCurveTo(splinePts[i].x, splinePts[i].y, xc, yc);
         }
-        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        ctx.lineTo(splinePts[splinePts.length - 1].x, splinePts[splinePts.length - 1].y);
 
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1.8;
@@ -7036,8 +7027,8 @@
         ctx.stroke();
 
         if (fillColor) {
-          ctx.lineTo(pts[pts.length - 1].x, h);
-          ctx.lineTo(pts[0].x, h);
+          ctx.lineTo(splinePts[splinePts.length - 1].x, h);
+          ctx.lineTo(splinePts[0].x, h);
           ctx.closePath();
           const grad = ctx.createLinearGradient(0, 0, 0, h);
           grad.addColorStop(0, fillColor);
@@ -7047,14 +7038,14 @@
         }
       }
 
-      // TX (Upload - Cyan) line across full 2 hours
+      // TX (Upload - Cyan) line
       renderSpline(txPoints, '#38BDF8', null);
 
-      // RX (Download - Emerald) line with gradient fill across full 2 hours
+      // RX (Download - Emerald) line with gradient fill
       const rxFill = isLight ? 'rgba(52, 211, 153, 0.20)' : 'rgba(52, 211, 153, 0.28)';
       renderSpline(rxPoints, '#34D399', rxFill);
 
-      // Scrub indicator across the full 120-minute (2-hour) window
+      // Scrub indicator
       const scrub = nicSparkScrubState[nicName];
       if (scrub && scrub.active && rxPoints.length > 1) {
         const closestIdx = Math.max(0, Math.min(rxPoints.length - 1, Math.round(scrub.ratio * (rxPoints.length - 1))));
@@ -7087,9 +7078,8 @@
         ctx.stroke();
 
         if (tip) {
-          const slotsAgo = (rxPoints.length - 1) - closestIdx;
-          const minAgo = Math.round((slotsAgo * 15) / 60);
-          const timeStr = formatMinutesAgoLabel(minAgo);
+          const minAgo = Math.max(0, Math.round((Date.now() - ptRx.t) / 60000));
+          const timeStr = minAgo === 0 ? 'Ahora' : `-${minAgo} min`;
           tip.style.display = 'block';
           tip.innerHTML = `<strong>${timeStr}</strong>: <span style="color:#34D399;">↓ ${formatSpeed(ptRx.val)}</span> · <span style="color:#38BDF8;">↑ ${formatSpeed(ptTx.val)}</span>`;
         }
@@ -8627,7 +8617,7 @@
       return {
         audit_metadata: {
           report_type: 'ZERO_TRUST_PHYSICAL_DEVICE_CERTIFICATE_AND_GROUPED_CLIENTS_AUDIT',
-          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '10.2.1',
+          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '10.2.2',
           generated_at_iso: new Date().toISOString(),
           generated_at_local: new Date().toLocaleString('es-ES'),
           server_node: {
@@ -9341,7 +9331,6 @@
                       </div>
                       <div class="nic-sparkline-axis">
                         <span>-2 horas</span>
-                        <span>-1h 30m</span>
                         <span>-1 hora</span>
                         <span>-30 min</span>
                         <span>Ahora</span>
