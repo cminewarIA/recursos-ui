@@ -988,6 +988,12 @@ function buildLiveConnectionsMap(localIp: string) {
     asn: string;
     is_lan: boolean;
     geo_status: 'cached' | 'lan' | 'pending';
+    bytes_sent?: number;
+    bytes_received?: number;
+    bytes_total?: number;
+    tx_speed?: number;
+    rx_speed?: number;
+    total_speed?: number;
   }[] = [];
 
   const rawSockets = parseProcNetSockets();
@@ -1036,6 +1042,12 @@ function buildLiveConnectionsMap(localIp: string) {
       remote_port: s.remotePort,
       service: s.service,
       state: s.state,
+      bytes_sent: 0,
+      bytes_received: 0,
+      bytes_total: 0,
+      tx_speed: 0.0,
+      rx_speed: 0.0,
+      total_speed: 0.0,
       lat,
       lng,
       city,
@@ -1071,6 +1083,12 @@ function buildLiveConnectionsMap(localIp: string) {
         remote_port: client.port,
         service: client.service,
         state: 'ESTABLISHED',
+        bytes_sent: 0,
+        bytes_received: 0,
+        bytes_total: 0,
+        tx_speed: 0.0,
+        rx_speed: 0.0,
+        total_speed: 0.0,
         lat,
         lng,
         city: geo?.city || (isLan ? 'Cliente Web Activo' : 'Resolviendo GeoIP...'),
@@ -1102,6 +1120,12 @@ function buildLiveConnectionsMap(localIp: string) {
         remote_port: ep.port,
         service: ep.service,
         state: 'ESTABLISHED',
+        bytes_sent: 0,
+        bytes_received: 0,
+        bytes_total: 0,
+        tx_speed: 0.0,
+        rx_speed: 0.0,
+        total_speed: 0.0,
         lat: geo.lat,
         lng: geo.lng,
         city: geo.city,
@@ -2145,6 +2169,74 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
           return;
         }
 
+        if (url === '/api/dex/status' || url === '/api/usb/status') {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: true,
+              detected_env: 'web',
+              is_native_or_mobile: false,
+              hide_device_tab: false,
+              usb_listening: true,
+              session_running: false,
+              devices: [],
+              dependencies: { adb: false, scrcpy: false, ready: false },
+            })
+          );
+          return;
+        }
+
+        if (url === '/api/dex/start' || url === '/api/dex/stop') {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, message: 'Controlador DeX exclusivo de la aplicación nativa Linux' }));
+          return;
+        }
+
+        if (url === '/api/native/device-info') {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              client_type: 'web_browser',
+              is_native: false,
+              access_level: 'WEB_SANDBOX',
+            })
+          );
+          return;
+        }
+
+        if (url?.startsWith('/api/telegram_bot')) {
+          res.setHeader('Content-Type', 'application/json');
+          if (url === '/api/telegram_bot/config') {
+            res.end(
+              JSON.stringify({
+                success: true,
+                bot_token_set: false,
+                bot_username: '',
+                admin_user_ids: [],
+                notify_completed_torrents: true,
+                notify_network_changes: true,
+              })
+            );
+          } else if (url === '/api/telegram_bot/activity') {
+            res.end(JSON.stringify({ success: true, activity: [] }));
+          } else {
+            res.end(JSON.stringify({ success: true, message: 'Operación simulada en entorno de desarrollo' }));
+          }
+          return;
+        }
+
+        if (url?.startsWith('/api/fail2ban')) {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'ok', success: true }));
+          return;
+        }
+
+        if (url === '/api/service/action' || url === '/api/wol/wake') {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: true, message: 'Acción completada' }));
+          return;
+        }
+
         next();
       });
     },
@@ -2164,6 +2256,9 @@ export default defineConfig(({ mode }) => {
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    build: {
+      emptyOutDir: false,
     },
   };
 });
