@@ -1028,7 +1028,31 @@ class LocalHtmlBridgeServer:
                                 "local_version": ver,
                                 "remote_version": ver,
                                 "update_available": False,
+                                "auto_install_enabled": True,
+                                "installed_deb_version": ver,
+                                "package_installed": True,
+                                "package_needs_install": False,
                                 "branch": "main",
+                            }
+                        )
+                        return
+                    if clean_path == "/api/system/logs":
+                        self._send_json(
+                            {
+                                "ok": True,
+                                "logs": [],
+                                "entries": [],
+                                "total_errors": 0,
+                                "counts_by_category": {
+                                    "all": 0,
+                                    "total": 0,
+                                    "systemd": 0,
+                                    "docker": 0,
+                                    "network": 0,
+                                    "kernel": 0,
+                                    "auth": 0,
+                                    "app": 0,
+                                },
                             }
                         )
                         return
@@ -1080,6 +1104,10 @@ class LocalHtmlBridgeServer:
                     return
 
                 if self._proxy_to_remote("POST", body=raw_body):
+                    return
+
+                if clean_path in ("/api/system/auto-update", "/api/system/logs/clear"):
+                    self._send_json({"ok": True, "success": True, "auto_install_enabled": True})
                     return
 
                 self._send_json({"ok": False, "error": "Modo sin conexión al servidor remoto"}, 503)

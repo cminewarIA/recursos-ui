@@ -5262,11 +5262,11 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <!-- Botones de Descarga Directa Exclusivos para la Versión Web -->
                 <div class="ota-web-download-row" id="otaWebDownloadButtons" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_10.2.1_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_10.3.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_10.2.1.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_10.3.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5275,8 +5275,30 @@
                   <span id="lblCheckVersionNow">Comprobar ahora</span>
                 </button>
                 <button class="action-btn primary-cta" id="btnUpdateGithub" onclick="triggerSystemUpdate()">
-                  <span id="lblUpdateGithub">Actualizar desde GitHub</span>
+                  <span id="lblUpdateGithub">Instalar / Actualizar Ahora</span>
                 </button>
+              </div>
+            </div>
+
+            <!-- Panel de Instalación Automática al Detectar (OTA & Paquete Nativo .deb) -->
+            <div class="surface-panel" id="autoInstallConfigCard" style="margin-top: 14px; padding: 14px 18px; border: 1px solid var(--border-subtle); background: var(--bg-surface-inset); border-radius: var(--radius-sm);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Instalación Automática al Detectar</span>
+                    <span class="adw-badge badge-green mono" id="verAutoInstallBadge">ACTIVO</span>
+                    <span class="adw-badge badge-blue mono" id="verDebInstalledBadge">Paquete .deb: v10.3.0</span>
+                  </div>
+                  <div style="font-size: 12px; color: var(--text-muted);" id="verAutoInstallStatusText">
+                    Cualquier actualización en GitHub o paquete local (.deb) pendiente se descarga, compila e instala automáticamente en cuanto se detecta.
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-secondary); user-select: none;">
+                    <input type="checkbox" id="chkAutoInstallOnDetect" checked onchange="toggleAutoInstallPreference(this.checked)" style="width: 16px; height: 16px; accent-color: var(--accent-emerald);" />
+                    <span>Auto-instalar al detectar</span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -5286,7 +5308,7 @@
                 <div style="display: flex; flex-direction: column; gap: 3px;">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Paquetes Oficiales Compilados</span>
-                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v10.2.1</span>
+                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v10.3.0</span>
                     <span class="adw-badge badge-purple" style="font-size: 10px; font-weight: 600;">Solo en la Web</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);">
@@ -5294,11 +5316,11 @@
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_10.2.1_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_10.3.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux amd64)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_10.2.1.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_10.3.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5339,7 +5361,7 @@
 
             <div id="verUpdateTerminalBox" style="display: none; margin-top: 16px;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11.5px;">
-                <span style="color: var(--accent-cyan-bright); font-weight: 700;">Salida de Actualización en Vivo</span>
+                <span style="color: var(--accent-cyan-bright); font-weight: 700;">Salida de Instalación y Actualización en Vivo</span>
                 <span id="verTerminalState" class="mono">Ejecutando...</span>
               </div>
               <pre class="terminal-box" id="verUpdateTerminalOutput"></pre>
@@ -6229,12 +6251,26 @@
       const targetPath = VIEW_TO_PATH[viewName] || '/';
 
       const waitScreen = document.getElementById('usbProjectionWaitScreen');
-      if (waitScreen) {
-        waitScreen.style.display = 'none';
-      }
-      if (typeof EnvironmentDetector !== 'undefined' && pushState) {
-        EnvironmentDetector._dismissedToWeb = true;
-        EnvironmentDetector.stopUsbPolling();
+      const envInfo = (typeof EnvironmentDetector !== 'undefined' && typeof EnvironmentDetector.getInfo === 'function')
+        ? EnvironmentDetector.getInfo()
+        : { isUbuntuNative: false };
+
+      if (viewName === 'dex' && envInfo.isUbuntuNative) {
+        if (waitScreen) waitScreen.style.display = 'flex';
+        if (typeof EnvironmentDetector !== 'undefined') {
+          EnvironmentDetector._dismissedToWeb = false;
+          EnvironmentDetector.startUsbPolling();
+        }
+      } else {
+        if (waitScreen && !envInfo.isUbuntuNative) {
+          waitScreen.style.display = 'none';
+        }
+        if (typeof EnvironmentDetector !== 'undefined' && pushState && viewName !== 'dex') {
+          EnvironmentDetector._dismissedToWeb = true;
+          if (!envInfo.isUbuntuNative) {
+            EnvironmentDetector.stopUsbPolling();
+          }
+        }
       }
 
       updateHistoryButtonsState();
@@ -7748,6 +7784,55 @@
       }
     }
 
+    let _autoInstallInProgressClient = false;
+    let _lastAutoInstallTriggerTs = 0;
+
+    function isAutoInstallEnabled() {
+      try {
+        const stored = localStorage.getItem('recursos_auto_install_on_detect');
+        if (stored !== null) return stored !== 'false';
+      } catch (e) {}
+      return true;
+    }
+
+    async function toggleAutoInstallPreference(enabled) {
+      const flag = Boolean(enabled);
+      try {
+        localStorage.setItem('recursos_auto_install_on_detect', flag ? 'true' : 'false');
+      } catch (e) {}
+
+      const badge = document.getElementById('verAutoInstallBadge');
+      const statusTxt = document.getElementById('verAutoInstallStatusText');
+      if (badge) {
+        badge.className = 'adw-badge mono ' + (flag ? 'badge-green' : 'badge-amber');
+        badge.innerText = flag ? 'ACTIVO' : 'MANUAL';
+      }
+      if (statusTxt) {
+        statusTxt.innerText = flag
+          ? 'Cualquier actualización en GitHub o paquete local (.deb) pendiente se descarga, compila e instala automáticamente en cuanto se detecta.'
+          : 'Modo manual activo: las actualizaciones detectadas esperarán confirmación antes de instalarse.';
+      }
+
+      try {
+        await fetch('/api/system/auto-update', {
+          method: 'POST',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ enabled: flag })
+        });
+      } catch (e) {}
+
+      showToast(
+        flag
+          ? 'Instalación automática al detectar activada'
+          : 'Instalación automática pausada (modo manual)',
+        flag ? 'success' : 'info'
+      );
+
+      if (flag && latestVersionInfo && (latestVersionInfo.update_available || latestVersionInfo.package_needs_install)) {
+        executeSystemUpdate(true);
+      }
+    }
+
     async function checkSystemVersion(forceRefresh = false) {
       const btn = document.getElementById('btnCheckVersionNow');
       const lbl = document.getElementById('lblCheckVersionNow');
@@ -7760,13 +7845,22 @@
         const data = await res.json();
         latestVersionInfo = data;
         renderVersionInfo(data);
-        if (forceRefresh) {
+
+        const shouldAutoInstall = isAutoInstallEnabled() && (data.update_available || data.package_needs_install);
+        const nowMs = Date.now();
+        if (shouldAutoInstall && !_autoInstallInProgressClient && (nowMs - _lastAutoInstallTriggerTs > 30000)) {
+          const reasonMsg = data.update_available
+            ? `Nueva versión detectada (${data.remote_hash || 'GitHub'}) · Instalando automáticamente...`
+            : `Paquete local v${data.version || ''} detectado · Instalando automáticamente...`;
+          showToast(reasonMsg, 'info');
+          executeSystemUpdate(true);
+        } else if (forceRefresh) {
           const rHash = data.remote_hash || (data.remote && data.remote.sha) || '';
           const lHash = data.local_hash || (data.local && data.local.sha) || '';
           showToast(
             data.update_available
               ? `Actualización disponible en GitHub (${rHash})`
-              : `Sistema sincronizado con GitHub (${lHash})`,
+              : `Sistema y paquete v${data.version || ''} sincronizados (${lHash})`,
             data.update_available ? 'info' : 'success'
           );
         }
@@ -7848,7 +7942,7 @@
       const lblVerHeader = document.getElementById('lblVersionHeader');
       if (dotVerHeader && lblVerHeader) {
         dotVerHeader.style.background = hasUpdate ? 'var(--accent-amber)' : 'var(--accent-emerald)';
-        lblVerHeader.innerText = hasUpdate ? `Actualizar (${remoteHash})` : `${semVer} · ${localHash}`;
+        lblVerHeader.innerText = hasUpdate ? `Instalando (${remoteHash})` : `${semVer} · ${localHash}`;
       }
 
       const ovVersionCommit = document.getElementById('ovVersionCommit');
@@ -7857,7 +7951,7 @@
       const ovVersionBadge = document.getElementById('ovVersionBadge');
       if (ovVersionBadge) {
         ovVersionBadge.className = 'adw-badge ' + (hasUpdate ? 'badge-amber' : 'badge-green');
-        ovVersionBadge.innerText = hasUpdate ? 'Actualización disponible' : 'Al día con GitHub';
+        ovVersionBadge.innerText = hasUpdate ? 'Instalando actualización...' : 'Al día con GitHub';
       }
 
       const ovBadgeGitVersion = document.getElementById('ovBadgeGitVersion');
@@ -7873,6 +7967,33 @@
       const cleanSemVer = semVer.replace(/^v/, '');
       const otaCardVer = document.getElementById('otaCardVersionBadge');
       if (otaCardVer) otaCardVer.innerText = `v${cleanSemVer}`;
+
+      const autoChk = document.getElementById('chkAutoInstallOnDetect');
+      const autoEnabled = isAutoInstallEnabled();
+      if (autoChk) autoChk.checked = autoEnabled;
+
+      const verAutoInstallBadge = document.getElementById('verAutoInstallBadge');
+      if (verAutoInstallBadge) {
+        verAutoInstallBadge.className = 'adw-badge mono ' + (autoEnabled ? 'badge-green' : 'badge-amber');
+        verAutoInstallBadge.innerText = info.auto_install_in_progress
+          ? 'INSTALANDO...'
+          : (autoEnabled ? 'ACTIVO' : 'MANUAL');
+      }
+
+      const verDebInstalledBadge = document.getElementById('verDebInstalledBadge');
+      if (verDebInstalledBadge) {
+        const debVer = info.installed_deb_version || cleanSemVer;
+        const needsInst = Boolean(info.package_needs_install);
+        verDebInstalledBadge.className = 'adw-badge mono ' + (needsInst ? 'badge-amber' : 'badge-blue');
+        verDebInstalledBadge.innerText = needsInst
+          ? `Instalando .deb v${cleanSemVer}...`
+          : `Paquete .deb: v${debVer}`;
+      }
+
+      const verAutoInstallStatusText = document.getElementById('verAutoInstallStatusText');
+      if (verAutoInstallStatusText && info.auto_install_status) {
+        verAutoInstallStatusText.innerText = `${info.auto_install_status} · Detección continua activa cada 60s.`;
+      }
 
       const btnOtaDeb = document.getElementById('btnOtaDownloadDeb');
       if (btnOtaDeb) {
@@ -7899,8 +8020,8 @@
       if (verStatusBadge) {
         verStatusBadge.className = 'adw-badge ' + (hasUpdate ? 'badge-amber' : 'badge-green');
         verStatusBadge.innerText = hasUpdate
-          ? `Nueva versión disponible (${behindCount > 0 ? behindCount + ' commits' : remoteHash})`
-          : 'Sincronizado con GitHub';
+          ? `Instalando nueva versión (${behindCount > 0 ? behindCount + ' commits' : remoteHash})`
+          : 'Sincronizado e instalado';
       }
 
       const verLocalBranch = document.getElementById('verLocalBranch');
@@ -7922,21 +8043,22 @@
       const detectedDomain = info.public_domain || getDetectedPublicDomain();
       const dnsEl = document.getElementById('dnsDetectedDomain');
       if (dnsEl && detectedDomain) dnsEl.innerText = detectedDomain;
+
+      // Si durante el renderizado de métricas en vivo se detecta actualización y auto-install está activo, disparar inmediatamente
+      if (autoEnabled && (hasUpdate || info.package_needs_install) && !_autoInstallInProgressClient && (Date.now() - _lastAutoInstallTriggerTs > 30000)) {
+        executeSystemUpdate(true);
+      }
     }
 
     function triggerSystemUpdate() {
-      const localHash = (latestVersionInfo && (latestVersionInfo.local_hash || (latestVersionInfo.local && latestVersionInfo.local.sha))) || 'actual';
-      const remoteHash = (latestVersionInfo && (latestVersionInfo.remote_hash || (latestVersionInfo.remote && latestVersionInfo.remote.sha))) || 'origin/main';
-
-      showConfirmModal(
-        'Actualizar servidor desde GitHub',
-        `Se ejecutará git pull origin main desde cminewarIA/recursos-ui.\n\n• Commit local: ${localHash}\n• Commit remoto: ${remoteHash}\n\nEl servicio system-dashboard.service se reiniciará automáticamente.`,
-        executeSystemUpdate,
-        false
-      );
+      executeSystemUpdate(false);
     }
 
-    async function executeSystemUpdate() {
+    async function executeSystemUpdate(isAutomatic = false) {
+      if (_autoInstallInProgressClient) return;
+      _autoInstallInProgressClient = true;
+      _lastAutoInstallTriggerTs = Date.now();
+
       const btn = document.getElementById('btnUpdateGithub');
       const lbl = document.getElementById('lblUpdateGithub');
       const termBox = document.getElementById('verUpdateTerminalBox');
@@ -7944,34 +8066,46 @@
       const termState = document.getElementById('verTerminalState');
 
       if (btn) btn.disabled = true;
-      if (lbl) lbl.innerText = 'Actualizando...';
+      if (lbl) lbl.innerText = isAutomatic ? 'Auto-instalando...' : 'Instalando...';
       if (termBox) termBox.style.display = 'block';
-      if (termState) termState.innerText = 'Ejecutando git pull origin main...';
-      if (termOut) termOut.innerText = '$ git fetch origin main\n$ git pull --ff-only origin main\nSincronizando con GitHub...';
+      if (termState) termState.innerText = isAutomatic
+        ? 'Instalando actualización detectada automáticamente...'
+        : 'Ejecutando git pull + compilación e instalación .deb...';
+      if (termOut) termOut.innerText = '$ git fetch origin main\n$ git pull --ff-only origin main\n$ bash packaging/build_deb.sh\n$ sudo apt-get install -y ./dist/recursos-cockpit.deb\nAplicando cambios...';
 
       try {
         const res = await fetch('/api/system/update', {
           method: 'POST',
-          headers: authHeaders({ 'Content-Type': 'application/json' })
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ automatic: Boolean(isAutomatic) })
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          if (termOut) termOut.innerText = (data.output || data.log || data.message || 'Actualización completada.');
-          if (termState) termState.innerText = '✔ Completado';
-          showToast(data.message || 'Actualización aplicada con éxito', 'success');
-          setTimeout(() => { window.location.reload(); }, 3500);
+          if (termOut) termOut.innerText = (data.output || data.log || data.message || 'Actualización e instalación completadas.');
+          if (termState) termState.innerText = '✔ Instalado';
+          if (data.version_info) {
+            latestVersionInfo = data.version_info;
+            renderVersionInfo(data.version_info);
+          }
+          showToast(data.message || 'Instalación aplicada automáticamente con éxito', 'success');
+          if (data.output && !String(data.output).includes('Already up to date')) {
+            setTimeout(() => { window.location.reload(); }, 3500);
+          }
         } else {
-          if (termOut) termOut.innerText = `Error:\n${data.error || 'Fallo en git pull'}`;
+          if (termOut) termOut.innerText = `Error:\n${data.error || 'Fallo en actualización'}`;
           if (termState) termState.innerText = 'Error';
-          showToast(data.error || 'Error al actualizar', 'error');
+          if (!isAutomatic) {
+            showToast(data.error || 'Error al instalar actualización', 'error');
+          }
         }
       } catch (err) {
         if (termState) termState.innerText = 'Reconectando...';
-        showToast('Reiniciando servicio tras actualización...', 'info');
+        showToast('Reiniciando servicio tras instalación...', 'info');
         setTimeout(() => { window.location.reload(); }, 3500);
       } finally {
+        _autoInstallInProgressClient = false;
         if (btn) btn.disabled = false;
-        if (lbl) lbl.innerText = 'Actualizar desde GitHub';
+        if (lbl) lbl.innerText = 'Instalar / Actualizar Ahora';
       }
     }
 
@@ -11650,7 +11784,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       });
 
       checkSystemVersion(false);
-      setInterval(() => checkSystemVersion(false), 300000);
+      setInterval(() => checkSystemVersion(false), 60000);
 
       let _resizeRafId = null;
       const handleDynamicViewportReflow = () => {
@@ -11658,11 +11792,14 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         _resizeRafId = requestAnimationFrame(() => {
           _resizeRafId = null;
           renderActiveView();
-          if (activeView === 'network' && window.ConnectionsGeoMap && window.ConnectionsGeoMap._leafletMap) {
+          const mapEng = (typeof NetworkConnectionsMapEngine !== 'undefined' && NetworkConnectionsMapEngine)
+            ? NetworkConnectionsMapEngine
+            : window.ConnectionsGeoMap;
+          if (activeView === 'network' && mapEng && mapEng._leafletMap) {
             try {
-              window.ConnectionsGeoMap._leafletMap.invalidateSize({ animate: false });
-              if (typeof window.ConnectionsGeoMap.enforceMapWorldBounds === 'function') {
-                window.ConnectionsGeoMap.enforceMapWorldBounds();
+              mapEng._leafletMap.invalidateSize({ animate: false });
+              if (typeof mapEng.enforceMapWorldBounds === 'function') {
+                mapEng.enforceMapWorldBounds();
               }
             } catch (e) {}
           }

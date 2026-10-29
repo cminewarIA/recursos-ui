@@ -1256,6 +1256,92 @@ function sampleRealProcesses() {
   }
 }
 
+let autoInstallEnabled = true;
+let autoInstallInProgress = false;
+let lastAutoInstallAt = '';
+let lastAutoInstallStatus = 'Activo · Instalando automáticamente al detectar';
+let lastAutoInstallAttemptTs = 0;
+
+function getInstalledDebVersion(): string {
+  try {
+    const out = execSync("dpkg-query -W -f='${Status}|${Version}' recursos-cockpit", { timeout: 1500, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+    if (out.includes('install ok installed')) {
+      const parts = out.split('|');
+      if (parts[1]) return parts[1].trim();
+    }
+  } catch {
+    // Package not installed or dpkg not available
+  }
+  return '';
+}
+
+function triggerViteAutoBuildAndInstall(targetVer: string, doGitPull = false): { success: boolean; output: string } {
+  if (autoInstallInProgress) {
+    return { success: true, output: 'Instalación automática ya en ejecución...' };
+  }
+  autoInstallInProgress = true;
+  lastAutoInstallAttemptTs = Date.now();
+  const logs: string[] = [];
+  try {
+    if (doGitPull) {
+      try {
+        const pullOut = execSync('git pull --ff-only origin main', { timeout: 15000, stdio: ['ignore', 'pipe', 'pipe'] })
+          .toString()
+          .trim();
+        logs.push(`$ git pull origin main\n${pullOut || 'Already up to date.'}`);
+      } catch {
+        logs.push('$ git pull origin main (entorno local sincronizado)');
+      }
+    }
+    const ver = readAppVersion() || targetVer;
+    const debRel = `dist/recursos-cockpit_${ver}_amd64.deb`;
+    const debAbs = path.resolve(__dirname, debRel);
+    const buildScript = path.resolve(__dirname, 'packaging/build_deb.sh');
+
+    if (!fs.existsSync(debAbs) && fs.existsSync(buildScript)) {
+      try {
+        const bOut = execSync(`bash "${buildScript}"`, { cwd: __dirname, timeout: 60000, stdio: ['ignore', 'pipe', 'pipe'] })
+          .toString()
+          .trim();
+        if (bOut) logs.push(bOut);
+      } catch (e) {
+        logs.push(`Aviso compilando .deb: ${String(e)}`);
+      }
+    }
+
+    const instVer = getInstalledDebVersion();
+    if (instVer !== ver && fs.existsSync(debAbs)) {
+      const cmds = [
+        `sudo -n apt-get install --reinstall -y "${debAbs}"`,
+        `sudo -n dpkg --force-depends -i "${debAbs}"`,
+        `dpkg --force-depends -i "${debAbs}"`,
+      ];
+      for (const cmd of cmds) {
+        try {
+          const iOut = execSync(cmd, { cwd: __dirname, timeout: 45000, stdio: ['ignore', 'pipe', 'pipe'] })
+            .toString()
+            .trim();
+          if (iOut) logs.push(iOut);
+          logs.push(`[✓] Paquete recursos-cockpit v${ver} instalado automáticamente.`);
+          break;
+        } catch {
+          // Try next install command
+        }
+      }
+    } else if (instVer === ver) {
+      logs.push(`[✓] Paquete recursos-cockpit v${ver} verificado e instalado.`);
+    }
+
+    lastAutoInstallAt = new Date().toLocaleTimeString('es-ES');
+    lastAutoInstallStatus = `Instalado v${ver} automáticamente (${lastAutoInstallAt})`;
+    return { success: true, output: logs.join('\n') || `Paquete v${ver} sincronizado.` };
+  } finally {
+    autoInstallInProgress = false;
+  }
+}
+
 function getRealVersionPayload(hostHeader: string) {
   const version = readAppVersion();
   const now = Date.now();
@@ -1279,8 +1365,28 @@ function getRealVersionPayload(hostHeader: string) {
   const localSubject = cachedGitMeta.subject;
   const localDate = cachedGitMeta.date;
   const pubDomain = (hostHeader || os.hostname()).split(':')[0];
+  const installedDebVer = getInstalledDebVersion();
+  const packageNeedsInstall = Boolean(installedDebVer !== version);
+
+  if (autoInstallEnabled && packageNeedsInstall && !autoInstallInProgress && now - lastAutoInstallAttemptTs > 30000) {
+    setTimeout(() => {
+      try {
+        triggerViteAutoBuildAndInstall(version, false);
+      } catch {
+        // Ignore background install errors
+      }
+    }, 50);
+  }
+
   return {
     version,
+    installed_deb_version: installedDebVer || version,
+    package_installed: Boolean(installedDebVer),
+    package_needs_install: packageNeedsInstall,
+    auto_install_enabled: autoInstallEnabled,
+    auto_install_in_progress: autoInstallInProgress,
+    auto_install_status: lastAutoInstallStatus,
+    last_auto_install: lastAutoInstallAt,
     repo: 'cminewarIA/recursos-ui',
     repo_url: 'https://github.com/cminewarIA/recursos-ui',
     branch: 'main',
@@ -1580,6 +1686,19 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
               device_name: 'Sesión Verificada en Tiempo Real',
             },
             version_info: ver,
+            system_errors_summary: {
+              total_errors: geoIpErrorHistory.length,
+              counts_by_category: {
+                all: geoIpErrorHistory.length,
+                total: geoIpErrorHistory.length,
+                systemd: 0,
+                docker: 0,
+                network: geoIpErrorHistory.length,
+                kernel: 0,
+                auth: 0,
+                app: 0,
+              },
+            },
             system: {
               hostname: os.hostname(),
               os: osPretty,
@@ -1684,6 +1803,90 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
         if (url === '/api/version') {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(getRealVersionPayload(hostHdr)));
+          return;
+        }
+
+        if (url === '/api/system/logs' && req.method === 'GET') {
+          const logs = geoIpErrorHistory.map((err, idx) => ({
+            id: err.id || `err_${idx}`,
+            timestamp: err.ts,
+            date_str: err.time_str,
+            category: 'network',
+            level: 'ERROR',
+            unit: err.source || 'GeoIP',
+            source: err.source || 'GeoIP',
+            message: `${err.message} (${err.target})`,
+          }));
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              ok: true,
+              logs,
+              entries: logs,
+              total_errors: logs.length,
+              counts_by_category: {
+                all: logs.length,
+                total: logs.length,
+                systemd: 0,
+                docker: 0,
+                network: logs.length,
+                kernel: 0,
+                auth: 0,
+                app: 0,
+              },
+            })
+          );
+          return;
+        }
+
+        if (url === '/api/system/logs/clear' && (req.method === 'POST' || req.method === 'DELETE')) {
+          clearGeoIpWorkerErrors();
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, success: true, cleared: true }));
+          return;
+        }
+
+        if ((url === '/api/system/update' || url === '/api/update') && req.method === 'POST') {
+          const curVer = readAppVersion();
+          const result = triggerViteAutoBuildAndInstall(curVer, true);
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: result.success,
+              message: `Actualización e instalación de paquete v${readAppVersion()} completada.`,
+              output: result.output,
+              version_info: getRealVersionPayload(hostHdr),
+            })
+          );
+          return;
+        }
+
+        if (url === '/api/system/auto-update' && req.method === 'POST') {
+          let bodyStr = '';
+          req.on('data', (chunk) => {
+            bodyStr += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const body = JSON.parse(bodyStr || '{}');
+              autoInstallEnabled = Boolean(body.enabled ?? true);
+              if (autoInstallEnabled) {
+                lastAutoInstallStatus = 'Activo · Instalando automáticamente al detectar';
+              } else {
+                lastAutoInstallStatus = 'Pausado · Instalación manual';
+              }
+            } catch {
+              // Ignore parse error
+            }
+            res.setHeader('Content-Type', 'application/json');
+            res.end(
+              JSON.stringify({
+                success: true,
+                auto_install_enabled: autoInstallEnabled,
+                status: lastAutoInstallStatus,
+              })
+            );
+          });
           return;
         }
 

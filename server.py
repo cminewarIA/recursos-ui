@@ -3208,15 +3208,243 @@ def get_app_version():
 
     return "0.0.0"
 
-def get_version_info(force_refresh=False):
+AUTO_INSTALL_CONFIG_FILE = os.path.join(BASE_DIR, "auto_install_config.json")
+AUTO_INSTALL_LOCK = threading.Lock()
+AUTO_INSTALL_EXEC_LOCK = threading.Lock()
+AUTO_INSTALL_STATE = {
+    "enabled": True,
+    "in_progress": False,
+    "last_installed_at": "",
+    "last_status": "Activo · Instalando automáticamente al detectar",
+    "last_output": "",
+    "last_attempt_ts": 0.0,
+}
+
+def load_auto_install_preference():
+    try:
+        if os.path.isfile(AUTO_INSTALL_CONFIG_FILE):
+            with open(AUTO_INSTALL_CONFIG_FILE, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                if isinstance(cfg, dict) and "enabled" in cfg:
+                    AUTO_INSTALL_STATE["enabled"] = bool(cfg["enabled"])
+    except Exception:
+        pass
+    return AUTO_INSTALL_STATE["enabled"]
+
+def save_auto_install_preference(enabled):
+    with AUTO_INSTALL_LOCK:
+        AUTO_INSTALL_STATE["enabled"] = bool(enabled)
+        try:
+            with open(AUTO_INSTALL_CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump({"enabled": bool(enabled), "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}, f)
+        except Exception:
+            pass
+    return AUTO_INSTALL_STATE["enabled"]
+
+load_auto_install_preference()
+
+def get_installed_deb_version():
+    """Devuelve la versión del paquete Debian `recursos-cockpit` instalada en el sistema operativo local."""
+    try:
+        res = subprocess.run(
+            ["dpkg-query", "-W", "-f=${Status}|${Version}", "recursos-cockpit"],
+            capture_output=True, text=True, timeout=2
+        )
+        if res.returncode == 0 and "install ok installed" in (res.stdout or ""):
+            parts = res.stdout.strip().split("|")
+            if len(parts) == 2 and parts[1].strip():
+                return parts[1].strip()
+    except Exception:
+        pass
+    return ""
+
+def ensure_local_deb_built_and_installed(target_version=None):
+    """
+    Compila el paquete `dist/recursos-cockpit_${VERSION}_amd64.deb` si no existe
+    y lo instala inmediatamente en el sistema operativo al detectarse.
+    """
+    ver = (target_version or get_app_version()).strip()
+    deb_rel = os.path.join("dist", f"recursos-cockpit_{ver}_amd64.deb")
+    deb_abs = os.path.join(BASE_DIR, deb_rel)
+    build_script = os.path.join(BASE_DIR, "packaging", "build_deb.sh")
+    logs = []
+
+    if not os.path.isfile(deb_abs) and os.path.isfile(build_script):
+        logs.append(f"[+] Compilando paquete nativo Debian para v{ver}...")
+        try:
+            p_build = subprocess.run(
+                ["bash", build_script],
+                cwd=BASE_DIR, capture_output=True, text=True, timeout=120
+            )
+            b_out = ((p_build.stdout or "") + "\n" + (p_build.stderr or "")).strip()
+            if b_out:
+                logs.append(b_out)
+        except Exception as e:
+            logs.append(f"[-] Error compilando paquete .deb: {e}")
+
+    installed_ver = get_installed_deb_version()
+    if installed_ver == ver and os.path.isfile("/usr/bin/recursos-cockpit"):
+        logs.append(f"[✓] Paquete recursos-cockpit v{ver} ya instalado y verificado en /usr/bin/recursos-cockpit.")
+        return True, "\n".join(logs)
+
+    if os.path.isfile(deb_abs):
+        logs.append(f"[+] Instalando automáticamente paquete detectado: {deb_rel}...")
+        install_cmds = []
+        if os.geteuid() == 0 if hasattr(os, "geteuid") else False:
+            install_cmds = [
+                ["apt-get", "install", "--reinstall", "-y", deb_abs],
+                ["dpkg", "--force-depends", "-i", deb_abs],
+            ]
+        else:
+            install_cmds = [
+                ["sudo", "-n", "apt-get", "install", "--reinstall", "-y", deb_abs],
+                ["sudo", "-n", "dpkg", "--force-depends", "-i", deb_abs],
+                ["dpkg", "--force-depends", "-i", deb_abs],
+            ]
+
+        for cmd in install_cmds:
+            try:
+                p_inst = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, text=True, timeout=90)
+                i_out = ((p_inst.stdout or "") + "\n" + (p_inst.stderr or "")).strip()
+                if p_inst.returncode == 0:
+                    if i_out:
+                        logs.append(i_out)
+                    logs.append(f"[✓] Instalación automática de recursos-cockpit v{ver} completada.")
+                    return True, "\n".join(logs)
+            except Exception:
+                continue
+
+    return (get_installed_deb_version() == ver), "\n".join(logs)
+
+def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
+    """
+    Ejecuta la sincronización desde GitHub (`git pull origin main`) cuando procede
+    y compila + instala inmediatamente el paquete local `.deb` según se detecta.
+    """
+    if not AUTO_INSTALL_EXEC_LOCK.acquire(blocking=False):
+        return {
+            "success": True,
+            "already_running": True,
+            "message": "Instalación automática ya en curso...",
+            "output": AUTO_INSTALL_STATE.get("last_output", ""),
+        }
+
+    try:
+        with AUTO_INSTALL_LOCK:
+            AUTO_INSTALL_STATE["in_progress"] = True
+            AUTO_INSTALL_STATE["last_attempt_ts"] = time.time()
+            AUTO_INSTALL_STATE["last_status"] = f"Instalando actualización detectada ({trigger_source})..."
+
+        out_lines = []
+        pull_ok = True
+
+        if do_git_pull:
+            try:
+                subprocess.run(
+                    ["git", "fetch", "origin", GITHUB_BRANCH],
+                    cwd=BASE_DIR, capture_output=True, text=True, timeout=20
+                )
+                p_pull = subprocess.run(
+                    ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
+                    cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                )
+                if p_pull.returncode != 0:
+                    subprocess.run(["git", "stash"], cwd=BASE_DIR, capture_output=True, timeout=10)
+                    p_pull = subprocess.run(
+                        ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
+                        cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                    )
+                    if p_pull.returncode != 0:
+                        p_pull = subprocess.run(
+                            ["git", "pull", "origin", GITHUB_BRANCH],
+                            cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                        )
+                pull_out = ((p_pull.stdout or "").strip() + "\n" + (p_pull.stderr or "").strip()).strip()
+                out_lines.append(f"$ git pull origin {GITHUB_BRANCH}\n{pull_out or 'Already up to date.'}")
+                pull_ok = (p_pull.returncode == 0)
+            except Exception as e:
+                pull_ok = False
+                out_lines.append(f"[-] Error ejecutando git pull: {e}")
+
+        new_ver = get_app_version()
+        deb_ok, deb_log = ensure_local_deb_built_and_installed(new_ver)
+        if deb_log:
+            out_lines.append(deb_log)
+
+        combined_output = "\n".join([line for line in out_lines if line]).strip()
+        now_str = datetime.now().strftime("%H:%M:%S")
+
+        with AUTO_INSTALL_LOCK:
+            AUTO_INSTALL_STATE["in_progress"] = False
+            AUTO_INSTALL_STATE["last_installed_at"] = now_str
+            AUTO_INSTALL_STATE["last_output"] = combined_output
+            AUTO_INSTALL_STATE["last_status"] = (
+                f"Instalado v{new_ver} automáticamente ({now_str})"
+                if (pull_ok or deb_ok)
+                else f"Revisión completada ({now_str})"
+            )
+
+        updated_ver = get_version_info(force_refresh=True, allow_auto_trigger=False)
+
+        if do_git_pull and pull_ok and "Already up to date" not in combined_output:
+            def delayed_service_restart():
+                time.sleep(1.5)
+                try:
+                    subprocess.run(["sudo", "-n", "systemctl", "restart", "system-dashboard.service"], capture_output=True, timeout=15)
+                except Exception:
+                    pass
+            threading.Thread(target=delayed_service_restart, daemon=True).start()
+
+        return {
+            "success": bool(pull_ok or deb_ok),
+            "deb_installed": bool(deb_ok),
+            "message": f"Actualización e instalación de paquete v{new_ver} aplicada correctamente.",
+            "output": combined_output or "Sistema y paquete .deb sincronizados.",
+            "version_info": updated_ver,
+        }
+    finally:
+        with AUTO_INSTALL_LOCK:
+            AUTO_INSTALL_STATE["in_progress"] = False
+        AUTO_INSTALL_EXEC_LOCK.release()
+
+def auto_install_watcher_worker():
+    """
+    Hilo guardián que supervisa periódicamente si existe una nueva versión en GitHub
+    o un paquete local `.deb` pendiente de compilar/instalar y lo instala según se detecta.
+    """
+    time.sleep(2.0)
+    while True:
+        try:
+            if AUTO_INSTALL_STATE.get("enabled", True):
+                ver_target = get_app_version()
+                inst_ver = get_installed_deb_version()
+                deb_path = os.path.join(BASE_DIR, "dist", f"recursos-cockpit_{ver_target}_amd64.deb")
+                if inst_ver != ver_target or not os.path.isfile(deb_path):
+                    perform_auto_update_and_install(trigger_source="local_package_detected", do_git_pull=False)
+
+                info = get_version_info(force_refresh=True, allow_auto_trigger=False)
+                if info.get("update_available"):
+                    perform_auto_update_and_install(trigger_source="github_ota_detected", do_git_pull=True)
+        except Exception as e:
+            print(f"[-] Advertencia en auto_install_watcher_worker: {e}")
+        time.sleep(60)
+
+def get_version_info(force_refresh=False, allow_auto_trigger=True):
     """
     Obtiene la versión actual instalada localmente (Git commit, fecha, versión semántica)
     y la compara en tiempo real con el repositorio remoto en GitHub (cminewarIA/recursos-ui).
+    Si detecta una actualización o paquete desfasado y la instalación automática está activa,
+    dispara la instalación inmediatamente en segundo plano.
     """
     now = time.time()
     with VERSION_LOCK:
-        if not force_refresh and VERSION_CACHE["data"] and (now - VERSION_CACHE["timestamp"] < 90):
-            return dict(VERSION_CACHE["data"])
+        if not force_refresh and VERSION_CACHE["data"] and (now - VERSION_CACHE["timestamp"] < 60):
+            cached_copy = dict(VERSION_CACHE["data"])
+            cached_copy["auto_install_enabled"] = AUTO_INSTALL_STATE.get("enabled", True)
+            cached_copy["auto_install_in_progress"] = AUTO_INSTALL_STATE.get("in_progress", False)
+            cached_copy["auto_install_status"] = AUTO_INSTALL_STATE.get("last_status", "")
+            cached_copy["last_auto_install"] = AUTO_INSTALL_STATE.get("last_installed_at", "")
+            return cached_copy
 
     pkg_version = get_app_version()
 
@@ -3327,9 +3555,34 @@ def get_version_info(force_refresh=False):
         if behind_count == 0:
             behind_count = 1
 
+    installed_deb_ver = get_installed_deb_version()
+    package_installed = bool(installed_deb_ver)
+    package_needs_install = bool(installed_deb_ver != pkg_version)
+
+    # Si se detecta actualización o paquete pendiente y auto_install está activo, instalar inmediatamente en background
+    if (
+        allow_auto_trigger
+        and AUTO_INSTALL_STATE.get("enabled", True)
+        and (update_available or package_needs_install)
+        and not AUTO_INSTALL_STATE.get("in_progress", False)
+        and (now - AUTO_INSTALL_STATE.get("last_attempt_ts", 0.0) > 25.0)
+    ):
+        threading.Thread(
+            target=perform_auto_update_and_install,
+            kwargs={"trigger_source": "detected_on_check", "do_git_pull": bool(update_available)},
+            daemon=True,
+        ).start()
+
     pub_dom = detect_system_dns_domain()
     result = {
         "version": pkg_version,
+        "installed_deb_version": installed_deb_ver or pkg_version,
+        "package_installed": package_installed,
+        "package_needs_install": package_needs_install,
+        "auto_install_enabled": AUTO_INSTALL_STATE.get("enabled", True),
+        "auto_install_in_progress": AUTO_INSTALL_STATE.get("in_progress", False),
+        "auto_install_status": AUTO_INSTALL_STATE.get("last_status", ""),
+        "last_auto_install": AUTO_INSTALL_STATE.get("last_installed_at", ""),
         "repo": GITHUB_REPO,
         "repo_url": f"https://github.com/{GITHUB_REPO}",
         "branch": local_branch,
@@ -8479,7 +8732,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 6. Actualización en 1 clic desde GitHub (git pull origin main + reinicio limpio)
+        # 6. Actualización e instalación automática desde GitHub (git pull + build .deb + apt install + reinicio)
         elif clean_path in ("/api/system/update", "/api/update"):
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
@@ -8489,58 +8742,43 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 return
 
             try:
-                p_fetch = subprocess.run(
-                    ["git", "fetch", "origin", GITHUB_BRANCH],
-                    cwd=BASE_DIR, capture_output=True, text=True, timeout=20
-                )
-                p_pull = subprocess.run(
-                    ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
-                    cwd=BASE_DIR, capture_output=True, text=True, timeout=25
-                )
-                if p_pull.returncode != 0:
-                    # Si falla por cambios locales o bloqueo de working tree, resguardar con stash y reintentar
-                    subprocess.run(["git", "stash"], cwd=BASE_DIR, capture_output=True, timeout=10)
-                    p_pull = subprocess.run(
-                        ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
-                        cwd=BASE_DIR, capture_output=True, text=True, timeout=25
-                    )
-                    if p_pull.returncode != 0:
-                        p_pull = subprocess.run(
-                            ["git", "pull", "origin", GITHUB_BRANCH],
-                            cwd=BASE_DIR, capture_output=True, text=True, timeout=25
-                        )
-
-                pull_out = (p_pull.stdout.strip() + "\n" + p_pull.stderr.strip()).strip()
-                updated_ver = get_version_info(force_refresh=True)
-
-                if p_pull.returncode == 0:
-                    def delayed_service_restart():
-                        time.sleep(1.5)
-                        try:
-                            subprocess.run(["sudo", "systemctl", "restart", "system-dashboard.service"], capture_output=True, timeout=15)
-                        except Exception:
-                            pass
-
-                    threading.Thread(target=delayed_service_restart, daemon=True).start()
-                    resp = json.dumps({
-                        "success": True,
-                        "message": "Actualización descargada desde GitHub correctamente. Reiniciando servicio system-dashboard...",
-                        "output": pull_out or "Already up to date.",
-                        "version_info": updated_ver
-                    }).encode('utf-8')
-                else:
-                    resp = json.dumps({
-                        "success": False,
-                        "error": f"Error al ejecutar git pull: {pull_out or 'Código ' + str(p_pull.returncode)}",
-                        "output": pull_out,
-                        "version_info": updated_ver
-                    }).encode('utf-8')
+                res_obj = perform_auto_update_and_install(trigger_source="api_request", do_git_pull=True)
+                resp = json.dumps(res_obj).encode('utf-8')
             except Exception as e:
                 resp = json.dumps({
                     "success": False,
-                    "error": f"Excepción durante la actualización desde GitHub: {str(e)}"
+                    "error": f"Excepción durante la actualización e instalación automática: {str(e)}"
                 }).encode('utf-8')
 
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 6b. Configurar preferencia de instalación automática al detectar
+        elif clean_path == "/api/system/auto-update":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            enabled = bool(body.get("enabled", True))
+            saved = save_auto_install_preference(enabled)
+            if saved:
+                threading.Thread(
+                    target=perform_auto_update_and_install,
+                    kwargs={"trigger_source": "auto_toggle_enabled", "do_git_pull": True},
+                    daemon=True,
+                ).start()
+            resp = json.dumps({
+                "success": True,
+                "auto_install_enabled": saved,
+                "status": AUTO_INSTALL_STATE.get("last_status", ""),
+            }).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
@@ -8773,6 +9011,7 @@ def run_server(port=8085):
     threading.Thread(target=fetch_security_worker, daemon=True).start()
     threading.Thread(target=fetch_connections_geo_worker, daemon=True).start()
     threading.Thread(target=background_collector, daemon=True).start()
+    threading.Thread(target=auto_install_watcher_worker, daemon=True, name="AutoInstallWatcher").start()
     threading.Thread(target=telegram_bot_polling_worker, daemon=True, name="TelegramBotPolling").start()
     threading.Thread(target=telegram_bot_monitor_worker, daemon=True, name="TelegramBotMonitor").start()
     

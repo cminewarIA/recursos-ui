@@ -27,10 +27,40 @@ class DexController:
             except Exception:
                 pass
 
-    def check_dependencies(self):
+    def ensure_dependencies_installed(self):
+        """Automatically install adb and scrcpy if missing when detected."""
+        adb_path = shutil.which("adb")
+        scrcpy_path = shutil.which("scrcpy")
+        if adb_path and scrcpy_path:
+            return True
+        missing = []
+        if not adb_path:
+            missing.append("adb")
+        if not scrcpy_path:
+            missing.append("scrcpy")
+        self._emit_status(
+            f"Instalando dependencias detectadas automáticamente ({', '.join(missing)})...",
+            "info",
+        )
+        try:
+            subprocess.run(
+                ["sudo", "-n", "apt-get", "install", "-y"] + missing,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except Exception:
+            pass
+        return bool(shutil.which("adb") and shutil.which("scrcpy"))
+
+    def check_dependencies(self, auto_install=True):
         """Return dict with availability and version info of adb and scrcpy."""
         adb_path = shutil.which("adb")
         scrcpy_path = shutil.which("scrcpy")
+        if auto_install and (not adb_path or not scrcpy_path):
+            self.ensure_dependencies_installed()
+            adb_path = shutil.which("adb")
+            scrcpy_path = shutil.which("scrcpy")
         scrcpy_ver = ""
         supports_new_display = False
         if scrcpy_path:
@@ -166,6 +196,11 @@ class DexController:
         with self._lock:
             return self.scrcpy_proc is not None and self.scrcpy_proc.poll() is None
 
+    @property
+    def is_running(self):
+        """Property alias for is_session_running() used by LocalHtmlBridgeServer."""
+        return self.is_session_running()
+
     def start_dex_session(
         self,
         device_id=None,
@@ -174,13 +209,14 @@ class DexController:
         max_fps=60,
         use_uhid=True,
         turn_screen_off=False,
+        usb_only=True,
     ):
         """
         Launch USB video projection for Samsung DeX or Android Desktop Mode.
         Configures experimental desktop mode settings on the Android device via USB
         and starts low-latency video projection via scrcpy.
         """
-        deps = self.check_dependencies()
+        deps = self.check_dependencies(auto_install=True)
         if not deps["ready"]:
             self._emit_status(
                 "Faltan dependencias en el sistema: instala 'adb' y 'scrcpy' para proyectar por USB.",
@@ -188,7 +224,7 @@ class DexController:
             )
             return False
 
-        devices = self.list_connected_devices(usb_only=True)
+        devices = self.list_connected_devices(usb_only=usb_only)
         authorized = [d for d in devices if d["state"] == "device"]
         if not authorized:
             if any(d["state"] == "unauthorized" for d in devices):
@@ -332,3 +368,8 @@ class DexController:
             self._emit_status("Proyección USB finalizada. Esperando dispositivo...", "info")
             return True
         return False
+
+    def stop_session(self):
+        """Alias for stop_dex_session() used by LocalHtmlBridgeServer."""
+        return self.stop_dex_session()
+
