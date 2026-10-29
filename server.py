@@ -7692,7 +7692,17 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 with open(index_path, 'r', encoding='utf-8') as f:
                     content_str = f.read()
                 current_ver = get_app_version()
+                local_sha = "HEAD"
+                try:
+                    p_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=1.5)
+                    if p_sha.returncode == 0 and p_sha.stdout.strip():
+                        local_sha = p_sha.stdout.strip()[:7]
+                except Exception:
+                    pass
                 content_str = content_str.replace('id="sidebarVersionTag">Sincronizando...<', f'id="sidebarVersionTag">v{current_ver}<')
+                build_injection = f'<meta name="recursos-app-version" content="{current_ver}" data-commit="{local_sha}"><script>window.__INITIAL_APP_VERSION__ = "{current_ver}"; window.__INITIAL_APP_HASH__ = "{local_sha}";</script>'
+                if '</head>' in content_str:
+                    content_str = content_str.replace('</head>', f'{build_injection}\n</head>', 1)
                 content = content_str.encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')

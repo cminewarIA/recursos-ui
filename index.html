@@ -5342,6 +5342,28 @@
               </div>
             </div>
 
+            <!-- Panel de Auto-Actualización Reactiva de la WebApp -->
+            <div class="surface-panel" id="webAppAutoReloadConfigCard" style="margin-top: 14px; padding: 14px 18px; border: 1px solid var(--border-subtle); background: var(--bg-surface-inset); border-radius: var(--radius-sm);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Auto-Actualización Reactiva de la WebApp</span>
+                    <span class="adw-badge badge-green mono" id="verAutoReloadBadge">ACTIVO</span>
+                    <span class="adw-badge badge-purple mono" id="verAppLoadedBadge">Cargada: v10.5.0</span>
+                  </div>
+                  <div style="font-size: 12px; color: var(--text-muted);" id="verAutoReloadStatusText">
+                    Al detectarse un cambio de versión o nuevo commit en el servidor, la interfaz se recarga automáticamente y restaura la vista activa sin requerir recarga manual.
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-secondary); user-select: none;">
+                    <input type="checkbox" id="chkAutoReloadOnUpdate" checked onchange="toggleAutoReloadPreference(this.checked)" style="width: 16px; height: 16px; accent-color: var(--accent-emerald);" />
+                    <span>Auto-recargar webapp al detectar</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <!-- Panel Exclusivo Web: Descarga Directa de Paquetes Nativos (.deb & .apk) -->
             <div class="surface-panel ota-web-downloads-card" id="otaWebDownloadsCard" style="margin-top: 14px; padding: 14px 18px; border: 1px solid var(--border-subtle); background: var(--bg-surface-inset); border-radius: var(--radius-sm);">
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
@@ -5953,6 +5975,12 @@
   <div id="appToast" style="position: fixed; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 2500; padding: 12px 18px; border-radius: 14px; background: var(--bg-surface-elevated); border: 1px solid var(--border-highlight); color: var(--text-primary); font-size: 12.5px; font-weight: 600; box-shadow: var(--glass-shadow); backdrop-filter: blur(20px); display: none; align-items: center; gap: 10px; width: max-content; max-width: calc(100vw - 32px); pointer-events: none;">
     <span id="appToastIcon">✔</span>
     <span id="appToastText"></span>
+  </div>
+
+  <!-- Banner Flotante Auto-Actualización Reactiva de la WebApp (Apple Liquid Glass) -->
+  <div id="webAppAutoUpdateBanner" style="position: fixed; top: calc(20px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 99999; backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 9999px; box-shadow: 0 16px 40px rgba(0,0,0,0.6), 0 0 24px rgba(56, 189, 248, 0.25); padding: 10px 22px; display: none; align-items: center; gap: 12px; color: #f8fafc; font-size: 13px; font-weight: 600; pointer-events: none; transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); width: max-content; max-width: calc(100vw - 32px);">
+    <div style="width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.25); border-top-color: var(--accent-cyan-bright); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;"></div>
+    <span id="webAppAutoUpdateBannerText">Nueva versión detectada en el servidor · Actualizando interfaz...</span>
   </div>
 
   <!-- ======================================================================
@@ -7834,6 +7862,141 @@
     let _autoInstallInProgressClient = false;
     let _lastAutoInstallTriggerTs = 0;
 
+    // Motor de Detección y Auto-Actualización Reactiva de la WebApp
+    const _initialAppVersion = (window.__INITIAL_APP_VERSION__ || (document.querySelector('meta[name="recursos-app-version"]')?.getAttribute('content')) || '').trim();
+    const _initialAppHash = (window.__INITIAL_APP_HASH__ || (document.querySelector('meta[name="recursos-app-version"]')?.getAttribute('data-commit')) || '').trim();
+    let _isReloadingDueToUpdate = false;
+    let _lastKnownServerHash = _initialAppHash;
+    let _lastKnownServerVer = _initialAppVersion;
+
+    function isAutoReloadOnUpdateEnabled() {
+      try {
+        const stored = localStorage.getItem('recursos_auto_reload_on_update');
+        if (stored !== null) return stored !== 'false';
+      } catch (e) {}
+      return true;
+    }
+
+    function toggleAutoReloadPreference(enabled) {
+      const flag = Boolean(enabled);
+      try {
+        localStorage.setItem('recursos_auto_reload_on_update', flag ? 'true' : 'false');
+      } catch (e) {}
+
+      const badge = document.getElementById('verAutoReloadBadge');
+      const statusTxt = document.getElementById('verAutoReloadStatusText');
+      if (badge) {
+        badge.className = 'adw-badge mono ' + (flag ? 'badge-green' : 'badge-amber');
+        badge.innerText = flag ? 'ACTIVO' : 'PAUSADO';
+      }
+      if (statusTxt) {
+        statusTxt.innerText = flag
+          ? 'Al detectarse un cambio de versión o nuevo commit en el servidor, la interfaz se recarga automáticamente y restaura la vista activa sin requerir recarga manual.'
+          : 'Modo manual activo: la interfaz esperará a que el usuario recargue manualmente tras actualizarse el servidor.';
+      }
+
+      showToast(
+        flag
+          ? 'Auto-recarga reactiva de la WebApp activada'
+          : 'Auto-recarga reactiva pausada (modo manual)',
+        flag ? 'success' : 'info'
+      );
+    }
+
+    async function triggerSmoothWebAppReload(reasonMsg, newVersion, newHash) {
+      if (_isReloadingDueToUpdate) return;
+      _isReloadingDueToUpdate = true;
+
+      console.log(`[WebApp AutoUpdate] ${reasonMsg}`);
+
+      const banner = document.getElementById('webAppAutoUpdateBanner');
+      const bannerText = document.getElementById('webAppAutoUpdateBannerText');
+      if (banner) {
+        if (bannerText) {
+          bannerText.innerText = reasonMsg || 'Nueva versión detectada · Actualizando interfaz...';
+        }
+        banner.style.display = 'inline-flex';
+        banner.style.opacity = '1';
+      }
+
+      showToast(reasonMsg || 'Nueva versión lista · Actualizando interfaz...', 'info', 4000);
+
+      let retries = 0;
+      const maxRetries = 25;
+      let serverReady = false;
+
+      while (retries < maxRetries && !serverReady) {
+        retries++;
+        await new Promise(r => setTimeout(r, 700));
+        try {
+          const res = await fetch('/api/version?_t=' + Date.now(), { 
+            headers: authHeaders(),
+            cache: 'no-store'
+          });
+          if (res.ok) {
+            const vData = await res.json();
+            const currentHash = (vData.local_hash || (vData.local && vData.local.sha) || '').slice(0, 7);
+            const currentVer = (vData.version || '').trim();
+            if (newHash && currentHash && currentHash.startsWith(newHash.slice(0, 7))) {
+              serverReady = true;
+              break;
+            }
+            if (newVersion && currentVer && currentVer === newVersion) {
+              serverReady = true;
+              break;
+            }
+            if (retries >= 4) {
+              serverReady = true;
+              break;
+            }
+          }
+        } catch (e) {
+          // Servidor reiniciándose tras la actualización
+        }
+      }
+
+      setTimeout(() => {
+        try {
+          sessionStorage.setItem('recursos_reloaded_from_update', 'true');
+        } catch (e) {}
+        window.location.reload(true);
+      }, 600);
+    }
+
+    function checkWebAppAutoUpdate(info) {
+      if (!info || _isReloadingDueToUpdate) return;
+      if (!isAutoReloadOnUpdateEnabled()) return;
+
+      const serverVer = (info.version || '').trim();
+      const serverHash = (info.local_hash || (info.local && info.local.sha) || '').trim().slice(0, 7);
+
+      if (!_lastKnownServerHash && serverHash) _lastKnownServerHash = serverHash;
+      if (!_lastKnownServerVer && serverVer) _lastKnownServerVer = serverVer;
+
+      const clientVer = _initialAppVersion;
+      const clientHash = _initialAppHash;
+
+      if (clientHash && serverHash && clientHash !== 'HEAD' && serverHash !== 'HEAD') {
+        if (!serverHash.startsWith(clientHash.slice(0, 7)) && !clientHash.startsWith(serverHash)) {
+          triggerSmoothWebAppReload(
+            `Servidor actualizado a v${serverVer || ''} (${serverHash}) · Recargando interfaz...`,
+            serverVer,
+            serverHash
+          );
+          return;
+        }
+      }
+
+      if (clientVer && serverVer && clientVer !== serverVer) {
+        triggerSmoothWebAppReload(
+          `Nueva versión v${serverVer} lista en el servidor · Recargando interfaz...`,
+          serverVer,
+          serverHash
+        );
+        return;
+      }
+    }
+
     function isAutoInstallEnabled() {
       try {
         const stored = localStorage.getItem('recursos_auto_install_on_detect');
@@ -7892,6 +8055,7 @@
         const data = await res.json();
         latestVersionInfo = data;
         renderVersionInfo(data);
+        checkWebAppAutoUpdate(data);
 
         const shouldAutoInstall = isAutoInstallEnabled() && (data.update_available || data.package_needs_install);
         const nowMs = Date.now();
@@ -8019,6 +8183,23 @@
       const autoEnabled = isAutoInstallEnabled();
       if (autoChk) autoChk.checked = autoEnabled;
 
+      const autoReloadChk = document.getElementById('chkAutoReloadOnUpdate');
+      const autoReloadEnabled = isAutoReloadOnUpdateEnabled();
+      if (autoReloadChk) autoReloadChk.checked = autoReloadEnabled;
+
+      const verAutoReloadBadge = document.getElementById('verAutoReloadBadge');
+      if (verAutoReloadBadge) {
+        verAutoReloadBadge.className = 'adw-badge mono ' + (autoReloadEnabled ? 'badge-green' : 'badge-amber');
+        verAutoReloadBadge.innerText = autoReloadEnabled ? 'ACTIVO' : 'PAUSADO';
+      }
+
+      const verAppLoadedBadge = document.getElementById('verAppLoadedBadge');
+      if (verAppLoadedBadge) {
+        const loadedVer = _initialAppVersion || cleanSemVer;
+        const loadedHash = _initialAppHash ? _initialAppHash.slice(0, 7) : localHash;
+        verAppLoadedBadge.innerText = `Cargada: v${loadedVer} (${loadedHash})`;
+      }
+
       const verAutoInstallBadge = document.getElementById('verAutoInstallBadge');
       if (verAutoInstallBadge) {
         verAutoInstallBadge.className = 'adw-badge mono ' + (autoEnabled ? 'badge-green' : 'badge-amber');
@@ -8091,6 +8272,9 @@
       const dnsEl = document.getElementById('dnsDetectedDomain');
       if (dnsEl && detectedDomain) dnsEl.innerText = detectedDomain;
 
+      // Auto-actualización reactiva de la WebApp al renderizar versión
+      checkWebAppAutoUpdate(info);
+
       // Si durante el renderizado de métricas en vivo se detecta actualización y auto-install está activo, disparar inmediatamente
       if (autoEnabled && (hasUpdate || info.package_needs_install) && !_autoInstallInProgressClient && (Date.now() - _lastAutoInstallTriggerTs > 30000)) {
         executeSystemUpdate(true);
@@ -8135,7 +8319,13 @@
             renderVersionInfo(data.version_info);
           }
           showToast(data.message || 'Instalación aplicada automáticamente con éxito', 'success');
-          if (data.output && !String(data.output).includes('Already up to date')) {
+          if (isAutoReloadOnUpdateEnabled()) {
+            triggerSmoothWebAppReload(
+              'Actualización completada · Recargando interfaz...',
+              data.version_info?.version,
+              data.version_info?.local_hash
+            );
+          } else if (data.output && !String(data.output).includes('Already up to date')) {
             setTimeout(() => { window.location.reload(); }, 3500);
           }
         } else {
@@ -8148,7 +8338,11 @@
       } catch (err) {
         if (termState) termState.innerText = 'Reconectando...';
         showToast('Reiniciando servicio tras instalación...', 'info');
-        setTimeout(() => { window.location.reload(); }, 3500);
+        if (isAutoReloadOnUpdateEnabled()) {
+          triggerSmoothWebAppReload('Servidor reiniciándose tras actualización · Sincronizando interfaz...', '', '');
+        } else {
+          setTimeout(() => { window.location.reload(); }, 3500);
+        }
       } finally {
         _autoInstallInProgressClient = false;
         if (btn) btn.disabled = false;
@@ -11825,6 +12019,16 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       updateMetrics();
       setInterval(updateMetrics, 2000);
       setTimeout(() => syncCurrentDeviceTelemetry(false), 600);
+
+      try {
+        if (sessionStorage.getItem('recursos_reloaded_from_update') === 'true') {
+          sessionStorage.removeItem('recursos_reloaded_from_update');
+          setTimeout(() => {
+            const vLabel = _initialAppVersion ? `v${_initialAppVersion}` : 'última versión';
+            showToast(`WebApp sincronizada con éxito a ${vLabel}`, 'success');
+          }, 850);
+        }
+      } catch (e) {}
 
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) updateMetrics();
