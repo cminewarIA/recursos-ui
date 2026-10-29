@@ -6,6 +6,7 @@ val CockpitBg = Color(0xFF090D16)
 val CockpitCard = Color(0xFF121826)
 val CockpitCardElevated = Color(0xFF192236)
 val CockpitBorder = Color(0xFF2A354C)
+val CockpitDockBg = Color(0xEE121826)
 
 val NeonBlue = Color(0xFF0A84FF)
 val NeonGreen = Color(0xFF30D158)

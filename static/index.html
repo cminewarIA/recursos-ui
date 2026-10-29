@@ -2347,7 +2347,7 @@
       cursor: pointer;
       transition: all 0.15s ease;
       font-variant-numeric: tabular-nums;
-      min-height: 98px;
+      min-height: 118px;
     }
     [data-theme="light"] .conn-capsule {
       background: rgba(255, 255, 255, 0.90);
@@ -2389,6 +2389,46 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .conn-capsule-traffic {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+      padding: 3px 6px;
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+    [data-theme="light"] .conn-capsule-traffic {
+      background: rgba(15, 23, 42, 0.04);
+      border-color: rgba(15, 23, 42, 0.08);
+    }
+    .traffic-metric {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-weight: 600;
+    }
+    .traffic-metric .traffic-icon {
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .traffic-metric.down {
+      color: #34D399;
+    }
+    .traffic-metric.up {
+      color: #38BDF8;
+    }
+    .traffic-metric.total {
+      color: #FBBF24;
+    }
+    .traffic-metric .traffic-val {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: -0.02em;
     }
     .conn-capsule-geo {
       display: flex;
@@ -6516,6 +6556,13 @@
       if (bytesPerSec < 1024) return bytesPerSec.toFixed(0) + ' B/s';
       if (bytesPerSec < 1024 * 1024) return (bytesPerSec / 1024).toFixed(1) + ' KB/s';
       return (bytesPerSec / (1024 * 1024)).toFixed(2) + ' MB/s';
+    }
+
+    function formatConnSpeed(bytesPerSec) {
+      if (!bytesPerSec || bytesPerSec <= 0) return '0 B/s';
+      if (bytesPerSec < 1024) return Math.round(bytesPerSec) + ' B/s';
+      if (bytesPerSec < 1024 * 1024) return (bytesPerSec / 1024).toFixed(1) + ' KB/s';
+      return (bytesPerSec / (1024 * 1024)).toFixed(1) + ' MB/s';
     }
 
     function setRadialGauge(circleId, textId, pct) {
@@ -15428,6 +15475,17 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           ? `<strong>${escapeHtml(item.remote_ip)}${item.remote_port ? ':' + item.remote_port : ''}</strong> <span style="color: #0284c7; font-size: 10px;">(${escapeHtml(item.domain)})</span>`
           : `<strong>${escapeHtml(item.remote_ip)}${item.remote_port ? ':' + item.remote_port : ''}</strong>`;
 
+        const rxSpd = formatConnSpeed(item.rx_speed || 0);
+        const txSpd = formatConnSpeed(item.tx_speed || 0);
+        const totBytes = formatBytes(item.bytes_total || ((item.bytes_sent || 0) + (item.bytes_received || 0)));
+        const trafficMetricsHtml = `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px; background: #0f172a; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-family: monospace; font-size: 10.5px; margin: 6px 0;">
+            <span style="color: #34d399; font-weight: 700;" title="Velocidad de descarga (RX)">↓ ${rxSpd}</span>
+            <span style="color: #38bdf8; font-weight: 700;" title="Velocidad de subida (TX)">↑ ${txSpd}</span>
+            <span style="color: #fbbf24; font-weight: 700;" title="Volumen acumulado total">∑ ${totBytes}</span>
+          </div>
+        `;
+
         wrap.innerHTML = `
           ${returnBarHtml}
           <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${dirColor}; margin-bottom: 4px;">
@@ -15444,6 +15502,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
             Remoto: ${remoteDisplay}<br>
             Local: ${localDisplay} (${escapeHtml(item.state || 'ACTIVE')})
           </div>
+          ${trafficMetricsHtml}
           <div style="font-size: 11px; color: #334155;">
             📍 <strong>${escapeHtml(item.city || 'Nodo Remoto')}${item.country ? ', ' + escapeHtml(item.country) : ''}</strong>
             <span style="font-family: monospace; font-size: 10px; color: #64748b;">(${Number(item.lat).toFixed(4)}°, ${Number(item.lng).toFixed(4)}°)</span><br>
@@ -15954,7 +16013,7 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
           const focusedId = (this._activePopupState && this._activePopupState.selectedConnId) || '';
           const focusedIp = (this._activePopupState && this._activePopupState.activeRemoteIp) || '';
           const tableSig = `${connectionsMapMode}|${connectionsMapServiceSel || ''}|${connectionsMapHistorySearch}|${connectionsMapFilter}|${connectionsMapDeviceSel || ''}|${expandedDeviceHistoryIp || ''}|${expandedDeviceHistoryService || ''}|${histCacheVer}|${focusedId}|${focusedIp}|` +
-            mapConns.map(c => `${c.id}:${c.state}:${c.geo_status || ''}:${c.city || ''}:${c.domain || ''}:${c.hit_count || 1}`).join(';');
+            mapConns.map(c => `${c.id}:${c.state}:${c.geo_status || ''}:${c.rx_speed || 0}:${c.tx_speed || 0}:${c.bytes_total || 0}:${c.city || ''}:${c.domain || ''}:${c.hit_count || 1}`).join(';');
 
           if (forceRedraw || this._lastTableSignature !== tableSig) {
             this._lastTableSignature = tableSig;
@@ -16010,6 +16069,26 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                   inlineDrawerHtml = buildInlineDeviceHistoryDrawerHtml(c.local_ip || srvIp, devDisplayName);
                 }
 
+                const rxSpd = formatConnSpeed(c.rx_speed || 0);
+                const txSpd = formatConnSpeed(c.tx_speed || 0);
+                const totBytes = formatBytes(c.bytes_total || ((c.bytes_sent || 0) + (c.bytes_received || 0)));
+                const trafficHtml = `
+                  <div class="conn-capsule-traffic">
+                    <div class="traffic-metric down" title="Velocidad de descarga (RX): ${rxSpd}">
+                      <span class="traffic-icon">↓</span>
+                      <span class="mono traffic-val">${rxSpd}</span>
+                    </div>
+                    <div class="traffic-metric up" title="Velocidad de carga / subida (TX): ${txSpd}">
+                      <span class="traffic-icon">↑</span>
+                      <span class="mono traffic-val">${txSpd}</span>
+                    </div>
+                    <div class="traffic-metric total" title="Volumen total transferido en esta conexión: ${totBytes}">
+                      <span class="traffic-icon">∑</span>
+                      <span class="mono traffic-val">${totBytes}</span>
+                    </div>
+                  </div>
+                `;
+
                 return `
                   <div class="conn-capsule ${isMapFocused ? 'is-focused' : ''}" id="capsule-${escapeHtml(c.id)}" onclick="focusConnectionOnMap('${escapeHtml(c.id)}')">
                     <div class="conn-capsule-top">
@@ -16034,6 +16113,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
                         ${procInfo}
                       </div>
                     </div>
+
+                    ${trafficHtml}
 
                     <div class="conn-capsule-geo" title="📍 ${escapeHtml(locText)} · ${escapeHtml(c.isp || 'Red')} ${c.asn ? '(' + escapeHtml(c.asn) + ')' : ''}">
                       <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 175px;">📍 ${escapeHtml(locText)}</span>

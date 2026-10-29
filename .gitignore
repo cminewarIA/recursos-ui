@@ -18,6 +18,8 @@ venv/
 # Datos y sesiones locales sensibles
 trusted_devices.json
 geoip_cache.json
+geoip_history.db
+nic_history_2h.json
 .auth_secret
 .aistudio/
 .gmp_cache/

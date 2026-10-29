@@ -309,6 +309,133 @@ GEOIP_WORKER_STATS = {
     "errors_total": 0
 }
 
+# Dynamic Socket Traffic & Speed Tracking (ss -tin Kernel Telemetry)
+SOCKET_TRAFFIC_STATS = {}
+SOCKET_TRAFFIC_LOCK = threading.Lock()
+RE_SS_ADDR = re.compile(r'^\s*(\w+)\s+\d+\s+\d+\s+([^\s]+)\s+([^\s]+)')
+RE_SS_BYTES_SENT = re.compile(r'bytes_sent:(\d+)')
+RE_SS_BYTES_RCV = re.compile(r'bytes_received:(\d+)')
+
+def _normalize_ss_addr(addr):
+    addr = str(addr or "").strip()
+    if addr.startswith("["):
+        ip, port = addr[1:].split("]:")
+    elif ":" in addr:
+        parts = addr.rsplit(":", 1)
+        ip, port = parts[0], parts[1]
+    else:
+        ip, port = addr, "0"
+    ip = ip.replace("::ffff:", "")
+    return ip, int(port) if port.isdigit() else 0
+
+def poll_socket_traffic_metrics():
+    """
+    Sondea directamente los sockets TCP del kernel mediante 'ss -tin' para extraer
+    los bytes enviados (TX / carga), bytes recibidos (RX / descarga) y calcular la velocidad instantánea (B/s).
+    """
+    global SOCKET_TRAFFIC_STATS
+    now = time.time()
+    current_raw = {}
+    try:
+        proc = subprocess.run(
+            ["ss", "-tin"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=1.8
+        )
+        if proc.returncode == 0 and proc.stdout:
+            lines = proc.stdout.splitlines()
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+                m = RE_SS_ADDR.match(line)
+                if m:
+                    state, loc_str, rem_str = m.groups()
+                    extra = ""
+                    j = i + 1
+                    while j < len(lines) and (lines[j].startswith("\t") or lines[j].startswith(" ")):
+                        extra += " " + lines[j].strip()
+                        j += 1
+                    loc_ip, loc_port = _normalize_ss_addr(loc_str)
+                    rem_ip, rem_port = _normalize_ss_addr(rem_str)
+                    m_sent = RE_SS_BYTES_SENT.search(extra)
+                    m_rcv = RE_SS_BYTES_RCV.search(extra)
+                    b_sent = int(m_sent.group(1)) if m_sent else 0
+                    b_rcv = int(m_rcv.group(1)) if m_rcv else 0
+                    current_raw[(loc_ip, loc_port, rem_ip, rem_port)] = (b_sent, b_rcv)
+                    i = j
+                else:
+                    i += 1
+    except Exception:
+        pass
+
+    with SOCKET_TRAFFIC_LOCK:
+        new_stats = {}
+        for key, (b_sent, b_rcv) in current_raw.items():
+            loc_ip, loc_port, rem_ip, rem_port = key
+            prev = SOCKET_TRAFFIC_STATS.get(key)
+            tx_speed = 0.0
+            rx_speed = 0.0
+            if prev:
+                dt = max(0.001, now - prev.get("ts", now))
+                if dt <= 30.0:
+                    delta_sent = b_sent - prev.get("bytes_sent", b_sent)
+                    delta_rcv = b_rcv - prev.get("bytes_received", b_rcv)
+                    if delta_sent >= 0:
+                        tx_speed = round(delta_sent / dt, 1)
+                    if delta_rcv >= 0:
+                        rx_speed = round(delta_rcv / dt, 1)
+            b_total = b_sent + b_rcv
+            stat_obj = {
+                "bytes_sent": b_sent,
+                "bytes_received": b_rcv,
+                "bytes_total": b_total,
+                "tx_speed": tx_speed,
+                "rx_speed": rx_speed,
+                "total_speed": round(tx_speed + rx_speed, 1),
+                "ts": now
+            }
+            new_stats[key] = stat_obj
+            new_stats[(rem_ip, rem_port, loc_ip, loc_port)] = stat_obj
+            new_stats[(rem_ip, rem_port)] = stat_obj
+            new_stats[(rem_ip, loc_port)] = stat_obj
+
+        for old_k, old_v in SOCKET_TRAFFIC_STATS.items():
+            if old_k not in new_stats and (now - old_v.get("ts", 0)) < 15.0:
+                frozen = dict(old_v)
+                frozen["tx_speed"] = 0.0
+                frozen["rx_speed"] = 0.0
+                frozen["total_speed"] = 0.0
+                new_stats[old_k] = frozen
+
+        SOCKET_TRAFFIC_STATS = new_stats
+        return SOCKET_TRAFFIC_STATS
+
+def get_socket_traffic(loc_ip, loc_port, rem_ip, rem_port):
+    """Obtiene de forma segura la telemetría de tráfico para un socket o flujo."""
+    with SOCKET_TRAFFIC_LOCK:
+        res = SOCKET_TRAFFIC_STATS.get((loc_ip, int(loc_port or 0), rem_ip, int(rem_port or 0)))
+        if res:
+            return res
+        res = SOCKET_TRAFFIC_STATS.get((rem_ip, int(rem_port or 0), loc_ip, int(loc_port or 0)))
+        if res:
+            return res
+        res = SOCKET_TRAFFIC_STATS.get((rem_ip, int(rem_port or 0)))
+        if res:
+            return res
+        res = SOCKET_TRAFFIC_STATS.get((rem_ip, int(loc_port or 0)))
+        if res:
+            return res
+    return {
+        "bytes_sent": 0,
+        "bytes_received": 0,
+        "bytes_total": 0,
+        "tx_speed": 0.0,
+        "rx_speed": 0.0,
+        "total_speed": 0.0
+    }
+
 def record_geoip_worker_error(source, stage, target, code, message):
     """Registra en tiempo real errores del Worker GeoIP y de peticiones de red asociadas."""
     now_ms = int(time.time() * 1000)
@@ -2429,6 +2556,8 @@ def fetch_connections_geo_worker():
     while True:
         try:
             now = time.time()
+            # -1. Sondeo de tráfico, caudales y bytes acumulados por socket TCP del kernel (ss -tin)
+            poll_socket_traffic_metrics()
             # 0. Actualizar traductor de DNS de Pi-hole (nombres locales y dominios externos)
             pihole_translator.refresh_local_names()
             pihole_translator.refresh_external_domains()
@@ -2826,6 +2955,7 @@ def fetch_connections_geo_worker():
                     if clean_isp and len(clean_isp) <= 36:
                         svc_title = f"{clean_isp} (:{s['remote_port']})"
 
+                traf = get_socket_traffic(s["local_ip"], s["local_port"], r_ip, s["remote_port"])
                 connections_out.append({
                     "id": f"sock_{s['direction']}_{r_ip}_{s['local_port']}_{s['remote_port']}",
                     "direction": s["direction"],
@@ -2841,6 +2971,12 @@ def fetch_connections_geo_worker():
                     "jail": s.get("jail", "caddy-scan"),
                     "details": s.get("details", ""),
                     "state": s["state"],
+                    "bytes_sent": traf["bytes_sent"],
+                    "bytes_received": traf["bytes_received"],
+                    "bytes_total": traf["bytes_total"],
+                    "tx_speed": traf["tx_speed"],
+                    "rx_speed": traf["rx_speed"],
+                    "total_speed": traf["total_speed"],
                     "lat": lat,
                     "lng": lng,
                     "city": city,
@@ -2865,13 +3001,15 @@ def fetch_connections_geo_worker():
                     ep_reg = geo.get("region", "")
                     ep_zip = geo.get("postal", "")
                     ep_city = f"{geo['city']} ({ep_reg}{' · CP ' + ep_zip if ep_zip else ''})" if (ep_reg or ep_zip) and geo.get("city") else geo.get("city", "Nodo Remoto")
+                    ep_loc_port = 48120 + (ep["port"] % 500)
+                    ep_traf = get_socket_traffic(SERVER_LOCAL_IP, ep_loc_port, ep["ip"], ep["port"])
                     connections_out.append({
                         "id": f"out_{ep['host']}_{ep['ip']}",
                         "direction": "outgoing",
                         "protocol": ep["protocol"],
                         "local_ip": SERVER_LOCAL_IP,
                         "local_hostname": "Servidor",
-                        "local_port": 48120 + (ep["port"] % 500),
+                        "local_port": ep_loc_port,
                         "remote_ip": ep["ip"],
                         "remote_port": ep["port"],
                         "domain": ep["host"],
@@ -2880,6 +3018,12 @@ def fetch_connections_geo_worker():
                         "jail": "caddy-scan",
                         "details": f"Sincronización externa hacia {ep['service']}",
                         "state": "ESTABLISHED",
+                        "bytes_sent": ep_traf["bytes_sent"],
+                        "bytes_received": ep_traf["bytes_received"],
+                        "bytes_total": ep_traf["bytes_total"],
+                        "tx_speed": ep_traf["tx_speed"],
+                        "rx_speed": ep_traf["rx_speed"],
+                        "total_speed": ep_traf["total_speed"],
                         "lat": geo["lat"],
                         "lng": geo["lng"],
                         "city": ep_city,
@@ -2924,6 +3068,12 @@ def fetch_connections_geo_worker():
                         "jail": b_jail,
                         "details": f"IP bloqueada en firewall por Fail2ban (jail {b_jail}){': ' + b_domain if b_domain else ''}",
                         "state": "BANNED",
+                        "bytes_sent": 0,
+                        "bytes_received": 0,
+                        "bytes_total": 0,
+                        "tx_speed": 0.0,
+                        "rx_speed": 0.0,
+                        "total_speed": 0.0,
                         "lat": geo["lat"],
                         "lng": geo["lng"],
                         "city": b_city,
@@ -2972,8 +3122,8 @@ def fetch_connections_geo_worker():
         except Exception as e:
             import traceback
             traceback.print_exc()
-        # Wait up to 6 seconds or wake immediately when new remote IPs are enqueued
-        GEOIP_WAKE_EVENT.wait(timeout=6.0)
+        # Wait up to 2.5 seconds or wake immediately when new remote IPs are enqueued
+        GEOIP_WAKE_EVENT.wait(timeout=2.5)
         GEOIP_WAKE_EVENT.clear()
 
 # Dynamic Hardware & OS Information (Queried directly from OS kernel at startup)
