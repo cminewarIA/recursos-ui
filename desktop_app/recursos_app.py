@@ -898,11 +898,14 @@ class LocalHtmlBridgeServer:
                 mode_js = json.dumps(parent.conn_mgr.connection_mode or "LOCAL")
                 node_js = json.dumps(parent.conn_mgr.active_url or "local")
                 dev_info_js = json.dumps(parent.conn_mgr.refresh_device_telemetry(), ensure_ascii=False)
+                app_ver = get_app_version()
                 bridge_script = (
                     "<script>"
                     "window.__RECURSOS_UBUNTU_NATIVE__ = true;"
                     "window.__RECURSOS_NATIVE__ = true;"
                     "window.__RECURSOS_NATIVE_PLATFORM__ = 'ubuntu';"
+                    f"window.__INITIAL_APP_VERSION__ = '{app_ver}';"
+                    "window.__INITIAL_APP_HASH__ = 'HEAD';"
                     f"window.__RECURSOS_DEVICE_TOKEN__ = {token_js};"
                     f"window.__RECURSOS_CONN_MODE__ = {mode_js};"
                     f"window.__RECURSOS_NODE_URL__ = {node_js};"

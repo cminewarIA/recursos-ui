@@ -7868,6 +7868,7 @@
     let _isReloadingDueToUpdate = false;
     let _lastKnownServerHash = _initialAppHash;
     let _lastKnownServerVer = _initialAppVersion;
+    let _autoUpdateCircuitBroken = false;
 
     function isAutoReloadOnUpdateEnabled() {
       try {
@@ -7881,6 +7882,10 @@
       const flag = Boolean(enabled);
       try {
         localStorage.setItem('recursos_auto_reload_on_update', flag ? 'true' : 'false');
+        if (!flag) {
+          const banner = document.getElementById('webAppAutoUpdateBanner');
+          if (banner) { banner.style.display = 'none'; banner.style.opacity = '0'; }
+        }
       } catch (e) {}
 
       const badge = document.getElementById('verAutoReloadBadge');
@@ -7907,7 +7912,38 @@
       if (_isReloadingDueToUpdate) return;
       _isReloadingDueToUpdate = true;
 
-      console.log(`[WebApp AutoUpdate] ${reasonMsg}`);
+      // Circuit Breaker: Comprobar intentos previos en sessionStorage
+      let attempts = 0;
+      let lastReloadTs = 0;
+      try {
+        attempts = parseInt(sessionStorage.getItem('recursos_update_reload_attempts') || '0', 10);
+        lastReloadTs = parseInt(sessionStorage.getItem('recursos_last_update_reload_ts') || '0', 10);
+      } catch (e) {}
+
+      const now = Date.now();
+      // Si ya intentamos recargar hace menos de 45 segundos para esta misma actualización, no repetir en bucle
+      if (lastReloadTs > 0 && (now - lastReloadTs < 45000)) {
+        console.warn(`[WebApp AutoUpdate] Circuit Breaker: Recarga reciente detectada (${Math.round((now - lastReloadTs)/1000)}s atrás). Evitando bucle de recarga.`);
+        _isReloadingDueToUpdate = false;
+        return;
+      }
+
+      // Si se han intentado ya 2 recargas consecutivas y la versión sigue discrepando (caché agresiva de navegador/proxy)
+      if (attempts >= 2) {
+        console.warn(`[WebApp AutoUpdate] Circuit Breaker activado: ${attempts} recargas consecutivas sin cambio de versión local. Abortando recarga automática continua.`);
+        _autoUpdateCircuitBroken = true;
+        _isReloadingDueToUpdate = false;
+        const banner = document.getElementById('webAppAutoUpdateBanner');
+        if (banner) { banner.style.display = 'none'; banner.style.opacity = '0'; }
+        showToast(
+          `Nueva versión ${newVersion || ''} disponible en el servidor. Pulsa aquí o Ctrl+F5 para refrescar la caché.`,
+          'info',
+          7000
+        );
+        return;
+      }
+
+      console.log(`[WebApp AutoUpdate] ${reasonMsg} (Intento #${attempts + 1})`);
 
       const banner = document.getElementById('webAppAutoUpdateBanner');
       const bannerText = document.getElementById('webAppAutoUpdateBannerText');
@@ -7921,13 +7957,22 @@
 
       showToast(reasonMsg || 'Nueva versión lista · Actualizando interfaz...', 'info', 4000);
 
+      // Timeout de seguridad: Si pasan 9 segundos y la recarga no se ejecuta, cerrar el banner
+      const bannerSafetyTimeout = setTimeout(() => {
+        if (banner) {
+          banner.style.display = 'none';
+          banner.style.opacity = '0';
+        }
+        _isReloadingDueToUpdate = false;
+      }, 9000);
+
       let retries = 0;
-      const maxRetries = 25;
+      const maxRetries = 15;
       let serverReady = false;
 
       while (retries < maxRetries && !serverReady) {
         retries++;
-        await new Promise(r => setTimeout(r, 700));
+        await new Promise(r => setTimeout(r, 600));
         try {
           const res = await fetch('/api/version?_t=' + Date.now(), { 
             headers: authHeaders(),
@@ -7945,27 +7990,43 @@
               serverReady = true;
               break;
             }
-            if (retries >= 4) {
+            if (retries >= 3) {
               serverReady = true;
               break;
             }
           }
-        } catch (e) {
-          // Servidor reiniciándose tras la actualización
-        }
+        } catch (e) {}
       }
+
+      clearTimeout(bannerSafetyTimeout);
 
       setTimeout(() => {
         try {
           sessionStorage.setItem('recursos_reloaded_from_update', 'true');
+          sessionStorage.setItem('recursos_last_update_reload_ts', String(Date.now()));
+          sessionStorage.setItem('recursos_update_reload_attempts', String(attempts + 1));
+          sessionStorage.setItem('recursos_last_target_hash', newHash || '');
         } catch (e) {}
-        window.location.reload(true);
-      }, 600);
+
+        // Forzar recarga con cache-busting en la URL para evitar servir HTML viejo de caché
+        try {
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.set('_v', (newHash || Date.now().toString()).slice(0, 7));
+          window.location.replace(currentUrl.toString());
+        } catch (e) {
+          window.location.reload();
+        }
+      }, 400);
     }
 
     function checkWebAppAutoUpdate(info) {
-      if (!info || _isReloadingDueToUpdate) return;
+      if (!info || _isReloadingDueToUpdate || _autoUpdateCircuitBroken) return;
       if (!isAutoReloadOnUpdateEnabled()) return;
+
+      // En entornos nativos (Ubuntu WebKit2 o Android WebView), no recargar en caliente desatendido
+      if (window.__RECURSOS_NATIVE__ || window.__RECURSOS_UBUNTU_NATIVE__ || window.RecursosAndroidBridge) {
+        return;
+      }
 
       const serverVer = (info.version || '').trim();
       const serverHash = (info.local_hash || (info.local && info.local.sha) || '').trim().slice(0, 7);
@@ -7976,10 +8037,26 @@
       const clientVer = _initialAppVersion;
       const clientHash = _initialAppHash;
 
-      if (clientHash && serverHash && clientHash !== 'HEAD' && serverHash !== 'HEAD') {
-        if (!serverHash.startsWith(clientHash.slice(0, 7)) && !clientHash.startsWith(serverHash)) {
+      // Si aún no tenemos versión o hash del cliente inicial (ej. webview o modo estático), adoptamos los del servidor sin recargar
+      if (!clientVer && !clientHash) {
+        return;
+      }
+
+      // Si la versión y el hash ya coinciden exactamente, reiniciar el contador de reintentos
+      if ((!clientHash || !serverHash || clientHash === serverHash) && (!clientVer || !serverVer || clientVer === serverVer)) {
+        try {
+          if (sessionStorage.getItem('recursos_update_reload_attempts')) {
+            sessionStorage.removeItem('recursos_update_reload_attempts');
+          }
+        } catch (e) {}
+        return;
+      }
+
+      // 1. Detección por hash de commit diferente al que cargó el cliente
+      if (clientHash && serverHash && clientHash !== 'HEAD' && serverHash !== 'HEAD' && clientHash !== 'desconocido' && serverHash !== 'desconocido') {
+        if (!serverHash.startsWith(clientHash.slice(0, 7)) && !clientHash.startsWith(serverHash.slice(0, 7))) {
           triggerSmoothWebAppReload(
-            `Servidor actualizado a v${serverVer || ''} (${serverHash}) · Recargando interfaz...`,
+            `Servidor actualizado a v${serverVer || ''} (${serverHash}) · Sincronizando interfaz...`,
             serverVer,
             serverHash
           );
@@ -7987,9 +8064,10 @@
         }
       }
 
+      // 2. Detección por versión semántica diferente
       if (clientVer && serverVer && clientVer !== serverVer) {
         triggerSmoothWebAppReload(
-          `Nueva versión v${serverVer} lista en el servidor · Recargando interfaz...`,
+          `Nueva versión v${serverVer} lista en el servidor · Sincronizando interfaz...`,
           serverVer,
           serverHash
         );
@@ -8059,7 +8137,7 @@
 
         const shouldAutoInstall = isAutoInstallEnabled() && (data.update_available || data.package_needs_install);
         const nowMs = Date.now();
-        if (shouldAutoInstall && !_autoInstallInProgressClient && (nowMs - _lastAutoInstallTriggerTs > 30000)) {
+        if (shouldAutoInstall && !_autoInstallInProgressClient && (nowMs - _lastAutoInstallTriggerTs > 180000)) {
           const reasonMsg = data.update_available
             ? `Nueva versión detectada (${data.remote_hash || 'GitHub'}) · Instalando automáticamente...`
             : `Paquete local v${data.version || ''} detectado · Instalando automáticamente...`;
@@ -8149,11 +8227,15 @@
         badgeNavVer.innerText = hasUpdate ? `↑ ${remoteHash}` : semVer;
       }
 
+      const isActivelyInstalling = Boolean(info.auto_install_in_progress || _autoInstallInProgressClient);
+
       const dotVerHeader = document.getElementById('dotVersionHeader');
       const lblVerHeader = document.getElementById('lblVersionHeader');
       if (dotVerHeader && lblVerHeader) {
-        dotVerHeader.style.background = hasUpdate ? 'var(--accent-amber)' : 'var(--accent-emerald)';
-        lblVerHeader.innerText = hasUpdate ? `Instalando (${remoteHash})` : `${semVer} · ${localHash}`;
+        dotVerHeader.style.background = isActivelyInstalling ? 'var(--accent-cyan)' : (hasUpdate ? 'var(--accent-amber)' : 'var(--accent-emerald)');
+        lblVerHeader.innerText = isActivelyInstalling
+          ? `Instalando (${remoteHash})`
+          : (hasUpdate ? `Actualización lista (${remoteHash})` : `${semVer} · ${localHash}`);
       }
 
       const ovVersionCommit = document.getElementById('ovVersionCommit');
@@ -8161,8 +8243,10 @@
 
       const ovVersionBadge = document.getElementById('ovVersionBadge');
       if (ovVersionBadge) {
-        ovVersionBadge.className = 'adw-badge ' + (hasUpdate ? 'badge-amber' : 'badge-green');
-        ovVersionBadge.innerText = hasUpdate ? 'Instalando actualización...' : 'Al día con GitHub';
+        ovVersionBadge.className = 'adw-badge ' + (isActivelyInstalling ? 'badge-blue' : (hasUpdate ? 'badge-amber' : 'badge-green'));
+        ovVersionBadge.innerText = isActivelyInstalling
+          ? 'Instalando actualización...'
+          : (hasUpdate ? 'Actualización disponible en GitHub' : 'Al día con GitHub');
       }
 
       const ovBadgeGitVersion = document.getElementById('ovBadgeGitVersion');
@@ -8213,9 +8297,9 @@
         const debVer = info.installed_deb_version || cleanSemVer;
         const needsInst = Boolean(info.package_needs_install);
         verDebInstalledBadge.className = 'adw-badge mono ' + (needsInst ? 'badge-amber' : 'badge-blue');
-        verDebInstalledBadge.innerText = needsInst
+        verDebInstalledBadge.innerText = isActivelyInstalling
           ? `Instalando .deb v${cleanSemVer}...`
-          : `Paquete .deb: v${debVer}`;
+          : (needsInst ? `Paquete .deb pendiente: v${cleanSemVer}` : `Paquete .deb: v${debVer}`);
       }
 
       const verAutoInstallStatusText = document.getElementById('verAutoInstallStatusText');
@@ -8246,10 +8330,12 @@
 
       const verStatusBadge = document.getElementById('verStatusBadge');
       if (verStatusBadge) {
-        verStatusBadge.className = 'adw-badge ' + (hasUpdate ? 'badge-amber' : 'badge-green');
-        verStatusBadge.innerText = hasUpdate
-          ? `Instalando nueva versión (${behindCount > 0 ? behindCount + ' commits' : remoteHash})`
-          : 'Sincronizado e instalado';
+        verStatusBadge.className = 'adw-badge ' + (isActivelyInstalling ? 'badge-blue' : (hasUpdate ? 'badge-amber' : 'badge-green'));
+        verStatusBadge.innerText = isActivelyInstalling
+          ? 'Instalando actualización...'
+          : (hasUpdate
+              ? `Actualización disponible (${behindCount > 0 ? behindCount + ' commits' : remoteHash})`
+              : 'Sincronizado e instalado');
       }
 
       const verLocalBranch = document.getElementById('verLocalBranch');
@@ -8275,8 +8361,8 @@
       // Auto-actualización reactiva de la WebApp al renderizar versión
       checkWebAppAutoUpdate(info);
 
-      // Si durante el renderizado de métricas en vivo se detecta actualización y auto-install está activo, disparar inmediatamente
-      if (autoEnabled && (hasUpdate || info.package_needs_install) && !_autoInstallInProgressClient && (Date.now() - _lastAutoInstallTriggerTs > 30000)) {
+      // Si durante el renderizado de métricas en vivo se detecta actualización y auto-install está activo, disparar con backoff de 180s
+      if (autoEnabled && (hasUpdate || info.package_needs_install) && !_autoInstallInProgressClient && (Date.now() - _lastAutoInstallTriggerTs > 180000)) {
         executeSystemUpdate(true);
       }
     }
@@ -12021,6 +12107,13 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       setTimeout(() => syncCurrentDeviceTelemetry(false), 600);
 
       try {
+        const autoUpdBanner = document.getElementById('webAppAutoUpdateBanner');
+        if (autoUpdBanner) {
+          autoUpdBanner.style.display = 'none';
+          autoUpdBanner.style.opacity = '0';
+        }
+        _isReloadingDueToUpdate = false;
+
         if (sessionStorage.getItem('recursos_reloaded_from_update') === 'true') {
           sessionStorage.removeItem('recursos_reloaded_from_update');
           setTimeout(() => {
