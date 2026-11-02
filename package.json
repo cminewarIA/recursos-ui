@@ -1,7 +1,7 @@
 {
   "name": "dashboard-recursos",
   "private": true,
-  "version": "10.5.2",
+  "version": "11.1.0",
   "type": "module",
   "description": "Hardware and System Metrics Realtime Dashboard",
   "scripts": {

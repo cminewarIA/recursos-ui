@@ -17,10 +17,10 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-  <!-- Google Fonts: Outfit (Display), Plus Jakarta Sans (UI Body) & JetBrains Mono (Tabular Telemetry) -->
+  <!-- Google Fonts: Space Grotesk & Outfit (Display), Plus Jakarta Sans (UI Body) & JetBrains Mono (Tabular Telemetry) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <!-- D3.js v7 for Fluid Animated Data Visualizations & Arc Transitions -->
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
   <!-- Leaflet.js v1.9.4 for OpenStreetMap / CartoDB Dark Matter High-Performance Zero-Key Geospatial Mapping -->
@@ -29,31 +29,31 @@
 
   <style>
     /* ==========================================================================
-       RECURSOS — INFRASTRUCTURE & TELEMETRY ENGINEERING CONSOLE (v10.2.1)
-       High-Craft Dark/Light UI · Hairline Grid Architecture · Zero-Hardcoding
+       RECURSOS v11.1.0 — ORBITAL HORIZON & LIQUID TITANIUM COMMAND MATRIX
+       Zero-Redundancy Streamlined Architecture · Contextual Domain Sub-Nav · ⌘K
        ========================================================================== */
     :root,
     html[data-theme="dark"] {
       color-scheme: dark;
-      /* 60% Deep Carbon-Slate Canvas */
-      --bg-canvas: #090D16;
-      --bg-canvas-glow-1: transparent;
-      --bg-canvas-glow-2: transparent;
-      --bg-sidebar: #0C111D;
-      --bg-header: rgba(12, 17, 29, 0.88);
-      --bg-dock: rgba(15, 23, 42, 0.92);
+      /* 60% Deep Obsidian-Onyx Spatial Canvas */
+      --bg-canvas: #04060B;
+      --bg-canvas-glow-1: rgba(0, 229, 255, 0.055);
+      --bg-canvas-glow-2: rgba(139, 92, 246, 0.045);
+      --bg-sidebar: rgba(8, 12, 21, 0.96);
+      --bg-header: rgba(6, 10, 18, 0.86);
+      --bg-dock: rgba(9, 14, 24, 0.90);
 
-      /* 30% Architectural Elevated Surfaces (Hairline Border Hierarchy) */
-      --bg-surface: #111827;
-      --bg-surface-elevated: #161F33;
-      --bg-surface-hover: #1E293B;
-      --bg-surface-inset: #0B0F19;
+      /* 30% Machined Graphite & Liquid Titanium Surfaces */
+      --bg-surface: #0A0F1A;
+      --bg-surface-elevated: #101726;
+      --bg-surface-hover: #162033;
+      --bg-surface-inset: #060911;
 
-      --border-subtle: rgba(255, 255, 255, 0.075);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --border-highlight: rgba(56, 189, 248, 0.42);
-      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
-      --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --border-highlight: rgba(0, 229, 255, 0.48);
+      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+      --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.65), 0 1px 3px rgba(0, 0, 0, 0.4);
 
       /* High-Contrast Optical Typography */
       --text-primary: #F8FAFC;
@@ -61,10 +61,10 @@
       --text-muted: #64748B;
       --text-dim: #475569;
 
-      /* 10% Semantic Telemetry Accents */
-      --accent-cyan: #0284C7;
-      --accent-cyan-bright: #38BDF8;
-      --accent-cyan-soft: rgba(56, 189, 248, 0.12);
+      /* 10% Laser-Sharp Telemetry Accents */
+      --accent-cyan: #00B8D9;
+      --accent-cyan-bright: #22D3EE;
+      --accent-cyan-soft: rgba(34, 211, 238, 0.12);
 
       --accent-violet: #7C3AED;
       --accent-violet-bright: #A78BFA;
@@ -86,42 +86,42 @@
       --accent-rose-soft: rgba(244, 63, 94, 0.12);
 
       --chart-grid: rgba(255, 255, 255, 0.05);
-      --chart-fade-bottom: rgba(9, 13, 22, 0);
+      --chart-fade-bottom: rgba(4, 6, 11, 0);
 
-      /* Crisp Architectural Radii (No Bloated Squircles) */
-      --radius-xl: 12px;
-      --radius-lg: 10px;
-      --radius-md: 8px;
-      --radius-sm: 6px;
+      /* Precision Machined Radii */
+      --radius-xl: 16px;
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 7px;
 
       /* 2+1 Font Stack Discipline */
-      --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-display: 'Space Grotesk', 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
     }
 
-    /* High-Craft Daylight Engineering Surface (Light Mode) */
+    /* High-Craft Ceramic Alabaster Surface (Light Mode) */
     html[data-theme="light"] {
       color-scheme: light;
-      --bg-canvas: #F1F5F9;
-      --bg-canvas-glow-1: transparent;
-      --bg-canvas-glow-2: transparent;
-      --bg-sidebar: #FFFFFF;
+      --bg-canvas: #EEF2F6;
+      --bg-canvas-glow-1: rgba(2, 132, 199, 0.04);
+      --bg-canvas-glow-2: rgba(124, 58, 237, 0.03);
+      --bg-sidebar: rgba(255, 255, 255, 0.96);
       --bg-header: rgba(255, 255, 255, 0.90);
       --bg-dock: rgba(255, 255, 255, 0.94);
 
       --bg-surface: #FFFFFF;
       --bg-surface-elevated: #F8FAFC;
       --bg-surface-hover: #F1F5F9;
-      --bg-surface-inset: #F8FAFC;
+      --bg-surface-inset: #F1F5F9;
 
-      --border-subtle: rgba(15, 23, 42, 0.085);
-      --border-strong: rgba(15, 23, 42, 0.16);
-      --border-highlight: rgba(2, 132, 199, 0.40);
-      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
-      --card-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+      --border-subtle: rgba(15, 23, 42, 0.09);
+      --border-strong: rgba(15, 23, 42, 0.18);
+      --border-highlight: rgba(2, 132, 199, 0.45);
+      --specular-inset: inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+      --card-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.07), 0 1px 3px rgba(15, 23, 42, 0.05);
 
-      --text-primary: #0F172A;
+      --text-primary: #090D16;
       --text-secondary: #334155;
       --text-muted: #64748B;
       --text-dim: #94A3B8;
@@ -150,7 +150,7 @@
       --accent-rose-soft: rgba(225, 29, 72, 0.10);
 
       --chart-grid: rgba(15, 23, 42, 0.06);
-      --chart-fade-bottom: rgba(241, 245, 249, 0);
+      --chart-fade-bottom: rgba(238, 242, 246, 0);
     }
 
     /* Native HTML5 View Transitions API Smooth Cross-Fade */
@@ -183,6 +183,9 @@
       height: 100%;
       height: 100dvh;
       background-color: var(--bg-canvas);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 15% -10%, var(--bg-canvas-glow-1), transparent 70%),
+        radial-gradient(ellipse 70% 45% at 85% 0%, var(--bg-canvas-glow-2), transparent 70%);
       color: var(--text-primary);
       font-family: var(--font-sans);
       font-size: clamp(12.5px, 0.2vw + 12px, 14px);
@@ -240,7 +243,7 @@
     }
 
     /* ==========================================================================
-       ENTERPRISE WORKSPACE SHELL (DOCKED SIDEBAR ON DESKTOP, DRAWER ON MOBILE)
+       ORBITAL HORIZON WORKSPACE SHELL (100% PANORAMIC VIEWPORT + SLIDE-OVER DRAWER)
        ========================================================================== */
     .app-shell {
       display: flex;
@@ -255,58 +258,43 @@
       overflow: hidden !important;
     }
 
+    /* Slide-over Deep Module Launcher Drawer (On-Demand on All Screens) */
     .sidebar {
       position: fixed;
-      top: 0;
-      left: 0;
-      bottom: 0;
-      width: 248px;
-      max-width: calc(100vw - 48px);
+      top: 10px;
+      left: 10px;
+      bottom: 10px;
+      width: 280px;
+      max-width: calc(100vw - 24px);
       background: var(--bg-sidebar);
-      border-right: 1px solid var(--border-subtle);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-xl);
       display: flex;
       flex-direction: column;
       user-select: none;
-      z-index: 100;
-      transform: translateX(-100%);
+      z-index: 1100;
+      transform: translateX(calc(-100% - 24px));
       opacity: 0;
       pointer-events: none;
-      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
+      transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
     }
 
     .sidebar.open {
       transform: translateX(0);
       opacity: 1;
       pointer-events: auto;
-      box-shadow: 12px 0 36px rgba(0, 0, 0, 0.45);
-    }
-
-    @media (min-width: 1120px) {
-      .sidebar {
-        position: relative;
-        top: auto;
-        left: auto;
-        bottom: auto;
-        width: 244px;
-        flex-shrink: 0;
-        transform: none;
-        opacity: 1;
-        pointer-events: auto;
-        box-shadow: none;
-        z-index: 20;
-      }
-      .sidebar-backdrop {
-        display: none !important;
-      }
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.72), var(--specular-inset);
     }
 
     .sidebar-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(5, 8, 15, 0.65);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      z-index: 90;
+      background: rgba(3, 6, 12, 0.68);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 1090;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.2s ease;
@@ -318,7 +306,7 @@
     }
 
     .sidebar-brand {
-      height: 54px;
+      height: 58px;
       padding: 0 16px;
       display: flex;
       align-items: center;
@@ -337,28 +325,28 @@
 
     .brand-title {
       font-family: var(--font-display);
-      font-size: 15.5px;
+      font-size: 16px;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.025em;
       color: var(--text-primary);
     }
 
     .version-tag {
       font-family: var(--font-mono);
       font-size: 10.5px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      background: var(--bg-surface-elevated);
-      border: 1px solid var(--border-subtle);
-      padding: 2px 6px;
-      border-radius: 4px;
+      font-weight: 700;
+      color: var(--accent-cyan-bright);
+      background: var(--accent-cyan-soft);
+      border: 1px solid rgba(34, 211, 238, 0.28);
+      padding: 2px 7px;
+      border-radius: 5px;
       letter-spacing: 0.01em;
     }
 
     .sidebar-scroll {
       flex: 1;
       overflow-y: auto;
-      padding: 12px 8px;
+      padding: 12px 10px;
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -368,7 +356,7 @@
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.07em;
+      letter-spacing: 0.08em;
       color: var(--text-muted);
       padding: 0 10px 4px;
     }
@@ -377,15 +365,15 @@
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
     }
 
     .nav-link {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      min-height: 36px;
-      padding: 6px 10px;
+      min-height: 38px;
+      padding: 6px 11px;
       border-radius: var(--radius-sm);
       color: var(--text-secondary);
       text-decoration: none;
@@ -404,7 +392,7 @@
     .nav-link.active {
       background: var(--accent-cyan-soft);
       color: var(--accent-cyan-bright);
-      border-color: rgba(56, 189, 248, 0.25);
+      border-color: rgba(34, 211, 238, 0.30);
       font-weight: 600;
     }
 
@@ -431,19 +419,20 @@
       font-size: 10.5px;
       font-weight: 600;
       color: var(--text-muted);
-      background: rgba(148, 163, 184, 0.10);
-      padding: 1px 5px;
-      border-radius: 4px;
+      background: rgba(148, 163, 184, 0.12);
+      padding: 1px 6px;
+      border-radius: 5px;
       font-variant-numeric: tabular-nums;
     }
 
     .sidebar-footer {
-      padding: 10px 12px;
+      padding: 12px 14px;
       border-top: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 7px;
       background: var(--bg-surface-inset);
+      border-radius: 0 0 var(--radius-xl) var(--radius-xl);
     }
 
     .sidebar-meta-row {
@@ -481,11 +470,12 @@
       height: 7px;
       border-radius: 50%;
       background: var(--accent-emerald);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
       flex-shrink: 0;
     }
 
     /* ==========================================================================
-       TOP WORKSPACE HEADER BAR (3-ZONE COMPACT BAR)
+       ORBITAL COMMAND BRIDGE (DUAL-TIER PANORAMIC NAVIGATION & HUD)
        ========================================================================== */
     .main-pane {
       flex: 1;
@@ -493,20 +483,21 @@
       flex-direction: column;
       overflow: hidden;
       min-width: 0;
+      width: 100%;
     }
 
     .top-header {
-      height: 54px;
-      padding: 0 20px;
+      min-height: 56px;
+      padding: 6px clamp(12px, 2vw, 28px);
       background: var(--bg-header);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      z-index: 40;
+      z-index: 45;
       flex-shrink: 0;
     }
 
@@ -518,36 +509,30 @@
     }
 
     .cockpit-drawer-btn {
-      background: var(--bg-surface);
+      background: var(--bg-surface-elevated);
       border: 1px solid var(--border-subtle);
       color: var(--text-primary);
-      width: 34px;
       height: 34px;
+      padding: 0 10px;
       border-radius: var(--radius-sm);
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 7px;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
       cursor: pointer;
-      transition: background 0.14s ease, border-color 0.14s ease;
+      transition: all 0.14s ease;
     }
     .cockpit-drawer-btn:hover {
       background: var(--bg-surface-hover);
-      border-color: var(--border-strong);
-    }
-    @media (min-width: 1120px) {
-      .cockpit-drawer-btn {
-        display: none;
-      }
+      border-color: var(--accent-cyan-bright);
+      color: var(--accent-cyan-bright);
     }
 
     .history-nav-group {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      padding: 2px;
+      display: none !important;
     }
 
     .history-btn {
@@ -556,20 +541,11 @@
       color: var(--text-secondary);
       width: 28px;
       height: 28px;
-      border-radius: 4px;
+      border-radius: 5px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: background 0.14s ease, color 0.14s ease, opacity 0.14s ease;
-    }
-    .history-btn:hover:not(:disabled) {
-      background: var(--bg-surface-hover);
-      color: var(--text-primary);
-    }
-    .history-btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
     }
 
     .breadcrumb-trail {
@@ -581,51 +557,165 @@
     }
 
     .breadcrumb-home {
-      color: var(--text-muted);
+      color: var(--text-primary);
       text-decoration: none;
-      font-size: 12.5px;
-      font-weight: 500;
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.015em;
     }
     .breadcrumb-home:hover {
-      color: var(--text-primary);
+      color: var(--accent-cyan-bright);
     }
 
     .breadcrumb-slash {
       color: var(--text-dim);
       font-size: 12px;
+      display: none;
     }
 
     .breadcrumb-current {
       font-family: var(--font-display);
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text-primary);
-      letter-spacing: -0.015em;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--accent-cyan-bright);
+      letter-spacing: -0.01em;
       overflow: hidden;
       text-overflow: ellipsis;
+      display: none;
     }
 
     .route-chip {
-      font-family: var(--font-mono);
-      font-size: 10.5px;
-      font-weight: 500;
-      color: var(--text-muted);
+      display: none !important;
+    }
+
+    /* 4-Domain Logical Navigation Matrix in Center of Top Bar */
+    .orbital-domain-switcher {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
-      padding: 1px 6px;
+      border-radius: var(--radius-md);
+      box-shadow: var(--specular-inset);
+    }
+    .orbital-domain-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      height: 30px;
+      padding: 0 11px;
+      border-radius: 7px;
+      font-family: var(--font-display);
+      font-size: 11.5px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .orbital-domain-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-surface-hover);
+    }
+    .orbital-domain-btn.active {
+      background: var(--bg-surface-elevated);
+      color: var(--accent-cyan-bright);
+      border-color: rgba(34, 211, 238, 0.32);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+    .orbital-domain-num {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      opacity: 0.65;
+    }
+
+    /* Tier 2: Contextual Sub-Navigation Ribbon */
+    .orbital-subnav-bar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 6px clamp(12px, 2vw, 28px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex-shrink: 0;
+      z-index: 40;
+    }
+    .orbital-subnav-bar::-webkit-scrollbar { display: none; }
+
+    .orbital-subnav-track {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: max-content;
+    }
+
+    .orbital-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 29px;
+      padding: 0 10px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.14s ease;
+    }
+    .orbital-pill:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-primary);
+      border-color: var(--border-subtle);
+    }
+    .orbital-pill.active {
+      background: var(--accent-cyan-soft);
+      color: var(--accent-cyan-bright);
+      border-color: rgba(34, 211, 238, 0.34);
+    }
+    .orbital-pill-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
       border-radius: 4px;
+      background: rgba(148, 163, 184, 0.12);
+      color: var(--text-secondary);
+    }
+    .orbital-pill.active .orbital-pill-badge {
+      background: rgba(34, 211, 238, 0.18);
+      color: var(--accent-cyan-bright);
+    }
+    .orbital-sep {
+      width: 1px;
+      height: 16px;
+      background: var(--border-subtle);
+      margin: 0 2px;
+      flex-shrink: 0;
     }
 
     .header-center-telemetry {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 4px 12px;
+      gap: 7px;
+      padding: 4px 10px;
       border-radius: var(--radius-sm);
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
-      font-size: 11.5px;
+      font-size: 11px;
       color: var(--text-secondary);
+      white-space: nowrap;
     }
 
     .header-right {
@@ -633,6 +723,38 @@
       align-items: center;
       gap: 6px;
       flex-shrink: 0;
+    }
+
+    /* Command Palette Trigger (⌘K) */
+    .cmd-palette-trigger {
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      height: 32px;
+      padding: 0 10px;
+      border-radius: var(--radius-sm);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    .cmd-palette-trigger:hover {
+      border-color: var(--accent-cyan-bright);
+      color: var(--text-primary);
+      background: var(--bg-surface-hover);
+    }
+    .cmd-kbd {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--accent-cyan-bright);
     }
 
     .search-box {
@@ -643,7 +765,7 @@
       border-radius: var(--radius-sm);
       padding: 0 10px;
       height: 32px;
-      width: 200px;
+      width: 190px;
       transition: border-color 0.15s ease;
     }
     .search-box:focus-within {
@@ -661,7 +783,7 @@
       border: none;
       outline: none;
       color: var(--text-primary);
-      font-size: 12.5px;
+      font-size: 12px;
       width: 100%;
       font-family: var(--font-sans);
     }
@@ -683,7 +805,7 @@
       cursor: pointer;
       text-decoration: none;
       white-space: nowrap;
-      transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+      transition: all 0.14s ease;
     }
     .action-btn:hover:not(:disabled) {
       background: var(--bg-surface-hover);
@@ -694,13 +816,14 @@
       cursor: not-allowed;
     }
     .action-btn.primary-cta {
-      background: var(--accent-cyan);
-      border-color: rgba(255, 255, 255, 0.15);
+      background: linear-gradient(135deg, var(--accent-cyan), #0284C7);
+      border-color: rgba(255, 255, 255, 0.2);
       color: #FFFFFF;
+      box-shadow: 0 4px 14px rgba(0, 184, 217, 0.25);
     }
     .action-btn.primary-cta:hover:not(:disabled) {
       background: var(--accent-cyan-bright);
-      color: #090D16;
+      color: #04060B;
     }
 
     .theme-cycle-btn {
@@ -709,7 +832,7 @@
     }
 
     /* ==========================================================================
-       VIEWPORT & ARCHITECTURAL PANELS
+       VIEWPORT & ORBITAL PANELS
        ========================================================================== */
     .viewport-scroll {
       flex: 1;
@@ -717,7 +840,7 @@
       min-width: 0;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: clamp(12px, 1.8vw, 24px) clamp(10px, 2.2vw, 32px) calc(98px + env(safe-area-inset-bottom, 0px));
+      padding: clamp(14px, 1.8vw, 24px) clamp(12px, 2.4vw, 36px) clamp(20px, 2.5vw, 32px);
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
     }
@@ -729,36 +852,109 @@
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: clamp(12px, 1.4vw, 20px);
+      gap: clamp(14px, 1.5vw, 20px);
     }
 
-    /* Node Identity Header Bar */
-    .command-banner {
+    /* ==========================================================================
+       NEW VALUE-ADDED WIDGET: GLOBAL SYSTEM HEALTH & VITAL PULSE RIBBON
+       ========================================================================== */
+    .vital-pulse-ribbon {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 235px), 1fr));
+      gap: clamp(10px, 1.1vw, 14px);
+      width: 100%;
+    }
+    .vital-pulse-pod {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      padding: 16px 20px;
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: var(--specular-inset);
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+    }
+    .vital-pulse-pod:hover {
+      background: var(--bg-surface-elevated);
+      border-color: var(--border-strong);
+      transform: translateY(-1px);
+    }
+    .vital-pod-kicker {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .vital-pod-val {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-top: 2px;
+    }
+    .vital-pod-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .health-bar-mini {
+      width: 64px;
+      height: 6px;
+      background: rgba(148, 163, 184, 0.15);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .health-bar-mini-fill {
+      height: 100%;
+      width: 96%;
+      background: linear-gradient(90deg, #10B981, #22D3EE);
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+
+    /* Panoramic Node Identity Hero Deck */
+    .command-banner {
+      background:
+        radial-gradient(circle at 0% 0%, rgba(34, 211, 238, 0.09), transparent 48%),
+        radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.07), transparent 48%),
+        var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      box-shadow: var(--card-shadow), var(--specular-inset);
+      border-radius: var(--radius-xl);
+      padding: clamp(16px, 1.8vw, 22px) clamp(18px, 2vw, 26px);
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 16px;
       position: relative;
+      overflow: hidden;
     }
 
     .command-banner-left {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 16px;
       min-width: 0;
     }
 
     .server-emblem {
-      width: 48px;
-      height: 48px;
+      width: 52px;
+      height: 52px;
       border-radius: var(--radius-md);
       background: var(--bg-surface-inset);
-      border: 1px solid var(--border-subtle);
+      border: 1px solid var(--border-strong);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -767,10 +963,11 @@
       position: relative;
       cursor: pointer;
       overflow: hidden;
-      transition: border-color 0.16s ease;
+      transition: border-color 0.16s ease, transform 0.16s ease;
     }
     .server-emblem:hover {
       border-color: var(--accent-cyan-bright);
+      transform: scale(1.03);
     }
 
     .server-emblem img,
@@ -794,7 +991,7 @@
     .logo-edit-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(9, 13, 22, 0.82);
+      background: rgba(4, 6, 11, 0.84);
       color: #F8FAFC;
       font-size: 9.5px;
       font-weight: 700;
@@ -817,26 +1014,26 @@
     .host-headline {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 9px;
       flex-wrap: wrap;
     }
 
     .host-headline h1 {
       font-family: var(--font-display);
-      font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+      font-size: clamp(1.25rem, 2vw, 1.55rem);
       font-weight: 700;
       color: var(--text-primary);
-      letter-spacing: -0.02em;
+      letter-spacing: -0.025em;
     }
 
     .unboxed-meta {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 8px;
       flex-wrap: wrap;
       font-size: 12px;
       color: var(--text-muted);
-      margin-top: 3px;
+      margin-top: 4px;
     }
 
     .meta-sep {
@@ -845,12 +1042,12 @@
     }
 
     /* ==========================================================================
-       12-COLUMN TELEMETRY PILLARS GRID
+       MACHINED SILICON TELEMETRY PILLARS GRID (WITH TOP LASER ACCENTS)
        ========================================================================== */
     .telemetry-pillars-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-      gap: clamp(10px, 1.2vw, 16px);
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 265px), 1fr));
+      gap: clamp(12px, 1.3vw, 18px);
       width: 100%;
     }
 
@@ -858,23 +1055,45 @@
       min-width: 0;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--card-shadow), var(--specular-inset);
       border-radius: var(--radius-lg);
-      padding: clamp(14px, 1.4vw, 18px) clamp(14px, 1.6vw, 20px);
+      padding: clamp(16px, 1.5vw, 20px) clamp(16px, 1.7vw, 22px);
       text-decoration: none;
       color: inherit;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 12px;
-      transition: border-color 0.16s ease, background 0.16s ease;
+      gap: 13px;
+      transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
       position: relative;
       overflow: hidden;
       cursor: pointer;
     }
 
+    .pillar-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent-cyan-bright), transparent 85%);
+      opacity: 0.75;
+    }
+    .pillar-card:nth-child(2)::before {
+      background: linear-gradient(90deg, var(--accent-violet-bright), transparent 85%);
+    }
+    .pillar-card:nth-child(3)::before {
+      background: linear-gradient(90deg, var(--accent-emerald-bright), transparent 85%);
+    }
+    .pillar-card:nth-child(4)::before {
+      background: linear-gradient(90deg, var(--accent-amber-bright), transparent 85%);
+    }
+
     .pillar-card:hover {
       background: var(--bg-surface-elevated);
       border-color: var(--border-strong);
+      transform: translateY(-2px);
     }
 
     .pillar-top {
@@ -885,11 +1104,12 @@
     }
 
     .pillar-label {
+      font-family: var(--font-display);
       font-size: 11px;
       font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -897,7 +1117,7 @@
 
     .pillar-value {
       font-family: var(--font-mono);
-      font-size: clamp(1.35rem, 1.9vw, 1.65rem);
+      font-size: clamp(1.4rem, 2vw, 1.75rem);
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: -0.03em;
@@ -918,18 +1138,23 @@
     .bento-expand-hint {
       font-size: 11px;
       font-weight: 600;
-      color: var(--text-muted);
+      color: var(--accent-cyan-bright);
+      background: var(--accent-cyan-soft);
+      border: 1px solid rgba(34, 211, 238, 0.22);
+      padding: 2px 8px;
+      border-radius: 5px;
       cursor: pointer;
-      transition: color 0.14s ease;
+      transition: all 0.14s ease;
     }
     .bento-expand-hint:hover {
-      color: var(--accent-cyan-bright);
+      background: rgba(34, 211, 238, 0.22);
+      border-color: var(--accent-cyan-bright);
     }
 
     /* Radial Instrument Gauge */
     .radial-gauge {
-      width: 56px;
-      height: 56px;
+      width: 58px;
+      height: 58px;
       flex-shrink: 0;
       position: relative;
       display: flex;
@@ -967,10 +1192,15 @@
     }
 
     .mini-oscilloscope {
-      height: 48px;
+      height: 50px;
       width: 100%;
       margin-top: 2px;
       position: relative;
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      overflow: hidden;
     }
 
     .mini-oscilloscope canvas {
@@ -980,12 +1210,12 @@
     }
 
     /* ==========================================================================
-       OVERVIEW SECONDARY OPERATIONAL MODULES
+       OVERVIEW SECONDARY OPERATIONAL MODULES (BENTO MATRIX)
        ========================================================================== */
     .modules-bento-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 285px), 1fr));
-      gap: clamp(10px, 1.2vw, 16px);
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 265px), 1fr));
+      gap: clamp(12px, 1.3vw, 18px);
       width: 100%;
     }
 
@@ -993,20 +1223,22 @@
       min-width: 0;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--card-shadow), var(--specular-inset);
       border-radius: var(--radius-lg);
-      padding: clamp(14px, 1.4vw, 18px) clamp(14px, 1.6vw, 20px);
+      padding: clamp(16px, 1.5vw, 20px) clamp(16px, 1.7vw, 22px);
       text-decoration: none;
       color: inherit;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 10px;
-      transition: border-color 0.16s ease, background 0.16s ease;
+      gap: 11px;
+      transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
     }
 
     .module-card:hover {
       background: var(--bg-surface-elevated);
       border-color: var(--border-strong);
+      transform: translateY(-2px);
     }
 
     .module-header {
@@ -1044,8 +1276,9 @@
     .hero-instrument-card {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      padding: 18px 20px;
+      box-shadow: var(--card-shadow), var(--specular-inset);
+      border-radius: var(--radius-xl);
+      padding: 20px 24px;
     }
 
     .instrument-header {
@@ -1058,16 +1291,17 @@
     }
 
     .instrument-kicker {
+      font-family: var(--font-display);
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-muted);
+      letter-spacing: 0.07em;
+      color: var(--accent-cyan-bright);
     }
 
     .instrument-big-readout {
       font-family: var(--font-mono);
-      font-size: clamp(1.6rem, 2.6vw, 2.1rem);
+      font-size: clamp(1.65rem, 2.7vw, 2.2rem);
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: -0.03em;
@@ -1086,7 +1320,7 @@
 
     .oscilloscope-stage {
       width: 100%;
-      height: clamp(140px, 21dvh, 250px);
+      height: clamp(145px, 22dvh, 255px);
       position: relative;
       background: var(--bg-surface-inset);
       border: 1px solid var(--border-subtle);
@@ -1106,8 +1340,8 @@
     /* Hardware Specification Grid (Zero-Hardcoding Dynamic Cells) */
     .hw-spec-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
-      gap: clamp(8px, 1vw, 14px);
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 205px), 1fr));
+      gap: clamp(9px, 1vw, 14px);
       width: 100%;
     }
 
@@ -1115,8 +1349,9 @@
       min-width: 0;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--specular-inset);
       border-radius: var(--radius-md);
-      padding: clamp(11px, 1.2vw, 15px) clamp(12px, 1.4vw, 16px);
+      padding: clamp(12px, 1.3vw, 16px) clamp(14px, 1.5vw, 18px);
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -1155,10 +1390,10 @@
 
     .section-title {
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: 15.5px;
       font-weight: 700;
       color: var(--text-primary);
-      letter-spacing: -0.01em;
+      letter-spacing: -0.015em;
     }
 
     .section-subtitle {
@@ -1169,6 +1404,7 @@
     .surface-panel {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
+      box-shadow: var(--card-shadow), var(--specular-inset);
       border-radius: var(--radius-lg);
       overflow: hidden;
     }
@@ -1266,6 +1502,33 @@
       background: var(--accent-cyan-bright);
       border-radius: 2px;
       transition: width 0.25s ease, background-color 0.25s ease;
+    }
+
+    /* Command Palette Modal (⌘K Spotlight) */
+    .cmd-palette-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 360px;
+      overflow-y: auto;
+      padding-top: 6px;
+    }
+    .cmd-palette-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface-inset);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .cmd-palette-item:hover {
+      background: var(--accent-cyan-soft);
+      border-color: rgba(34, 211, 238, 0.35);
     }
 
     /* Active Network Interface Cards (NIC Hardware Inspector) */
@@ -3305,34 +3568,14 @@
        ========================================================================== */
     .floating-dock-shell,
     .floating-touch-dock-wrap {
-      position: fixed;
-      left: 50%;
-      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-      transform: translateX(-50%);
-      z-index: 99;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 5px;
-      width: fit-content;
-      max-width: calc(100vw - 20px);
-      min-width: 0;
-      pointer-events: none;
-    }
-
-    @media (min-width: 1120px) {
-      .floating-dock-shell,
-      .floating-touch-dock-wrap {
-        left: calc(50% + 122px);
-        max-width: calc(100vw - 280px);
-      }
+      display: none !important;
     }
 
     .swipe-pagination-dots {
       display: none;
       align-items: center;
       gap: 5px;
-      padding: 3px 8px;
+      padding: 3px 9px;
       background: var(--bg-surface-elevated);
       border: 1px solid var(--border-subtle);
       border-radius: 999px;
@@ -3375,17 +3618,17 @@
       align-items: center;
       justify-content: flex-start;
       gap: 4px;
-      padding: 0 8px;
-      height: 52px;
-      min-height: 52px;
-      max-height: 52px;
+      padding: 0 10px;
+      height: 54px;
+      min-height: 54px;
+      max-height: 54px;
       box-sizing: border-box;
       background: var(--bg-dock);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(24px) saturate(185%);
+      -webkit-backdrop-filter: blur(24px) saturate(185%);
       border: 1px solid var(--border-strong);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-      border-radius: 10px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
       width: fit-content;
       max-width: 100%;
       min-width: 0;
@@ -3402,9 +3645,9 @@
 
     .dock-divider {
       width: 1px;
-      height: 20px;
+      height: 22px;
       background: var(--border-subtle);
-      margin: 0 2px;
+      margin: 0 3px;
       flex: 0 0 1px;
       flex-shrink: 0;
     }
@@ -3412,10 +3655,10 @@
     .dock-item {
       flex: 0 0 auto;
       flex-shrink: 0;
-      min-width: 48px;
+      min-width: 50px;
       height: 40px;
-      padding: 2px 7px;
-      border-radius: 6px;
+      padding: 3px 8px;
+      border-radius: 10px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--text-muted);
@@ -3430,18 +3673,20 @@
       user-select: none;
       -webkit-user-select: none;
       white-space: nowrap;
-      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+      transition: all 0.16s ease;
     }
 
     .dock-item:hover {
       color: var(--text-primary);
       background: var(--bg-surface-hover);
+      transform: translateY(-1px);
     }
 
     .dock-item.active {
       background: var(--accent-cyan-soft);
       color: var(--accent-cyan-bright);
-      border-color: rgba(56, 189, 248, 0.28);
+      border-color: rgba(34, 211, 238, 0.34);
+      box-shadow: 0 0 14px rgba(34, 211, 238, 0.14);
     }
 
     .dock-item svg {
@@ -3452,8 +3697,8 @@
 
     .dock-label {
       font-size: 9px;
-      font-weight: 600;
-      letter-spacing: 0;
+      font-weight: 700;
+      letter-spacing: 0.01em;
       white-space: nowrap;
       line-height: 1;
     }
@@ -3797,72 +4042,148 @@
     <main class="main-pane">
 
       <header class="top-header">
-        <!-- ZONE 1: Navigation Drawer Trigger, History & Active Route -->
+        <!-- ZONE 1: Brand Lockup, Drawer Trigger & Contextual Subview Title -->
         <div class="header-left">
-          <button class="cockpit-drawer-btn" onclick="toggleSidebar()" title="Menú completo de módulos y subsistemas">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+          <button class="cockpit-drawer-btn" onclick="toggleSidebar()" title="Abrir índice lateral completo de subsistemas">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+            <span>Módulos</span>
           </button>
 
-          <div class="history-nav-group">
-            <button class="history-btn" id="btnHistoryBack" onclick="navigateHistoryBack()" title="Página anterior (Atrás)" disabled>
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <button class="history-btn" id="btnHistoryForward" onclick="navigateHistoryForward()" title="Página siguiente (Adelante)" disabled>
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
+          <div class="history-nav-group" aria-hidden="true">
+            <button class="history-btn" id="btnHistoryBack" onclick="navigateHistoryBack()" disabled></button>
+            <button class="history-btn" id="btnHistoryForward" onclick="navigateHistoryForward()" disabled></button>
           </div>
 
           <div class="breadcrumb-trail">
             <a href="/" class="breadcrumb-home" onclick="return navigateTo(event, 'overview')">Recursos</a>
-            <span class="breadcrumb-slash">/</span>
+            <span class="breadcrumb-slash" id="breadcrumbSlash">/</span>
             <span class="breadcrumb-current" id="currentViewTitle">Cabina General</span>
             <span class="route-chip" id="currentRouteBadge">/</span>
           </div>
         </div>
 
-        <!-- ZONE 2: Tesla Center Live Telemetry Pulse & Real-Time Render Auditor -->
-        <div class="header-center-telemetry" id="hudCenterTelemetry" onclick="openPerfAuditDialog()" style="cursor: pointer;" title="Auditoría de rendimiento en tiempo real (Toca para inspeccionar FPS, latencia API y optimizaciones activas)">
-          <span class="live-dot" id="hudPulseDot"></span>
-          <span id="hudClockReadout" class="mono" style="font-weight: 700; color: var(--text-primary);">--:--:--</span>
-          <span class="meta-sep">·</span>
-          <span id="hudPerfLatency" class="mono" style="color: var(--accent-emerald-bright);">RAF 60fps</span>
+        <!-- ZONE 2: 4-Domain Orbital Command Bridge -->
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+          <nav class="orbital-domain-switcher" aria-label="Dominios de Arquitectura">
+            <button type="button" class="orbital-domain-btn active" id="domainBtnMission" data-domain="mission" onclick="switchOrbitalDomain('mission')">
+              <span>01 · Misión</span>
+            </button>
+            <button type="button" class="orbital-domain-btn" id="domainBtnSilicon" data-domain="silicon" onclick="switchOrbitalDomain('silicon')">
+              <span>02 · Silicio</span>
+            </button>
+            <button type="button" class="orbital-domain-btn" id="domainBtnNetwork" data-domain="network" onclick="switchOrbitalDomain('network')">
+              <span>03 · Red &amp; Escudo</span>
+            </button>
+            <button type="button" class="orbital-domain-btn" id="domainBtnOps" data-domain="ops" onclick="switchOrbitalDomain('ops')">
+              <span>04 · Operaciones</span>
+            </button>
+          </nav>
         </div>
 
-        <!-- ZONE 3: Search, Titanium Theme Switcher, OTA & Zero-Trust -->
+        <!-- ZONE 3: Unified Utility Bar (Search, Live FPS, ⌘K, Theme, Version OTA, Zero-Trust) -->
         <div class="header-right">
           <div class="search-box" id="searchBox" style="display: none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="filterInput" placeholder="Filtrar..." oninput="onFilterChange()">
           </div>
 
-          <button class="action-btn theme-cycle-btn" id="btnThemeSwitch" onclick="cycleTitaniumTheme()" title="Cambiar acabado: Titanio Oscuro / Titanio Claro / Automático">
+          <div class="header-center-telemetry" id="hudCenterTelemetry" onclick="openPerfAuditDialog()" style="cursor: pointer;" title="Auditoría de rendimiento en tiempo real (60 FPS y latencia API)">
+            <span class="live-dot" id="hudPulseDot"></span>
+            <span id="hudClockReadout" class="mono" style="font-weight: 700; color: var(--text-primary);">--:--:--</span>
+            <span class="meta-sep">·</span>
+            <span id="hudPerfLatency" class="mono" style="color: var(--accent-emerald-bright);">60fps</span>
+          </div>
+
+          <button type="button" class="cmd-palette-trigger" onclick="openCommandPalette()" title="Paleta de Comandos y Navegación Rápida (Ctrl+K / ⌘K)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <kbd class="cmd-kbd">⌘K</kbd>
+          </button>
+
+          <button class="action-btn theme-cycle-btn" id="btnThemeSwitch" onclick="cycleTitaniumTheme()" title="Cambiar acabado: Titanio Oscuro / Alabastro Claro / Automático">
             <span id="themeSwitchIcon">🌗</span>
-            <span id="themeSwitchLabel" style="font-size: 11.5px;">Auto</span>
+            <span id="themeSwitchLabel" style="display: none;">Auto</span>
           </button>
 
           <a href="/version" class="action-btn" id="btnHeaderVersion" onclick="return navigateTo(event, 'version')" title="Estado de versión y sincronización OTA con GitHub">
             <span class="live-dot" id="dotVersionHeader"></span>
-            <span id="lblVersionHeader" class="mono">Sincronizando...</span>
+            <span id="lblVersionHeader" class="mono">v11.1.0</span>
           </a>
 
-          <button class="action-btn" onclick="openTrustDialog()" title="Seguridad Zero-Trust y Dispositivos Confiables">
+          <button class="action-btn" onclick="openTrustDialog()" title="Certificados Zero-Trust y Dispositivos Autorizados">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span>Zero-Trust</span>
+            <span id="ovBadgeTrust" class="mono" style="font-size: 11px;">Zero-Trust</span>
           </button>
         </div>
       </header>
 
+      <!-- ==================================================================
+           CONTEXTUAL SUB-NAVIGATION RIBBON (ONLY SHOWN IN MULTI-VIEW DOMAINS)
+           ================================================================== -->
+      <div class="orbital-subnav-bar" id="orbitalSubnavBar" style="display: none;">
+        <div class="orbital-subnav-group" id="orbitalSubnavPills" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <a href="/" class="orbital-pill" id="subPillOverview" data-view="overview" data-domain="mission" style="display: none;" onclick="return navigateTo(event, 'overview')">
+            <span>Cabina Central</span>
+          </a>
+          <a href="/procesador" class="orbital-pill" id="subPillProcessor" data-view="processor" data-domain="silicon" onclick="return navigateTo(event, 'processor')">
+            <span>Procesador (CPU)</span>
+            <span class="orbital-pill-badge" id="subBadgeCpu">--%</span>
+          </a>
+          <a href="/memoria" class="orbital-pill" id="subPillMemory" data-view="memory" data-domain="silicon" onclick="return navigateTo(event, 'memory')">
+            <span>Memoria RAM</span>
+            <span class="orbital-pill-badge" id="subBadgeRam">--%</span>
+          </a>
+          <a href="/grafica" class="orbital-pill" id="subPillGpu" data-view="gpu" data-domain="silicon" onclick="return navigateTo(event, 'gpu')">
+            <span>Gráfica (GPU)</span>
+            <span class="orbital-pill-badge" id="subBadgeGpu">--</span>
+          </a>
+          <a href="/almacenamiento" class="orbital-pill" id="subPillDrives" data-view="drives" data-domain="silicon" onclick="return navigateTo(event, 'drives')">
+            <span>Almacenamiento</span>
+            <span class="orbital-pill-badge" id="subBadgeDrives">--%</span>
+          </a>
+          <a href="/red" class="orbital-pill" id="subPillNetwork" data-view="network" data-domain="network" onclick="return navigateTo(event, 'network')">
+            <span>Red, Interfaces &amp; Mapa</span>
+            <span class="orbital-pill-badge" id="subBadgeNet">--</span>
+          </a>
+          <a href="/seguridad" class="orbital-pill" id="subPillSecurity" data-view="security" data-domain="network" onclick="return navigateTo(event, 'security')">
+            <span>Ciberdefensa &amp; IPS</span>
+            <span class="orbital-pill-badge" id="subBadgeSec">OK</span>
+          </a>
+          <a href="/dns" class="orbital-pill" id="subPillDns" data-view="dns" data-domain="network" onclick="return navigateTo(event, 'dns')">
+            <span>DNS Dinámico &amp; FTL</span>
+          </a>
+          <a href="/aplicaciones" class="orbital-pill" id="subPillApps" data-view="apps" data-domain="ops" onclick="return navigateTo(event, 'apps')">
+            <span>Contenedores &amp; Servicios</span>
+            <span class="orbital-pill-badge" id="subBadgeApps">--</span>
+          </a>
+          <a href="/descargas" class="orbital-pill" id="subPillTorrents" data-view="torrents" data-domain="ops" onclick="return navigateTo(event, 'torrents')">
+            <span>Descargas &amp; Media</span>
+            <span class="orbital-pill-badge" id="subBadgeTorrents">--</span>
+          </a>
+          <a href="/procesos" class="orbital-pill" id="subPillProcesses" data-view="processes" data-domain="ops" onclick="return navigateTo(event, 'processes')">
+            <span>Monitor de Procesos</span>
+            <span class="orbital-pill-badge" id="subBadgeProcs">--</span>
+          </a>
+          <a href="/version" class="orbital-pill" id="subPillVersion" data-view="version" data-domain="ops" onclick="return navigateTo(event, 'version')">
+            <span>Versión &amp; GitHub OTA</span>
+            <span class="orbital-pill-badge" id="subBadgeVersion">v11.1.0</span>
+          </a>
+          <a href="/dex" class="orbital-pill" id="subPillDex" data-view="dex" data-domain="ops" style="display: none;" onclick="return navigateTo(event, 'dex')">
+            <span>Estación DeX USB</span>
+          </a>
+        </div>
+      </div>
+
       <div class="viewport-scroll" id="mainScrollContainer">
 
         <!-- ==================================================================
-             0. CABINA GENERAL (APPLE LIQUID GLASS BENTO + TESLA COCKPIT - RUTA /)
+             0. CABINA GENERAL (ZERO-REDUNDANCY COMMAND MATRIX - RUTA /)
              ================================================================== -->
         <div class="view-page" id="viewOverview">
 
-          <!-- System Identity & Live Telemetry Status Banner -->
-          <div class="command-banner">
+          <!-- UNIFIED NODE IDENTITY & GLOBAL SYSTEM HEALTH DECK -->
+          <div class="command-banner" id="ovVitalPulseRibbon">
             <div class="command-banner-left">
-              <div class="server-emblem" id="hostOsEmblemBtn" onclick="openHostOsLogoPicker()" title="Logo del sistema operativo detectado · Toca para buscar en Google o subir un archivo local">
+              <div class="server-emblem" id="hostOsEmblemBtn" onclick="openHostOsLogoPicker()" title="Logo del sistema operativo detectado · Haz clic para cambiar">
                 <div id="hostOsEmblemContent" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
                   <img id="hostOsLogoImg" src="https://cdn.simpleicons.org/linux/FCC624" alt="OS Logo" onerror="this.onerror=null; this.src='https://www.google.com/s2/favicons?sz=128&domain=kernel.org';">
                 </div>
@@ -3873,11 +4194,8 @@
               <div>
                 <div class="host-headline">
                   <h1 id="ovHostTitle">Detectando nodo...</h1>
-                  <button class="action-btn" style="min-height: 26px; height: 26px; padding: 0 9px; font-size: 11px;" onclick="openHostOsLogoPicker()" title="Cambiar el logo del sistema por búsqueda web o archivo local">
-                    Logo SO
-                  </button>
                   <span class="meta-sep">·</span>
-                  <a href="/dns" onclick="return navigateTo(event, 'dns')" id="ovPublicDomainBadge" class="mono" style="font-size: 12.5px; color: var(--accent-cyan-bright); text-decoration: none;">Detectando DNS...</a>
+                  <a href="/dns" onclick="return navigateTo(event, 'dns')" id="ovPublicDomainBadge" class="mono" style="font-size: 12.5px; color: var(--accent-cyan-bright); text-decoration: none;" title="Inspeccionar DNS Dinámico y Tráfico por IP">Detectando DNS...</a>
                 </div>
                 <div class="unboxed-meta">
                   <span id="ovSysOs" class="hw-detecting">Detectando sistema operativo...</span>
@@ -3891,21 +4209,53 @@
               </div>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative; z-index: 1;">
-              <button class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="SystemLogsCenter.toggleCenter()" id="ovSystemLogsToggleBtn" title="Abrir/ocultar Centro Unificado de Registro de Fallos (Apps, Servicios y Kernel)">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            <!-- Integrated Global Health Score + Unified System Logs Trigger -->
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: relative; z-index: 1;">
+              <div onclick="openPerfAuditDialog()" style="display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: var(--bg-surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer;" title="Índice sintético de salud global del nodo · Pulsa para abrir auditoría de rendimiento">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Salud del Nodo</span>
+                    <span class="adw-badge badge-green mono" id="ovHealthBadge" style="padding: 1px 5px; font-size: 9.5px;">ÓPTIMO</span>
+                  </div>
+                  <div class="mono" style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;" id="ovHealthStatusText">Evaluando subsistemas...</div>
+                </div>
+                <div style="text-align: right;">
+                  <div class="mono" style="font-size: 18px; font-weight: 800; color: var(--accent-emerald-bright); line-height: 1;" id="ovHealthScoreVal">100%</div>
+                  <div class="health-bar-mini" style="width: 56px; margin-top: 4px;">
+                    <div class="health-bar-mini-fill" id="ovHealthMiniBar" style="width: 100%;"></div>
+                  </div>
+                </div>
+              </div>
+
+              <button class="action-btn" style="min-height: 38px; height: 38px; padding: 0 12px; font-size: 11.5px;" onclick="SystemLogsCenter.toggleCenter()" id="ovSystemLogsToggleBtn" title="Abrir/ocultar Centro Unificado de Registro de Fallos (Apps, Servicios y Kernel)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
                 <span id="ovSystemLogsBadgeText" class="mono">Logs: verificando...</span>
               </button>
-              <button class="action-btn" style="min-height: 28px; height: 28px; padding: 0 10px; font-size: 11px;" onclick="openPerfAuditDialog()" title="Ver auditoría de rendimiento y optimización en tiempo real">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                <span id="ovPerfBadgeText">Auditoría 60fps</span>
-              </button>
-              <span class="adw-badge badge-green" id="ovBadgeStatus">Telemetría Activa</span>
-              <span class="adw-badge badge-blue" id="ovBadgeTrust" onclick="openTrustDialog()" style="cursor: pointer;">Verificando red...</span>
+            </div>
+
+            <!-- Hidden telemetry compatibility hooks (zero visual redundancy) -->
+            <div style="display: none;" aria-hidden="true">
+              <span id="ovVitalLoadBadge"></span>
+              <span id="ovVitalThermalVal"></span>
+              <span id="ovVitalThermalSub"></span>
+              <span id="ovVitalClientsBadge"></span>
+              <span id="ovVitalNetVal"></span>
+              <span id="ovVitalNetSub"></span>
+              <span id="ovVitalShieldBadge"></span>
+              <span id="ovVitalShieldVal"></span>
+              <span id="ovVitalShieldSub"></span>
+              <span id="ovPerfBadgeText"></span>
+              <span id="ovBadgeStatus"></span>
+              <span id="ovDnsDomainTitle"></span>
+              <span id="ovDnsSub"></span>
+              <span id="ovVersionCommit"></span>
+              <span id="ovVersionSub"></span>
+              <span id="ovVersionBadge"></span>
+              <span id="ovBadgeGitVersion"></span>
             </div>
           </div>
 
-          <!-- Centro Unificado de Registro y Monitor de Fallos del Sistema (Todas las Apps y Servicios) -->
+          <!-- Centro Unificado de Registro y Monitor de Fallos del Sistema (Desplegable bajo demanda) -->
           <div class="system-logs-center-card" id="systemLogsCenterCard" style="display: none; margin-bottom: 16px;">
             <div class="system-logs-bar">
               <div class="system-logs-title-group">
@@ -3948,7 +4298,7 @@
             </div>
           </div>
 
-          <!-- 4 Primary Hardware Telemetry Pillars with Radial SVG Gauges, Expandable Sheet & Live Sparklines -->
+          <!-- 4 Primary Hardware Telemetry Pillars (4-Column Symmetrical Matrix) -->
           <div class="telemetry-pillars-grid">
 
             <!-- 1. CPU PILLAR -->
@@ -3964,15 +4314,15 @@
                     <circle class="radial-track" cx="28" cy="28" r="22"></circle>
                     <circle class="radial-progress" id="gaugeCpuCircle" cx="28" cy="28" r="22" stroke="#38BDF8"></circle>
                   </svg>
-                  <span class="radial-center-text" id="gaugeCpuText">--%</span>
+                  <span class="radial-center-text" id="gaugeCpuText" style="display: none;">--%</span>
                 </div>
               </div>
               <div class="mini-oscilloscope">
                 <canvas id="ovCanvasCpu"></canvas>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                <span class="bento-expand-hint" onclick="openBentoSheet('processor', event)" title="Expandir tarjeta interactiva con gráfica táctil">Inspector Táctil</span>
-                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver núcleos →</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('processor', event)" title="Expandir gráfica interactiva">Inspector Táctil</span>
+                <span class="module-arrow">→</span>
               </div>
             </a>
 
@@ -3996,8 +4346,8 @@
                 <canvas id="ovCanvasRam"></canvas>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                <span class="bento-expand-hint" onclick="openBentoSheet('memory', event)" title="Expandir tarjeta interactiva con gráfica táctil">Inspector Táctil</span>
-                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver RAM/Swap →</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('memory', event)" title="Expandir gráfica interactiva">Inspector Táctil</span>
+                <span class="module-arrow">→</span>
               </div>
             </a>
 
@@ -4014,15 +4364,15 @@
                     <circle class="radial-track" cx="28" cy="28" r="22"></circle>
                     <circle class="radial-progress" id="gaugeGpuCircle" cx="28" cy="28" r="22" stroke="#34D399"></circle>
                   </svg>
-                  <span class="radial-center-text" id="gaugeGpuText">--%</span>
+                  <span class="radial-center-text" id="gaugeGpuText" style="display: none;">--%</span>
                 </div>
               </div>
               <div class="mini-oscilloscope">
                 <canvas id="ovCanvasGpu"></canvas>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                <span class="bento-expand-hint" onclick="openBentoSheet('gpu', event)" title="Expandir tarjeta interactiva con gráfica táctil">Inspector Táctil</span>
-                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver sensores →</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('gpu', event)" title="Expandir gráfica interactiva">Inspector Táctil</span>
+                <span class="module-arrow">→</span>
               </div>
             </a>
 
@@ -4030,7 +4380,7 @@
             <a href="/almacenamiento" class="pillar-card" onclick="return navigateTo(event, 'drives')">
               <div class="pillar-top">
                 <div>
-                  <div class="pillar-label">Almacenamiento & E/S</div>
+                  <div class="pillar-label">Almacenamiento &amp; E/S</div>
                   <div class="pillar-value" id="ovDiskRootUsage">--%</div>
                   <div class="pillar-spec hw-detecting" id="ovDiskSub">Analizando volúmenes montados...</div>
                 </div>
@@ -4039,7 +4389,7 @@
                     <circle class="radial-track" cx="28" cy="28" r="22"></circle>
                     <circle class="radial-progress" id="gaugeDiskCircle" cx="28" cy="28" r="22" stroke="#FBBF24"></circle>
                   </svg>
-                  <span class="radial-center-text" id="gaugeDiskText">--%</span>
+                  <span class="radial-center-text" id="gaugeDiskText" style="display: none;">--%</span>
                 </div>
               </div>
               <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -4052,14 +4402,14 @@
                 </div>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                <span class="bento-expand-hint" onclick="openBentoSheet('drives', event)" title="Expandir tarjeta interactiva con gráfica táctil">Inspector Táctil</span>
-                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Ver discos →</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('drives', event)" title="Expandir gráfica interactiva">Inspector Táctil</span>
+                <span class="module-arrow">→</span>
               </div>
             </a>
 
           </div>
 
-          <!-- Secondary Operational Bento Grid (6 Modules) -->
+          <!-- 4 Operational Modules (Symmetrical 4-Column Bento Grid, Zero Redundancy) -->
           <div class="modules-bento-grid">
 
             <!-- 5. RED & INTERFACES -->
@@ -4067,9 +4417,9 @@
               <div class="module-header">
                 <div class="module-title-group">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-                  <span>Red, Interfaces & Clientes</span>
+                  <span>Red, Mapa &amp; Clientes</span>
                 </div>
-                <span class="bento-expand-hint" onclick="openBentoSheet('network', event)">Expandir</span>
+                <span class="bento-expand-hint" onclick="openBentoSheet('network', event)">Inspector Táctil</span>
               </div>
               <div>
                 <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovNetSpeed">Detectando tráfico...</div>
@@ -4085,7 +4435,7 @@
               <div class="module-header">
                 <div class="module-title-group">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-emerald-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                  <span>Contenedores Docker & Servicios</span>
+                  <span>Docker &amp; Servicios</span>
                 </div>
                 <span class="module-arrow">→</span>
               </div>
@@ -4101,7 +4451,7 @@
               <div class="module-header">
                 <div class="module-title-group">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-rose-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                  <span>Seguridad Activa (Pi-hole & Fail2ban)</span>
+                  <span>Ciberdefensa (Pi-hole &amp; IPS)</span>
                 </div>
                 <span class="module-arrow">→</span>
               </div>
@@ -4109,7 +4459,7 @@
                 <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovSecPihole">Consultando Pi-hole FTL...</div>
                 <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="ovSecF2b">Consultando jaulas Fail2ban...</div>
               </div>
-              <div style="font-size: 11.5px; color: var(--text-secondary);">Auditoría DNS Sinkhole y cortafuegos IPS</div>
+              <div style="font-size: 11.5px; color: var(--text-secondary);">Filtrado DNS Sinkhole y cortafuegos activo</div>
             </a>
 
             <!-- 8. DESCARGAS & VIDEOTECA -->
@@ -4117,7 +4467,7 @@
               <div class="module-header">
                 <div class="module-title-group">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-violet-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  <span>Descargas Torrent & Emby Media</span>
+                  <span>Descargas &amp; Videoteca</span>
                 </div>
                 <span class="module-arrow">→</span>
               </div>
@@ -4128,41 +4478,6 @@
               <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                 <span class="adw-badge badge-blue" id="ovTorrentBadge">qBittorrent</span>
                 <span class="adw-badge badge-purple" id="ovEmbyBadge">Emby SQLite</span>
-              </div>
-            </a>
-
-            <!-- 9. DNS & DUCKDNS -->
-            <a href="/dns" class="module-card" onclick="return navigateTo(event, 'dns')">
-              <div class="module-header">
-                <div class="module-title-group">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  <span>Dominio Dinámico & Tráfico DNS</span>
-                </div>
-                <span class="module-arrow">→</span>
-              </div>
-              <div>
-                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovDnsDomainTitle">Detectando dominio...</div>
-                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="ovDnsSub">Autodetección desde proxy inverso, DuckDNS y sistema</div>
-              </div>
-              <div style="font-size: 11.5px; color: var(--accent-cyan-bright);">Inspección de consultas DNS por dispositivo →</div>
-            </a>
-
-            <!-- 10. VERSIÓN & GITHUB OTA -->
-            <a href="/version" class="module-card" onclick="return navigateTo(event, 'version')">
-              <div class="module-header">
-                <div class="module-title-group">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-emerald-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
-                  <span>Control de Versión & GitHub OTA</span>
-                </div>
-                <span class="module-arrow">→</span>
-              </div>
-              <div>
-                <div class="mono" style="font-size: 18px; font-weight: 700; color: var(--text-primary);" id="ovVersionCommit">Sincronizando versión...</div>
-                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="ovVersionSub">Comparación en vivo con cminewarIA/recursos-ui</div>
-              </div>
-              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                <span class="adw-badge badge-green" id="ovVersionBadge">Comprobando...</span>
-                <span class="adw-badge badge-purple" id="ovBadgeGitVersion">OTA 1-Clic</span>
               </div>
             </a>
 
@@ -5302,11 +5617,11 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <!-- Botones de Descarga Directa Exclusivos para la Versión Web -->
                 <div class="ota-web-download-row" id="otaWebDownloadButtons" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_10.3.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_11.0.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_10.3.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_11.0.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5327,7 +5642,7 @@
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Instalación Automática al Detectar</span>
                     <span class="adw-badge badge-green mono" id="verAutoInstallBadge">ACTIVO</span>
-                    <span class="adw-badge badge-blue mono" id="verDebInstalledBadge">Paquete .deb: v10.3.0</span>
+                    <span class="adw-badge badge-blue mono" id="verDebInstalledBadge">Paquete .deb: v11.0.0</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);" id="verAutoInstallStatusText">
                     Cualquier actualización en GitHub o paquete local (.deb) pendiente se descarga, compila e instala automáticamente en cuanto se detecta.
@@ -5349,7 +5664,7 @@
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Auto-Actualización Reactiva de la WebApp</span>
                     <span class="adw-badge badge-green mono" id="verAutoReloadBadge">ACTIVO</span>
-                    <span class="adw-badge badge-purple mono" id="verAppLoadedBadge">Cargada: v10.5.0</span>
+                    <span class="adw-badge badge-purple mono" id="verAppLoadedBadge">Cargada: v11.0.0</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);" id="verAutoReloadStatusText">
                     Al detectarse un cambio de versión o nuevo commit en el servidor, la interfaz se recarga automáticamente y restaura la vista activa sin requerir recarga manual.
@@ -5370,7 +5685,7 @@
                 <div style="display: flex; flex-direction: column; gap: 3px;">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Paquetes Oficiales Compilados</span>
-                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v10.3.0</span>
+                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v11.0.0</span>
                     <span class="adw-badge badge-purple" style="font-size: 10px; font-weight: 600;">Solo en la Web</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);">
@@ -5378,11 +5693,11 @@
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_10.3.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_11.0.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux amd64)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_10.3.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_11.0.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5780,6 +6095,25 @@
       </a>
     </nav>
   </div>
+
+  <!-- ======================================================================
+       NATIVE HTML5 <dialog>: SPOTLIGHT COMMAND PALETTE (⌘K / Ctrl+K)
+       ====================================================================== -->
+  <dialog class="bento-dialog" id="commandPaletteDialog" onclick="if(event.target===this) closeCommandPalette()" style="max-width: 640px; width: 94vw;">
+    <div class="bento-dialog-header" style="padding: 14px 18px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan-bright)" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="cmdPaletteSearchInput" placeholder="Buscar módulo, vista, diagnóstico o acción rápida (Esc para cerrar)..." oninput="filterCommandPalette(this.value)" style="flex: 1; background: transparent; border: none; color: var(--text-primary); font-family: var(--font-sans); font-size: 14px; font-weight: 600; outline: none;">
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <kbd class="cmd-kbd">ESC</kbd>
+        <button class="action-btn" style="min-height: 30px; height: 30px; padding: 0 10px;" onclick="closeCommandPalette()">✕</button>
+      </div>
+    </div>
+    <div class="bento-dialog-body" style="padding: 12px 14px; max-height: 68dvh;">
+      <div class="cmd-palette-list" id="cmdPaletteList"></div>
+    </div>
+  </dialog>
 
   <!-- ======================================================================
        NATIVE HTML5 <dialog>: EXPANDABLE BENTO TOUCH SHEET & SCRUBBING GRAPH
@@ -6370,9 +6704,54 @@
         dot.classList.toggle('active', dot.getAttribute('data-view') === viewName);
       });
 
+      // Sync Contextual Sub-Navigation Pills & 4-Domain Orbital Command Bridge
+      const VIEW_TO_DOMAIN = {
+        overview: 'mission',
+        processor: 'silicon',
+        memory: 'silicon',
+        gpu: 'silicon',
+        drives: 'silicon',
+        network: 'network',
+        security: 'network',
+        dns: 'network',
+        apps: 'ops',
+        torrents: 'ops',
+        processes: 'ops',
+        version: 'ops',
+        dex: 'ops'
+      };
+      const activeDomain = VIEW_TO_DOMAIN[viewName] || 'mission';
+      document.querySelectorAll('.orbital-domain-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-domain') === activeDomain);
+      });
+      const subnavBar = document.getElementById('orbitalSubnavBar');
+      if (subnavBar) {
+        subnavBar.style.display = (activeDomain === 'mission') ? 'none' : 'flex';
+      }
+      document.querySelectorAll('#orbitalSubnavPills .orbital-pill').forEach(pill => {
+        const pillDomain = pill.getAttribute('data-domain');
+        const pillView = pill.getAttribute('data-view');
+        const isActive = pillView === viewName;
+        pill.classList.toggle('active', isActive);
+        if (pill.id === 'subPillDex') {
+          const navDexLi = document.getElementById('navDexLi');
+          const dexAllowed = navDexLi && navDexLi.style.display !== 'none';
+          pill.style.display = (pillDomain === activeDomain && dexAllowed) ? 'inline-flex' : 'none';
+        } else {
+          pill.style.display = (pillDomain === activeDomain) ? 'inline-flex' : 'none';
+        }
+      });
+
       const pageTitle = VIEW_TITLES[viewName] || 'Cabina General';
       const titleEl = document.getElementById('currentViewTitle');
-      if (titleEl) titleEl.innerText = pageTitle;
+      const slashEl = document.getElementById('breadcrumbSlash');
+      if (titleEl) {
+        titleEl.innerText = pageTitle;
+        titleEl.style.display = (viewName === 'overview') ? 'none' : 'inline';
+      }
+      if (slashEl) {
+        slashEl.style.display = (viewName === 'overview') ? 'none' : 'inline';
+      }
 
       const routeTagEl = document.getElementById('currentRouteBadge');
       if (routeTagEl) routeTagEl.innerText = targetPath;
@@ -9750,7 +10129,6 @@
                       <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                         <span id="nicExceedBadge_${safeNicId}" class="adw-badge mono" style="${nicExceed.exceeded ? '' : 'display:none;'} background: rgba(244, 63, 94, 0.18); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.45);">⚠️ Supera umbral (${nicExceed.dirLabel})</span>
                         <span class="adw-badge badge-blue mono">${nic.speed_mbps ? nic.speed_mbps + ' Mbps' : 'Activa'}</span>
-                        <button class="action-btn" style="height: 26px; padding: 0 8px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(nicLogo.key)}', '${escapeHtml(nicTitle)}', '${escapeHtml(nicLogo.query)}', '${escapeHtml(nicLogo.url)}')" title="Cambiar logo de interfaz">🖼️</button>
                       </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
@@ -9900,7 +10278,6 @@
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                       ${(c.rx_bytes || c.tx_bytes) ? `<div class="mono" style="font-size: 12px; color: var(--text-secondary);">↓ ${formatBytes(c.tx_bytes || 0)} · ↑ ${formatBytes(c.rx_bytes || 0)}</div>` : ''}
-                      <button class="action-btn" style="height: 28px; padding: 0 9px; font-size: 11px;" onclick="openLogoPickerModal('${escapeHtml(devLogo.key)}', '${escapeHtml(devTitle)}', '${escapeHtml(devLogo.query)}', '${escapeHtml(devLogo.url)}')" title="Cambiar logo del dispositivo">🖼️ Logo</button>
                       ${c.mac && c.mac.includes(':') ? `<button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="wakeDevice('${escapeHtml(c.mac)}', '${encodeURIComponent(c.name || c.ip)}', this)" title="Despertar dispositivo por red (Wake-on-LAN)">⚡ WoL</button>` : ''}
                     </div>
                   </div>
@@ -10941,23 +11318,123 @@
 
         const badgeCpu = document.getElementById('badgeNavCpu');
         if (badgeCpu) badgeCpu.innerText = `${cpuPct.toFixed(0)}%`;
+        const subBadgeCpu = document.getElementById('subBadgeCpu');
+        if (subBadgeCpu) subBadgeCpu.innerText = `${cpuPct.toFixed(0)}%`;
+
         const badgeRam = document.getElementById('badgeNavRam');
         if (badgeRam) badgeRam.innerText = `${ramUsedGb} GB`;
+        const subBadgeRam = document.getElementById('subBadgeRam');
+        if (subBadgeRam) subBadgeRam.innerText = `${ramPct.toFixed(0)}%`;
+
+        const gpuBadgeTxt = gpu.available ? (gpu.temp_c !== null && gpu.temp_c !== undefined ? `${gpu.temp_c}°C` : `${gpu.gpu_util_percent || 0}%`) : 'Int.';
         const badgeGpu = document.getElementById('badgeNavGpu');
-        if (badgeGpu) badgeGpu.innerText = gpu.available ? (gpu.temp_c !== null && gpu.temp_c !== undefined ? `${gpu.temp_c} °C` : `${gpu.gpu_util_percent || 0}%`) : 'N/A';
+        if (badgeGpu) badgeGpu.innerText = gpuBadgeTxt;
+        const subBadgeGpu = document.getElementById('subBadgeGpu');
+        if (subBadgeGpu) subBadgeGpu.innerText = gpuBadgeTxt;
 
         const rootDisk = disks.find(d => d.mountpoint === '/') || disks[0] || null;
         const badgeDisk = document.getElementById('badgeNavDisk');
         if (badgeDisk) badgeDisk.innerText = rootDisk ? `${rootDisk.percent}%` : `${disks.length}`;
+        const subBadgeDrives = document.getElementById('subBadgeDrives');
+        if (subBadgeDrives) subBadgeDrives.innerText = rootDisk ? `${rootDisk.percent}%` : `${disks.length}`;
 
         const badgeNet = document.getElementById('badgeNavNet');
         if (badgeNet) badgeNet.innerText = `${wClients.length} disp.`;
+        const subBadgeNet = document.getElementById('subBadgeNet');
+        if (subBadgeNet) subBadgeNet.innerText = `${wClients.length}`;
+
         const badgeApps = document.getElementById('badgeNavApps');
         if (badgeApps) badgeApps.innerText = String(docker.length);
+        const subBadgeApps = document.getElementById('subBadgeApps');
+        if (subBadgeApps) subBadgeApps.innerText = String(docker.length);
+
         const badgeProc = document.getElementById('badgeNavProc');
         if (badgeProc) badgeProc.innerText = String(procs.length);
+        const subBadgeProcs = document.getElementById('subBadgeProcs');
+        if (subBadgeProcs) subBadgeProcs.innerText = String(procs.length);
+
         const badgeTor = document.getElementById('badgeNavTorrents');
         if (badgeTor) badgeTor.innerText = String(torrents.length);
+        const subBadgeTorrents = document.getElementById('subBadgeTorrents');
+        if (subBadgeTorrents) subBadgeTorrents.innerText = String(torrents.length);
+
+        const subBadgeVer = document.getElementById('subBadgeVersion');
+        if (subBadgeVer && data.version) subBadgeVer.innerText = `v${String(data.version).replace(/^v/, '')}`;
+
+        // Sync DeX Sub-Pill visibility with Ubuntu Native rules (Rule 7.5) & active domain
+        const subPillDex = document.getElementById('subPillDex');
+        const navDexLi = document.getElementById('navDexLi');
+        if (subPillDex && navDexLi) {
+          const isOpsDomain = ['apps', 'torrents', 'processes', 'version', 'dex'].includes(activeView);
+          subPillDex.style.display = (navDexLi.style.display === 'none' || !isOpsDomain) ? 'none' : 'inline-flex';
+        }
+
+        // Compute Real-Time Global System Health Score & Vital Pulse Ribbon
+        const diskPressure = rootDisk ? Number(rootDisk.percent || 0) : 0;
+        const sysErrCount = (data.system_errors_summary && Number(data.system_errors_summary.total_errors)) || 0;
+        const cpuPenalty = Math.max(0, (cpuPct - 55) * 0.45);
+        const ramPenalty = Math.max(0, (ramPct - 65) * 0.45);
+        const diskPenalty = Math.max(0, (diskPressure - 75) * 0.5);
+        const errPenalty = Math.min(18, sysErrCount * 1.5);
+        const healthScore = Math.max(12, Math.min(100, Math.round(100 - cpuPenalty - ramPenalty - diskPenalty - errPenalty)));
+
+        const elHealthVal = document.getElementById('ovHealthScoreVal');
+        const elHealthBadge = document.getElementById('ovHealthBadge');
+        const elHealthBar = document.getElementById('ovHealthMiniBar');
+        const elHealthTxt = document.getElementById('ovHealthStatusText');
+        if (elHealthVal) {
+          elHealthVal.innerText = `${healthScore}%`;
+          elHealthVal.style.color = healthScore >= 85 ? 'var(--accent-emerald-bright)' : (healthScore >= 65 ? 'var(--accent-amber-bright)' : 'var(--accent-rose-bright)');
+        }
+        if (elHealthBadge) {
+          elHealthBadge.className = 'adw-badge mono ' + (healthScore >= 85 ? 'badge-green' : (healthScore >= 65 ? 'badge-amber' : 'badge-red'));
+          elHealthBadge.innerText = healthScore >= 85 ? 'ÓPTIMO' : (healthScore >= 65 ? 'CARGA MEDIA' : 'ATENCIÓN');
+        }
+        if (elHealthBar) {
+          elHealthBar.style.width = `${healthScore}%`;
+        }
+        if (elHealthTxt) {
+          elHealthTxt.innerText = `CPU ${cpuPct.toFixed(0)}% · RAM ${ramPct.toFixed(0)}% · Disco ${diskPressure}%`;
+        }
+
+        const elVitalThermal = document.getElementById('ovVitalThermalVal');
+        const elVitalThermalSub = document.getElementById('ovVitalThermalSub');
+        const elVitalLoadBadge = document.getElementById('ovVitalLoadBadge');
+        if (elVitalThermal) {
+          const tempStr = (cpu.temp_c !== null && cpu.temp_c !== undefined && cpu.temp_c > 0) ? `${cpu.temp_c} °C` : (cpu.freq_mhz ? `${cpu.freq_mhz} MHz` : `${cpuPct.toFixed(1)}%`);
+          elVitalThermal.innerText = tempStr;
+        }
+        if (elVitalThermalSub) {
+          elVitalThermalSub.innerText = `${cpu.freq_mhz ? cpu.freq_mhz + ' MHz · ' : ''}${cpu.logical_cores || '--'} hilos activos`;
+        }
+        if (elVitalLoadBadge) {
+          elVitalLoadBadge.innerText = `Load ${cpu.load_1m ?? '0.0'}`;
+        }
+
+        const elVitalNet = document.getElementById('ovVitalNetVal');
+        const elVitalNetSub = document.getElementById('ovVitalNetSub');
+        const elVitalCliBadge = document.getElementById('ovVitalClientsBadge');
+        const totalNetSpeed = Number(net.rx_bytes_sec || 0) + Number(net.tx_bytes_sec || 0);
+        if (elVitalNet) elVitalNet.innerText = formatSpeed(totalNetSpeed);
+        if (elVitalNetSub) elVitalNetSub.innerText = `↓ ${formatSpeed(net.rx_bytes_sec)} · ↑ ${formatSpeed(net.tx_bytes_sec)}`;
+        if (elVitalCliBadge) elVitalCliBadge.innerText = `${wClients.length} nodos LAN`;
+
+        const elVitalShield = document.getElementById('ovVitalShieldVal');
+        const elVitalShieldSub = document.getElementById('ovVitalShieldSub');
+        const elVitalShieldBadge = document.getElementById('ovVitalShieldBadge');
+        const f2bBans = (sec.fail2ban && sec.fail2ban.currently_banned) || 0;
+        const piholeBlocks = (sec.pihole && sec.pihole.ads_blocked_today) || 0;
+        if (elVitalShield) {
+          elVitalShield.innerText = f2bBans > 0 ? `${f2bBans} IPs Bloq.` : 'Escudo Activo';
+        }
+        if (elVitalShieldSub) {
+          elVitalShieldSub.innerText = `Pi-hole: ${piholeBlocks.toLocaleString()} filtradas hoy`;
+        }
+        if (elVitalShieldBadge) {
+          elVitalShieldBadge.innerText = auth.is_local ? 'LAN Verificada' : 'WAN Cifrada';
+        }
+        const subBadgeSec = document.getElementById('subBadgeSec');
+        if (subBadgeSec) subBadgeSec.innerText = f2bBans > 0 ? `${f2bBans} bans` : 'OK';
 
         const pubDomain = sys.public_domain || (latestVersionInfo && latestVersionInfo.public_domain) || window.location.hostname || '';
         const localSrvIp = sys.local_ip || net.local_ip || '';
@@ -16589,6 +17066,114 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
         }
       }
     };
+
+    // =========================================================================
+    // ORBITAL 4-DOMAIN SWITCHER & SPOTLIGHT COMMAND PALETTE (⌘K / Ctrl+K)
+    // =========================================================================
+    function switchOrbitalDomain(domainKey) {
+      const domainPrimaryView = {
+        mission: 'overview',
+        silicon: 'processor',
+        network: 'network',
+        ops: 'apps'
+      };
+      const targetView = domainPrimaryView[domainKey] || 'overview';
+      switchView(targetView, true);
+    }
+
+    const COMMAND_PALETTE_ITEMS = [
+      { id: 'cmd_overview', icon: '⚡', title: 'Cabina Central (01 · Misión)', sub: 'Resumen ejecutivo de signos vitales, 4 pilares de silicio y estado global', kbd: 'Ruta /', action: () => switchView('overview', true) },
+      { id: 'cmd_cpu', icon: '🔲', title: 'Procesador & Hilos Lógicos (02 · Silicio)', sub: 'Osciloscopio de frecuencia, temperatura y carga por hilo del kernel', kbd: '/procesador', action: () => switchView('processor', true) },
+      { id: 'cmd_ram', icon: '🧬', title: 'Memoria RAM, Caché & Zram (02 · Silicio)', sub: 'Composición de memoria física, páginas sucias, buffers y Swap', kbd: '/memoria', action: () => switchView('memory', true) },
+      { id: 'cmd_gpu', icon: '🎮', title: 'Aceleradora Gráfica GPU (02 · Silicio)', sub: 'Telemetría VRAM, temperatura, consumo energético y procesos CUDA/DRM', kbd: '/grafica', action: () => switchView('gpu', true) },
+      { id: 'cmd_drives', icon: '💽', title: 'Almacenamiento & Discos (02 · Silicio)', sub: 'Volúmenes montados, sistemas de archivos y tasas de E/S en tiempo real', kbd: '/almacenamiento', action: () => switchView('drives', true) },
+      { id: 'cmd_net', icon: '🌐', title: 'Red, Interfaces & Mapa Geoespacial (03 · Red)', sub: 'Sparklines de 2h por NIC, anillo D3.js por subred y mapa Leaflet SQLite', kbd: '/red', action: () => switchView('network', true) },
+      { id: 'cmd_sec', icon: '🛡️', title: 'Ciberdefensa, Fail2ban & Certificados (03 · Escudo)', sub: 'Auditoría Zero-Trust por dispositivo físico, jaulas de bloqueo y Pi-hole', kbd: '/seguridad', action: () => switchView('security', true) },
+      { id: 'cmd_dns', icon: '📡', title: 'DNS Dinámico DuckDNS & Tráfico FTL (03 · Red)', sub: 'Sincronización de IP pública, resolvers upstream y consultas por cliente', kbd: '/dns', action: () => switchView('dns', true) },
+      { id: 'cmd_apps', icon: '🐳', title: 'Contenedores Docker, Systemd & Bot Telegram (04 · Ops)', sub: 'Orquestación de servicios activos, reinicio rápido y notificaciones', kbd: '/aplicaciones', action: () => switchView('apps', true) },
+      { id: 'cmd_torrents', icon: '🎬', title: 'Descargas P2P qBittorrent & Emby (04 · Ops)', sub: 'Transferencias activas y últimos medios indexados en biblioteca SQLite', kbd: '/descargas', action: () => switchView('torrents', true) },
+      { id: 'cmd_procs', icon: '📊', title: 'Monitor de Procesos del Kernel & D3.js (04 · Ops)', sub: 'Ranking Top 10 CPU vectorial interactivo e inspector de PIDs', kbd: '/procesos', action: () => switchView('processes', true) },
+      { id: 'cmd_ota', icon: '🚀', title: 'Gestor de Versiones & GitHub OTA (04 · Ops)', sub: 'Sincronización continua, auto-instalación .deb y descarga de paquetes nativos', kbd: '/version', action: () => switchView('version', true) },
+      { id: 'cmd_logs', icon: '📋', title: 'Abrir Centro Unificado de Fallos del Sistema', sub: 'Inspeccionar errores de Docker, unidades systemd y kernel journalctl', kbd: 'Modal', action: () => { if (typeof SystemLogsCenter !== 'undefined') SystemLogsCenter.openModal(); } },
+      { id: 'cmd_perf', icon: '⏱️', title: 'Auditoría de Rendimiento & Latencia API (60 FPS)', sub: 'Verificar cadencia requestAnimationFrame, memoria JS Heap y caché', kbd: 'Auditoría', action: () => { if (typeof openPerfAuditDialog === 'function') openPerfAuditDialog(); } },
+      { id: 'cmd_trust', icon: '🔐', title: 'Certificados Zero-Trust & Equipos Vinculados', sub: 'Gestionar dispositivos físicos con Full Access o modo Sandbox Web', kbd: 'Seguridad', action: () => { if (typeof openTrustDialog === 'function') openTrustDialog(); } },
+      { id: 'cmd_theme', icon: '🌗', title: 'Alternar Acabado Visual (Titanio Oscuro / Alabastro Claro)', sub: 'Conmutar entre Obsidian Titanium Dark, Ceramic Light o Automático', kbd: 'Tema', action: () => { if (typeof cycleTitaniumTheme === 'function') cycleTitaniumTheme(); } }
+    ];
+
+    function openCommandPalette() {
+      const dlg = document.getElementById('commandPaletteDialog');
+      const inp = document.getElementById('cmdPaletteSearchInput');
+      if (!dlg) return;
+      if (inp) inp.value = '';
+      filterCommandPalette('');
+      if (typeof dlg.showModal === 'function' && !dlg.open) {
+        dlg.showModal();
+      } else {
+        dlg.setAttribute('open', 'open');
+      }
+      setTimeout(() => { if (inp) inp.focus(); }, 40);
+    }
+
+    function closeCommandPalette() {
+      const dlg = document.getElementById('commandPaletteDialog');
+      if (!dlg) return;
+      if (typeof dlg.close === 'function' && dlg.open) {
+        dlg.close();
+      } else {
+        dlg.removeAttribute('open');
+      }
+    }
+
+    function executeCommandPaletteItem(cmdId) {
+      const item = COMMAND_PALETTE_ITEMS.find(i => i.id === cmdId);
+      closeCommandPalette();
+      if (item && typeof item.action === 'function') {
+        item.action();
+      }
+    }
+
+    function filterCommandPalette(query) {
+      const listEl = document.getElementById('cmdPaletteList');
+      if (!listEl) return;
+      const q = String(query || '').trim().toLowerCase();
+      const filtered = COMMAND_PALETTE_ITEMS.filter(item =>
+        !q ||
+        item.title.toLowerCase().includes(q) ||
+        item.sub.toLowerCase().includes(q) ||
+        item.kbd.toLowerCase().includes(q)
+      );
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">No se encontraron comandos o vistas para "${escapeHtml(query)}"</div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(item => `
+        <div class="cmd-palette-item" onclick="executeCommandPaletteItem('${item.id}')">
+          <div class="cmd-palette-item-left">
+            <div class="cmd-palette-icon">${item.icon}</div>
+            <div style="min-width: 0;">
+              <div class="cmd-palette-title">${escapeHtml(item.title)}</div>
+              <div class="cmd-palette-sub">${escapeHtml(item.sub)}</div>
+            </div>
+          </div>
+          <span class="cmd-kbd">${escapeHtml(item.kbd)}</span>
+        </div>
+      `).join('');
+    }
+
+    window.addEventListener('keydown', (ev) => {
+      if ((ev.metaKey || ev.ctrlKey) && String(ev.key).toLowerCase() === 'k') {
+        ev.preventDefault();
+        const dlg = document.getElementById('commandPaletteDialog');
+        if (dlg && dlg.open) {
+          closeCommandPalette();
+        } else {
+          openCommandPalette();
+        }
+      }
+    });
   </script>
 </body>
 </html>
+
