@@ -11,8 +11,8 @@ android {
         applicationId = "com.cminewar.recursoscockpit"
         minSdk = 26
         targetSdk = 34
-        versionCode = 110100
-        versionName = "11.1.0"
+        versionCode = 110200
+        versionName = "11.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
