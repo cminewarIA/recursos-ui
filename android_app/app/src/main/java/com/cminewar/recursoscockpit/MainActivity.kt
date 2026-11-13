@@ -8,7 +8,6 @@ import androidx.lifecycle.lifecycleScope
 import com.cminewar.recursoscockpit.data.*
 import com.cminewar.recursoscockpit.theme.RecursosCockpitTheme
 import com.cminewar.recursoscockpit.ui.CockpitDashboard
-import com.cminewar.recursoscockpit.ui.SettingsDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -30,8 +29,7 @@ class MainActivity : ComponentActivity() {
             RecursosCockpitTheme {
                 var connectionMode by remember { mutableStateOf(ConnectionMode.CONNECTING) }
                 var activeUrl by remember { mutableStateOf("") }
-                var scanningMessage by remember { mutableStateOf("Autodescubriendo nodo en red local (LAN)...") }
-                var showSettings by remember { mutableStateOf(false) }
+                var scanningMessage by remember { mutableStateOf("Buscando tu servidor en la red Wi-Fi...") }
 
                 fun triggerDiscoveryAndRefresh() {
                     lifecycleScope.launch {
@@ -52,7 +50,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Autodescubrimiento LAN/WAN en arranque y supervisión de enlace continuo
+                // Autodescubrimiento LAN/WAN completamente automático sin intervención del usuario
                 LaunchedEffect(Unit) {
                     connectionMode = ConnectionMode.SCANNING_LAN
                     val endpoint = discoveryManager.resolveActiveNode { msg ->
@@ -75,7 +73,7 @@ class MainActivity : ComponentActivity() {
                             if (isRevoked) {
                                 connectionMode = ConnectionMode.REVOKED
                             } else if (data == null) {
-                                // Conmutación automática transparente LAN <-> WAN si el nodo cambia de red
+                                // Conmutación automática transparente LAN <-> DNS externo
                                 val newEndpoint = discoveryManager.resolveActiveNode { msg ->
                                     scanningMessage = msg
                                 }
@@ -96,20 +94,8 @@ class MainActivity : ComponentActivity() {
                     activeUrl = activeUrl,
                     scanningMessage = scanningMessage,
                     deviceTelemetryProvider = { apiService.getDeviceTelemetryJson() },
-                    onRefresh = { triggerDiscoveryAndRefresh() },
-                    onOpenSettings = { showSettings = true }
+                    onRefresh = { triggerDiscoveryAndRefresh() }
                 )
-
-                if (showSettings) {
-                    SettingsDialog(
-                        securePreferences = securePreferences,
-                        onDismiss = { showSettings = false },
-                        onSaveAndReconnect = {
-                            showSettings = false
-                            triggerDiscoveryAndRefresh()
-                        }
-                    )
-                }
             }
         }
     }

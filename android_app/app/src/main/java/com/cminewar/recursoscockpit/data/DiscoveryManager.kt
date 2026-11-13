@@ -38,7 +38,7 @@ class DiscoveryManager(
         Log.i("RecursosCockpit", "Subred local detectada para autodescubrimiento: ${localSubnetBase ?: "ninguna"}")
 
         if (localSubnetBase != null) {
-            onScanningProgress?.invoke("Escaneando red local ($localSubnetBase.0/24)...")
+            onScanningProgress?.invoke("Buscando tu servidor en la red Wi-Fi...")
 
             // Prioridad a direcciones comunes (Gateway .1, .2, .254)
             val priorityCandidates = listOf(
@@ -86,11 +86,11 @@ class DiscoveryManager(
             }
         }
 
-        // 3. Conmutación a WAN exterior (Caddy proxy / DDNS) con token firmado
+        // 3. Conmutación a WAN exterior (Caddy proxy / DDNS detectado) con token firmado
         val wanDomain = securePreferences.wanDomain.trim().trimEnd('/')
         if (wanDomain.isNotEmpty()) {
             val wanCandidate = if (wanDomain.startsWith("http://") || wanDomain.startsWith("https://")) wanDomain else "https://$wanDomain"
-            onScanningProgress?.invoke("Conectando con nodo remoto seguro WAN...")
+            onScanningProgress?.invoke("Conectando desde fuera de casa de forma segura...")
             val wanRes = apiService.probeNode(wanCandidate, isQuickScan = false)
             if (wanRes.isRevoked) {
                 securePreferences.isCertRevoked = true

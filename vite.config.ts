@@ -1,6 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { execSync } from 'child_process';
+import { exec, execSync } from 'child_process';
 import dns from 'dns';
 import fs from 'fs';
 import http from 'http';
@@ -12,6 +12,7 @@ import { defineConfig, loadEnv, Plugin } from 'vite';
 // Real-time OS Telemetry state for Vite preview server (100% real system calls, zero fake specs)
 let prevCpuTimes: { idle: number; total: number }[] = [];
 let prevNetStats: Record<string, { rx: number; tx: number; ts: number }> = {};
+let prevDiskIo: { readSectors: number; writeSectors: number; ts: number } | null = null;
 const nicHistory2h: Record<string, { t: number; rx: number; tx: number }[]> = {};
 const nicHistoryFilePath = path.resolve(__dirname, 'nic_history_2h.json');
 let lastNicHistorySaveMs = 0;
@@ -70,6 +71,7 @@ const historyBuffer: Record<string, (number | string)[]> = {
   net_tx: [],
   disk_r: [],
   disk_w: [],
+  disk_pct: [],
 };
 
 function readAppVersion(): string {
@@ -78,6 +80,12 @@ function readAppVersion(): string {
   } catch {
     return '0.0.0';
   }
+}
+
+function getDisplayVersion(pkgVer?: string): string {
+  const ver = (pkgVer || readAppVersion()).trim();
+  if (ver === '12.0.0') return '2B.0.0';
+  return ver;
 }
 
 let cachedStaticCpu: { model: string; arch: string; vendor: string; cacheSize: string } | null = null;
@@ -1206,6 +1214,45 @@ function sampleRealDisks() {
   return disks;
 }
 
+function sampleRealDiskIo() {
+  const now = Date.now();
+  let readSectors = 0;
+  let writeSectors = 0;
+  try {
+    const raw = fs.readFileSync('/proc/diskstats', 'utf-8');
+    for (const line of raw.split('\n')) {
+      const cols = line.trim().split(/\s+/);
+      if (cols.length < 14) continue;
+      const dev = cols[2] || '';
+      if (!dev || dev.startsWith('loop') || dev.startsWith('ram') || dev.startsWith('dm-') || dev.startsWith('zram')) continue;
+      // Match whole block devices (sda, vda, nvme0n1, mmcblk0) avoiding double-counting partitions
+      const isWholeDisk = /^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|hd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/.test(dev);
+      if (!isWholeDisk) continue;
+      readSectors += parseInt(cols[5], 10) || 0;
+      writeSectors += parseInt(cols[9], 10) || 0;
+    }
+  } catch {
+    // /proc/diskstats unavailable
+  }
+
+  const readTotalBytes = readSectors * 512;
+  const writeTotalBytes = writeSectors * 512;
+  let readSec = 0;
+  let writeSec = 0;
+  if (prevDiskIo && now > prevDiskIo.ts) {
+    const dt = Math.max(0.05, (now - prevDiskIo.ts) / 1000);
+    readSec = Math.max(0, Math.round(((readSectors - prevDiskIo.readSectors) * 512) / dt));
+    writeSec = Math.max(0, Math.round(((writeSectors - prevDiskIo.writeSectors) * 512) / dt));
+  }
+  prevDiskIo = { readSectors, writeSectors, ts: now };
+  return {
+    read_bytes_sec: readSec,
+    write_bytes_sec: writeSec,
+    read_total_bytes: readTotalBytes,
+    write_total_bytes: writeTotalBytes,
+  };
+}
+
 const prevProcCpuTicks = new Map<number, { ticks: number; ts: number }>();
 
 function sampleRealProcesses() {
@@ -1284,8 +1331,11 @@ function sampleRealProcesses() {
 let autoInstallEnabled = true;
 let autoInstallInProgress = false;
 let lastAutoInstallAt = '';
-let lastAutoInstallStatus = 'Activo · Instalando automáticamente al detectar';
+let lastAutoInstallStatus = 'Activo · Vigilancia automática de actualizaciones';
 let lastAutoInstallAttemptTs = 0;
+let permCooldownUntil = 0;
+let cachedRecentCommits: Array<{ sha: string; message: string; date: string; is_local_head?: boolean }> = [];
+let cachedRecentCommitsTs = 0;
 
 function getInstalledDebVersion(): string {
   try {
@@ -1302,88 +1352,142 @@ function getInstalledDebVersion(): string {
   return '';
 }
 
-function triggerViteAutoBuildAndInstall(targetVer: string, doGitPull = false): { success: boolean; output: string } {
+function hasGitRepo(): boolean {
+  return fs.existsSync(path.resolve(__dirname, '.git'));
+}
+
+function getRecentCommitsCached(localSha: string): Array<{ sha: string; message: string; date: string; is_local_head?: boolean }> {
+  const now = Date.now();
+  if (cachedRecentCommits.length > 0 && now - cachedRecentCommitsTs < 60000) {
+    return cachedRecentCommits;
+  }
+  cachedRecentCommitsTs = now;
+  if (hasGitRepo()) {
+    try {
+      const out = execSync('git log -5 --format="%h|%s|%ci"', { timeout: 1200, stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString()
+        .trim();
+      if (out) {
+        cachedRecentCommits = out.split('\n').filter(Boolean).map((line) => {
+          const [sha = '', msg = '', dt = ''] = line.split('|');
+          return { sha: sha.trim(), message: msg.trim(), date: dt.trim().slice(0, 16), is_local_head: sha.trim() === localSha };
+        });
+        return cachedRecentCommits;
+      }
+    } catch {
+      // Ignore git log failure
+    }
+  }
+  return cachedRecentCommits;
+}
+
+function triggerViteAutoBuildAndInstallAsync(targetVer: string, doGitPull = false): Promise<{ success: boolean; output: string }> {
   if (autoInstallInProgress) {
-    return { success: true, output: 'Instalación automática ya en ejecución...' };
+    return Promise.resolve({ success: true, output: 'Actualización en marcha...' });
   }
   autoInstallInProgress = true;
   lastAutoInstallAttemptTs = Date.now();
-  const logs: string[] = [];
-  try {
-    if (doGitPull) {
-      try {
-        const pullOut = execSync('git pull --ff-only origin main', { timeout: 15000, stdio: ['ignore', 'pipe', 'pipe'] })
-          .toString()
-          .trim();
-        logs.push(`$ git pull origin main\n${pullOut || 'Already up to date.'}`);
-      } catch {
-        logs.push('$ git pull origin main (entorno local sincronizado)');
-      }
-    }
-    const ver = readAppVersion() || targetVer;
-    const debRel = `dist/recursos-cockpit_${ver}_amd64.deb`;
-    const debAbs = path.resolve(__dirname, debRel);
-    const buildScript = path.resolve(__dirname, 'packaging/build_deb.sh');
 
-    if (!fs.existsSync(debAbs) && fs.existsSync(buildScript)) {
-      try {
-        const bOut = execSync(`bash "${buildScript}"`, { cwd: __dirname, timeout: 60000, stdio: ['ignore', 'pipe', 'pipe'] })
-          .toString()
-          .trim();
-        if (bOut) logs.push(bOut);
-      } catch (e) {
-        logs.push(`Aviso compilando .deb: ${String(e)}`);
-      }
-    }
+  return new Promise((resolve) => {
+    const runStep = (cmd: string, timeoutMs = 45000): Promise<{ ok: boolean; out: string }> =>
+      new Promise((res) => {
+        exec(cmd, { cwd: __dirname, timeout: timeoutMs }, (err, stdout, stderr) => {
+          const combined = `${stdout || ''}\n${stderr || ''}`.trim();
+          res({ ok: !err, out: combined });
+        });
+      });
 
-    const instVer = getInstalledDebVersion();
-    if (instVer !== ver && fs.existsSync(debAbs)) {
-      const cmds = [
-        `sudo -n apt-get install --reinstall -y "${debAbs}"`,
-        `sudo -n dpkg --force-depends -i "${debAbs}"`,
-        `dpkg --force-depends -i "${debAbs}"`,
-      ];
-      for (const cmd of cmds) {
-        try {
-          const iOut = execSync(cmd, { cwd: __dirname, timeout: 45000, stdio: ['ignore', 'pipe', 'pipe'] })
-            .toString()
-            .trim();
-          if (iOut) logs.push(iOut);
-          logs.push(`[✓] Paquete recursos-cockpit v${ver} instalado automáticamente.`);
-          break;
-        } catch {
-          // Try next install command
+    (async () => {
+      const logs: string[] = [];
+      let pullOk = true;
+      let debOk = false;
+      try {
+        if (doGitPull) {
+          if (hasGitRepo()) {
+            const pRes = await runStep('git pull --ff-only origin main', 20000);
+            pullOk = pRes.ok;
+            logs.push(`$ git pull origin main\n${pRes.out || 'Ya está actualizado.'}`);
+          } else {
+            logs.push('Entorno sin carpeta .git local; actualización remota omitida.');
+          }
         }
-      }
-    } else if (instVer === ver) {
-      logs.push(`[✓] Paquete recursos-cockpit v${ver} verificado e instalado.`);
-    }
+        const ver = readAppVersion() || targetVer;
+        const dispVer = getDisplayVersion(ver);
+        const debRel = `dist/recursos-cockpit_${ver}_amd64.deb`;
+        const debAbs = path.resolve(__dirname, debRel);
+        const buildScript = path.resolve(__dirname, 'packaging/build_deb.sh');
 
-    lastAutoInstallAt = new Date().toLocaleTimeString('es-ES');
-    lastAutoInstallStatus = `Instalado v${ver} automáticamente (${lastAutoInstallAt})`;
-    return { success: true, output: logs.join('\n') || `Paquete v${ver} sincronizado.` };
-  } finally {
-    autoInstallInProgress = false;
-  }
+        if (!fs.existsSync(debAbs) && fs.existsSync(buildScript)) {
+          const bRes = await runStep(`bash "${buildScript}"`, 60000);
+          if (bRes.out) logs.push(bRes.out);
+        }
+
+        const instVer = getInstalledDebVersion();
+        if (instVer !== ver && fs.existsSync(debAbs)) {
+          const cmds = [
+            `sudo -n apt-get install --reinstall -y "${debAbs}"`,
+            `sudo -n dpkg --force-depends -i "${debAbs}"`,
+            `dpkg --force-depends -i "${debAbs}"`,
+          ];
+          let permDenied = false;
+          for (const cmd of cmds) {
+            const iRes = await runStep(cmd, 45000);
+            if (iRes.ok) {
+              if (iRes.out) logs.push(iRes.out);
+              logs.push(`[✓] Paquete recursos-cockpit v${dispVer} (${ver}) instalado.`);
+              debOk = true;
+              permCooldownUntil = 0;
+              break;
+            }
+            const low = iRes.out.toLowerCase();
+            if (low.includes('password is required') || low.includes('superuser') || low.includes('permission denied')) {
+              permDenied = true;
+            }
+          }
+          if (!debOk && permDenied) {
+            permCooldownUntil = Date.now() + 900000;
+            logs.push('[!] Se necesitan permisos sudo para instalar el paquete .deb. Pausa automática de 15 min.');
+          }
+        } else if (instVer === ver) {
+          debOk = true;
+          logs.push(`[✓] Paquete recursos-cockpit v${dispVer} (${ver}) ya instalado.`);
+        }
+
+        lastAutoInstallAt = new Date().toLocaleTimeString('es-ES');
+        lastAutoInstallStatus = debOk
+          ? `Al día · v${dispVer} (${lastAutoInstallAt})`
+          : `Código sincronizado · Paquete pendiente de permisos (${lastAutoInstallAt})`;
+        resolve({ success: pullOk, output: logs.join('\n') || `v${dispVer} sincronizado.` });
+      } finally {
+        autoInstallInProgress = false;
+      }
+    })();
+  });
 }
 
 function getRealVersionPayload(hostHeader: string) {
   const version = readAppVersion();
+  const dispVersion = getDisplayVersion(version);
+  const hasGit = hasGitRepo();
   const now = Date.now();
   if (now - cachedGitMeta.ts > 20000) {
-    try {
-      const sha = execSync('git rev-parse --short HEAD', { timeout: 1000 }).toString().trim() || 'HEAD';
-      const log = execSync('git log -1 --format="%s|%ci"', { timeout: 1000 }).toString().trim();
-      let subj = cachedGitMeta.subject;
-      let dt = cachedGitMeta.date;
-      if (log.includes('|')) {
-        const parts = log.split('|');
-        subj = parts[0];
-        dt = parts[1].slice(0, 16);
+    if (hasGit) {
+      try {
+        const sha = execSync('git rev-parse --short HEAD', { timeout: 1000, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() || 'HEAD';
+        const log = execSync('git log -1 --format="%s|%ci"', { timeout: 1000, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+        let subj = cachedGitMeta.subject;
+        let dt = cachedGitMeta.date;
+        if (log.includes('|')) {
+          const parts = log.split('|');
+          subj = parts[0];
+          dt = parts[1].slice(0, 16);
+        }
+        cachedGitMeta = { sha, subject: subj, date: dt, ts: now };
+      } catch {
+        cachedGitMeta.ts = now;
       }
-      cachedGitMeta = { sha, subject: subj, date: dt, ts: now };
-    } catch {
-      cachedGitMeta.ts = now;
+    } else {
+      cachedGitMeta = { sha: 'local', subject: `Edición CMineWar v${dispVersion}`, date: cachedGitMeta.date, ts: now };
     }
   }
   const localSha = cachedGitMeta.sha;
@@ -1393,18 +1497,15 @@ function getRealVersionPayload(hostHeader: string) {
   const installedDebVer = getInstalledDebVersion();
   const packageNeedsInstall = Boolean(installedDebVer !== version);
 
-  if (autoInstallEnabled && packageNeedsInstall && !autoInstallInProgress && now - lastAutoInstallAttemptTs > 30000) {
+  if (autoInstallEnabled && packageNeedsInstall && !autoInstallInProgress && now > permCooldownUntil && now - lastAutoInstallAttemptTs > 30000) {
     setTimeout(() => {
-      try {
-        triggerViteAutoBuildAndInstall(version, false);
-      } catch {
-        // Ignore background install errors
-      }
+      void triggerViteAutoBuildAndInstallAsync(version, false);
     }, 50);
   }
 
   return {
     version,
+    display_version: dispVersion,
     installed_deb_version: installedDebVer || version,
     package_installed: Boolean(installedDebVer),
     package_needs_install: packageNeedsInstall,
@@ -1412,6 +1513,8 @@ function getRealVersionPayload(hostHeader: string) {
     auto_install_in_progress: autoInstallInProgress,
     auto_install_status: lastAutoInstallStatus,
     last_auto_install: lastAutoInstallAt,
+    has_git: hasGit,
+    ahead_of_remote: false,
     repo: 'cminewarIA/recursos-ui',
     repo_url: 'https://github.com/cminewarIA/recursos-ui',
     branch: 'main',
@@ -1429,7 +1532,7 @@ function getRealVersionPayload(hostHeader: string) {
     checked_at: new Date().toLocaleTimeString('es-ES'),
     local: { sha: localSha, message: localSubject, date: localDate, clean: true },
     remote: { sha: localSha, message: localSubject, date: localDate, reachable: true },
-    recent_commits: [],
+    recent_commits: getRecentCommitsCached(localSha),
   };
 }
 
@@ -1685,6 +1788,10 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
           }
           const osCatalogEntry = BRAND_CATALOG[osId] || BRAND_CATALOG.linux;
 
+          const diskIo = sampleRealDiskIo();
+          const rootDisk = (disks as Array<{ percent?: number }>)[0];
+          const rootDiskPct = Number(rootDisk?.percent || 0);
+
           const timeStr = new Date().toLocaleTimeString('es-ES');
           historyBuffer.timestamps.push(timeStr);
           historyBuffer.cpu.push(cpu.overall);
@@ -1693,8 +1800,9 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
           historyBuffer.ram_total.push(ram.percent);
           historyBuffer.net_rx.push(Math.round((net.rx_bytes_sec / (1024 * 1024)) * 100) / 100);
           historyBuffer.net_tx.push(Math.round((net.tx_bytes_sec / (1024 * 1024)) * 100) / 100);
-          historyBuffer.disk_r.push(0);
-          historyBuffer.disk_w.push(0);
+          historyBuffer.disk_r.push(Math.round((diskIo.read_bytes_sec / (1024 * 1024)) * 100) / 100);
+          historyBuffer.disk_w.push(Math.round((diskIo.write_bytes_sec / (1024 * 1024)) * 100) / 100);
+          historyBuffer.disk_pct.push(Math.round(rootDiskPct * 10) / 10);
           for (const k of Object.keys(historyBuffer)) {
             if (historyBuffer[k].length > 60) historyBuffer[k] = historyBuffer[k].slice(-60);
           }
@@ -1765,7 +1873,7 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
               processes: [],
             },
             disks,
-            disk_io: { read_bytes_sec: 0, write_bytes_sec: 0, read_total_bytes: 0, write_total_bytes: 0 },
+            disk_io: diskIo,
             net,
             wifi_clients: (
               net.interfaces_list as {
@@ -1872,17 +1980,20 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
         }
 
         if ((url === '/api/system/update' || url === '/api/update') && req.method === 'POST') {
+          permCooldownUntil = 0;
           const curVer = readAppVersion();
-          const result = triggerViteAutoBuildAndInstall(curVer, true);
-          res.setHeader('Content-Type', 'application/json');
-          res.end(
-            JSON.stringify({
-              success: result.success,
-              message: `Actualización e instalación de paquete v${readAppVersion()} completada.`,
-              output: result.output,
-              version_info: getRealVersionPayload(hostHdr),
-            })
-          );
+          const dispVer = getDisplayVersion(curVer);
+          void triggerViteAutoBuildAndInstallAsync(curVer, true).then((result) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(
+              JSON.stringify({
+                success: result.success,
+                message: `Comprobación y actualización v${dispVer} completada.`,
+                output: result.output,
+                version_info: getRealVersionPayload(hostHdr),
+              })
+            );
+          });
           return;
         }
 
@@ -2467,11 +2578,50 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
   };
 }
 
+function emitStandaloneStaticHtmlPlugin(): Plugin {
+  return {
+    name: 'emit-standalone-static-html',
+    apply: 'build',
+    closeBundle() {
+      const distDir = path.resolve(__dirname, 'dist');
+      const distHtmlPath = path.join(distDir, 'index.html');
+      const staticOutPath = path.resolve(__dirname, 'static', 'index.html');
+      if (!fs.existsSync(distHtmlPath)) return;
+      let html = fs.readFileSync(distHtmlPath, 'utf-8');
+
+      // Inline compiled stylesheet tags into <style>
+      html = html.replace(/<link[^>]+rel=["']stylesheet["'][^>]+href=["']([^"']+)["'][^>]*>/gi, (full, href) => {
+        if (/^https?:\/\//i.test(href)) return full;
+        const cssFile = path.join(distDir, href.replace(/^\//, ''));
+        if (fs.existsSync(cssFile)) {
+          const css = fs.readFileSync(cssFile, 'utf-8').replace(/<\/style>/gi, '<\\/style>');
+          return `<style>${css}</style>`;
+        }
+        return full;
+      });
+
+      // Inline compiled module script tags into <script type="module">
+      html = html.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi, (full, src) => {
+        if (/^https?:\/\//i.test(src)) return full;
+        const jsFile = path.join(distDir, src.replace(/^\//, ''));
+        if (fs.existsSync(jsFile)) {
+          const js = fs.readFileSync(jsFile, 'utf-8').replace(/<\/script>/gi, '<\\/script>');
+          return `<script type="module">${js}</script>`;
+        }
+        return full;
+      });
+
+      fs.mkdirSync(path.dirname(staticOutPath), { recursive: true });
+      fs.writeFileSync(staticOutPath, html, 'utf-8');
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const mapsApiKey = env.VITE_GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
   return {
-    plugins: [realOsTelemetryMiddleware(mapsApiKey), react(), tailwindcss()],
+    plugins: [realOsTelemetryMiddleware(mapsApiKey), react(), tailwindcss(), emitStandaloneStaticHtmlPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

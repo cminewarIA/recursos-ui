@@ -41,15 +41,20 @@ chmod 755 "$PKG_DIR/DEBIAN/postinst" "$PKG_DIR/DEBIAN/prerm" "$PKG_DIR/DEBIAN/po
 # Ajustar versión en DEBIAN/control
 sed -i "s/^Version:.*/Version: $VERSION/" "$PKG_DIR/DEBIAN/control"
 
-# 2. Copiar archivos de la aplicación, motor HTML5 unificado y punto único de verdad de versión
+# 2. Copiar archivos de la aplicación, motor HTML5 unificado compilado y punto único de verdad de versión
 cp "$PROJECT_ROOT/desktop_app/recursos_app.py" "$PKG_DIR/usr/lib/$PKG_NAME/recursos_app.py"
 cp "$PROJECT_ROOT/desktop_app/dex_controller.py" "$PKG_DIR/usr/lib/$PKG_NAME/dex_controller.py"
-cp "$PROJECT_ROOT/index.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"
+if [ -f "$PROJECT_ROOT/static/index.html" ]; then
+    cp "$PROJECT_ROOT/static/index.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"
+else
+    cp "$PROJECT_ROOT/index.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"
+fi
+cp "$PROJECT_ROOT/static/"*.png "$PROJECT_ROOT/static/favicon.ico" "$PKG_DIR/usr/lib/$PKG_NAME/static/" 2>/dev/null || true
 cp "$PROJECT_ROOT/desktop_app/assets/"* "$PKG_DIR/usr/lib/$PKG_NAME/assets/"
 cp "$PROJECT_ROOT/VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/VERSION"
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/*.py
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/VERSION
-chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"
+chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/static/"*
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/assets"/*
 
 # 3. Crear lanzador en /usr/bin/recursos-cockpit

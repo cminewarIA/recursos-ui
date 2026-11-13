@@ -31,10 +31,6 @@ class SecurePreferences(context: Context) {
         get() = prefs.getString(KEY_SAVED_HOST, "") ?: ""
         set(value) = prefs.edit().putString(KEY_SAVED_HOST, value).apply()
 
-    var manualHost: String
-        get() = prefs.getString(KEY_MANUAL_HOST, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_MANUAL_HOST, value).apply()
-
     var manualPort: Int
         get() = prefs.getInt(KEY_MANUAL_PORT, 8085)
         set(value) = prefs.edit().putInt(KEY_MANUAL_PORT, value).apply()
@@ -50,7 +46,6 @@ class SecurePreferences(context: Context) {
     companion object {
         private const val KEY_DEVICE_TOKEN = "device_token"
         private const val KEY_SAVED_HOST = "saved_host"
-        private const val KEY_MANUAL_HOST = "manual_host"
         private const val KEY_MANUAL_PORT = "manual_port"
         private const val KEY_WAN_DOMAIN = "wan_domain"
         private const val KEY_CERT_REVOKED = "cert_revoked"

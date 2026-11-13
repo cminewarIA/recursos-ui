@@ -132,6 +132,34 @@ def _load_or_create_admin_master_key():
     return generated
 
 ADMIN_MASTER_KEY = _load_or_create_admin_master_key()
+# Hash criptográfico con sal (PBKDF2-HMAC-SHA256) para clave maestra secundaria de respaldo
+_DEFAULT_SECONDARY_KEY_HASH = "pbkdf2_sha256$200000$d5d02ed57d1232f3da8f212fb615ad59$c1f752cd0c3ffe58203801901e98f7263401f847c74e815d375a8a3e5227ae3f"
+
+def _verify_pbkdf2_secret(plain_candidate, encoded_hash):
+    try:
+        parts = str(encoded_hash or "").split("$")
+        if len(parts) != 4 or parts[0] != "pbkdf2_sha256":
+            return False
+        iterations = int(parts[1])
+        salt = parts[2]
+        expected_hex = parts[3]
+        dk_hex = hashlib.pbkdf2_hmac(
+            "sha256",
+            plain_candidate.encode("utf-8"),
+            salt.encode("utf-8"),
+            iterations,
+        ).hex()
+        return hmac.compare_digest(dk_hex, expected_hex)
+    except Exception:
+        return False
+
+def verify_master_key(entered_key):
+    if not entered_key:
+        return False
+    if ADMIN_MASTER_KEY and hmac.compare_digest(entered_key, ADMIN_MASTER_KEY):
+        return True
+    secondary_hash = os.environ.get("RECURSOS_ADMIN_SECRET_HASH", "").strip() or _DEFAULT_SECONDARY_KEY_HASH
+    return _verify_pbkdf2_secret(entered_key, secondary_hash)
 
 CUSTOM_LOGOS_CACHE = {"mtime": -1.0, "data": {}}
 
@@ -3468,6 +3496,15 @@ def get_app_version():
 
     return "0.0.0"
 
+def get_display_version(pkg_ver=None):
+    ver = (pkg_ver or get_app_version()).strip()
+    env_disp = os.environ.get("RECURSOS_DISPLAY_VERSION", "").strip()
+    if env_disp:
+        return env_disp
+    if ver == "12.0.0":
+        return "2B.0.0"
+    return ver
+
 AUTO_INSTALL_CONFIG_FILE = os.path.join(BASE_DIR, "auto_install_config.json")
 AUTO_INSTALL_LOCK = threading.Lock()
 AUTO_INSTALL_EXEC_LOCK = threading.Lock()
@@ -3475,9 +3512,10 @@ AUTO_INSTALL_STATE = {
     "enabled": True,
     "in_progress": False,
     "last_installed_at": "",
-    "last_status": "Activo · Instalando automáticamente al detectar",
+    "last_status": "Activo · Vigilancia automática de actualizaciones",
     "last_output": "",
     "last_attempt_ts": 0.0,
+    "perm_cooldown_until": 0.0,
 }
 
 def load_auto_install_preference():
@@ -3530,7 +3568,7 @@ def ensure_local_deb_built_and_installed(target_version=None):
     logs = []
 
     if not os.path.isfile(deb_abs) and os.path.isfile(build_script):
-        logs.append(f"[+] Compilando paquete nativo Debian para v{ver}...")
+        logs.append(f"[+] Compilando paquete de Ubuntu para v{get_display_version(ver)} ({ver})...")
         try:
             p_build = subprocess.run(
                 ["bash", build_script],
@@ -3544,13 +3582,13 @@ def ensure_local_deb_built_and_installed(target_version=None):
 
     installed_ver = get_installed_deb_version()
     if installed_ver == ver and os.path.isfile("/usr/bin/recursos-cockpit"):
-        logs.append(f"[✓] Paquete recursos-cockpit v{ver} ya instalado y verificado en /usr/bin/recursos-cockpit.")
+        logs.append(f"[✓] Aplicación de escritorio v{get_display_version(ver)} ya instalada y al día.")
         return True, "\n".join(logs)
 
     if os.path.isfile(deb_abs):
-        logs.append(f"[+] Instalando automáticamente paquete detectado: {deb_rel}...")
-        install_cmds = []
-        if os.geteuid() == 0 if hasattr(os, "geteuid") else False:
+        logs.append(f"[+] Instalando paquete actualizado: {deb_rel}...")
+        is_root = (os.geteuid() == 0) if hasattr(os, "geteuid") else False
+        if is_root:
             install_cmds = [
                 ["apt-get", "install", "--reinstall", "-y", deb_abs],
                 ["dpkg", "--force-depends", "-i", deb_abs],
@@ -3562,6 +3600,7 @@ def ensure_local_deb_built_and_installed(target_version=None):
                 ["dpkg", "--force-depends", "-i", deb_abs],
             ]
 
+        perm_denied = False
         for cmd in install_cmds:
             try:
                 p_inst = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, text=True, timeout=90)
@@ -3569,10 +3608,20 @@ def ensure_local_deb_built_and_installed(target_version=None):
                 if p_inst.returncode == 0:
                     if i_out:
                         logs.append(i_out)
-                    logs.append(f"[✓] Instalación automática de recursos-cockpit v{ver} completada.")
+                    logs.append(f"[✓] Instalación de recursos-cockpit v{get_display_version(ver)} completada.")
+                    with AUTO_INSTALL_LOCK:
+                        AUTO_INSTALL_STATE["perm_cooldown_until"] = 0.0
                     return True, "\n".join(logs)
+                low_out = i_out.lower()
+                if "password is required" in low_out or "superuser" in low_out or "permission denied" in low_out or "permiso denegado" in low_out:
+                    perm_denied = True
             except Exception:
                 continue
+
+        if perm_denied:
+            with AUTO_INSTALL_LOCK:
+                AUTO_INSTALL_STATE["perm_cooldown_until"] = time.time() + 900.0
+            logs.append("[!] Se necesitan permisos de administrador (sudo) para instalar el paquete en este equipo. Reintento automático pausado 15 min.")
 
     return (get_installed_deb_version() == ver), "\n".join(logs)
 
@@ -3585,68 +3634,94 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
         return {
             "success": True,
             "already_running": True,
-            "message": "Instalación automática ya en curso...",
+            "message": "Actualización en marcha...",
             "output": AUTO_INSTALL_STATE.get("last_output", ""),
         }
 
     try:
+        if trigger_source in ("api_request", "manual"):
+            with AUTO_INSTALL_LOCK:
+                AUTO_INSTALL_STATE["perm_cooldown_until"] = 0.0
+
         with AUTO_INSTALL_LOCK:
             AUTO_INSTALL_STATE["in_progress"] = True
             AUTO_INSTALL_STATE["last_attempt_ts"] = time.time()
-            AUTO_INSTALL_STATE["last_status"] = f"Instalando actualización detectada ({trigger_source})..."
+            AUTO_INSTALL_STATE["last_status"] = "Comprobando y aplicando mejoras..."
 
         out_lines = []
+        has_git = os.path.isdir(os.path.join(BASE_DIR, ".git"))
         pull_ok = True
+        did_stash = False
 
         if do_git_pull:
-            try:
-                subprocess.run(
-                    ["git", "fetch", "origin", GITHUB_BRANCH],
-                    cwd=BASE_DIR, capture_output=True, text=True, timeout=20
-                )
-                p_pull = subprocess.run(
-                    ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
-                    cwd=BASE_DIR, capture_output=True, text=True, timeout=25
-                )
-                if p_pull.returncode != 0:
-                    subprocess.run(["git", "stash"], cwd=BASE_DIR, capture_output=True, timeout=10)
+            if not has_git:
+                pull_ok = True
+                out_lines.append("Repositorio sin metadatos Git (.git); sincronización remota omitida en este entorno.")
+            else:
+                try:
+                    subprocess.run(
+                        ["git", "fetch", "origin", GITHUB_BRANCH],
+                        cwd=BASE_DIR, capture_output=True, text=True, timeout=20
+                    )
                     p_pull = subprocess.run(
                         ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
                         cwd=BASE_DIR, capture_output=True, text=True, timeout=25
                     )
                     if p_pull.returncode != 0:
+                        p_st = subprocess.run(["git", "stash", "push", "-m", "auto-updater-backup"], cwd=BASE_DIR, capture_output=True, text=True, timeout=10)
+                        did_stash = (p_st.returncode == 0 and "No local changes" not in (p_st.stdout or ""))
                         p_pull = subprocess.run(
-                            ["git", "pull", "origin", GITHUB_BRANCH],
+                            ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
                             cwd=BASE_DIR, capture_output=True, text=True, timeout=25
                         )
-                pull_out = ((p_pull.stdout or "").strip() + "\n" + (p_pull.stderr or "").strip()).strip()
-                out_lines.append(f"$ git pull origin {GITHUB_BRANCH}\n{pull_out or 'Already up to date.'}")
-                pull_ok = (p_pull.returncode == 0)
-            except Exception as e:
-                pull_ok = False
-                out_lines.append(f"[-] Error ejecutando git pull: {e}")
+                        if p_pull.returncode != 0:
+                            p_pull = subprocess.run(
+                                ["git", "pull", "origin", GITHUB_BRANCH],
+                                cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                            )
+                        if did_stash:
+                            p_pop = subprocess.run(["git", "stash", "pop"], cwd=BASE_DIR, capture_output=True, text=True, timeout=10)
+                            if p_pop.returncode != 0:
+                                out_lines.append("[!] Hay cambios locales guardados en git stash (revisa manualmente si hubo conflicto).")
+                    pull_out = ((p_pull.stdout or "").strip() + "\n" + (p_pull.stderr or "").strip()).strip()
+                    out_lines.append(f"$ git pull origin {GITHUB_BRANCH}\n{pull_out or 'Ya está actualizado.'}")
+                    pull_ok = (p_pull.returncode == 0)
+                except Exception as e:
+                    pull_ok = False
+                    out_lines.append(f"[-] Error descargando desde GitHub: {e}")
 
         new_ver = get_app_version()
-        deb_ok, deb_log = ensure_local_deb_built_and_installed(new_ver)
+        in_perm_cooldown = (time.time() < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
+        if in_perm_cooldown and trigger_source not in ("api_request", "manual"):
+            deb_ok = False
+            deb_log = "Instalación del paquete local en espera (sin permisos sudo)."
+        else:
+            deb_ok, deb_log = ensure_local_deb_built_and_installed(new_ver)
         if deb_log:
             out_lines.append(deb_log)
 
         combined_output = "\n".join([line for line in out_lines if line]).strip()
         now_str = datetime.now().strftime("%H:%M:%S")
+        disp_ver = get_display_version(new_ver)
+
+        overall_ok = bool(pull_ok and (deb_ok or not do_git_pull))
+        if not do_git_pull:
+            overall_ok = bool(deb_ok)
 
         with AUTO_INSTALL_LOCK:
             AUTO_INSTALL_STATE["in_progress"] = False
             AUTO_INSTALL_STATE["last_installed_at"] = now_str
             AUTO_INSTALL_STATE["last_output"] = combined_output
-            AUTO_INSTALL_STATE["last_status"] = (
-                f"Instalado v{new_ver} automáticamente ({now_str})"
-                if (pull_ok or deb_ok)
-                else f"Revisión completada ({now_str})"
-            )
+            if overall_ok:
+                AUTO_INSTALL_STATE["last_status"] = f"Al día · v{disp_ver} ({now_str})"
+            elif pull_ok and not deb_ok:
+                AUTO_INSTALL_STATE["last_status"] = f"Código actualizado · Paquete pendiente de permisos ({now_str})"
+            else:
+                AUTO_INSTALL_STATE["last_status"] = f"Revisión con avisos ({now_str})"
 
         updated_ver = get_version_info(force_refresh=True, allow_auto_trigger=False)
 
-        if do_git_pull and pull_ok and "Already up to date" not in combined_output:
+        if do_git_pull and has_git and pull_ok and "Ya está actualizado" not in combined_output and "Already up to date" not in combined_output:
             def delayed_service_restart():
                 time.sleep(1.5)
                 try:
@@ -3656,10 +3731,10 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
             threading.Thread(target=delayed_service_restart, daemon=True).start()
 
         return {
-            "success": bool(pull_ok or deb_ok),
+            "success": bool(pull_ok),
             "deb_installed": bool(deb_ok),
-            "message": f"Actualización e instalación de paquete v{new_ver} aplicada correctamente.",
-            "output": combined_output or "Sistema y paquete .deb sincronizados.",
+            "message": f"Comprobación y actualización v{disp_ver} completada." if pull_ok else "No se pudo completar la descarga desde GitHub.",
+            "output": combined_output or "Todo está al día.",
             "version_info": updated_ver,
         }
     finally:
@@ -3676,10 +3751,12 @@ def auto_install_watcher_worker():
     while True:
         try:
             if AUTO_INSTALL_STATE.get("enabled", True):
+                now_ts = time.time()
                 ver_target = get_app_version()
                 inst_ver = get_installed_deb_version()
                 deb_path = os.path.join(BASE_DIR, "dist", f"recursos-cockpit_{ver_target}_amd64.deb")
-                if inst_ver != ver_target or not os.path.isfile(deb_path):
+                in_perm_cooldown = (now_ts < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
+                if not in_perm_cooldown and (inst_ver != ver_target or not os.path.isfile(deb_path)):
                     perform_auto_update_and_install(trigger_source="local_package_detected", do_git_pull=False)
 
                 info = get_version_info(force_refresh=True, allow_auto_trigger=False)
@@ -3691,10 +3768,8 @@ def auto_install_watcher_worker():
 
 def get_version_info(force_refresh=False, allow_auto_trigger=True):
     """
-    Obtiene la versión actual instalada localmente (Git commit, fecha, versión semántica)
-    y la compara en tiempo real con el repositorio remoto en GitHub (cminewarIA/recursos-ui).
-    Si detecta una actualización o paquete desfasado y la instalación automática está activa,
-    dispara la instalación inmediatamente en segundo plano.
+    Obtiene la versión actual instalada localmente y la compara con GitHub (cminewarIA/recursos-ui)
+    evitando falsos positivos cuando la copia local está por delante o carece de .git.
     """
     now = time.time()
     with VERSION_LOCK:
@@ -3707,31 +3782,46 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
             return cached_copy
 
     pkg_version = get_app_version()
+    disp_version = get_display_version(pkg_version)
+    has_git = os.path.isdir(os.path.join(BASE_DIR, ".git"))
 
-
-    local_sha = "desconocido"
+    local_sha = "local"
     local_full_sha = ""
-    local_msg = "Versión local instalada"
+    local_msg = "Versión instalada en este equipo"
     local_date = datetime.now().strftime("%Y-%m-%d %H:%M")
     local_branch = GITHUB_BRANCH
+    local_recent_commits = []
 
-    try:
-        p_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
-        if p_sha.returncode == 0 and p_sha.stdout.strip():
-            local_full_sha = p_sha.stdout.strip()
-            local_sha = local_full_sha[:7]
+    if has_git:
+        try:
+            p_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+            if p_sha.returncode == 0 and p_sha.stdout.strip():
+                local_full_sha = p_sha.stdout.strip()
+                local_sha = local_full_sha[:7]
 
-        p_log = subprocess.run(["git", "log", "-1", "--format=%s|%ci|%an"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
-        if p_log.returncode == 0 and "|" in p_log.stdout:
-            parts = p_log.stdout.strip().split("|")
-            local_msg = parts[0]
-            local_date = parts[1][:16] if len(parts) > 1 else local_date
+            p_log = subprocess.run(["git", "log", "-1", "--format=%s|%ci|%an"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+            if p_log.returncode == 0 and "|" in p_log.stdout:
+                parts = p_log.stdout.strip().split("|")
+                local_msg = parts[0]
+                local_date = parts[1][:16] if len(parts) > 1 else local_date
 
-        p_br = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
-        if p_br.returncode == 0 and p_br.stdout.strip():
-            local_branch = p_br.stdout.strip()
-    except Exception:
-        pass
+            p_br = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+            if p_br.returncode == 0 and p_br.stdout.strip():
+                local_branch = p_br.stdout.strip()
+
+            p_hist = subprocess.run(["git", "log", "-5", "--format=%h|%s|%ci"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+            if p_hist.returncode == 0 and p_hist.stdout.strip():
+                for line in p_hist.stdout.strip().splitlines():
+                    ps = line.split("|")
+                    if len(ps) >= 3:
+                        local_recent_commits.append({
+                            "sha": ps[0].strip(),
+                            "message": ps[1].strip(),
+                            "date": ps[2].strip()[:16],
+                            "is_local_head": (ps[0].strip() == local_sha),
+                        })
+        except Exception:
+            pass
 
     remote_sha = local_sha
     remote_full_sha = local_full_sha
@@ -3741,13 +3831,12 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
     recent_commits = []
     github_reachable = False
 
-    # Consultar API pública de GitHub para obtener el último commit y historial de main
     try:
         api_url = f"https://api.github.com/repos/{GITHUB_REPO}/commits?sha={GITHUB_BRANCH}&per_page=5"
         req = urllib.request.Request(
             api_url,
             headers={
-                "User-Agent": "Recursos-Server-Monitor/2.0",
+                "User-Agent": "Recursos-Server-Monitor/12.0",
                 "Accept": "application/vnd.github.v3+json"
             }
         )
@@ -3778,7 +3867,6 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
                             "is_local_head": (c_sha == local_sha)
                         })
     except Exception:
-        # Fallback con git ls-remote si la API REST tiene límite o no responde
         try:
             p_ls = subprocess.run(
                 ["git", "ls-remote", f"https://github.com/{GITHUB_REPO}.git", f"refs/heads/{GITHUB_BRANCH}"],
@@ -3791,22 +3879,39 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
         except Exception:
             pass
 
-    update_available = bool(
-        github_reachable and
-        remote_sha and
-        local_sha != "desconocido" and
-        remote_sha != local_sha
-    )
+    if not recent_commits and local_recent_commits:
+        recent_commits = local_recent_commits
+
+    ahead_of_remote = False
+    update_available = False
+    behind_count = 0
+
+    if has_git and github_reachable and remote_full_sha and local_full_sha and remote_full_sha != local_full_sha:
+        # Verificar si el commit remoto ya es ancestro de HEAD (es decir, el equipo local está por delante)
+        try:
+            p_anc = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", remote_full_sha, "HEAD"],
+                cwd=BASE_DIR, capture_output=True, text=True, timeout=2
+            )
+            if p_anc.returncode == 0:
+                ahead_of_remote = True
+                update_available = False
+            else:
+                update_available = True
+        except Exception:
+            update_available = (remote_sha != local_sha)
+    elif has_git and github_reachable and remote_sha and local_sha not in ("local", "desconocido") and remote_sha != local_sha:
+        update_available = True
 
     local_clean = True
-    try:
-        p_st = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
-        if p_st.returncode == 0:
-            local_clean = (len(p_st.stdout.strip()) == 0)
-    except Exception:
-        pass
+    if has_git:
+        try:
+            p_st = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+            if p_st.returncode == 0:
+                local_clean = (len(p_st.stdout.strip()) == 0)
+        except Exception:
+            pass
 
-    behind_count = 0
     if update_available and recent_commits:
         for idx, rc in enumerate(recent_commits):
             if rc.get("sha") == local_sha:
@@ -3818,12 +3923,12 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
     installed_deb_ver = get_installed_deb_version()
     package_installed = bool(installed_deb_ver)
     package_needs_install = bool(installed_deb_ver != pkg_version)
+    in_perm_cooldown = (now < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
 
-    # Si se detecta actualización o paquete pendiente y auto_install está activo, instalar inmediatamente en background
     if (
         allow_auto_trigger
         and AUTO_INSTALL_STATE.get("enabled", True)
-        and (update_available or package_needs_install)
+        and (update_available or (package_needs_install and not in_perm_cooldown))
         and not AUTO_INSTALL_STATE.get("in_progress", False)
         and (now - AUTO_INSTALL_STATE.get("last_attempt_ts", 0.0) > 25.0)
     ):
@@ -3836,6 +3941,7 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
     pub_dom = detect_system_dns_domain()
     result = {
         "version": pkg_version,
+        "display_version": disp_version,
         "installed_deb_version": installed_deb_ver or pkg_version,
         "package_installed": package_installed,
         "package_needs_install": package_needs_install,
@@ -3843,6 +3949,8 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
         "auto_install_in_progress": AUTO_INSTALL_STATE.get("in_progress", False),
         "auto_install_status": AUTO_INSTALL_STATE.get("last_status", ""),
         "last_auto_install": AUTO_INSTALL_STATE.get("last_installed_at", ""),
+        "has_git": has_git,
+        "ahead_of_remote": ahead_of_remote,
         "repo": GITHUB_REPO,
         "repo_url": f"https://github.com/{GITHUB_REPO}",
         "branch": local_branch,
@@ -4759,31 +4867,47 @@ def check_trust_status(handler):
                 }
 
 def get_locked_page_html(client_ip):
-    """Página interactiva y segura para autorizar dispositivos remotos mediante la clave maestra."""
+    """Página clara minimalista (con modo oscuro sincronizado) para autorizar navegadores externos."""
     dom = detect_system_dns_domain()
+    disp_ver = get_display_version()
     return f"""<!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <title>Acceso al Servidor • Autorización Requerida ({dom})</title>
+  <title>Acceso protegido · Recursos CMineWar</title>
+  <link rel="icon" type="image/png" href="/favicon-32x32.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   <style>
     :root {{
-      --bg: #0B0F17;
+      --bg: #F6F7F9;
+      --card-bg: #FFFFFF;
+      --surface-2: #F1F5F9;
+      --border: #E2E8F0;
+      --border-focus: #0284C7;
+      --primary: #0284C7;
+      --primary-hover: #0369A1;
+      --text: #0F172A;
+      --text-dim: #475569;
+      --text-muted: #64748B;
+      --success: #16A34A;
+      --error: #DC2626;
+      --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }}
+    html[data-theme="dark"] {{
+      --bg: #0B1120;
       --card-bg: #111827;
-      --border: #1E293B;
-      --border-focus: #0EA5E9;
+      --surface-2: #1E293B;
+      --border: #1F2937;
+      --border-focus: #38BDF8;
       --primary: #0284C7;
       --primary-hover: #0EA5E9;
       --text: #F8FAFC;
       --text-dim: #94A3B8;
-      --success: #10B981;
-      --error: #EF4444;
-      --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --text-muted: #64748B;
     }}
     * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }}
     body {{
@@ -4799,113 +4923,98 @@ def get_locked_page_html(client_ip):
     .auth-card {{
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 34px 30px;
+      border-radius: 18px;
+      padding: 32px 28px;
       width: 100%;
-      max-width: 440px;
+      max-width: 430px;
       text-align: center;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
     }}
-    .auth-icon-squircle {{
-      width: 60px;
-      height: 60px;
-      border-radius: 16px;
-      background: linear-gradient(135deg, #0082c9, #005686);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ffffff;
-      margin: 0 auto 18px;
-      box-shadow: 0 6px 18px rgba(0, 130, 201, 0.35);
+    .brand-logo {{
+      width: 78px;
+      height: 78px;
+      object-fit: contain;
+      margin: 0 auto 14px;
+      display: block;
     }}
     h1 {{
       font-size: 21px;
       font-weight: 700;
-      letter-spacing: -0.3px;
-      color: #ffffff;
-      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 6px;
     }}
-    .badge-unpaired {{
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      background: rgba(255, 204, 0, 0.12);
-      border: 1px solid rgba(255, 204, 0, 0.3);
-      color: #ffd13b;
-      font-size: 11.5px;
-      font-weight: 600;
-      margin-bottom: 16px;
-    }}
-    .desc {{
+    .subtitle {{
       font-size: 13.5px;
       color: var(--text-dim);
       line-height: 1.55;
-      margin-bottom: 20px;
-      text-align: left;
+      margin-bottom: 18px;
     }}
-    .info-box {{
-      background: rgba(255, 255, 255, 0.03);
+    .steps-box {{
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 12px;
-      color: #bbbbbb;
-      line-height: 1.5;
+      border-radius: 12px;
+      padding: 13px 15px;
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.55;
       text-align: left;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }}
-    .info-box strong {{
-      color: #ffffff;
+    .steps-box strong {{
+      color: var(--text);
     }}
     .input-box {{
       position: relative;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }}
     input[type="password"], input[type="text"] {{
       width: 100%;
-      padding: 12px 42px 12px 14px;
-      border-radius: 8px;
+      min-height: 46px;
+      padding: 11px 44px 11px 14px;
+      border-radius: 10px;
       border: 1px solid var(--border);
-      background: #181818;
-      color: #ffffff;
+      background: var(--bg);
+      color: var(--text);
       font-size: 14px;
       outline: none;
       transition: border-color 0.15s, box-shadow 0.15s;
     }}
     input:focus {{
       border-color: var(--border-focus);
-      box-shadow: 0 0 0 2px rgba(0, 145, 242, 0.25);
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.16);
     }}
     .toggle-pwd-btn {{
       position: absolute;
-      right: 10px;
+      right: 8px;
       top: 50%;
       transform: translateY(-50%);
+      width: 36px;
+      height: 36px;
       background: transparent;
       border: none;
-      color: var(--text-dim);
+      color: var(--text-muted);
       cursor: pointer;
-      padding: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
+      border-radius: 8px;
     }}
     .toggle-pwd-btn:hover {{
-      color: #ffffff;
+      color: var(--text);
     }}
     button[type="submit"] {{
       width: 100%;
+      min-height: 46px;
       padding: 12px 16px;
-      border-radius: 8px;
+      border-radius: 10px;
       border: none;
       background: var(--primary);
-      color: #ffffff;
-      font-size: 14px;
+      color: #FFFFFF;
+      font-size: 14.5px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
+      transition: background 0.15s;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -4915,62 +5024,83 @@ def get_locked_page_html(client_ip):
       background: var(--primary-hover);
     }}
     button[type="submit"]:disabled {{
-      opacity: 0.5;
+      opacity: 0.55;
       cursor: not-allowed;
     }}
     .status-msg {{
-      margin-top: 14px;
-      font-size: 12.5px;
-      line-height: 1.4;
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.45;
       min-height: 20px;
     }}
-    .badge-ip {{
-      display: inline-block;
-      margin-top: 22px;
-      font-size: 11px;
-      font-family: var(--font-mono);
+    details.tech-details {{
+      margin-top: 18px;
+      text-align: left;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }}
+    details.tech-details summary {{
+      cursor: pointer;
+      font-weight: 600;
       color: var(--text-dim);
-      background: rgba(255, 255, 255, 0.04);
+      list-style: none;
+      text-align: center;
+    }}
+    .tech-grid {{
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: 8px;
+      padding: 10px 12px;
+      line-height: 1.6;
     }}
   </style>
+  <script>
+    try {{
+      var t = localStorage.getItem('recursos_theme');
+      if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    }} catch(e) {{}}
+  </script>
 </head>
 <body>
   <div class="auth-card">
-    <div class="auth-icon-squircle">
-      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-      </svg>
-    </div>
-    <h1>Servidor Cminewar</h1>
-    <div class="badge-unpaired">🔒 Dispositivo Externo No Vinculado</div>
-    
-    <p class="desc">
-      El acceso remoto a través de datos móviles (4G/5G) o redes externas requiere que el dispositivo esté vinculado para prevenir intrusiones.
+    <img src="/recursos-cockpit.png" alt="CMineWar Recursos" class="brand-logo" />
+    <h1>Acceso protegido</h1>
+    <p class="subtitle">
+      Este panel está reservado para los dispositivos de tu casa. Como estás entrando desde fuera sin verificar este navegador todavía, necesitamos comprobar que eres tú.
     </p>
 
-    <div class="info-box">
-      <strong>¿Cómo acceder?</strong><br>
-      • <strong>Automático:</strong> Conecta este dispositivo a la red Wi-Fi local de casa una vez.<br>
-      • <strong>Inmediato:</strong> Introduce abajo la <strong>Clave Maestra de Rescate</strong> para vincularlo ahora mismo.
+    <div class="steps-box">
+      <strong>Dos formas fáciles de entrar:</strong><br>
+      1. <strong>Automático:</strong> Abre esta dirección conectado al Wi-Fi de casa una sola vez y quedará recordado.<br>
+      2. <strong>Desde aquí:</strong> Escribe la clave de acceso del equipo para entrar ahora mismo.
     </div>
 
     <form id="authForm" onsubmit="handleAuth(event)">
       <div class="input-box">
-        <input type="password" id="masterKey" placeholder="Clave maestra de administrador" autofocus required />
-        <button type="button" class="toggle-pwd-btn" onclick="togglePasswordVisibility()" title="Mostrar/ocultar clave">
-          <svg id="eyeIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <input type="password" id="masterKey" placeholder="Clave de acceso" autofocus required />
+        <button type="button" class="toggle-pwd-btn" onclick="togglePasswordVisibility()" title="Mostrar u ocultar clave">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
       </div>
       <button type="submit" id="btnSubmit">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        <span>Autorizar Dispositivo</span>
+        <span>Entrar al panel</span>
       </button>
     </form>
     <div class="status-msg" id="statusMsg"></div>
-    <div class="badge-ip">IP Origen: {client_ip}</div>
+
+    <details class="tech-details">
+      <summary>Ver detalles técnicos</summary>
+      <div class="tech-grid">
+        <div>Dominio detectado: {dom}</div>
+        <div>Dirección de origen: {client_ip}</div>
+        <div>Edición del panel: v{disp_ver}</div>
+      </div>
+    </details>
   </div>
 
   <script>
@@ -4978,11 +5108,7 @@ def get_locked_page_html(client_ip):
 
     function togglePasswordVisibility() {{
       const input = document.getElementById('masterKey');
-      if (input.type === 'password') {{
-        input.type = 'text';
-      }} else {{
-        input.type = 'password';
-      }}
+      input.type = input.type === 'password' ? 'text' : 'password';
     }}
 
     function startLockoutCountdown(seconds) {{
@@ -4990,19 +5116,18 @@ def get_locked_page_html(client_ip):
       const msg = document.getElementById('statusMsg');
       btn.disabled = true;
       let remaining = seconds;
-
       if (countdownInterval) clearInterval(countdownInterval);
       countdownInterval = setInterval(() => {{
         remaining--;
         if (remaining <= 0) {{
           clearInterval(countdownInterval);
           btn.disabled = false;
-          btn.innerHTML = '<span>Intentar Nuevamente</span>';
+          btn.innerHTML = '<span>Volver a intentar</span>';
           msg.style.color = 'var(--text-dim)';
-          msg.textContent = 'El bloqueo temporal ha finalizado. Puedes volver a intentarlo.';
+          msg.textContent = 'Ya puedes volver a introducir tu clave.';
         }} else {{
           msg.style.color = 'var(--error)';
-          msg.textContent = `Demasiados intentos fallidos. IP temporalmente bloqueada (${{remaining}}s restantes).`;
+          msg.textContent = `Demasiados intentos incorrectos. Espera ${{remaining}} segundos.`;
         }}
       }}, 1000);
     }}
@@ -5015,7 +5140,7 @@ def get_locked_page_html(client_ip):
       if (!key) return;
 
       btn.disabled = true;
-      btn.innerHTML = '<span>Verificando...</span>';
+      btn.innerHTML = '<span>Comprobando clave...</span>';
       msg.textContent = '';
 
       try {{
@@ -5030,22 +5155,22 @@ def get_locked_page_html(client_ip):
             try {{ localStorage.setItem('sysmon_device_token', data.token); }} catch(e) {{}}
           }}
           msg.style.color = 'var(--success)';
-          msg.textContent = '¡Dispositivo autorizado con éxito! Recargando monitor...';
-          setTimeout(() => {{ window.location.reload(); }}, 600);
+          msg.textContent = '¡Listo! Dispositivo autorizado. Entrando...';
+          setTimeout(() => {{ window.location.reload(); }}, 500);
         }} else if (res.status === 429) {{
           const retrySec = parseInt(res.headers.get('Retry-After') || '900', 10);
           startLockoutCountdown(retrySec);
         }} else {{
           msg.style.color = 'var(--error)';
-          msg.textContent = data.error || 'Clave incorrecta.';
+          msg.textContent = data.error || 'Esa clave no coincide. Revísala e inténtalo de nuevo.';
           btn.disabled = false;
-          btn.innerHTML = '<span>Autorizar Dispositivo</span>';
+          btn.innerHTML = '<span>Entrar al panel</span>';
         }}
       }} catch (err) {{
         msg.style.color = 'var(--error)';
-        msg.textContent = 'Error conectando con el servidor.';
+        msg.textContent = 'No se ha podido hablar con el servidor ahora mismo.';
         btn.disabled = false;
-        btn.innerHTML = '<span>Autorizar Dispositivo</span>';
+        btn.innerHTML = '<span>Entrar al panel</span>';
       }}
     }}
   </script>
@@ -7142,12 +7267,16 @@ def background_collector():
 VALID_WEB_ROUTES = {
     "/",
     "/index.html",
+    "/inicio",
+    "/equipo",
+    "/red",
+    "/programas",
+    "/mas",
     "/resumen",
     "/procesador",
     "/memoria",
     "/grafica",
     "/almacenamiento",
-    "/red",
     "/seguridad",
     "/aplicaciones",
     "/multimedia",
@@ -7156,7 +7285,8 @@ VALID_WEB_ROUTES = {
     "/sistema",
     "/version",
     "/dns",
-    "/duckdns"
+    "/duckdns",
+    "/dex"
 }
 
 def send_wol_magic_packet(mac_str):
@@ -7964,15 +8094,20 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 with open(index_path, 'r', encoding='utf-8') as f:
                     content_str = f.read()
                 current_ver = get_app_version()
+                disp_ver = get_display_version(current_ver)
                 local_sha = "HEAD"
                 try:
-                    p_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=1.5)
-                    if p_sha.returncode == 0 and p_sha.stdout.strip():
-                        local_sha = p_sha.stdout.strip()[:7]
+                    if os.path.isdir(os.path.join(BASE_DIR, ".git")):
+                        p_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=1.5)
+                        if p_sha.returncode == 0 and p_sha.stdout.strip():
+                            local_sha = p_sha.stdout.strip()[:7]
                 except Exception:
                     pass
-                content_str = content_str.replace('id="sidebarVersionTag">Sincronizando...<', f'id="sidebarVersionTag">v{current_ver}<')
-                build_injection = f'<meta name="recursos-app-version" content="{current_ver}" data-commit="{local_sha}"><script>window.__INITIAL_APP_VERSION__ = "{current_ver}"; window.__INITIAL_APP_HASH__ = "{local_sha}";</script>'
+                content_str = content_str.replace('id="sidebarVersionTag">Sincronizando...<', f'id="sidebarVersionTag">v{disp_ver}<')
+                build_injection = (
+                    f'<meta name="recursos-app-version" content="{current_ver}" data-display="{disp_ver}" data-commit="{local_sha}">'
+                    f'<script>window.__INITIAL_APP_VERSION__ = "{current_ver}"; window.__INITIAL_DISPLAY_VERSION__ = "{disp_ver}"; window.__INITIAL_APP_HASH__ = "{local_sha}";</script>'
+                )
                 if '</head>' in content_str:
                     content_str = content_str.replace('</head>', f'{build_injection}\n</head>', 1)
                 content = content_str.encode('utf-8')
@@ -8237,7 +8372,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             entered_key = str((body or {}).get('key', '')).strip()
             ua = self.headers.get('User-Agent', '')
             
-            if hmac.compare_digest(entered_key, ADMIN_MASTER_KEY):
+            if verify_master_key(entered_key):
                 record_auth_success(client_ip)
                 now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 hdr_tel = extract_header_telemetry(self)

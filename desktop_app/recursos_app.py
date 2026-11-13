@@ -118,16 +118,40 @@ def get_app_version():
     return "0.0.0"
 
 
+def get_display_version(raw_ver=None):
+    v = str(raw_ver or get_app_version()).strip()
+    if v.startswith("12."):
+        return "2B." + v[3:]
+    return v
+
+
 def resolve_bundled_html_path():
-    """Localiza el archivo HTML5 canónico empaquetado o en el repositorio local."""
+    """Localiza el archivo HTML5 canónico compilado (static/index.html tiene prioridad)."""
     candidates = [
-        os.path.join(SCRIPT_DIR, "..", "index.html"),
         os.path.join(SCRIPT_DIR, "..", "static", "index.html"),
         os.path.join(SCRIPT_DIR, "static", "index.html"),
         "/usr/lib/recursos-cockpit/static/index.html",
         "/usr/share/recursos-cockpit/static/index.html",
-        "./index.html",
         "./static/index.html",
+        os.path.join(SCRIPT_DIR, "..", "index.html"),
+        "./index.html",
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            return os.path.abspath(path)
+    return None
+
+
+def resolve_static_asset_path(fname):
+    safe_name = os.path.basename(str(fname or "").strip())
+    if not safe_name:
+        return None
+    candidates = [
+        os.path.join(SCRIPT_DIR, "..", "static", safe_name),
+        os.path.join(SCRIPT_DIR, "assets", safe_name),
+        os.path.join("/usr/lib/recursos-cockpit/static", safe_name),
+        os.path.join("/usr/lib/recursos-cockpit/assets", safe_name),
+        os.path.join("/usr/share/pixmaps", safe_name),
     ]
     for path in candidates:
         if os.path.isfile(path):
@@ -415,83 +439,110 @@ def encode_telemetry_header(telemetry_dict):
 
 NATIVE_CSS = b"""
 window {
-    background-color: #06070a;
-    color: #f5f5f7;
+    background-color: #f6f7f9;
+    color: #0f172a;
 }
 headerbar {
     background-image: none;
-    background-color: #0c1017;
-    color: #f5f5f7;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: #ffffff;
+    color: #0f172a;
+    border-bottom: 1px solid #e2e8f0;
+}
+.launcher-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 20px;
+}
+.launcher-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.launcher-subtitle {
+    font-size: 13px;
+    color: #475569;
 }
 .badge-ready {
-    background-color: rgba(48, 209, 88, 0.18);
-    color: #30d158;
-    border-radius: 6px;
+    background-color: #ecfdf5;
+    color: #15803d;
+    border-radius: 8px;
     padding: 4px 10px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-lan {
-    background-color: rgba(48, 209, 88, 0.2);
-    color: #30d158;
-    border-radius: 6px;
+    background-color: #ecfdf5;
+    color: #15803d;
+    border-radius: 8px;
     padding: 4px 10px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-wan {
-    background-color: rgba(10, 132, 255, 0.2);
-    color: #38bdf8;
-    border-radius: 6px;
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    border-radius: 8px;
     padding: 4px 10px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-revoked {
-    background-color: rgba(255, 69, 58, 0.25);
-    color: #ff453a;
-    border-radius: 6px;
+    background-color: #fef2f2;
+    color: #b91c1c;
+    border-radius: 8px;
     padding: 4px 10px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-scanning {
-    background-color: rgba(255, 159, 10, 0.2);
-    color: #ff9f0a;
-    border-radius: 6px;
+    background-color: #fffbeb;
+    color: #b45309;
+    border-radius: 8px;
     padding: 4px 10px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-local {
-    background-color: rgba(142, 155, 174, 0.2);
-    color: #94a3b8;
-    border-radius: 6px;
+    background-color: #f1f5f9;
+    color: #475569;
+    border-radius: 8px;
     padding: 4px 10px;
     font-weight: 700;
     font-size: 11px;
 }
+.btn-primary {
+    background-image: none;
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    border-radius: 10px;
+    padding: 10px 18px;
+    border: none;
+}
+.btn-primary:hover {
+    background-color: #1e293b;
+}
 .btn-nav {
     background-image: none;
-    background-color: #151c28;
-    color: #e2e8f0;
+    background-color: #ffffff;
+    color: #0f172a;
     font-weight: 600;
-    border-radius: 6px;
-    padding: 4px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 6px 12px;
+    border: 1px solid #cbd5e1;
 }
 .btn-nav:hover {
-    background-color: #1e293b;
+    background-color: #f8fafc;
 }
 .btn-dex {
     background-image: none;
-    background-color: rgba(14, 165, 233, 0.18);
-    color: #38bdf8;
+    background-color: #eff6ff;
+    color: #1d4ed8;
     font-weight: 700;
-    border-radius: 6px;
-    padding: 4px 12px;
-    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 8px;
+    padding: 6px 12px;
+    border: 1px solid #bfdbfe;
 }
 """
 
@@ -513,7 +564,9 @@ class ServerConnectionManager:
         self.latest_metrics = None
         self.device_token = ""
         self.saved_host = ""
+        self.node_port = int(os.environ.get("RECURSOS_NODE_PORT", "8085"))
         self.wan_domain = os.environ.get("RECURSOS_WAN_DOMAIN", "").strip()
+        self.auto_install_enabled = True
         self.is_revoked = False
         self._last_net_io = psutil.net_io_counters() if psutil else None
         self._last_net_ts = time.time()
@@ -546,7 +599,9 @@ class ServerConnectionManager:
                     data = json.load(f)
                     self.device_token = data.get("device_token", "")
                     self.saved_host = data.get("saved_host", "")
+                    self.node_port = int(data.get("node_port", 8085) or 8085)
                     self.wan_domain = str(data.get("wan_domain", "") or os.environ.get("RECURSOS_WAN_DOMAIN", "")).strip()
+                    self.auto_install_enabled = bool(data.get("auto_install_enabled", True))
                     self.is_revoked = data.get("is_revoked", False)
         except Exception:
             pass
@@ -559,7 +614,9 @@ class ServerConnectionManager:
                     {
                         "device_token": self.device_token,
                         "saved_host": self.saved_host,
+                        "node_port": self.node_port,
                         "wan_domain": self.wan_domain,
+                        "auto_install_enabled": self.auto_install_enabled,
                         "is_revoked": self.is_revoked,
                         "hardware_id": self.device_telemetry.get("hardware_id", ""),
                     },
@@ -568,6 +625,123 @@ class ServerConnectionManager:
                 )
         except Exception:
             pass
+
+    def get_primary_lan_ip(self):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0.2)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            if ip and not ip.startswith("127."):
+                return ip
+        except Exception:
+            pass
+        return str(self.device_telemetry.get("local_ip") or "127.0.0.1")
+
+    def detect_local_node_status(self):
+        """Comprueba si existe un nodo local instalado o activo en esta máquina Ubuntu."""
+        service_exists = os.path.isfile("/etc/systemd/system/system-dashboard.service")
+        server_py_path = ""
+        for cand in (
+            os.path.join(SCRIPT_DIR, "..", "server.py"),
+            "/usr/lib/recursos-cockpit/server.py",
+            "/usr/share/recursos-cockpit/server.py",
+        ):
+            if os.path.isfile(cand):
+                server_py_path = os.path.abspath(cand)
+                break
+        running, _ = self._probe(f"http://127.0.0.1:{self.node_port}", timeout=0.5)
+        service_active = False
+        if service_exists:
+            try:
+                p = subprocess.run(
+                    ["systemctl", "is-active", "system-dashboard.service"],
+                    capture_output=True,
+                    text=True,
+                    timeout=1.5,
+                )
+                service_active = p.returncode == 0
+            except Exception:
+                pass
+        installed = bool(service_exists or running)
+        lan_ip = self.get_primary_lan_ip()
+        return {
+            "installed": installed,
+            "running": bool(running or service_active),
+            "service_exists": service_exists,
+            "server_py_path": server_py_path,
+            "lan_ip": lan_ip,
+            "port": self.node_port,
+            "lan_url": f"http://{lan_ip}:{self.node_port}",
+        }
+
+    def install_or_enable_local_node(self):
+        """Instala y arranca el nodo local como servicio si no existe, o devuelve sus datos LAN si ya está instalado."""
+        status = self.detect_local_node_status()
+        if status["installed"] and status["running"]:
+            return True, f"El nodo local ya está instalado y activo en {status['lan_url']}", status
+        server_py = status.get("server_py_path")
+        if not server_py:
+            return False, "No se encontró el archivo server.py para instalar el nodo local en este equipo.", status
+        work_dir = os.path.dirname(server_py)
+        unit_content = (
+            "[Unit]\n"
+            "Description=Recursos Cockpit Telemetry Node\n"
+            "After=network-online.target\n"
+            "Wants=network-online.target\n\n"
+            "[Service]\n"
+            "Type=simple\n"
+            f"WorkingDirectory={work_dir}\n"
+            f"ExecStart={sys.executable} {server_py}\n"
+            "Restart=always\n"
+            "RestartSec=3\n\n"
+            "[Install]\n"
+            "WantedBy=multi-user.target\n"
+        )
+        try:
+            tmp_unit = os.path.join(self.config_dir, "system-dashboard.service")
+            os.makedirs(self.config_dir, exist_ok=True)
+            with open(tmp_unit, "w", encoding="utf-8") as f:
+                f.write(unit_content)
+            install_cmd = (
+                f"cp {tmp_unit} /etc/systemd/system/system-dashboard.service && "
+                "systemctl daemon-reload && systemctl enable --now system-dashboard.service"
+            )
+            runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
+            res = subprocess.run([runner, "sh", "-c", install_cmd], capture_output=True, text=True, timeout=45)
+            if res.returncode == 0:
+                time.sleep(1.0)
+                new_status = self.detect_local_node_status()
+                return True, f"Nodo local instalado y activo en {new_status['lan_url']}", new_status
+        except Exception as e:
+            return False, f"No se pudo completar la instalación automática: {e}", status
+
+        # Fallback en espacio de usuario si no se concedieron privilegios de servicio
+        try:
+            subprocess.Popen(
+                [sys.executable, server_py],
+                cwd=work_dir,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            time.sleep(1.2)
+            new_status = self.detect_local_node_status()
+            if new_status["running"]:
+                return True, f"Nodo local iniciado en {new_status['lan_url']}", new_status
+        except Exception:
+            pass
+        return False, "Instalación cancelada o sin permisos suficientes.", status
+
+    def clear_saved_node(self):
+        self.saved_host = ""
+        self.wan_domain = ""
+        self.device_token = ""
+        self.is_revoked = False
+        self.active_url = ""
+        self.connection_mode = "DISCONNECTED"
+        self._save_config()
 
     def register_device_with_server(self, base_url=None):
         target_base = base_url or self.active_url
@@ -600,7 +774,20 @@ class ServerConnectionManager:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 if resp.status == 200:
                     body = resp.read().decode("utf-8")
-                    return ("Recursos" in body or "version" in body), False
+                    try:
+                        parsed = json.loads(body)
+                        pub_dom = str(parsed.get("public_domain") or "").strip()
+                        if (
+                            pub_dom
+                            and not pub_dom.endswith(".local")
+                            and not pub_dom.replace(".", "").isdigit()
+                            and pub_dom not in ("localhost", "127.0.0.1")
+                        ):
+                            self.wan_domain = pub_dom
+                            self._save_config()
+                    except Exception:
+                        pass
+                    return ("Recursos" in body or "version" in body or "current_version" in body), False
         except urllib.error.HTTPError as he:
             if he.code == 403:
                 return True, True
@@ -628,8 +815,9 @@ class ServerConnectionManager:
 
     def discover_server(self):
         with self.lock:
+            port = self.node_port or 8085
             if self.saved_host:
-                cand = f"http://{self.saved_host}:8085"
+                cand = f"http://{self.saved_host}:{port}"
                 ok, is_rev = self._probe(cand, timeout=0.8)
                 if is_rev:
                     self.is_revoked = True
@@ -640,9 +828,10 @@ class ServerConnectionManager:
                     self.active_url = cand
                     self.connection_mode = "LAN"
                     self.is_revoked = False
+                    self._save_config()
                     return cand
 
-            for cand in ["http://127.0.0.1:8085", "http://localhost:8085"]:
+            for cand in [f"http://127.0.0.1:{port}", f"http://localhost:{port}"]:
                 ok, is_rev = self._probe(cand, timeout=0.4)
                 if is_rev:
                     self.is_revoked = True
@@ -658,12 +847,10 @@ class ServerConnectionManager:
 
             subnet = self._get_local_subnet_base()
             if subnet:
-                for cand in [
-                    f"http://{subnet}.2:8085",
-                    f"http://{subnet}.1:8085",
-                    "http://recursos.local:8085",
-                ]:
-                    ok, is_rev = self._probe(cand, timeout=0.4)
+                cands = [f"http://{subnet}.{last}:{port}" for last in (2, 1, 10, 50, 100, 150, 200)]
+                cands.append(f"http://recursos.local:{port}")
+                for cand in cands:
+                    ok, is_rev = self._probe(cand, timeout=0.35)
                     if is_rev:
                         self.is_revoked = True
                         self.connection_mode = "REVOKED"
@@ -678,7 +865,7 @@ class ServerConnectionManager:
 
             wan_dom = (self.wan_domain or "").strip().rstrip("/")
             if wan_dom:
-                wan_cand = f"https://{wan_dom}"
+                wan_cand = wan_dom if wan_dom.startswith(("http://", "https://")) else f"https://{wan_dom}"
                 ok, is_rev = self._probe(wan_cand, timeout=1.5)
                 if is_rev:
                     self.is_revoked = True
@@ -726,7 +913,7 @@ class ServerConnectionManager:
                     ).strip()
                     if (
                         pub_dom
-                        and not self.wan_domain
+                        and pub_dom != self.wan_domain
                         and not pub_dom.endswith(".local")
                         and not pub_dom.replace(".", "").isdigit()
                         and pub_dom not in ("localhost", "127.0.0.1")
@@ -918,18 +1105,20 @@ class LocalHtmlBridgeServer:
                 node_js = json.dumps(parent.conn_mgr.active_url or "local")
                 dev_info_js = json.dumps(parent.conn_mgr.refresh_device_telemetry(), ensure_ascii=False)
                 app_ver = get_app_version()
+                disp_ver = get_display_version(app_ver)
                 bridge_script = (
                     "<script>"
                     "window.__RECURSOS_UBUNTU_NATIVE__ = true;"
                     "window.__RECURSOS_NATIVE__ = true;"
                     "window.__RECURSOS_NATIVE_PLATFORM__ = 'ubuntu';"
                     f"window.__INITIAL_APP_VERSION__ = '{app_ver}';"
+                    f"window.__INITIAL_DISPLAY_VERSION__ = '{disp_ver}';"
                     "window.__INITIAL_APP_HASH__ = 'HEAD';"
                     f"window.__RECURSOS_DEVICE_TOKEN__ = {token_js};"
                     f"window.__RECURSOS_CONN_MODE__ = {mode_js};"
                     f"window.__RECURSOS_NODE_URL__ = {node_js};"
-                    f"window.__RECURSOS_NATIVE_DEVICE_INFO__ = {dev_info_js};"
-                    f"try {{ if ({token_js}) localStorage.setItem('sysmon_device_token', {token_js}); }} catch(e) {{}}"
+                    f"window.__RECURSOS_DEVICE_TELEMETRY__ = {dev_info_js};"
+                    f"try {{ if ({token_js}) {{ localStorage.setItem('recursos_device_token', {token_js}); localStorage.setItem('sysmon_device_token', {token_js}); }} }} catch(e) {{}}"
                     "</script>"
                 )
                 if "<head>" in html:
@@ -991,6 +1180,29 @@ class LocalHtmlBridgeServer:
                 parsed = urllib.parse.urlparse(self.path)
                 clean_path = parsed.path
 
+                if clean_path in (
+                    "/recursos-cockpit.png",
+                    "/favicon.ico",
+                    "/favicon.png",
+                    "/favicon-16x16.png",
+                    "/favicon-32x32.png",
+                    "/favicon-192x192.png",
+                    "/favicon-512x512.png",
+                    "/apple-touch-icon.png",
+                ):
+                    asset_path = resolve_static_asset_path(clean_path)
+                    if asset_path and os.path.isfile(asset_path):
+                        with open(asset_path, "rb") as af:
+                            data = af.read()
+                        ctype = "image/x-icon" if asset_path.endswith(".ico") else "image/png"
+                        self.send_response(200)
+                        self.send_header("Content-Type", ctype)
+                        self.send_header("Cache-Control", "public, max-age=86400")
+                        self.send_header("Content-Length", str(len(data)))
+                        self.end_headers()
+                        self.wfile.write(data)
+                        return
+
                 if clean_path == "/api/native/device-info":
                     self._send_json(parent.conn_mgr.refresh_device_telemetry())
                     return
@@ -1002,6 +1214,7 @@ class LocalHtmlBridgeServer:
                     self._send_json(
                         {
                             "ok": True,
+                            "success": True,
                             "usb_only": True,
                             "environment": "ubuntu_native",
                             "session_running": parent.dex.is_running,
@@ -1044,13 +1257,21 @@ class LocalHtmlBridgeServer:
                         return
                     if clean_path == "/api/version":
                         ver = get_app_version()
+                        disp_ver = get_display_version(ver)
                         self._send_json(
                             {
+                                "current_version": ver,
+                                "display_version": disp_ver,
                                 "version": ver,
                                 "local_version": ver,
                                 "remote_version": ver,
+                                "remote_display_version": disp_ver,
                                 "update_available": False,
-                                "auto_install_enabled": True,
+                                "ahead_of_remote": False,
+                                "has_git": False,
+                                "recent_commits": [],
+                                "auto_install_enabled": parent.conn_mgr.auto_install_enabled,
+                                "auto_install_status": "Modo sin conexión al nodo",
                                 "installed_deb_version": ver,
                                 "package_installed": True,
                                 "package_needs_install": False,
@@ -1135,8 +1356,23 @@ class LocalHtmlBridgeServer:
                 if self._proxy_to_remote("POST", body=raw_body):
                     return
 
-                if clean_path in ("/api/system/auto-update", "/api/system/logs/clear"):
-                    self._send_json({"ok": True, "success": True, "auto_install_enabled": True})
+                if clean_path == "/api/system/auto-update":
+                    try:
+                        payload = json.loads(raw_body.decode("utf-8"))
+                    except Exception:
+                        payload = {}
+                    parent.conn_mgr.auto_install_enabled = bool(payload.get("enabled", True))
+                    parent.conn_mgr._save_config()
+                    self._send_json({
+                        "ok": True,
+                        "success": True,
+                        "auto_install_enabled": parent.conn_mgr.auto_install_enabled,
+                        "status": "Guardado localmente",
+                    })
+                    return
+
+                if clean_path == "/api/system/logs/clear":
+                    self._send_json({"ok": True, "success": True})
                     return
 
                 self._send_json({"ok": False, "error": "Modo sin conexión al servidor remoto"}, 503)
@@ -1189,9 +1425,10 @@ def detect_runtime_environment(force_env=None):
 class RecursosNativeWindow(Gtk.ApplicationWindow):
     def __init__(self, app, start_in_dex=False, env_info=None):
         self.env_info = env_info or detect_runtime_environment()
+        disp_ver = get_display_version()
         super().__init__(
             application=app,
-            title=f"Recursos Cockpit v{get_app_version()}",
+            title=f"Recursos v{disp_ver}",
         )
         self.set_default_size(1280, 820)
         self.set_position(Gtk.WindowPosition.CENTER)
@@ -1199,6 +1436,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         self.is_fullscreen = False
         self.start_in_dex = start_in_dex
         self.webview = None
+        self.main_stack = None
 
         self._apply_css()
         self._set_app_icon()
@@ -1215,25 +1453,44 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         self.connect("destroy", lambda *_: self.bridge.stop())
         self.show_all()
 
-        threading.Thread(target=self._initial_discovery_worker, daemon=True).start()
+        GLib.idle_add(self._refresh_config_labels)
+        GLib.idle_add(self._refresh_local_node_panel)
+        if self.start_in_dex:
+            self._connect_and_open_webview(target_view="dex")
         GLib.timeout_add(3000, self._refresh_connection_badge)
 
-    def _initial_discovery_worker(self):
-        self.conn_mgr.discover_server()
-        self.conn_mgr.fetch_metrics()
-        self.conn_mgr.register_device_with_server()
-        GLib.idle_add(self._refresh_connection_badge)
-        GLib.idle_add(self._sync_webview_session)
+    def _connect_and_open_webview(self, target_view="inicio"):
+        self.lbl_conn_status.set_text("Buscando nodo...")
+        if hasattr(self, "lbl_home_status"):
+            self.lbl_home_status.set_text("Buscando tu servidor en el Wi-Fi local y mediante DNS externo detectado...")
+
+        def worker():
+            self.conn_mgr.discover_server()
+            self.conn_mgr.fetch_metrics()
+            self.conn_mgr.register_device_with_server()
+            GLib.idle_add(self._on_node_connected_ui, target_view)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_node_connected_ui(self, target_view="inicio"):
+        self._refresh_connection_badge()
+        self._refresh_config_labels()
+        self._sync_webview_session()
+        if self.main_stack:
+            self.main_stack.set_visible_child_name("webview")
+        if hasattr(self, "btn_back_home"):
+            self.btn_back_home.set_visible(True)
+        if target_view:
+            self._navigate_spa(target_view)
+        return False
 
     def _sync_webview_session(self):
         if self.webview and HAS_WEBKIT2:
             tok = json.dumps(self.conn_mgr.device_token or "")
-            mode = json.dumps(self.conn_mgr.connection_mode or "LOCAL")
-            url = json.dumps(self.conn_mgr.active_url or "local")
             dev_info = json.dumps(self.conn_mgr.refresh_device_telemetry(), ensure_ascii=False)
             js = (
-                f"window.__RECURSOS_NATIVE_DEVICE_INFO__={dev_info};"
-                f"if(window.injectNativeSession){{window.injectNativeSession({tok},{mode},{url},{dev_info});}}"
+                f"window.__RECURSOS_DEVICE_TELEMETRY__={dev_info};"
+                f"if(window.injectNativeSession){{window.injectNativeSession({tok},{dev_info});}}"
             )
             try:
                 if hasattr(self.webview, "evaluate_javascript"):
@@ -1272,51 +1529,49 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
     def _build_headerbar(self):
         hb = Gtk.HeaderBar()
         hb.set_show_close_button(True)
-        hb.props.title = "Recursos Cockpit"
-        hb.props.subtitle = f"v{get_app_version()} · Motor HTML5 Unificado & Estación USB DeX"
+        disp_ver = get_display_version()
+        hb.props.title = "Recursos"
+        hb.props.subtitle = f"v{disp_ver} · Aplicación Nativa Ubuntu"
 
-        ver_badge = Gtk.Label(label=f"v{get_app_version()}")
-        ver_badge.get_style_context().add_class("badge-ready")
-        hb.pack_start(ver_badge)
+        self.btn_back_home = Gtk.Button(label="Menú principal")
+        self.btn_back_home.get_style_context().add_class("btn-nav")
+        self.btn_back_home.set_tooltip_text("Volver a las tres opciones de inicio")
+        self.btn_back_home.connect("clicked", lambda *_: self._show_launcher_view("home"))
+        hb.pack_start(self.btn_back_home)
 
-        self.lbl_conn_status = Gtk.Label(label="📡 Autodescubriendo nodo...")
-        self.lbl_conn_status.get_style_context().add_class("badge-scanning")
+        self.lbl_conn_status = Gtk.Label(label="Listo para conectar")
+        self.lbl_conn_status.get_style_context().add_class("badge-local")
         hb.pack_start(self.lbl_conn_status)
 
-        btn_cockpit = Gtk.Button(label="🏠 Cockpit")
-        btn_cockpit.get_style_context().add_class("btn-nav")
-        btn_cockpit.set_tooltip_text("Ir a la Cabina General del Cockpit")
-        btn_cockpit.connect("clicked", lambda *_: self._navigate_spa("overview"))
-        hb.pack_start(btn_cockpit)
-
-        btn_dex = Gtk.Button(label="📱 Estación DeX (USB)")
+        btn_dex = Gtk.Button(label="Pantalla móvil USB")
         btn_dex.get_style_context().add_class("btn-dex")
-        btn_dex.set_tooltip_text("Abrir el submenú exclusivo de Proyección USB Samsung DeX / Android Desktop")
-        btn_dex.connect("clicked", lambda *_: self._navigate_spa("dex"))
+        btn_dex.set_tooltip_text("Abrir control de proyección USB")
+        btn_dex.connect("clicked", lambda *_: self._connect_and_open_webview(target_view="dex"))
         hb.pack_start(btn_dex)
 
         btn_about = Gtk.Button.new_from_icon_name("help-about-symbolic", Gtk.IconSize.BUTTON)
-        btn_about.set_tooltip_text(f"Acerca de Recursos Cockpit (v{get_app_version()})")
+        btn_about.set_tooltip_text(f"Acerca de Recursos (v{disp_ver})")
         btn_about.connect("clicked", self._show_about_dialog)
         hb.pack_end(btn_about)
 
-        btn_fs = Gtk.Button(label="⛶ Pantalla Completa")
+        btn_fs = Gtk.Button(label="Pantalla completa")
         btn_fs.get_style_context().add_class("btn-nav")
         btn_fs.set_tooltip_text("Alternar pantalla completa (F11)")
         btn_fs.connect("clicked", lambda *_: self._toggle_fullscreen())
         hb.pack_end(btn_fs)
 
-        btn_reconnect = Gtk.Button(label="🔄 Reconectar")
-        btn_reconnect.get_style_context().add_class("btn-nav")
-        btn_reconnect.set_tooltip_text("Escanear red local LAN / WAN y sincronizar sesión")
-        btn_reconnect.connect("clicked", self._on_reconnect_clicked)
-        hb.pack_end(btn_reconnect)
-
         self.set_titlebar(hb)
+
+    def _show_launcher_view(self, stack_name="home"):
+        if self.main_stack:
+            self.main_stack.set_visible_child_name(stack_name)
+        if stack_name == "home":
+            self._refresh_config_labels()
+            self._refresh_local_node_panel()
 
     def _navigate_spa(self, view_name):
         if self.webview and HAS_WEBKIT2:
-            js = f"if(typeof switchView==='function'){{switchView('{view_name}', true);}}"
+            js = f"if(typeof window.switchView==='function'){{window.switchView('{view_name}');}}"
             try:
                 if hasattr(self.webview, "evaluate_javascript"):
                     self.webview.evaluate_javascript(js, -1, None, None, None, None, None)
@@ -1325,17 +1580,13 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             except Exception:
                 pass
 
-    def _on_reconnect_clicked(self, _widget):
-        self.lbl_conn_status.set_text("📡 Escaneando LAN/WAN...")
-        threading.Thread(target=self._initial_discovery_worker, daemon=True).start()
-
     def _show_about_dialog(self, _widget):
         about = Gtk.AboutDialog(transient_for=self, modal=True)
-        about.set_program_name("Recursos Cockpit")
-        about.set_version(f"v{get_app_version()}")
+        about.set_program_name("Recursos")
+        about.set_version(f"v{get_display_version()}")
         about.set_comments(
-            "Aplicación Nativa Ubuntu con Motor HTML5/CSS3/D3.js/Leaflet Acelerado por Hardware, "
-            "Autodescubrimiento LAN/WAN Zero-Trust y Estación de Proyección USB Samsung DeX."
+            "Aplicación nativa de Ubuntu con autodetección en red local, conexión cifrada por DNS detectado, "
+            "instalador de nodo local y control USB para móvil."
         )
         about.set_website("https://github.com/cminewarIA/recursos-ui")
         about.set_website_label("GitHub cminewarIA/recursos-ui")
@@ -1358,7 +1609,116 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         about.destroy()
 
     def _build_main_layout(self):
-        initial_view = "dex" if self.start_in_dex else "overview"
+        self.main_stack = Gtk.Stack()
+        self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+
+        # Page 1: Native 3-Option Home Launcher
+        home_scroll = Gtk.ScrolledWindow()
+        home_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        center_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        center_box.set_valign(Gtk.Align.CENTER)
+        center_box.set_halign(Gtk.Align.CENTER)
+        center_box.set_margin_top(28)
+        center_box.set_margin_bottom(28)
+        center_box.set_margin_start(28)
+        center_box.set_margin_end(28)
+        center_box.set_size_request(680, -1)
+
+        # Header with CMineWar Logo
+        brand_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        brand_box.set_halign(Gtk.Align.CENTER)
+        logo_path = resolve_static_asset_path("recursos-cockpit.png")
+        if logo_path:
+            try:
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(logo_path, 88, 88, True)
+                img = Gtk.Image.new_from_pixbuf(pb)
+                brand_box.pack_start(img, False, False, 0)
+            except Exception:
+                pass
+        title_lbl = Gtk.Label(label=f"Recursos · v{get_display_version()}")
+        title_lbl.get_style_context().add_class("launcher-title")
+        sub_lbl = Gtk.Label(label="Elige cómo quieres utilizar tu equipo ahora")
+        sub_lbl.get_style_context().add_class("launcher-subtitle")
+        brand_box.pack_start(title_lbl, False, False, 0)
+        brand_box.pack_start(sub_lbl, False, False, 0)
+        center_box.pack_start(brand_box, False, False, 4)
+
+        self.lbl_home_status = Gtk.Label(label="")
+        self.lbl_home_status.set_line_wrap(True)
+        self.lbl_home_status.get_style_context().add_class("launcher-subtitle")
+        center_box.pack_start(self.lbl_home_status, False, False, 0)
+
+        # Opción 1: Conectar con el nodo
+        card1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        card1.get_style_context().add_class("launcher-card")
+        c1_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        c1_t = Gtk.Label(label="1. Conectar con el nodo", xalign=0)
+        c1_t.set_attributes(None)
+        c1_d = Gtk.Label(
+            label="Escanea tu Wi-Fi local automáticamente o conecta desde fuera con el dominio DNS detectado y guardado.",
+            xalign=0,
+        )
+        c1_d.set_line_wrap(True)
+        c1_d.get_style_context().add_class("launcher-subtitle")
+        c1_text.pack_start(c1_t, False, False, 0)
+        c1_text.pack_start(c1_d, False, False, 0)
+        btn_opt1 = Gtk.Button(label="Conectar ahora")
+        btn_opt1.get_style_context().add_class("btn-primary")
+        btn_opt1.set_valign(Gtk.Align.CENTER)
+        btn_opt1.connect("clicked", lambda *_: self._connect_and_open_webview("inicio"))
+        card1.pack_start(c1_text, True, True, 0)
+        card1.pack_end(btn_opt1, False, False, 0)
+        center_box.pack_start(card1, False, False, 0)
+
+        # Opción 2: Instalar nodo local (o mostrar IP y puerto si ya está instalado)
+        card2 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card2.get_style_context().add_class("launcher-card")
+        c2_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        c2_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        c2_t = Gtk.Label(label="2. Instalar nodo local", xalign=0)
+        self.lbl_node_info = Gtk.Label(
+            label="Comprobando si ya hay un nodo servidor instalado en este ordenador...",
+            xalign=0,
+        )
+        self.lbl_node_info.set_line_wrap(True)
+        self.lbl_node_info.get_style_context().add_class("launcher-subtitle")
+        c2_text.pack_start(c2_t, False, False, 0)
+        c2_text.pack_start(self.lbl_node_info, False, False, 0)
+        self.btn_opt2 = Gtk.Button(label="Instalar nodo")
+        self.btn_opt2.get_style_context().add_class("btn-nav")
+        self.btn_opt2.set_valign(Gtk.Align.CENTER)
+        self.btn_opt2.connect("clicked", self._on_install_local_node_clicked)
+        c2_top.pack_start(c2_text, True, True, 0)
+        c2_top.pack_end(self.btn_opt2, False, False, 0)
+        card2.pack_start(c2_top, False, False, 0)
+        center_box.pack_start(card2, False, False, 0)
+
+        # Opción 3: Configuraciones (Muestra y guarda la conexión detectada desde Opción 1)
+        card3 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card3.get_style_context().add_class("launcher-card")
+        c3_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        c3_t = Gtk.Label(label="3. Configuraciones de conexión", xalign=0)
+        c3_header.pack_start(c3_t, True, True, 0)
+        btn_forget = Gtk.Button(label="Olvidar conexión")
+        btn_forget.get_style_context().add_class("btn-nav")
+        btn_forget.connect("clicked", self._on_forget_config_clicked)
+        c3_header.pack_end(btn_forget, False, False, 0)
+        card3.pack_start(c3_header, False, False, 0)
+
+        self.lbl_cfg_lan = Gtk.Label(label="IP en red local (LAN): sin detectar", xalign=0)
+        self.lbl_cfg_dns = Gtk.Label(label="Dominio externo detectado (DNS): sin detectar", xalign=0)
+        self.lbl_cfg_cert = Gtk.Label(label="Certificado cifrado del dispositivo: pendiente", xalign=0)
+        for lbl in (self.lbl_cfg_lan, self.lbl_cfg_dns, self.lbl_cfg_cert):
+            lbl.get_style_context().add_class("launcher-subtitle")
+            lbl.set_selectable(True)
+            card3.pack_start(lbl, False, False, 0)
+
+        center_box.pack_start(card3, False, False, 0)
+        home_scroll.add(center_box)
+        self.main_stack.add_named(home_scroll, "home")
+
+        # Page 2: WebKit2 Unified Interface
+        initial_view = "dex" if self.start_in_dex else "inicio"
         target_uri = f"http://127.0.0.1:{self.bridge_port}/?env=ubuntu_native&view={initial_view}"
 
         if HAS_WEBKIT2 and WebKit2 is not None:
@@ -1366,7 +1726,6 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             settings = self.webview.get_settings()
             settings.set_enable_javascript(True)
             settings.set_enable_webgl(True)
-            settings.set_enable_Smooth_scrolling(True) if hasattr(settings, "set_enable_Smooth_scrolling") else None
             if hasattr(settings, "set_enable_smooth_scrolling"):
                 settings.set_enable_smooth_scrolling(True)
             if hasattr(settings, "set_user_agent"):
@@ -1383,25 +1742,83 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
             if hasattr(self.webview, "set_background_color"):
                 rgba = Gdk.RGBA()
-                rgba.parse("#06070a")
+                rgba.parse("#f6f7f9")
                 self.webview.set_background_color(rgba)
 
             self.webview.load_uri(target_uri)
-            self.add(self.webview)
+            self.main_stack.add_named(self.webview, "webview")
         else:
-            # Fallback informativo si el paquete gir1.2-webkit2 no está presente
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
             box.set_valign(Gtk.Align.CENTER)
             box.set_halign(Gtk.Align.CENTER)
             lbl = Gtk.Label(
                 label=(
-                    f"Recursos Cockpit v{get_app_version()}\n"
-                    f"Puente HTML5 activo en: {target_uri}\n"
-                    "Instala gir1.2-webkit2-4.1 para renderizado embebido."
+                    f"Recursos v{get_display_version()}\n"
+                    f"Interfaz lista en: {target_uri}\n"
+                    "Instala gir1.2-webkit2-4.1 para ver el panel integrado."
                 )
             )
             box.pack_start(lbl, False, False, 0)
-            self.add(box)
+            self.main_stack.add_named(box, "webview")
+
+        self.main_stack.set_visible_child_name("webview" if self.start_in_dex else "home")
+        self.add(self.main_stack)
+
+    def _refresh_local_node_panel(self):
+        st = self.conn_mgr.detect_local_node_status()
+        if st["installed"]:
+            state_txt = "activo" if st["running"] else "instalado"
+            self.lbl_node_info.set_text(
+                f"Nodo local ya {state_txt}. Dirección para conectar en tu red Wi-Fi (LAN): {st['lan_ip']} · Puerto {st['port']}"
+            )
+            self.btn_opt2.set_label("Conectar al nodo local" if st["running"] else "Iniciar nodo local")
+        else:
+            self.lbl_node_info.set_text(
+                "No hay ningún nodo instalado en este equipo. Puedes instalarlo para gestionar este ordenador desde la red."
+            )
+            self.btn_opt2.set_label("Instalar nodo local")
+        return False
+
+    def _refresh_config_labels(self):
+        lan_txt = f"{self.conn_mgr.saved_host}:{self.conn_mgr.node_port}" if self.conn_mgr.saved_host else "Pendiente de conexión en red local"
+        dns_txt = self.conn_mgr.wan_domain if self.conn_mgr.wan_domain else "Se guardará automáticamente al conectar por primera vez"
+        cert_txt = (
+            "Verificado y cifrado correctamente"
+            if self.conn_mgr.device_token and not self.conn_mgr.is_revoked
+            else ("Revocado (vuelve a conectar en red local)" if self.conn_mgr.is_revoked else "Se verificará al conectar en LAN")
+        )
+        self.lbl_cfg_lan.set_text(f"Conexión en red local (LAN): {lan_txt}")
+        self.lbl_cfg_dns.set_text(f"Dominio externo detectado (DNS): {dns_txt}")
+        self.lbl_cfg_cert.set_text(f"Certificado de seguridad: {cert_txt}")
+        return False
+
+    def _on_install_local_node_clicked(self, _widget):
+        st = self.conn_mgr.detect_local_node_status()
+        if st["installed"] and st["running"]:
+            self.conn_mgr.saved_host = "127.0.0.1"
+            self.conn_mgr._save_config()
+            self._connect_and_open_webview("inicio")
+            return
+        self.lbl_node_info.set_text("Instalando y activando nodo local...")
+
+        def worker():
+            ok, msg, new_st = self.conn_mgr.install_or_enable_local_node()
+            GLib.idle_add(self._on_install_finished, ok, msg, new_st)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_install_finished(self, ok, msg, _st):
+        self.lbl_home_status.set_text(msg)
+        self._refresh_local_node_panel()
+        if ok:
+            self._refresh_config_labels()
+        return False
+
+    def _on_forget_config_clicked(self, _widget):
+        self.conn_mgr.clear_saved_node()
+        self.lbl_home_status.set_text("Se han borrado los datos guardados del nodo.")
+        self._refresh_config_labels()
+        self._refresh_connection_badge()
 
     def _on_dex_status_callback(self, _status, _message):
         GLib.idle_add(self._sync_webview_session)
@@ -1414,16 +1831,19 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
         if mode == "LAN":
             ctx.add_class("badge-lan")
-            self.lbl_conn_status.set_text(f"🟢 LAN ({self.conn_mgr.saved_host})")
+            self.lbl_conn_status.set_text(f"Red local ({self.conn_mgr.saved_host})")
         elif mode == "WAN":
             ctx.add_class("badge-wan")
-            self.lbl_conn_status.set_text("🌐 WAN (DDNS)")
+            self.lbl_conn_status.set_text(f"Externa ({self.conn_mgr.wan_domain or 'DNS'})")
         elif mode == "REVOKED":
             ctx.add_class("badge-revoked")
-            self.lbl_conn_status.set_text("🔒 Certificado Revocado")
+            self.lbl_conn_status.set_text("Acceso revocado")
+        elif mode == "LOCAL":
+            ctx.add_class("badge-local")
+            self.lbl_conn_status.set_text("Sin nodo remoto")
         else:
             ctx.add_class("badge-local")
-            self.lbl_conn_status.set_text("💻 Silicio Local")
+            self.lbl_conn_status.set_text("Listo para conectar")
         return True
 
     def _on_key_press(self, _widget, event):
