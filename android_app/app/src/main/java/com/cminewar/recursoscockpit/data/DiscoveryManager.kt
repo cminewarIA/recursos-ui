@@ -87,19 +87,25 @@ class DiscoveryManager(
         }
 
         // 3. Conmutación a WAN exterior (Caddy proxy / DDNS) con token firmado
-        val wanCandidate = "https://${securePreferences.wanDomain.trimEnd('/')}"
-        onScanningProgress?.invoke("Conectando con nodo remoto seguro WAN...")
-        val wanRes = apiService.probeNode(wanCandidate, isQuickScan = false)
-        if (wanRes.isRevoked) {
-            securePreferences.isCertRevoked = true
-            return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.REVOKED)
-        }
-        if (wanRes.isOnline) {
-            return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.CONNECTED_WAN)
+        val wanDomain = securePreferences.wanDomain.trim().trimEnd('/')
+        if (wanDomain.isNotEmpty()) {
+            val wanCandidate = if (wanDomain.startsWith("http://") || wanDomain.startsWith("https://")) wanDomain else "https://$wanDomain"
+            onScanningProgress?.invoke("Conectando con nodo remoto seguro WAN...")
+            val wanRes = apiService.probeNode(wanCandidate, isQuickScan = false)
+            if (wanRes.isRevoked) {
+                securePreferences.isCertRevoked = true
+                return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.REVOKED)
+            }
+            if (wanRes.isOnline) {
+                return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.CONNECTED_WAN)
+            }
+            // 4. Fallback de error con dominio WAN configurado
+            val fallback = if (savedHost.isNotEmpty()) "http://$savedHost:${securePreferences.manualPort}" else wanCandidate
+            return@withContext ResolvedEndpoint(fallback, ConnectionMode.ERROR)
         }
 
-        // 4. Fallback de error
-        val fallback = if (savedHost.isNotEmpty()) "http://$savedHost:${securePreferences.manualPort}" else wanCandidate
+        // 4. Fallback de error sin dominio WAN configurado
+        val fallback = if (savedHost.isNotEmpty()) "http://$savedHost:${securePreferences.manualPort}" else ""
         ResolvedEndpoint(fallback, ConnectionMode.ERROR)
     }
 

@@ -22,6 +22,7 @@ data class VersionInfo(
 )
 
 data class MetricsResponse(
+    @SerializedName("version_info") val versionInfo: VersionInfo? = null,
     @SerializedName("system") val system: SystemData? = null,
     @SerializedName("cpu") val cpu: CpuData? = null,
     @SerializedName("ram") val ram: RamData? = null,

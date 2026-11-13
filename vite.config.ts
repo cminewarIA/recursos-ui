@@ -4,6 +4,7 @@ import { execSync } from 'child_process';
 import dns from 'dns';
 import fs from 'fs';
 import http from 'http';
+import nodeNet from 'net';
 import os from 'os';
 import path from 'path';
 import { defineConfig, loadEnv, Plugin } from 'vite';
@@ -2083,8 +2084,25 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
               full_domain: ver.public_domain,
               last_registered_ip: ver.local_ip,
               last_update_time: new Date().toLocaleTimeString('es-ES'),
+              token_set: false,
               token_masked: '••••••••••••••••',
               upstream_dns: ['127.0.0.1'],
+            })
+          );
+          return;
+        }
+
+        if ((url === '/api/dns/duckdns/update' || url === '/api/duckdns/update') && req.method === 'POST') {
+          const ver = getRealVersionPayload(hostHdr);
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: true,
+              status: 'OK',
+              message: 'DDNS actualizado en modo desarrollo',
+              domain: ver.public_domain,
+              ip: ver.local_ip,
+              updated_at: new Date().toLocaleTimeString('es-ES'),
             })
           );
           return;
@@ -2205,29 +2223,235 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
         }
 
         if (url?.startsWith('/api/telegram_bot')) {
-          res.setHeader('Content-Type', 'application/json');
+          const g = globalThis as unknown as {
+            __viteTgState?: {
+              config: { notify_completed_torrents: boolean; notify_network_changes: boolean };
+              allowed_users: number[];
+              activity: Array<Record<string, unknown>>;
+            };
+          };
+          if (!g.__viteTgState) {
+            g.__viteTgState = {
+              config: { notify_completed_torrents: true, notify_network_changes: true },
+              allowed_users: [],
+              activity: [],
+            };
+          }
+          const tgState = g.__viteTgState;
+
+          const sendTgJson = (obj: unknown, status = 200) => {
+            res.statusCode = status;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(obj));
+          };
+
+          if (req.method === 'POST') {
+            let rawBody = '';
+            req.on('data', (chunk) => {
+              rawBody += chunk;
+            });
+            req.on('end', () => {
+              let body: Record<string, unknown> = {};
+              try {
+                body = rawBody ? JSON.parse(rawBody) : {};
+              } catch {
+                sendTgJson({ success: false, error: 'JSON inválido' }, 400);
+                return;
+              }
+              const nowIso = new Date().toISOString().slice(0, 19).replace('T', ' ');
+              if (url === '/api/telegram_bot/config') {
+                if ('notify_completed_torrents' in body) {
+                  tgState.config.notify_completed_torrents = Boolean(body.notify_completed_torrents);
+                }
+                if ('notify_network_changes' in body) {
+                  tgState.config.notify_network_changes = Boolean(body.notify_network_changes);
+                }
+                sendTgJson({ success: true, config: tgState.config });
+                return;
+              }
+              if (url === '/api/telegram_bot/whitelist/add') {
+                const uid = Number.parseInt(String(body.user_id || ''), 10);
+                if (!Number.isFinite(uid) || uid <= 0) {
+                  sendTgJson({ success: false, error: 'El ID de usuario/chat debe ser un número entero válido' }, 400);
+                  return;
+                }
+                if (!tgState.allowed_users.includes(uid)) tgState.allowed_users.push(uid);
+                sendTgJson({ success: true, message: `Usuario ${uid} añadido a la lista blanca`, allowed_users: tgState.allowed_users });
+                return;
+              }
+              if (url === '/api/telegram_bot/whitelist/remove') {
+                const uid = Number.parseInt(String(body.user_id || ''), 10);
+                tgState.allowed_users = tgState.allowed_users.filter((x) => x !== uid);
+                sendTgJson({ success: true, message: `Usuario ${uid} eliminado de la lista blanca`, allowed_users: tgState.allowed_users });
+                return;
+              }
+              if (url === '/api/telegram_bot/send') {
+                const msg = String(body.message || body.text || '').trim();
+                if (!msg) {
+                  sendTgJson({ success: false, error: 'El mensaje no puede estar vacío' }, 400);
+                  return;
+                }
+                tgState.activity.unshift({
+                  direction: 'out',
+                  type: 'custom_broadcast',
+                  target: 'Dev',
+                  user_name: 'Panel Web (Dev)',
+                  title: 'Mensaje en modo desarrollo',
+                  content: msg,
+                  time_str: nowIso,
+                  status: 'ok',
+                });
+                sendTgJson({ success: true, message: 'Mensaje registrado en modo desarrollo' });
+                return;
+              }
+              if (url === '/api/telegram_bot/activity/clear') {
+                tgState.activity = [];
+                sendTgJson({ success: true, message: 'Historial de mensajes vaciado' });
+                return;
+              }
+              if (url === '/api/telegram_bot/test' || url === '/api/telegram_bot/ping') {
+                sendTgJson({ success: true, message: 'Ping de prueba simulado en modo desarrollo' });
+                return;
+              }
+              sendTgJson({ success: true, message: 'Operación completada' });
+            });
+            return;
+          }
+
           if (url === '/api/telegram_bot/config') {
-            res.end(
-              JSON.stringify({
-                success: true,
-                bot_token_set: false,
-                bot_username: '',
-                admin_user_ids: [],
-                notify_completed_torrents: true,
-                notify_network_changes: true,
-              })
-            );
-          } else if (url === '/api/telegram_bot/activity') {
-            res.end(JSON.stringify({ success: true, activity: [] }));
+            sendTgJson({
+              success: true,
+              bot_token_set: false,
+              bot_username: '',
+              admin_user_ids: tgState.allowed_users,
+              ...tgState.config,
+            });
           } else {
-            res.end(JSON.stringify({ success: true, message: 'Operación simulada en entorno de desarrollo' }));
+            sendTgJson({
+              success: true,
+              bot_status: { enabled: false, active: false, username: '' },
+              activity: tgState.activity,
+              allowed_users: tgState.allowed_users,
+              config: tgState.config,
+            });
           }
           return;
         }
 
         if (url?.startsWith('/api/fail2ban')) {
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ status: 'ok', success: true }));
+          const g = globalThis as unknown as { __viteFail2banBans?: Array<Record<string, unknown>> };
+          if (!g.__viteFail2banBans) g.__viteFail2banBans = [];
+          const sendF2bJson = (obj: unknown, status = 200) => {
+            res.statusCode = status;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(obj));
+          };
+
+          if (url === '/api/fail2ban/history' && req.method === 'GET') {
+            sendF2bJson({ status: 'ok', total: g.__viteFail2banBans.length, history: g.__viteFail2banBans });
+            return;
+          }
+
+          if (req.method === 'POST') {
+            let rawBody = '';
+            req.on('data', (chunk) => {
+              rawBody += chunk;
+            });
+            req.on('end', () => {
+              let body: Record<string, unknown> = {};
+              try {
+                body = rawBody ? JSON.parse(rawBody) : {};
+              } catch {
+                if (url !== '/api/fail2ban/import') {
+                  sendF2bJson({ success: false, error: 'JSON inválido' }, 400);
+                  return;
+                }
+              }
+              if (url === '/api/fail2ban/ban') {
+                const ip = String(body.ip || '').trim();
+                const jail = String(body.jail || 'caddy-scan').trim() || 'caddy-scan';
+                if (!ip || nodeNet.isIP(ip) === 0) {
+                  sendF2bJson({ success: false, error: 'Dirección IP no válida' }, 400);
+                  return;
+                }
+                if (!g.__viteFail2banBans!.some((b) => b.ip === ip)) {
+                  g.__viteFail2banBans!.unshift({ ip, jail, banned_at: Math.floor(Date.now() / 1000), is_active: true });
+                }
+                sendF2bJson({ success: true, message: `IP ${ip} registrada en modo dev (${jail})`, ip, jail });
+                return;
+              }
+              if (url === '/api/fail2ban/unban') {
+                const ip = String(body.ip || '').trim();
+                if (!ip || nodeNet.isIP(ip) === 0) {
+                  sendF2bJson({ success: false, error: 'Dirección IP no válida' }, 400);
+                  return;
+                }
+                g.__viteFail2banBans = g.__viteFail2banBans!.filter((b) => b.ip !== ip);
+                sendF2bJson({ success: true, message: `IP ${ip} desbloqueada en modo dev`, ip });
+                return;
+              }
+              if (url === '/api/fail2ban/import') {
+                const text = String(body.text || rawBody || '');
+                const matches = text.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || [];
+                const validIps = Array.from(new Set(matches.filter((cand) => nodeNet.isIP(cand) === 4)));
+                sendF2bJson({
+                  success: validIps.length > 0,
+                  total_imported: validIps.length,
+                  active_banned: validIps.length,
+                  message: validIps.length > 0 ? `Se procesaron ${validIps.length} IPs en modo dev` : 'No se encontraron IPs válidas',
+                }, validIps.length > 0 ? 200 : 400);
+                return;
+              }
+              sendF2bJson({ status: 'ok', success: true });
+            });
+            return;
+          }
+
+          sendF2bJson({ status: 'ok', success: true });
+          return;
+        }
+
+        if (url === '/api/wol/shutdown' || url === '/api/device/shutdown') {
+          let rawBody = '';
+          req.on('data', (chunk) => {
+            rawBody += chunk;
+          });
+          req.on('end', () => {
+            let body: Record<string, unknown> = {};
+            try {
+              body = rawBody ? JSON.parse(rawBody) : {};
+            } catch {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'JSON inválido' }));
+              return;
+            }
+            const ip = String(body.ip || '').trim();
+            const mac = String(body.mac || '').trim();
+            const name = String(body.name || ip || mac || 'dispositivo').trim();
+            const cleanMac = mac.replace(/[^0-9A-Fa-f]/g, '');
+            const localIp = sampleRealNetwork().local_ip;
+            if (ip && (ip === '127.0.0.1' || ip === '::1' || ip === localIp)) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Operación bloqueada: no se puede apagar el servidor anfitrión' }));
+              return;
+            }
+            if ((!ip || nodeNet.isIP(ip) === 0) && cleanMac.length !== 12) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Se requiere una dirección IP o MAC válida' }));
+              return;
+            }
+            res.setHeader('Content-Type', 'application/json');
+            res.end(
+              JSON.stringify({
+                success: true,
+                message: `Señal Sleep-on-LAN (SoL) enviada en modo desarrollo a ${name}`,
+                channels: ['sol_udp'],
+              })
+            );
+          });
           return;
         }
 

@@ -339,6 +339,18 @@ class ApiService(
                         Log.i("RecursosCockpit", "Nuevo token certificado recibido y persistido en KeyStore: $receivedToken")
                         securePreferences.deviceToken = receivedToken
                     }
+                    // Autoguardado dinámico del dominio WAN público cuando está disponible en LAN
+                    val learnedDomain = (metrics.versionInfo?.publicDomain ?: metrics.system?.publicDomain ?: "").trim()
+                    if (
+                        securePreferences.wanDomain.isBlank() &&
+                        learnedDomain.isNotEmpty() &&
+                        !learnedDomain.endsWith(".local") &&
+                        learnedDomain != "localhost" &&
+                        learnedDomain != "127.0.0.1" &&
+                        !learnedDomain.matches(Regex("""^\d{1,3}(\.\d{1,3}){3}$"""))
+                    ) {
+                        securePreferences.wanDomain = learnedDomain
+                    }
                     Pair(metrics, false)
                 } else if (response.code == 403) {
                     Log.w("RecursosCockpit", "Acceso denegado (HTTP 403): Certificado de dispositivo revocado en el servidor.")

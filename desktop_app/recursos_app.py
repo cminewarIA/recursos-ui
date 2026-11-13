@@ -513,7 +513,7 @@ class ServerConnectionManager:
         self.latest_metrics = None
         self.device_token = ""
         self.saved_host = ""
-        self.wan_domain = "recursos.cminewar.duckdns.org"
+        self.wan_domain = os.environ.get("RECURSOS_WAN_DOMAIN", "").strip()
         self.is_revoked = False
         self._last_net_io = psutil.net_io_counters() if psutil else None
         self._last_net_ts = time.time()
@@ -546,7 +546,7 @@ class ServerConnectionManager:
                     data = json.load(f)
                     self.device_token = data.get("device_token", "")
                     self.saved_host = data.get("saved_host", "")
-                    self.wan_domain = data.get("wan_domain", "recursos.cminewar.duckdns.org")
+                    self.wan_domain = str(data.get("wan_domain", "") or os.environ.get("RECURSOS_WAN_DOMAIN", "")).strip()
                     self.is_revoked = data.get("is_revoked", False)
         except Exception:
             pass
@@ -676,17 +676,19 @@ class ServerConnectionManager:
                         self._save_config()
                         return cand
 
-            wan_cand = f"https://{self.wan_domain.rstrip('/')}"
-            ok, is_rev = self._probe(wan_cand, timeout=1.5)
-            if is_rev:
-                self.is_revoked = True
-                self.connection_mode = "REVOKED"
-                return wan_cand
-            if ok:
-                self.active_url = wan_cand
-                self.connection_mode = "WAN"
-                self.is_revoked = False
-                return wan_cand
+            wan_dom = (self.wan_domain or "").strip().rstrip("/")
+            if wan_dom:
+                wan_cand = f"https://{wan_dom}"
+                ok, is_rev = self._probe(wan_cand, timeout=1.5)
+                if is_rev:
+                    self.is_revoked = True
+                    self.connection_mode = "REVOKED"
+                    return wan_cand
+                if ok:
+                    self.active_url = wan_cand
+                    self.connection_mode = "WAN"
+                    self.is_revoked = False
+                    return wan_cand
 
             self.connection_mode = "LOCAL"
             return ""
@@ -711,10 +713,27 @@ class ServerConnectionManager:
             with urllib.request.urlopen(req, timeout=2.5) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
+                    cfg_changed = False
                     new_token = data.get("auth_status", {}).get("token")
                     if new_token and new_token != self.device_token:
                         self.device_token = new_token
                         self.is_revoked = False
+                        cfg_changed = True
+                    pub_dom = str(
+                        data.get("version_info", {}).get("public_domain")
+                        or data.get("system", {}).get("public_domain")
+                        or ""
+                    ).strip()
+                    if (
+                        pub_dom
+                        and not self.wan_domain
+                        and not pub_dom.endswith(".local")
+                        and not pub_dom.replace(".", "").isdigit()
+                        and pub_dom not in ("localhost", "127.0.0.1")
+                    ):
+                        self.wan_domain = pub_dom
+                        cfg_changed = True
+                    if cfg_changed:
                         self._save_config()
 
                     with self.lock:
@@ -1068,7 +1087,14 @@ class LocalHtmlBridgeServer:
             def do_POST(self):
                 parsed = urllib.parse.urlparse(self.path)
                 clean_path = parsed.path
-                length = int(self.headers.get("Content-Length", 0) or 0)
+                try:
+                    length = int(self.headers.get("Content-Length", 0) or 0)
+                except (ValueError, TypeError):
+                    self._send_json({"ok": False, "error": "Content-Length inválido"}, 400)
+                    return
+                if length < 0 or length > 5 * 1024 * 1024:
+                    self._send_json({"ok": False, "error": "Payload demasiado grande"}, 413)
+                    return
                 raw_body = self.rfile.read(length) if length > 0 else b"{}"
 
                 if clean_path == "/api/dex/start":

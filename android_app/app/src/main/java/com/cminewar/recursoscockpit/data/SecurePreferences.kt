@@ -40,7 +40,7 @@ class SecurePreferences(context: Context) {
         set(value) = prefs.edit().putInt(KEY_MANUAL_PORT, value).apply()
 
     var wanDomain: String
-        get() = prefs.getString(KEY_WAN_DOMAIN, "recursos.cminewar.duckdns.org") ?: "recursos.cminewar.duckdns.org"
+        get() = prefs.getString(KEY_WAN_DOMAIN, "") ?: ""
         set(value) = prefs.edit().putString(KEY_WAN_DOMAIN, value).apply()
 
     var isCertRevoked: Boolean

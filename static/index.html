@@ -29,7 +29,7 @@
 
   <style>
     /* ==========================================================================
-       RECURSOS v11.1.0 — ORBITAL HORIZON & LIQUID TITANIUM COMMAND MATRIX
+       RECURSOS v11.3.0 — ORBITAL HORIZON & LIQUID TITANIUM COMMAND MATRIX
        Zero-Redundancy Streamlined Architecture · Contextual Domain Sub-Nav · ⌘K
        ========================================================================== */
     :root,
@@ -696,6 +696,15 @@
       visibility: visible;
       pointer-events: auto;
       transform: translateX(-50%) translateY(0);
+    }
+    .orbital-domain-item[data-domain-item="ops"] .orbital-dropdown-menu {
+      left: auto;
+      right: 0;
+      transform: translateY(4px);
+    }
+    .orbital-domain-item[data-domain-item="ops"]:hover .orbital-dropdown-menu,
+    .orbital-domain-item[data-domain-item="ops"].open .orbital-dropdown-menu {
+      transform: translateY(0);
     }
 
     /* Legacy second bar permanently disabled */
@@ -4359,7 +4368,7 @@
                 </a>
                 <a href="/version" class="orbital-pill" id="subPillVersion" data-view="version" data-domain="ops" onclick="return navigateTo(event, 'version')">
                   <span>Versión &amp; GitHub OTA</span>
-                  <span class="orbital-pill-badge" id="subBadgeVersion">v11.2.0</span>
+                  <span class="orbital-pill-badge" id="subBadgeVersion">v11.3.0</span>
                 </a>
                 <a href="/dex" class="orbital-pill" id="subPillDex" data-view="dex" data-domain="ops" style="display: none;" onclick="return navigateTo(event, 'dex')">
                   <span>Estación DeX USB</span>
@@ -4395,7 +4404,7 @@
 
           <a href="/version" class="action-btn" id="btnHeaderVersion" onclick="return navigateTo(event, 'version')" title="Estado de versión y sincronización OTA con GitHub">
             <span class="live-dot" id="dotVersionHeader"></span>
-            <span id="lblVersionHeader" class="mono">v11.2.0</span>
+            <span id="lblVersionHeader" class="mono">v11.3.0</span>
           </a>
 
           <button class="action-btn" id="btnHeaderZeroTrust" onclick="openTrustDialog()" title="Certificados Zero-Trust y Dispositivos Autorizados">
@@ -5849,11 +5858,11 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <!-- Botones de Descarga Directa Exclusivos para la Versión Web -->
                 <div class="ota-web-download-row" id="otaWebDownloadButtons" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_11.0.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaDownloadDeb" download="recursos-cockpit_11.3.0_amd64.deb" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(225, 29, 72, 0.4); color: var(--accent-rose-bright);" title="Descargar instalador nativo Debian/Ubuntu (.deb)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_11.0.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaDownloadApk" download="recursos-cockpit_11.3.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright);" title="Descargar paquete nativo Android (.apk)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -5874,7 +5883,7 @@
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Instalación Automática al Detectar</span>
                     <span class="adw-badge badge-green mono" id="verAutoInstallBadge">ACTIVO</span>
-                    <span class="adw-badge badge-blue mono" id="verDebInstalledBadge">Paquete .deb: v11.0.0</span>
+                    <span class="adw-badge badge-blue mono" id="verDebInstalledBadge">Paquete .deb: v11.3.0</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);" id="verAutoInstallStatusText">
                     Cualquier actualización en GitHub o paquete local (.deb) pendiente se descarga, compila e instala automáticamente en cuanto se detecta.
@@ -5896,7 +5905,7 @@
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Auto-Actualización Reactiva de la WebApp</span>
                     <span class="adw-badge badge-green mono" id="verAutoReloadBadge">ACTIVO</span>
-                    <span class="adw-badge badge-purple mono" id="verAppLoadedBadge">Cargada: v11.0.0</span>
+                    <span class="adw-badge badge-purple mono" id="verAppLoadedBadge">Cargada: v11.3.0</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);" id="verAutoReloadStatusText">
                     Al detectarse un cambio de versión o nuevo commit en el servidor, la interfaz se recarga automáticamente y restaura la vista activa sin requerir recarga manual.
@@ -5917,7 +5926,7 @@
                 <div style="display: flex; flex-direction: column; gap: 3px;">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Paquetes Oficiales Compilados</span>
-                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v11.0.0</span>
+                    <span class="adw-badge badge-blue mono" id="otaCardVersionBadge">v11.3.0</span>
                     <span class="adw-badge badge-purple" style="font-size: 10px; font-weight: 600;">Solo en la Web</span>
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted);">
@@ -5925,11 +5934,11 @@
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_11.0.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
+                  <a href="/download/recursos-cockpit.deb" id="btnOtaCardDownloadDeb" download="recursos-cockpit_11.3.0_amd64.deb" class="action-btn primary-cta" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Descargar .deb (Linux amd64)</span>
                   </a>
-                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_11.0.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
+                  <a href="/download/recursos-cockpit.apk" id="btnOtaCardDownloadApk" download="recursos-cockpit_11.3.0.apk" class="action-btn" style="display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: 12px; font-weight: 600; border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald-bright); background: rgba(16, 185, 129, 0.08);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
                     <span>Descargar .apk (Android)</span>
                   </a>
@@ -6659,6 +6668,20 @@
         }
       } catch (e) {}
       return h;
+    }
+
+    async function safeReadJson(res, fallback = {}) {
+      try {
+        const cType = (res && res.headers && res.headers.get('content-type')) || '';
+        const text = await res.text();
+        if (!text) return fallback;
+        if (cType.includes('application/json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          return JSON.parse(text);
+        }
+        return Object.assign({}, fallback, { success: false, error: `Respuesta inesperada HTTP ${res.status}` });
+      } catch (e) {
+        return Object.assign({}, fallback, { success: false, error: 'Error analizando respuesta del servidor' });
+      }
     }
 
     window.injectNativeSession = function(token, mode, nodeUrl, nativeDeviceInfo) {
@@ -9686,7 +9709,7 @@
       return {
         audit_metadata: {
           report_type: 'ZERO_TRUST_PHYSICAL_DEVICE_CERTIFICATE_AND_GROUPED_CLIENTS_AUDIT',
-          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '10.2.2',
+          schema_version: (latestMetrics && latestMetrics.version) || verInfo.version || '0.0.0',
           generated_at_iso: new Date().toISOString(),
           generated_at_local: new Date().toLocaleString('es-ES'),
           server_node: {
@@ -10171,13 +10194,16 @@
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ id: devId, client_key: clientKey })
           })
-          .then(r => r.json())
+          .then(r => safeReadJson(r))
           .then(res => {
             if (res.success) {
               showToast(`Cliente "${clientLabel}" desvinculado del dispositivo`, 'success');
               loadTrustedDevicesList();
+            } else if (res.error) {
+              showToast(res.error, 'error');
             }
-          });
+          })
+          .catch(() => showToast('Error de red al desvincular cliente', 'error'));
         },
         true
       );
@@ -10193,7 +10219,7 @@
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ id: devId })
           })
-          .then(r => r.json())
+          .then(r => safeReadJson(r))
           .then(res => {
             if (res.success) {
               if (isCurrent) {
@@ -10203,8 +10229,11 @@
                 showToast(`Certificado revocado para ${devName}`, 'success');
                 loadTrustedDevicesList();
               }
+            } else if (res.error) {
+              showToast(res.error, 'error');
             }
-          });
+          })
+          .catch(() => showToast('Error de red al revocar certificado', 'error'));
         },
         true
       );
@@ -10219,13 +10248,16 @@
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' })
           })
-          .then(r => r.json())
+          .then(r => safeReadJson(r))
           .then(res => {
             if (res.success) {
               showToast('Se han revocado los certificados de los demás dispositivos físicos', 'success');
               loadTrustedDevicesList();
+            } else if (res.error) {
+              showToast(res.error, 'error');
             }
-          });
+          })
+          .catch(() => showToast('Error de red al revocar certificados', 'error'));
         },
         true
       );
@@ -10474,6 +10506,12 @@
             if (filtered.length === 0) {
               list.innerHTML = '<div class="data-row" style="justify-content: center; color: var(--text-muted); padding: 24px;">No hay dispositivos que coincidan con el filtro seleccionado.</div>';
             } else {
+              const hostIps = new Set([
+                '127.0.0.1',
+                '::1',
+                (latestMetrics.system && latestMetrics.system.local_ip) || '',
+                (latestMetrics.net && latestMetrics.net.local_ip) || ''
+              ].filter(Boolean));
               list.innerHTML = filtered.map(c => {
                 const isCable = c.conn_type === 'cable' || c.band === 'Ethernet';
                 const is5g = !isCable && c.band && c.band.includes('5');
@@ -10484,6 +10522,9 @@
                 const fallbackEmoji = getDeviceEmoji(c.dev_icon || c.icon || c.dev_type);
                 const vendorLabel = (c.brand_name && c.brand_name !== 'Dispositivo') ? c.brand_name : (c.vendor || '');
                 const devTitle = `${c.name || c.ip} (${c.ip || c.mac || ''})`;
+                const hasValidMac = !!(c.mac && c.mac.includes(':'));
+                const isSelfHost = !!(c.ip && hostIps.has(c.ip));
+                const showShutdownBtn = !isSelfHost && (hasValidMac || Boolean(c.ip));
 
                 const avatarInner = devLogo.url
                   ? `<img class="${isCustomData ? 'custom-cover' : ''}" src="${escapeHtml(devLogo.url)}" alt="${escapeHtml(c.name || c.ip)}" data-fb="${escapeHtml(devLogo.fallback || '')}" onerror="if(this.dataset.fb && this.src!==this.dataset.fb){this.src=this.dataset.fb;}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline';}"><span style="display:none;font-size:18px;">${fallbackEmoji}</span>`
@@ -10507,7 +10548,12 @@
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                       ${(c.rx_bytes || c.tx_bytes) ? `<div class="mono" style="font-size: 12px; color: var(--text-secondary);">↓ ${formatBytes(c.tx_bytes || 0)} · ↑ ${formatBytes(c.rx_bytes || 0)}</div>` : ''}
-                      ${c.mac && c.mac.includes(':') ? `<button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="wakeDevice('${escapeHtml(c.mac)}', '${encodeURIComponent(c.name || c.ip)}', this)" title="Despertar dispositivo por red (Wake-on-LAN)">⚡ WoL</button>` : ''}
+                      ${(hasValidMac || showShutdownBtn) ? `
+                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                          ${hasValidMac ? `<button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="wakeDevice('${escapeHtml(c.mac)}', '${encodeURIComponent(c.name || c.ip)}', this)" title="Despertar dispositivo por red (Wake-on-LAN)">⚡ WoL</button>` : ''}
+                          ${showShutdownBtn ? `<button class="action-btn" style="height: 28px; padding: 0 10px; font-size: 11px; border-color: rgba(244, 63, 94, 0.38); color: var(--accent-rose-bright);" onclick="shutdownDevice('${escapeHtml(hasValidMac ? c.mac : '')}', '${escapeHtml(c.ip || '')}', '${encodeURIComponent(c.name || c.ip || '')}', this)" title="Enviar señal de apagado por red (Sleep-on-LAN / SSH)">⏻ Apagar</button>` : ''}
+                        </div>
+                      ` : ''}
                     </div>
                   </div>
                 `;
@@ -11258,7 +11304,7 @@
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ ip, jail: jail === 'all' ? '' : jail })
       })
-      .then(r => r.json())
+      .then(r => safeReadJson(r))
       .then(res => {
         if (res.success) {
           showToast(res.message || 'Acción aplicada en Fail2ban', 'success');
@@ -11291,7 +11337,7 @@
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ ip, jail: targetJail })
           })
-          .then(r => r.json())
+          .then(r => safeReadJson(r))
           .then(res => {
             if (res.success) {
               showToast(res.message || `IP ${ip} bloqueada en ${targetJail}`, 'success');
@@ -11320,7 +11366,7 @@
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ ip, jail: jail || '' })
           })
-          .then(r => r.json())
+          .then(r => safeReadJson(r))
           .then(res => {
             if (res.success) {
               showToast(res.message || `IP ${ip} desbloqueada`, 'success');
@@ -12043,7 +12089,7 @@
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ mac })
       })
-      .then(r => r.json())
+      .then(r => safeReadJson(r))
       .then(d => {
         if (d.success) {
           if (btn) {
@@ -12071,6 +12117,63 @@
           }, 2400);
         }
       });
+    }
+
+    function shutdownDevice(mac, ip, encName, btn) {
+      const name = decodeURIComponent(encName || '') || ip || mac || 'Dispositivo';
+      const originalHtml = btn ? btn.innerHTML : '⏻ Apagar';
+      const detailLines = [
+        ip ? `IP: ${ip}` : '',
+        mac ? `MAC: ${mac}` : ''
+      ].filter(Boolean).join(' · ');
+
+      showConfirmModal(
+        'Enviar señal de apagado por red',
+        `¿Deseas enviar una señal de apagado remoto (Sleep-on-LAN / SSH) al dispositivo "${name}"?\n\n${detailLines}`,
+        () => {
+          if (btn) {
+            btn.innerHTML = '⏳ Enviando...';
+            btn.disabled = true;
+          }
+          fetch('/api/wol/shutdown', {
+            method: 'POST',
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ mac, ip, name })
+          })
+          .then(r => safeReadJson(r))
+          .then(d => {
+            if (d.success) {
+              if (btn) {
+                btn.innerHTML = '✔ Señal enviada';
+                btn.style.borderColor = 'var(--accent-rose)';
+                btn.style.color = 'var(--accent-rose-bright)';
+              }
+              showToast(d.message || `⏻ Señal de apagado enviada a ${name}`, 'success');
+              setTimeout(() => {
+                if (typeof updateMetrics === 'function') updateMetrics();
+              }, 2000);
+            } else {
+              if (btn) btn.innerHTML = '⚠️ Error';
+              showToast(d.error || 'No se pudo emitir la señal de apagado', 'error');
+            }
+          })
+          .catch(() => {
+            if (btn) btn.innerHTML = '⚠️ Error';
+            showToast(`Error de conexión al enviar señal de apagado a ${name}`, 'error');
+          })
+          .finally(() => {
+            if (btn) {
+              setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+                btn.style.borderColor = 'rgba(244, 63, 94, 0.38)';
+                btn.style.color = 'var(--accent-rose-bright)';
+              }, 2600);
+            }
+          });
+        },
+        true
+      );
     }
 
     async function sendTelegramTestPing(btn) {
@@ -14888,12 +14991,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       },
 
       toggleOverviewTerminal() {
-        const card = document.getElementById('ovMainNodeErrorTerminalCard');
-        if (!card) return;
-        const isHidden = card.style.display === 'none';
-        card.style.display = isHidden ? 'block' : 'none';
-        if (isHidden) {
-          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (typeof openSystemLogsModal === 'function') {
+          openSystemLogsModal();
         }
       },
 
@@ -14979,74 +15078,8 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       },
 
       renderAll() {
-        const total = this._errors.length;
-        const geoCount = this._errors.filter(e => e.source === 'GEOIP_WORKER').length;
-        const netCount = total - geoCount;
-        const hasErr = total > 0;
-
-        // Update counts
-        setText('cntOvErrAll', total);
-        setText('cntOvErrGeo', geoCount);
-        setText('cntOvErrNet', netCount);
-        setText('cntNetErrAll', total);
-        setText('cntNetErrGeo', geoCount);
-        setText('cntNetErrNet', netCount);
-
-        // Update filter active states
-        const fMap = [
-          ['btnOvErrFilterAll', 'all'],
-          ['btnOvErrFilterGeo', 'geoip'],
-          ['btnOvErrFilterNet', 'network'],
-          ['btnNetErrFilterAll', 'all'],
-          ['btnNetErrFilterGeo', 'geoip'],
-          ['btnNetErrFilterNet', 'network']
-        ];
-        for (const [btnId, fVal] of fMap) {
-          const b = document.getElementById(btnId);
-          if (b) b.classList.toggle('active', this._filter === fVal);
-        }
-
-        // Update badges & cards
-        const badgeText = `${total} ${total === 1 ? 'error' : 'errores'}`;
-        for (const id of ['ovNodeErrStatusBadge', 'netNodeErrStatusBadge']) {
-          const el = document.getElementById(id);
-          if (el) {
-            el.textContent = badgeText;
-            el.className = `adw-badge ${hasErr ? 'badge-red' : 'badge-green'} mono`;
-          }
-        }
-
-        const ovBtnTxt = document.getElementById('ovNodeErrorBadgeText');
-        if (ovBtnTxt) {
-          ovBtnTxt.textContent = `Terminal: ${total} ${total === 1 ? 'error' : 'errores'}`;
-        }
-        const ovBtn = document.getElementById('ovNodeErrorTerminalToggleBtn');
-        if (ovBtn) {
-          ovBtn.style.borderColor = hasErr ? 'rgba(244, 63, 94, 0.55)' : '';
-          ovBtn.style.color = hasErr ? 'var(--accent-rose-bright)' : '';
-        }
-
-        for (const cardId of ['ovMainNodeErrorTerminalCard', 'netMainNodeErrorTerminalCard']) {
-          const cardEl = document.getElementById(cardId);
-          if (cardEl) cardEl.classList.toggle('has-active-errors', hasErr);
-        }
-
-        const htmlFull = this.buildEntriesHtml(60, false);
-        const ovOut = document.getElementById('ovMainNodeErrorTerminalOutput');
-        if (ovOut) ovOut.innerHTML = htmlFull;
-        const netOut = document.getElementById('netMainNodeErrorTerminalOutput');
-        if (netOut) netOut.innerHTML = htmlFull;
-
-        // Also update the Server Host popup terminal if mounted in DOM
-        const popupTermOut = document.getElementById('srvPopupNodeErrorTerminalOutput');
-        if (popupTermOut) {
-          popupTermOut.innerHTML = this.buildEntriesHtml(15, true);
-        }
-        const popupTermBadge = document.getElementById('srvPopupNodeErrorBadge');
-        if (popupTermBadge) {
-          popupTermBadge.textContent = badgeText;
-          popupTermBadge.style.background = hasErr ? 'rgba(244, 63, 94, 0.16)' : 'rgba(16, 185, 129, 0.16)';
-          popupTermBadge.style.color = hasErr ? '#e11d48' : '#059669';
+        if (typeof SystemLogsCenter !== 'undefined' && typeof SystemLogsCenter.updateGlobalBadges === 'function') {
+          SystemLogsCenter.updateGlobalBadges();
         }
       }
     };
@@ -15410,9 +15443,9 @@ ${escapeHtml(item.content || '(Mensaje sin contenido)')}
       const caret = document.getElementById('iconMapDrawerCaret');
       const cntEl = document.getElementById('cntMapDrawerActiveTotal');
       const svcChip = document.getElementById('btnMapClearServiceQuick');
-      const svcChipLbl = document.getElementById('lblMapActiveService') || document.getElementById('lblMapActiveServiceQuick');
+      const svcChipLbl = document.getElementById('lblMapActiveService');
       const devChip = document.getElementById('btnMapClearDeviceQuick');
-      const devChipLbl = document.getElementById('lblMapActiveDevice') || document.getElementById('lblMapActiveDeviceQuick');
+      const devChipLbl = document.getElementById('lblMapActiveDevice');
 
       connectionsMapServiceDrawerOpen = !!connectionsMapDrawerOpen;
       window.connectionsMapDrawerOpen = !!connectionsMapDrawerOpen;

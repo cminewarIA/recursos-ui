@@ -19,6 +19,9 @@ import socket
 import requests
 import collections
 import glob
+import shutil
+import urllib.request
+import urllib.parse
 
 
 # ==============================================================================
@@ -27,8 +30,6 @@ import glob
 METRICS_CACHE = {}
 METRICS_CACHE_BYTES = b"{}"
 METRICS_LOCK = threading.Lock()
-
-import urllib.request
 
 DOCKER_CACHE = []
 DOCKER_LOCK = threading.Lock()
@@ -77,10 +78,27 @@ SECURITY_CACHE = {
 }
 SECURITY_LOCK = threading.Lock()
 
-# Router ASUS RT-AX56U Settings
-ROUTER_IP = "192.168.50.10"
-ROUTER_USER = "Admin"
-ROUTER_PASS = "LFDe7@0Q5m25RLQhIbYSBzK6K0hwD@"
+def _detect_default_gateway_ip():
+    """Detecta dinámicamente la IP de la puerta de enlace por defecto desde /proc/net/route."""
+    try:
+        with open("/proc/net/route", "r", encoding="utf-8") as f:
+            next(f, None)
+            for line in f:
+                fields = line.strip().split()
+                if len(fields) >= 3 and fields[1] == "00000000":
+                    gw_hex = fields[2]
+                    if len(gw_hex) == 8:
+                        gw_ip = ".".join(str(int(gw_hex[i:i+2], 16)) for i in (6, 4, 2, 0))
+                        if gw_ip != "0.0.0.0":
+                            return gw_ip
+    except Exception:
+        pass
+    return ""
+
+# Configuración dinámica del router/AP (opcional vía variables de entorno)
+ROUTER_IP = os.environ.get("RECURSOS_ROUTER_IP", "").strip() or _detect_default_gateway_ip()
+ROUTER_USER = os.environ.get("RECURSOS_ROUTER_USER", "").strip()
+ROUTER_PASS = os.environ.get("RECURSOS_ROUTER_PASS", "").strip()
 
 # Zero-Trust Local Pairing Storage & Master Key
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -89,7 +107,31 @@ TRUSTED_FILE = os.path.join(BASE_DIR, "trusted_devices.json")
 TRUST_LOCK = threading.Lock()
 CUSTOM_LOGOS_FILE = os.path.join(BASE_DIR, "custom_logos.json")
 CUSTOM_LOGOS_LOCK = threading.Lock()
-ADMIN_MASTER_KEY = os.environ.get("ADMIN_MASTER_KEY", "Cminewar2026!")  # Clave maestra de rescate / desbloqueo remoto
+
+def _load_or_create_admin_master_key():
+    """Obtiene ADMIN_MASTER_KEY de entorno o genera/persiste una clave aleatoria segura en disco."""
+    env_key = os.environ.get("ADMIN_MASTER_KEY", "").strip()
+    if env_key:
+        return env_key
+    key_file = os.path.join(BASE_DIR, ".admin_master_key")
+    if os.path.isfile(key_file):
+        try:
+            with open(key_file, "r", encoding="utf-8") as f:
+                val = f.read().strip()
+                if val:
+                    return val
+        except Exception:
+            pass
+    generated = secrets.token_urlsafe(24)
+    try:
+        with open(key_file, "w", encoding="utf-8") as f:
+            f.write(generated)
+        os.chmod(key_file, 0o600)
+    except Exception:
+        pass
+    return generated
+
+ADMIN_MASTER_KEY = _load_or_create_admin_master_key()
 
 CUSTOM_LOGOS_CACHE = {"mtime": -1.0, "data": {}}
 
@@ -475,24 +517,40 @@ def clear_geoip_worker_errors():
 # ==============================================================================
 # BOT DE TELEGRAM INTEGRADO: GESTOR DE TORRENTS Y VIGILANCIA LAN (100% NATIVO)
 # ==============================================================================
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8813089508:AAF68Ti_JfZQqPVfAOqgk6mMoPtzL6arLzo")
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
-TELEGRAM_FILE_URL = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}" if TELEGRAM_BOT_TOKEN else ""
+TELEGRAM_FILE_URL = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}" if TELEGRAM_BOT_TOKEN else ""
 
-QBIT_API_URL = os.environ.get("QBIT_API_URL", "http://127.0.0.1:8082/api/v2")
-QBIT_SAVE_PATH = os.environ.get("QBIT_SAVE_PATH", "/mnt/almacenamiento/descargas")
+QBIT_API_URL = os.environ.get("QBIT_API_URL", "http://127.0.0.1:8082/api/v2").strip()
+def _resolve_default_qbit_save_path():
+    env_p = os.environ.get("QBIT_SAVE_PATH", "").strip()
+    if env_p:
+        return env_p
+    rel_dl = os.path.join(BASE_DIR, "downloads")
+    if os.path.exists("/mnt/almacenamiento/descargas"):
+        return "/mnt/almacenamiento/descargas"
+    return rel_dl
 
-def _resolve_tg_data_file(filename, fallback_dir="/home/servidor/scripts"):
-    """Resuelve rutas de persistencia buscando primero relativa al proyecto y luego en fallback."""
-    rel_path = os.path.join(BASE_DIR, filename)
-    if os.path.exists(rel_path):
-        return rel_path
-    abs_path = os.path.join(fallback_dir, filename)
-    if os.path.exists(abs_path):
-        return abs_path
-    if os.path.isdir(fallback_dir):
-        return abs_path
-    return rel_path
+QBIT_SAVE_PATH = _resolve_default_qbit_save_path()
+
+def _resolve_tg_data_file(filename, fallback_dir=None):
+    """Resuelve rutas de persistencia buscando primero en env/relativa al proyecto y luego en fallback existente."""
+    env_dir = os.environ.get("RECURSOS_DATA_DIR", "").strip() or os.environ.get("RECURSOS_SCRIPTS_DIR", "").strip()
+    candidates = []
+    if env_dir:
+        candidates.append(os.path.join(env_dir, filename))
+    candidates.extend([
+        os.path.join(BASE_DIR, filename),
+        os.path.join(BASE_DIR, "scripts", filename),
+    ])
+    if fallback_dir and os.path.isdir(fallback_dir):
+        candidates.append(os.path.join(fallback_dir, filename))
+    elif os.path.isdir("/home/servidor/scripts"):
+        candidates.append(os.path.join("/home/servidor/scripts", filename))
+    for cand in candidates:
+        if os.path.exists(cand):
+            return cand
+    return candidates[0]
 
 TELEGRAM_WHITELIST_FILE = _resolve_tg_data_file("telegram_bot_allowed_users.json")
 TELEGRAM_NOTIFIED_FILE = _resolve_tg_data_file("telegram_notified_torrents.json")
@@ -629,6 +687,20 @@ def tg_format_eta(seconds):
 
 def tg_send_message(chat_id, text, reply_to_message_id=None, parse_mode="Markdown", log_activity=True, log_title=None, log_type="command_reply"):
     """Envía un mensaje mediante la API oficial de Telegram y registra la actividad saliente."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_API_URL:
+        if log_activity:
+            record_tg_activity(
+                direction="out",
+                msg_type=log_type,
+                target=str(chat_id),
+                user_name=f"Chat {chat_id}",
+                title=log_title or "Mensaje omitido (Bot sin token)",
+                content=text,
+                status="error",
+                details={"error": "TELEGRAM_BOT_TOKEN no configurado en el entorno"}
+            )
+        return False
+
     url = f"{TELEGRAM_API_URL}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -846,6 +918,12 @@ def telegram_bot_monitor_worker():
 
 def telegram_bot_polling_worker():
     """Hilo principal de Telegram (long polling getUpdates) integrado en server.py."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_API_URL:
+        with TELEGRAM_BOT_LOCK:
+            TELEGRAM_BOT_CACHE["enabled"] = False
+            TELEGRAM_BOT_CACHE["polling_active"] = False
+            TELEGRAM_BOT_CACHE["last_action"] = "En espera (TELEGRAM_BOT_TOKEN no configurado)"
+        return
     print("[TG BOT] Long-polling de Telegram integrado iniciado.")
     offset = 0
     with TELEGRAM_BOT_LOCK:
@@ -1041,11 +1119,16 @@ def telegram_bot_polling_worker():
                         reply_to_message_id=msg_id,
                         log_title="Respuesta: Sincronizando dispositivos LAN"
                     )
-                    sync_script = next((p for p in [
+                    sync_candidates = [
                         os.path.join(BASE_DIR, "sync_pihole_devices.py"),
                         os.path.join(BASE_DIR, "scripts", "sync_pihole_devices.py"),
-                        "/home/servidor/scripts/sync_pihole_devices.py"
-                    ] if os.path.exists(p)), None)
+                    ]
+                    env_scripts = os.environ.get("RECURSOS_SCRIPTS_DIR", "").strip()
+                    if env_scripts:
+                        sync_candidates.insert(0, os.path.join(env_scripts, "sync_pihole_devices.py"))
+                    if os.path.isdir("/home/servidor/scripts"):
+                        sync_candidates.append("/home/servidor/scripts/sync_pihole_devices.py")
+                    sync_script = next((p for p in sync_candidates if os.path.isfile(p)), None)
                     if sync_script:
                         try:
                             res = subprocess.run(["python3", sync_script], capture_output=True, text=True, timeout=25)
@@ -2490,11 +2573,11 @@ class PiholeDnsTranslator:
                 SELECT timestamp, domain, client 
                 FROM queries 
                 WHERE timestamp > ? 
-                  AND client NOT IN ('127.0.0.1', '::1', '192.168.50.2')
+                  AND client NOT IN ('127.0.0.1', '::1', ?)
                   AND status IN (1, 2, 3, 14, 17)
                 ORDER BY timestamp DESC
                 LIMIT 160
-            """, (cutoff,))
+            """, (cutoff, SERVER_LOCAL_IP))
             seen = set()
             for ts, dom, client in cur.fetchall():
                 if not dom:
@@ -3177,7 +3260,7 @@ VERSION_LOCK = threading.Lock()
 DETECTED_DOMAIN_CACHE = None
 
 def detect_local_server_ip():
-    """Detecta automáticamente la IP privada LAN del servidor instalado."""
+    """Detecta automáticamente la IP privada LAN del servidor instalado sin valores fijos."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0.5)
@@ -3188,9 +3271,36 @@ def detect_local_server_ip():
             return ip
     except Exception:
         pass
-    return "192.168.50.2"
+    try:
+        for _iface, addrs in psutil.net_if_addrs().items():
+            for a in addrs:
+                if a.family == socket.AF_INET and a.address and not a.address.startswith("127."):
+                    return a.address
+    except Exception:
+        pass
+    return "127.0.0.1"
 
 SERVER_LOCAL_IP = detect_local_server_ip()
+
+def get_lan_broadcast_addresses():
+    """Obtiene dinámicamente las direcciones de broadcast IPv4 de las interfaces de red locales."""
+    bcasts = set()
+    try:
+        for _iface, addrs in psutil.net_if_addrs().items():
+            for a in addrs:
+                if a.family == socket.AF_INET and a.address and not a.address.startswith("127."):
+                    if getattr(a, "broadcast", None):
+                        bcasts.add(a.broadcast)
+                    elif getattr(a, "netmask", None):
+                        try:
+                            net = ipaddress.IPv4Network(f"{a.address}/{a.netmask}", strict=False)
+                            bcasts.add(str(net.broadcast_address))
+                        except Exception:
+                            pass
+    except Exception:
+        pass
+    bcasts.add("255.255.255.255")
+    return sorted(bcasts)
 
 def detect_system_dns_domain():
     """
@@ -3209,7 +3319,6 @@ def detect_system_dns_domain():
         return DETECTED_DOMAIN_CACHE
 
     candidate_files = [
-        # 1. Rutas relativas al repositorio (GitHub / Google AI Studio / Simulador)
         os.path.join(BASE_DIR, "Caddyfile"),
         os.path.join(BASE_DIR, "caddy", "Caddyfile"),
         os.path.join(BASE_DIR, "duck.sh"),
@@ -3219,21 +3328,22 @@ def detect_system_dns_domain():
         "./Caddyfile",
         "./duck.sh",
         "./duckdns/duck.sh",
-        # 2. Rutas del servidor local físico
         "/etc/caddy/Caddyfile",
-        "/home/servidor/Caddyfile",
-        "/home/servidor/servicios/caddy/Caddyfile",
-        "/home/servidor/docker/caddy/Caddyfile",
         "/opt/caddy/Caddyfile",
         "/etc/nginx/sites-enabled/default",
         "/etc/nginx/nginx.conf",
-        "/home/servidor/duckdns/duck.sh",
-        "/home/servidor/servicios/duckdns/duck.sh",
         "/etc/crontab"
     ]
+    if os.path.isdir("/home/servidor"):
+        candidate_files.extend([
+            "/home/servidor/Caddyfile",
+            "/home/servidor/servicios/caddy/Caddyfile",
+            "/home/servidor/docker/caddy/Caddyfile",
+            "/home/servidor/duckdns/duck.sh",
+            "/home/servidor/servicios/duckdns/duck.sh",
+        ])
 
-    # También buscar en directorios de servicios comunes si existen
-    for base_search in ["/home/servidor", "/etc/nginx/conf.d", "/etc/nginx/sites-enabled"]:
+    for base_search in ["/etc/nginx/conf.d", "/etc/nginx/sites-enabled", "/home/servidor"]:
         if os.path.isdir(base_search):
             try:
                 for entry in os.listdir(base_search):
@@ -4225,7 +4335,7 @@ def get_client_ip(handler):
     se extrae la IP sanitizada por el proxy (X-Real-IP o el cliente original en X-Forwarded-For).
     """
     direct_ip = handler.client_address[0]
-    if direct_ip in ('127.0.0.1', '::1', 'localhost', '192.168.50.2', SERVER_LOCAL_IP):
+    if direct_ip in ('127.0.0.1', '::1', 'localhost', SERVER_LOCAL_IP):
         x_real = handler.headers.get('X-Real-IP')
         if x_real:
             return x_real.strip()
@@ -5217,14 +5327,12 @@ def get_ram_info():
 
 def fetch_disks_worker():
     global DISKS_CACHE
-    target_mounts = [
-        ("/", "SSD Sistema (NVMe /)", "/dev/nvme0n1p2", "ext4"),
-        ("/mnt/almacenamiento", "HDD Almacenamiento 1TB (Servicios, Logs & Descargas)", "/dev/sda1", "ext4"),
-        ("/home/servidor/nas/video", "NAS Synology • Video (Cine y Series)", "//192.168.50.3/video", "cifs / smb3"),
-        ("/home/servidor/nas/photo", "NAS Synology • Fotos (Immich Library)", "//192.168.50.3/photo", "cifs / smb3"),
-        ("/home/servidor/nas/onedrive", "NAS Synology • OneDrive (Nextcloud)", "//192.168.50.3/OneDrive", "cifs / smb3"),
-        ("/home/servidor/nas/homes", "NAS Synology • Personal (Homes)", "//192.168.50.3/homes", "cifs / smb3")
-    ]
+    ignored_fstypes = {
+        "proc", "sysfs", "tmpfs", "devtmpfs", "devpts", "cgroup", "cgroup2",
+        "pstore", "securityfs", "debugfs", "tracefs", "configfs", "fusectl",
+        "hugetlbfs", "mqueue", "binfmt_misc", "autofs", "squashfs", "overlay",
+        "nsfs", "efivarfs", "fuse.lxcfs", "fuse.portal", "ramfs", "rpc_pipefs"
+    }
     while True:
         try:
             nvme_temp = None
@@ -5244,10 +5352,25 @@ def fetch_disks_worker():
                 pass
 
             disks = []
-            for mpoint, label, dev_name, fstype in target_mounts:
+            seen_mounts = set()
+            partitions = []
+            try:
+                partitions = psutil.disk_partitions(all=True)
+            except Exception:
+                partitions = []
+
+            for part in partitions:
+                mpoint = part.mountpoint
+                fstype = (part.fstype or "").lower()
+                dev_name = part.device or ""
+                if not mpoint or mpoint in seen_mounts:
+                    continue
+                if fstype in ignored_fstypes or mpoint.startswith(("/proc", "/sys", "/dev", "/run", "/snap")):
+                    continue
+                if fstype == "vfat" and mpoint.startswith("/boot"):
+                    continue
+                seen_mounts.add(mpoint)
                 try:
-                    if not os.path.exists(mpoint):
-                        continue
                     st = os.statvfs(mpoint)
                     total = st.f_blocks * st.f_frsize
                     free = st.f_bavail * st.f_frsize
@@ -5255,11 +5378,19 @@ def fetch_disks_worker():
                     if total == 0:
                         continue
                     percent = round((used / total) * 100, 1)
+                    if mpoint == "/":
+                        label = f"Sistema Raíz ({dev_name or '/'})"
+                    elif fstype in ("cifs", "smb", "smb3", "nfs", "nfs4", "sshfs"):
+                        share_leaf = os.path.basename(mpoint.rstrip("/")) or dev_name
+                        label = f"Recurso Red ({fstype.upper()}) · {share_leaf}"
+                    else:
+                        leaf = os.path.basename(mpoint.rstrip("/")) or mpoint
+                        label = f"Volumen {leaf} ({dev_name or fstype})"
                     disks.append({
                         "mountpoint": mpoint,
                         "label": label,
                         "device": dev_name,
-                        "fstype": fstype,
+                        "fstype": part.fstype or fstype,
                         "temp_c": nvme_temp if mpoint == "/" else None,
                         "total_bytes": total,
                         "used_bytes": used,
@@ -5268,6 +5399,27 @@ def fetch_disks_worker():
                     })
                 except Exception:
                     continue
+
+            if not disks and os.path.exists("/"):
+                try:
+                    st = os.statvfs("/")
+                    total = st.f_blocks * st.f_frsize
+                    free = st.f_bavail * st.f_frsize
+                    used = total - (st.f_bfree * st.f_frsize)
+                    if total > 0:
+                        disks.append({
+                            "mountpoint": "/",
+                            "label": "Sistema Raíz (/)",
+                            "device": "rootfs",
+                            "fstype": "ext4",
+                            "temp_c": nvme_temp,
+                            "total_bytes": total,
+                            "used_bytes": used,
+                            "free_bytes": free,
+                            "percent": round((used / total) * 100, 1)
+                        })
+                except Exception:
+                    pass
             with DISKS_LOCK:
                 DISKS_CACHE = disks
         except Exception:
@@ -5474,11 +5626,13 @@ def fetch_docker_worker():
             }
             try:
                 emby_candidates = [
+                    os.environ.get("RECURSOS_EMBY_DB", "").strip(),
                     os.path.join(BASE_DIR, "emby", "library.db"),
                     os.path.join(BASE_DIR, "..", "emby", "programdata", "data", "library.db"),
-                    "/home/servidor/servicios/emby/programdata/data/library.db"
                 ]
-                emby_db = next((p for p in emby_candidates if os.path.isfile(p)), "")
+                if os.path.exists("/home/servidor/servicios/emby/programdata/data/library.db"):
+                    emby_candidates.append("/home/servidor/servicios/emby/programdata/data/library.db")
+                emby_db = next((p for p in emby_candidates if p and os.path.isfile(p)), "")
                 if emby_db and os.path.exists(emby_db):
                     conn_emby = sqlite3.connect(f"file:{emby_db}?mode=ro", uri=True, timeout=1.5)
                     cur_emby = conn_emby.cursor()
@@ -5517,15 +5671,17 @@ def fetch_docker_worker():
             except Exception:
                 pass
 
-            parental_info = {"authorized": False, "status": "BLOCKED", "reason": "Galaxy A8 offline"}
+            parental_info = {"authorized": False, "status": "BLOCKED", "reason": "Control de acceso inactivo"}
             try:
                 st_candidates = [
+                    os.environ.get("RECURSOS_PARENTAL_STATE", "").strip(),
                     os.path.join(BASE_DIR, "control_acceso_s10", "estado.json"),
                     os.path.join(BASE_DIR, "estado.json"),
                     os.path.join(BASE_DIR, "..", "control_acceso_s10", "estado.json"),
-                    "/home/servidor/servicios/control_acceso_s10/estado.json"
                 ]
-                st_file = next((p for p in st_candidates if os.path.isfile(p)), "")
+                if os.path.exists("/home/servidor/servicios/control_acceso_s10/estado.json"):
+                    st_candidates.append("/home/servidor/servicios/control_acceso_s10/estado.json")
+                st_file = next((p for p in st_candidates if p and os.path.isfile(p)), "")
                 if st_file and os.path.exists(st_file):
                     with open(st_file, "r") as pf:
                         p_raw = json.load(pf)
@@ -5553,45 +5709,39 @@ def fetch_docker_worker():
         time.sleep(3.5)
 
 # ==============================================================================
-DEVICE_FRIENDLY_NAMES = {
-    "00:50:B6:BE:89:96": "servidor (Este Servidor)",
-    "90:09:D0:08:EC:98": "synology-nas (Almacenamiento Red)",
-    "18:B0:A4:D3:C5:3A": "Router Vodafone (Gateway Principal)",
-    "D4:5D:64:C5:75:40": "Repetidor ASUS RT-AX56U (Switch & Wi-Fi 6)",
-    "64:B5:C6:0A:80:45": "Nintendo 3DS",
-    "78:20:A5:C0:C4:6A": "Nintendo Switch OLED",
-    "40:44:F7:3E:6B:F1": "Nintendo Switch 2",
-    "54:4C:8A:A8:93:D3": "Xbox Series S",
-    "2C:54:91:66:C9:2F": "Xbox One X",
-    "1A:C3:E4:9A:12:A8": "Galaxy Tab S9 Ultra (Yonah)",
-    "E4:9F:7D:B2:C2:B2": "Galaxy Tab S10 Lite (Yanelis)",
-    "F4:02:28:61:A1:98": "Galaxy S21 (Yanelis)",
-    "7A:56:9B:5F:97:BE": "Galaxy S10 (Yonah)",
-    "00:B5:D0:F2:69:F3": "Galaxy A8 (Control Parental)",
-    "5A:F2:2B:00:BC:86": "Galaxy S25 (Yonah)",
-    "CA:AB:12:6B:FC:62": "Xiaomi Redmi A3",
-    "38:8B:59:30:C9:D6": "Google Home Mini (Principal)",
-    "38:8B:59:2F:D0:00": "Google Home Mini (Cocina)",
-    "38:8B:59:57:E2:ED": "Google Home Mini (Salón)",
-    "C4:98:5C:81:22:6C": "TV Sala de Estar (TCL)",
-    "54:2A:A2:EF:B0:B2": "Smart TV Philips 40PUH6400 (Wi-Fi)",
-    "1C:5A:6B:95:F6:08": "Smart TV Philips 40PUH6400 (Ethernet)",
-    "E4:C3:2A:CC:68:6A": "Bombilla TP-Link Tapo",
-    "C0:F8:53:AE:9A:75": "Enchufe Tuya Smart",
-    "C4:4F:33:89:21:13": "Luz de la cocina",
-    "C4:4F:33:8C:5F:94": "Luz de la solana",
-    "60:01:94:CF:16:E6": "Luz del baño",
-    "70:3E:97:95:5F:64": "Xiaomi TV Stick (TV Dormitorio)",
-    "7A:CA:DE:60:93:1B": "Sony Xperia XZ3",
-    "00:90:4C:DB:A9:B8": "Ubuntu Phablet",
-}
+def load_device_friendly_names():
+    """Carga dinámicamente alias opcionales por MAC desde device_friendly_names.json (Zero-Hardcoding)."""
+    aliases = {}
+    for cand in [
+        os.path.join(BASE_DIR, "device_friendly_names.json"),
+        TELEGRAM_FRIENDLY_NAMES_FILE,
+    ]:
+        if cand and os.path.isfile(cand):
+            try:
+                with open(cand, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        for k, v in data.items():
+                            if k and v:
+                                aliases[str(k).strip().upper()] = str(v).strip()
+            except Exception:
+                pass
+    return aliases
+
+def _is_lan_ipv4(ip_str):
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+        return isinstance(ip_obj, ipaddress.IPv4Address) and ip_obj.is_private and not ip_obj.is_loopback
+    except Exception:
+        return False
 
 # ==============================================================================
-# ASUS Wi-Fi Repeater Client & Traffic Monitor
+# Dynamic LAN/Wi-Fi Client & Traffic Monitor (Zero-Hardcoding)
 # ==============================================================================
 def get_arp_and_pihole_names():
     arp_map = {}
-    
+    friendly_names = load_device_friendly_names()
+
     # 1. Leer nombres estáticos de /etc/hosts
     hosts_ip_to_name = {}
     try:
@@ -5600,7 +5750,7 @@ def get_arp_and_pihole_names():
                 line = line.strip()
                 if line and not line.startswith("#"):
                     parts = line.split()
-                    if len(parts) >= 2 and parts[0].startswith("192.168.50."):
+                    if len(parts) >= 2 and _is_lan_ipv4(parts[0]):
                         hosts_ip_to_name[parts[0]] = parts[1]
     except Exception:
         pass
@@ -5609,10 +5759,10 @@ def get_arp_and_pihole_names():
     try:
         p = subprocess.run(['ip', 'neigh'], capture_output=True, text=True, timeout=2)
         for line in p.stdout.splitlines():
-            m = re.search(r'^(192\.168\.50\.\d+)\s+.*lladdr\s+([0-9a-fA-F:]{17})', line)
-            if m:
+            m = re.search(r'^(\d+\.\d+\.\d+\.\d+)\s+.*lladdr\s+([0-9a-fA-F:]{17})', line)
+            if m and _is_lan_ipv4(m.group(1)):
                 ip, mac = m.group(1), m.group(2).upper()
-                name = DEVICE_FRIENDLY_NAMES.get(mac) or hosts_ip_to_name.get(ip, ip)
+                name = friendly_names.get(mac) or hosts_ip_to_name.get(ip, ip)
                 arp_map[mac] = {'ip': ip, 'name': name}
     except Exception:
         pass
@@ -5631,17 +5781,21 @@ def get_arp_and_pihole_names():
             vendor = row[1] or ""
             name = row[2] or ""
             ip = row[3] or ""
-            if ip.startswith('192.168.50.'):
-                final_name = DEVICE_FRIENDLY_NAMES.get(mac) or hosts_ip_to_name.get(ip) or name or vendor or ip
+            if _is_lan_ipv4(ip):
+                final_name = friendly_names.get(mac) or hosts_ip_to_name.get(ip) or name or vendor or ip
                 if mac not in arp_map:
-                    arp_map[mac] = {'ip': ip, 'name': final_name}
+                    arp_map[mac] = {'ip': ip, 'name': final_name, 'vendor': vendor}
                 else:
-                    if DEVICE_FRIENDLY_NAMES.get(mac):
-                        arp_map[mac]['name'] = DEVICE_FRIENDLY_NAMES[mac]
+                    if vendor and not arp_map[mac].get('vendor'):
+                        arp_map[mac]['vendor'] = vendor
+                    if friendly_names.get(mac):
+                        arp_map[mac]['name'] = friendly_names[mac]
                     elif hosts_ip_to_name.get(ip):
                         arp_map[mac]['name'] = hosts_ip_to_name[ip]
                     elif name and arp_map[mac]['name'] == arp_map[mac]['ip']:
                         arp_map[mac]['name'] = name
+                    elif vendor and arp_map[mac]['name'] == arp_map[mac]['ip']:
+                        arp_map[mac]['name'] = f"{vendor} ({ip})"
         conn_pi.close()
     except Exception:
         pass
@@ -5650,72 +5804,57 @@ def get_arp_and_pihole_names():
 def get_ip_to_device_name_map():
     arp_mac_map = get_arp_and_pihole_names()
     ip_to_name = {}
-    for mac, data in arp_mac_map.items():
+    for _mac, data in arp_mac_map.items():
         if isinstance(data, dict) and 'ip' in data and 'name' in data:
             ip_to_name[data['ip']] = data['name']
     return ip_to_name
 
-DUCKDNS_SCRIPT_CANDIDATES = [
-    # 1. Rutas relativas al repositorio (GitHub / Google AI Studio / Simulador)
-    os.path.join(BASE_DIR, "duckdns", "duck.sh"),
-    os.path.join(BASE_DIR, "duck.sh"),
-    os.path.join(BASE_DIR, "..", "duckdns", "duck.sh"),
-    os.path.join(BASE_DIR, "servicios", "duckdns", "duck.sh"),
-    "./duckdns/duck.sh",
-    "./duck.sh",
-    # 2. Rutas del servidor local físico
-    "/home/servidor/servicios/duckdns/duck.sh",
-    "/home/servidor/duckdns/duck.sh"
-]
+def _build_duckdns_candidates(filename, extra_paths=None):
+    cands = []
+    env_dir = os.environ.get("DUCKDNS_DIR", "").strip()
+    if env_dir:
+        cands.append(os.path.join(env_dir, filename))
+    cands.extend([
+        os.path.join(BASE_DIR, "duckdns", filename),
+        os.path.join(BASE_DIR, filename),
+        os.path.join(BASE_DIR, "..", "duckdns", filename),
+        os.path.join(BASE_DIR, "servicios", "duckdns", filename),
+        f"./duckdns/{filename}",
+        f"./{filename}",
+    ])
+    for ep in (extra_paths or []):
+        if os.path.exists(ep):
+            cands.append(ep)
+    for sp in [f"/home/servidor/servicios/duckdns/{filename}", f"/home/servidor/duckdns/{filename}"]:
+        if os.path.exists(sp):
+            cands.append(sp)
+    return cands
 
 def get_duckdns_script_file():
-    for p in DUCKDNS_SCRIPT_CANDIDATES:
+    for p in _build_duckdns_candidates("duck.sh"):
         if os.path.isfile(p):
             return p
-    return DUCKDNS_SCRIPT_CANDIDATES[0]
+    return os.path.join(BASE_DIR, "duckdns", "duck.sh")
 
 DUCKDNS_SCRIPT = get_duckdns_script_file()
 
-DUCKDNS_LOG_CANDIDATES = [
-    # 1. Rutas relativas al repositorio (GitHub / Google AI Studio / Simulador)
-    os.path.join(BASE_DIR, "duck.log"),
-    os.path.join(BASE_DIR, "duckdns", "duck.log"),
-    os.path.join(BASE_DIR, "..", "duckdns", "duck.log"),
-    os.path.join(BASE_DIR, "logs", "duck.log"),
-    "./duck.log",
-    # 2. Rutas del servidor local físico
-    "/mnt/almacenamiento/logs/duckdns/duck.log",
-    "/home/servidor/servicios/duckdns/duck.log"
-]
-
 def get_duckdns_log_file():
-    for p in DUCKDNS_LOG_CANDIDATES:
+    for p in _build_duckdns_candidates("duck.log", [os.path.join(BASE_DIR, "logs", "duck.log"), "/mnt/almacenamiento/logs/duckdns/duck.log"]):
         if os.path.isfile(p):
             return p
-    return DUCKDNS_LOG_CANDIDATES[0]
-
-DUCKDNS_IP_CACHE_CANDIDATES = [
-    # 1. Rutas relativas al repositorio (GitHub / Google AI Studio / Simulador)
-    os.path.join(BASE_DIR, "last_ip.txt"),
-    os.path.join(BASE_DIR, "duckdns", "last_ip.txt"),
-    os.path.join(BASE_DIR, "..", "duckdns", "last_ip.txt"),
-    "./last_ip.txt",
-    # 2. Rutas del servidor local físico
-    "/home/servidor/servicios/duckdns/last_ip.txt",
-    "/home/servidor/duckdns/last_ip.txt"
-]
+    return os.path.join(BASE_DIR, "duck.log")
 
 def get_duckdns_ip_cache_file():
-    for p in DUCKDNS_IP_CACHE_CANDIDATES:
+    for p in _build_duckdns_candidates("last_ip.txt"):
         if os.path.isfile(p):
             return p
-    return DUCKDNS_IP_CACHE_CANDIDATES[0]
+    return os.path.join(BASE_DIR, "last_ip.txt")
 
 DUCKDNS_IP_CACHE = get_duckdns_ip_cache_file()
 
 def get_duckdns_status():
-    domain = "cminewar"
-    token = ""
+    domain = os.environ.get("DUCKDNS_DOMAIN", "").strip()
+    token = os.environ.get("DUCKDNS_TOKEN", "").strip()
     script_p = get_duckdns_script_file()
     if os.path.isfile(script_p):
         try:
@@ -5723,12 +5862,17 @@ def get_duckdns_status():
                 content = f.read()
                 m_dom = re.search(r'DOMAIN=["\']?([^"\'\s]+)["\']?', content)
                 m_tok = re.search(r'TOKEN=["\']?([^"\'\s]+)["\']?', content)
-                if m_dom:
+                if m_dom and not domain:
                     domain = m_dom.group(1)
-                if m_tok:
+                if m_tok and not token:
                     token = m_tok.group(1)
         except Exception:
             pass
+
+    if not domain:
+        sys_dom = detect_system_dns_domain()
+        if sys_dom.endswith(".duckdns.org"):
+            domain = sys_dom[:-len(".duckdns.org")].split(".")[-1]
 
     last_ip = ""
     ip_cache_p = get_duckdns_ip_cache_file()
@@ -5754,7 +5898,7 @@ def get_duckdns_status():
         except Exception:
             pass
 
-    masked_token = (token[:4] + "*" * (len(token) - 8) + token[-4:]) if len(token) > 8 else "****"
+    masked_token = (token[:4] + "*" * (len(token) - 8) + token[-4:]) if len(token) > 8 else ("****" if token else "")
 
     upstream_dns = []
     try:
@@ -5768,11 +5912,12 @@ def get_duckdns_status():
     except Exception:
         pass
 
+    full_domain = f"{domain}.duckdns.org" if (domain and "." not in domain) else (domain or detect_system_dns_domain())
     return {
         "installed": os.path.isfile(script_p),
         "domain": domain,
-        "full_domain": f"{domain}.duckdns.org",
-        "token": token,
+        "full_domain": full_domain,
+        "token_set": bool(token),
         "token_masked": masked_token,
         "last_registered_ip": last_ip,
         "last_log_entry": last_log_line,
@@ -5964,7 +6109,7 @@ def classify_device(name, mac):
     if any(k in name_l for k in ["nintendo", "3ds", "2ds", "switch", "wii", "dsi"]):
         brand = "nintendo"
         brand_name = "Nintendo"
-    elif any(k in name_l for k in ["xbox", "series-s", "series-x", "cminewar-s"]):
+    elif any(k in name_l for k in ["xbox", "series-s", "series-x"]):
         brand = "xbox"
         brand_name = "Microsoft Xbox"
     elif any(k in name_l for k in ["playstation", "ps4", "ps5", "dualsense"]):
@@ -5979,7 +6124,7 @@ def classify_device(name, mac):
     elif any(k in name_l for k in ["google", "home-mini", "pixel", "chromecast", "nest"]):
         brand = "google"
         brand_name = "Google"
-    elif any(k in name_l for k in ["asus", "rt-ax56u", "rog"]):
+    elif any(k in name_l for k in ["asus", "rt-", "rog"]):
         brand = "asus"
         brand_name = "ASUS"
     elif any(k in name_l for k in ["vodafone"]):
@@ -6036,12 +6181,6 @@ def classify_device(name, mac):
     elif any(k in name_l for k in ["windows", "surface", "desktop-"]):
         brand = "microsoft"
         brand_name = "Microsoft Windows"
-    elif mac_u.startswith(("90:09:D0", "00:11:32")):
-        brand = "synology"
-        brand_name = "Synology"
-    elif mac_u.startswith(("D4:5D:64", "C8:7F:54", "04:D4:C4", "2C:FD:A1")):
-        brand = "asus"
-        brand_name = "ASUS"
 
     # 2. Detectar Tipo e Icono
     if brand in ("nintendo", "xbox", "playstation") or any(k in name_l for k in ["playstation", "ps4", "ps5"]):
@@ -6151,380 +6290,315 @@ def fetch_wifi_worker():
     while True:
         try:
             arp_map = get_arp_and_pihole_names()
+            friendly_names = load_device_friendly_names()
 
-            # Leer estadísticas de red local cableada del servidor
+            # Detectar interfaces y MACs locales dinámicamente desde psutil y /proc/net/dev
             local_server_tx = 0
             local_server_rx = 0
+            cable_clients = []
             try:
-                with open("/proc/net/dev", "r") as f:
-                    for line in f:
-                        if "enx" in line or "eth0" in line:
-                            parts = line.split(":", 1)[1].split()
-                            local_server_rx = int(parts[0])
-                            local_server_tx = int(parts[8])
-                            break
+                net_io_map = psutil.net_io_counters(pernic=True)
+                net_if_addrs = psutil.net_if_addrs()
+                net_if_stats = psutil.net_if_stats()
+                for if_name, addrs in net_if_addrs.items():
+                    if if_name == "lo" or if_name.startswith(("veth", "docker", "br-")):
+                        continue
+                    st = net_if_stats.get(if_name)
+                    if st and not st.isup:
+                        continue
+                    ipv4_addr = ""
+                    mac_addr = ""
+                    for a in addrs:
+                        if a.family == socket.AF_INET and a.address and not a.address.startswith("127."):
+                            ipv4_addr = a.address
+                        elif hasattr(psutil, "AF_LINK") and a.family == psutil.AF_LINK and a.address and a.address != "00:00:00:00:00:00":
+                            mac_addr = a.address.upper()
+                    if not ipv4_addr:
+                        continue
+                    io_c = net_io_map.get(if_name)
+                    tx_b = io_c.bytes_sent if io_c else 0
+                    rx_b = io_c.bytes_recv if io_c else 0
+                    local_server_tx += tx_b
+                    local_server_rx += rx_b
+                    link_mbps = st.speed if (st and st.speed) else 1000
+                    cable_clients.append({
+                        "conn_type": "cable",
+                        "band": f"Cable ({link_mbps} Mbps)" if link_mbps else "Ethernet Local",
+                        "iface": if_name,
+                        "mac": mac_addr or f"IFACE:{if_name.upper()}",
+                        "ip": ipv4_addr,
+                        "name": f"{HOSTNAME} ({if_name})",
+                        "dev_type": "server",
+                        "dev_icon": "server",
+                        "brand": "linux",
+                        "brand_name": "Este Servidor",
+                        "status": "online",
+                        "tx_bytes": tx_b,
+                        "rx_bytes": rx_b,
+                        "rssi": 1000,
+                        "in_network": int(time.time() - BOOT_TIME)
+                    })
             except Exception:
                 pass
 
-            ssh_cmd = [
-                'sshpass', '-p', ROUTER_PASS,
-                'ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=4',
-                f'{ROUTER_USER}@{ROUTER_IP}',
-                '''
-                for iface in eth5 eth6; do
-                    for mac in $(wl -i $iface assoclist | awk '{print $2}'); do
-                        echo "=== $iface $mac ==="
-                        wl -i $iface sta_info $mac | grep -E "(in network|tx total bytes|rx data bytes|smoothed rssi|idle)"
-                    done
-                done
-                echo "=== ETH_PORTS ==="
-                cat /proc/net/dev | grep -E "(eth0|eth3|eth4):"
-                echo "=== FCACHE_L2 ==="
-                cat /proc/fcache/l2list 2>/dev/null
-                '''
-            ]
-            p = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=8)
-            if p.returncode == 0:
-                wifi_clients = []
-                current = None
-                eth_lines = []
-                fcache_lines = []
-                section = 'wifi'
-
-                for line in p.stdout.splitlines():
-                    line = line.strip()
-                    if line == '=== ETH_PORTS ===':
-                        section = 'eth'
-                        current = None
-                        continue
-                    elif line == '=== FCACHE_L2 ===':
-                        section = 'fcache'
-                        current = None
-                        continue
-
-                    if section == 'eth':
-                        if ':' in line:
-                            eth_lines.append(line)
-                        continue
-                    elif section == 'fcache':
-                        if '<' in line and '>' in line:
-                            fcache_lines.append(line)
-                        continue
-
-                    # wifi
-                    if line.startswith('=== '):
-                        parts = line.split()
-                        if len(parts) >= 3:
-                            current = {
-                                'conn_type': 'wifi',
-                                'band': '5 GHz' if parts[1] == 'eth6' else '2.4 GHz',
-                                'iface': parts[1],
-                                'mac': parts[2].upper(),
-                                'in_network': 0,
-                                'tx_bytes': 0,
-                                'rx_bytes': 0,
-                                'rssi': 0
-                            }
-                            wifi_clients.append(current)
-                    elif current:
-                        if 'in network' in line:
-                            m = re.search(r'in network (\d+) seconds', line)
-                            if m: current['in_network'] = int(m.group(1))
-                        elif 'tx total bytes:' in line:
-                            m = re.search(r'tx total bytes:\s+(\d+)', line)
-                            if m: current['tx_bytes'] = int(m.group(1))
-                        elif 'rx data bytes:' in line:
-                            m = re.search(r'rx data bytes:\s+(\d+)', line)
-                            if m: current['rx_bytes'] = int(m.group(1))
-                        elif 'smoothed rssi:' in line:
-                            m = re.search(r'smoothed rssi:\s+([-\d]+)', line)
-                            if m: current['rssi'] = int(m.group(1))
-
-                # Procesar flujos acelerados por hardware del switch ASUS (Flow Cache L2)
-                fcache_stats = {}
-                for f_line in fcache_lines:
-                    m_fc = re.search(r'(\d+)\s+(?:EPHY|WPHY)\s+\d+\s+<([0-9a-fA-F:]{17})>\s+<([0-9a-fA-F:]{17})>', f_line)
-                    if m_fc:
-                        hits = int(m_fc.group(1))
-                        src = m_fc.group(2).upper()
-                        dst = m_fc.group(3).upper()
-                        is_ack = ' 1   0' in f_line or f_line.endswith(' 1   0')
-                        bytes_est = hits * (66 if is_ack else 1450)
-
-                        # dst recibe = descarga para el cliente (tx_bytes en dashboard)
-                        fcache_stats.setdefault(dst, {'tx_bytes': 0, 'rx_bytes': 0})
-                        fcache_stats[dst]['tx_bytes'] += bytes_est
-
-                        # src transmite = subida del cliente (rx_bytes en dashboard)
-                        fcache_stats.setdefault(src, {'tx_bytes': 0, 'rx_bytes': 0})
-                        fcache_stats[src]['rx_bytes'] += bytes_est
-
-                # Calcular tasas de velocidad en vivo por MAC
-                now_t = time.time()
-                for mac_k, st_v in fcache_stats.items():
-                    prev = MAC_RATE_CACHE.get(mac_k)
-                    if prev:
-                        dt = now_t - prev['time']
-                        if dt > 0:
-                            st_v['speed_down'] = max(0, int((st_v['tx_bytes'] - prev['tx']) / dt))
-                            st_v['speed_up'] = max(0, int((st_v['rx_bytes'] - prev['rx']) / dt))
-                        else:
-                            st_v['speed_down'] = 0
-                            st_v['speed_up'] = 0
-                    else:
-                        st_v['speed_down'] = 0
-                        st_v['speed_up'] = 0
-                    MAC_RATE_CACHE[mac_k] = {'tx': st_v['tx_bytes'], 'rx': st_v['rx_bytes'], 'time': now_t}
-
-                # Extraer tráfico cableado del ASUS
-                asus_eth0_rx, asus_eth0_tx = 0, 0
-                asus_eth4_rx, asus_eth4_tx = 0, 0
-                asus_eth3_rx, asus_eth3_tx = 0, 0
-                for line in eth_lines:
-                    if 'eth0:' in line:
-                        parts = line.split(':', 1)[1].split()
-                        asus_eth0_rx, asus_eth0_tx = int(parts[0]), int(parts[8])
-                    elif 'eth4:' in line:
-                        parts = line.split(':', 1)[1].split()
-                        asus_eth4_rx, asus_eth4_tx = int(parts[0]), int(parts[8])
-                    elif 'eth3:' in line:
-                        parts = line.split(':', 1)[1].split()
-                        asus_eth3_rx, asus_eth3_tx = int(parts[0]), int(parts[8])
-
-                # Dispositivos de Cable Ethernet reales (sin puertos falsos)
-                cable_clients = [
-                    {
+            # Descubrir dinámicamente la puerta de enlace en ARP
+            gw_ip = _detect_default_gateway_ip()
+            if gw_ip:
+                gw_mac = next((m for m, info in arp_map.items() if info.get("ip") == gw_ip), "")
+                if gw_mac or _is_lan_ipv4(gw_ip):
+                    gw_name = (arp_map.get(gw_mac, {}).get("name") if gw_mac else None) or f"Gateway ({gw_ip})"
+                    gw_meta = classify_device(gw_name, gw_mac)
+                    cable_clients.append({
                         "conn_type": "cable",
-                        "band": "Cable Gigabit",
-                        "iface": "Ethernet (1G)",
-                        "mac": "00:50:B6:BE:89:96",
-                        "ip": "192.168.50.2",
-                        "name": "servidor (Este Servidor)",
-                        "dev_type": "server",
-                        "dev_icon": "server",
-                        "brand": "intel",
-                        "brand_name": "Intel Xeon / Linux",
-                        "status": "online",
-                        "tx_bytes": local_server_tx,
-                        "rx_bytes": local_server_rx,
-                        "rssi": 1000,
-                        "in_network": int(time.time() - BOOT_TIME)
-                    },
-                    {
-                        "conn_type": "cable",
-                        "band": "Cable Gigabit",
-                        "iface": "Ethernet (1G)",
-                        "mac": "90:09:D0:08:EC:98",
-                        "ip": "192.168.50.3",
-                        "name": "synology-nas (Almacenamiento Red)",
-                        "dev_type": "nas",
-                        "dev_icon": "server",
-                        "brand": "synology",
-                        "brand_name": "Synology",
+                        "band": "Gateway Uplink",
+                        "iface": "WAN / LAN",
+                        "mac": gw_mac or f"GW:{gw_ip}",
+                        "ip": gw_ip,
+                        "name": gw_name,
+                        "dev_type": "network",
+                        "dev_icon": "router",
+                        "brand": gw_meta.get("brand", "generic"),
+                        "brand_name": gw_meta.get("brand_name", "Gateway"),
                         "status": "online",
                         "tx_bytes": 0,
                         "rx_bytes": 0,
                         "rssi": 1000,
                         "in_network": int(time.time() - BOOT_TIME)
-                    },
-                    {
-                        "conn_type": "cable",
-                        "band": "Cable Uplink",
-                        "iface": "WAN (Gigabit)",
-                        "mac": "18:B0:A4:D3:C5:3A",
-                        "ip": "192.168.50.1",
-                        "name": "Router Vodafone (Gateway Principal)",
-                        "dev_type": "network",
-                        "dev_icon": "router",
-                        "brand": "vodafone",
-                        "brand_name": "Vodafone",
-                        "status": "online",
-                        "tx_bytes": asus_eth0_tx,
-                        "rx_bytes": asus_eth0_rx,
-                        "rssi": 1000,
-                        "in_network": int(time.time() - BOOT_TIME)
-                    },
-                    {
-                        "conn_type": "cable",
-                        "band": "Cable Gigabit",
-                        "iface": "LAN (Gigabit)",
-                        "mac": "D4:5D:64:C5:75:40",
-                        "ip": "192.168.50.10",
-                        "name": "Repetidor ASUS RT-AX56U (Switch & Wi-Fi 6)",
-                        "dev_type": "network",
-                        "dev_icon": "router",
-                        "brand": "asus",
-                        "brand_name": "ASUS",
-                        "status": "online",
-                        "tx_bytes": asus_eth4_tx,
-                        "rx_bytes": asus_eth4_rx,
-                        "rssi": 1000,
-                        "in_network": int(time.time() - BOOT_TIME)
-                    }
-                ]
+                    })
 
-                c_24 = 0
-                c_5 = 0
-                wifi_tx = 0
-                wifi_rx = 0
+            wifi_clients = []
+            fcache_stats = {}
+            asus_eth0_rx = asus_eth0_tx = 0
+            asus_eth4_rx = asus_eth4_tx = 0
+            asus_eth3_rx = asus_eth3_tx = 0
 
-                known_macs = set()
-                known_ips = set()
+            # Sondeo opcional de AP/router vía SSH sólo si está explícitamente configurado
+            if ROUTER_IP and ROUTER_USER and ROUTER_PASS and shutil.which("sshpass"):
+                try:
+                    ssh_cmd = [
+                        'sshpass', '-p', ROUTER_PASS,
+                        'ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=4',
+                        f'{ROUTER_USER}@{ROUTER_IP}',
+                        '''
+                        for iface in eth5 eth6; do
+                            for mac in $(wl -i $iface assoclist 2>/dev/null | awk '{print $2}'); do
+                                echo "=== $iface $mac ==="
+                                wl -i $iface sta_info $mac 2>/dev/null | grep -E "(in network|tx total bytes|rx data bytes|smoothed rssi|idle)"
+                            done
+                        done
+                        echo "=== ETH_PORTS ==="
+                        cat /proc/net/dev | grep -E "(eth0|eth3|eth4):"
+                        echo "=== FCACHE_L2 ==="
+                        cat /proc/fcache/l2list 2>/dev/null
+                        '''
+                    ]
+                    p = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=8)
+                    if p.returncode == 0:
+                        current = None
+                        eth_lines = []
+                        fcache_lines = []
+                        section = 'wifi'
 
-                # 1. Registrar clientes de cable
-                for c in cable_clients:
-                    known_macs.add(c['mac'].upper())
-                    known_ips.add(c['ip'])
-                # Prevenir duplicar el repetidor ASUS por su interfaz Wi-Fi secundaria
-                known_macs.add("C8:7F:54:B1:9E:C0")
-                known_ips.add("192.168.50.40")
+                        for line in p.stdout.splitlines():
+                            line = line.strip()
+                            if line == '=== ETH_PORTS ===':
+                                section = 'eth'
+                                current = None
+                                continue
+                            elif line == '=== FCACHE_L2 ===':
+                                section = 'fcache'
+                                current = None
+                                continue
 
-                # 2. Clientes inalámbricos de wl0/wl1 del ASUS
-                dedup_wifi = []
-                for c in wifi_clients:
-                    mac = c['mac'].upper()
-                    if mac not in known_macs:
-                        info = arp_map.get(mac, {})
-                        c_ip = info.get('ip', 'Desconocida')
-                        if c_ip in known_ips:
-                            continue
-                        known_macs.add(mac)
-                        if c_ip != 'Desconocida':
-                            known_ips.add(c_ip)
-                        c['ip'] = c_ip
-                        c['name'] = DEVICE_FRIENDLY_NAMES.get(mac) or info.get('name', mac)
-                        c_meta = classify_device(c['name'], mac)
-                        c['dev_type'] = c_meta['type']
-                        c['dev_icon'] = c_meta['icon']
-                        c['brand'] = c_meta.get('brand', 'generic')
-                        c['brand_name'] = c_meta.get('brand_name', 'Dispositivo')
+                            if section == 'eth':
+                                if ':' in line:
+                                    eth_lines.append(line)
+                                continue
+                            elif section == 'fcache':
+                                if '<' in line and '>' in line:
+                                    fcache_lines.append(line)
+                                continue
+
+                            if line.startswith('=== '):
+                                parts = line.split()
+                                if len(parts) >= 3:
+                                    current = {
+                                        'conn_type': 'wifi',
+                                        'band': '5 GHz' if parts[1] == 'eth6' else '2.4 GHz',
+                                        'iface': parts[1],
+                                        'mac': parts[2].upper(),
+                                        'in_network': 0,
+                                        'tx_bytes': 0,
+                                        'rx_bytes': 0,
+                                        'rssi': 0
+                                    }
+                                    wifi_clients.append(current)
+                            elif current:
+                                if 'in network' in line:
+                                    m = re.search(r'in network (\d+) seconds', line)
+                                    if m: current['in_network'] = int(m.group(1))
+                                elif 'tx total bytes:' in line:
+                                    m = re.search(r'tx total bytes:\s+(\d+)', line)
+                                    if m: current['tx_bytes'] = int(m.group(1))
+                                elif 'rx data bytes:' in line:
+                                    m = re.search(r'rx data bytes:\s+(\d+)', line)
+                                    if m: current['rx_bytes'] = int(m.group(1))
+                                elif 'smoothed rssi:' in line:
+                                    m = re.search(r'smoothed rssi:\s+([-\d]+)', line)
+                                    if m: current['rssi'] = int(m.group(1))
+
+                        for f_line in fcache_lines:
+                            m_fc = re.search(r'(\d+)\s+(?:EPHY|WPHY)\s+\d+\s+<([0-9a-fA-F:]{17})>\s+<([0-9a-fA-F:]{17})>', f_line)
+                            if m_fc:
+                                hits = int(m_fc.group(1))
+                                src = m_fc.group(2).upper()
+                                dst = m_fc.group(3).upper()
+                                is_ack = ' 1   0' in f_line or f_line.endswith(' 1   0')
+                                bytes_est = hits * (66 if is_ack else 1450)
+                                fcache_stats.setdefault(dst, {'tx_bytes': 0, 'rx_bytes': 0})
+                                fcache_stats[dst]['tx_bytes'] += bytes_est
+                                fcache_stats.setdefault(src, {'tx_bytes': 0, 'rx_bytes': 0})
+                                fcache_stats[src]['rx_bytes'] += bytes_est
+
+                        now_t = time.time()
+                        for mac_k, st_v in fcache_stats.items():
+                            prev = MAC_RATE_CACHE.get(mac_k)
+                            if prev:
+                                dt = now_t - prev['time']
+                                if dt > 0:
+                                    st_v['speed_down'] = max(0, int((st_v['tx_bytes'] - prev['tx']) / dt))
+                                    st_v['speed_up'] = max(0, int((st_v['rx_bytes'] - prev['rx']) / dt))
+                                else:
+                                    st_v['speed_down'] = 0
+                                    st_v['speed_up'] = 0
+                            else:
+                                st_v['speed_down'] = 0
+                                st_v['speed_up'] = 0
+                            MAC_RATE_CACHE[mac_k] = {'tx': st_v['tx_bytes'], 'rx': st_v['rx_bytes'], 'time': now_t}
+
+                        for line in eth_lines:
+                            if 'eth0:' in line:
+                                parts = line.split(':', 1)[1].split()
+                                asus_eth0_rx, asus_eth0_tx = int(parts[0]), int(parts[8])
+                            elif 'eth4:' in line:
+                                parts = line.split(':', 1)[1].split()
+                                asus_eth4_rx, asus_eth4_tx = int(parts[0]), int(parts[8])
+                            elif 'eth3:' in line:
+                                parts = line.split(':', 1)[1].split()
+                                asus_eth3_rx, asus_eth3_tx = int(parts[0]), int(parts[8])
+                except Exception:
+                    pass
+
+            c_24 = 0
+            c_5 = 0
+            known_macs = set()
+            known_ips = set()
+
+            for c in cable_clients:
+                known_macs.add(c['mac'].upper())
+                known_ips.add(c['ip'])
+
+            dedup_wifi = []
+            for c in wifi_clients:
+                mac = c['mac'].upper()
+                if mac not in known_macs:
+                    info = arp_map.get(mac, {})
+                    c_ip = info.get('ip', 'Desconocida')
+                    if c_ip in known_ips:
+                        continue
+                    known_macs.add(mac)
+                    if c_ip != 'Desconocida':
+                        known_ips.add(c_ip)
+                    c['ip'] = c_ip
+                    c['name'] = friendly_names.get(mac) or info.get('name', mac)
+                    c_meta = classify_device(c['name'], mac)
+                    c['dev_type'] = c_meta['type']
+                    c['dev_icon'] = c_meta['icon']
+                    c['brand'] = c_meta.get('brand', 'generic')
+                    c['brand_name'] = c_meta.get('brand_name', 'Dispositivo')
+                    c['status'] = 'online'
+                    if c['band'] == '2.4 GHz':
+                        c_24 += 1
+                    else:
+                        c_5 += 1
+                    dedup_wifi.append(c)
+            wifi_clients = dedup_wifi
+
+            # Incorporar vecinos ARP activos descubiertos dinámicamente en cualquier subred LAN privada
+            try:
+                p_neigh = subprocess.run(['ip', 'neigh'], capture_output=True, text=True, timeout=2)
+                for nline in p_neigh.stdout.splitlines():
+                    m_n = re.search(r'^(\d+\.\d+\.\d+\.\d+)\s+.*lladdr\s+([0-9a-fA-F:]{17})\s+(\w+)', nline)
+                    if m_n and _is_lan_ipv4(m_n.group(1)):
+                        n_ip, n_mac, n_state = m_n.group(1), m_n.group(2).upper(), m_n.group(3)
+                        if n_state in ('REACHABLE', 'STALE', 'DELAY') and n_mac not in known_macs and n_ip not in known_ips:
+                            known_macs.add(n_mac)
+                            known_ips.add(n_ip)
+                            info = arp_map.get(n_mac, {})
+                            d_name = friendly_names.get(n_mac) or info.get('name') or n_ip
+                            c_meta = classify_device(d_name, n_mac)
+                            is_24 = any(k in d_name.lower() for k in ["3ds", "esp", "tapo", "enchufe", "bombilla", "iot"])
+                            if is_24: c_24 += 1
+                            else: c_5 += 1
+                            is_active = (n_state in ('REACHABLE', 'DELAY'))
+                            wifi_clients.append({
+                                "conn_type": "wifi" if c_meta.get("type") != "server" else "cable",
+                                "band": "2.4 GHz" if is_24 else "LAN / 5 GHz",
+                                "iface": "arp-lan",
+                                "mac": n_mac,
+                                "ip": n_ip,
+                                "name": d_name,
+                                "tx_bytes": 0,
+                                "rx_bytes": 0,
+                                "rssi": -62 if is_active else -75,
+                                "in_network": int(time.time() - BOOT_TIME),
+                                "dev_type": c_meta['type'],
+                                "dev_icon": c_meta['icon'],
+                                "brand": c_meta.get('brand', 'generic'),
+                                "brand_name": c_meta.get('brand_name', 'Dispositivo'),
+                                "status": "online" if is_active else "idle"
+                            })
+            except Exception:
+                pass
+
+            for c in cable_clients + wifi_clients:
+                mac = c.get('mac', '').upper()
+                if mac in fcache_stats:
+                    fc = fcache_stats[mac]
+                    c['tx_bytes'] = max(c.get('tx_bytes', 0), fc['tx_bytes'])
+                    c['rx_bytes'] = max(c.get('rx_bytes', 0), fc['rx_bytes'])
+                    c['speed_down'] = fc.get('speed_down', 0)
+                    c['speed_up'] = fc.get('speed_up', 0)
+                    if c['speed_down'] > 30000 or c['speed_up'] > 20000:
                         c['status'] = 'online'
-                        
-                        if c['band'] == '2.4 GHz':
-                            c_24 += 1
-                        else:
-                            c_5 += 1
-                        wifi_tx += c['tx_bytes']
-                        wifi_rx += c['rx_bytes']
-                        dedup_wifi.append(c)
-                wifi_clients = dedup_wifi
 
-                # Sondeo activo ultra-rápido de dispositivos conocidos para mantener el caché ARP caliente
-                try:
-                    probe_ips = [info['ip'] for info in arp_map.values() if info.get('ip') and info['ip'].startswith('192.168.50.')]
-                    if probe_ips:
-                        subprocess.run(['fping', '-a', '-r', '1', '-t', '100'] + probe_ips, capture_output=True, timeout=2)
-                except Exception:
-                    pass
+            wifi_tx = sum(c.get('tx_bytes', 0) for c in wifi_clients)
+            wifi_rx = sum(c.get('rx_bytes', 0) for c in wifi_clients)
+            cable_tx = asus_eth4_tx + asus_eth0_tx + asus_eth3_tx + local_server_tx
+            cable_rx = asus_eth4_rx + asus_eth0_rx + asus_eth3_rx + local_server_rx
 
-                # 3. Agregar TODOS los demás dispositivos activos en la red (ej. Nintendo 3DS, Switch, etc.)
-                try:
-                    p_neigh = subprocess.run(['ip', 'neigh'], capture_output=True, text=True, timeout=2)
-                    for nline in p_neigh.stdout.splitlines():
-                        m_n = re.search(r'^(192\.168\.50\.\d+)\s+.*lladdr\s+([0-9a-fA-F:]{17})\s+(\w+)', nline)
-                        if m_n:
-                            n_ip, n_mac, n_state = m_n.group(1), m_n.group(2).upper(), m_n.group(3)
-                            if n_state in ('REACHABLE', 'STALE', 'DELAY') and n_mac not in known_macs and n_ip not in known_ips:
-                                known_macs.add(n_mac)
-                                known_ips.add(n_ip)
-                                info = arp_map.get(n_mac, {})
-                                d_name = DEVICE_FRIENDLY_NAMES.get(n_mac) or info.get('name') or n_ip
-                                c_meta = classify_device(d_name, n_mac)
-                                is_24 = any(k in d_name.lower() for k in ["3ds", "esp", "tapo", "enchufe", "bombilla", "switch"])
-                                if is_24: c_24 += 1
-                                else: c_5 += 1
-                                is_active = (n_state in ('REACHABLE', 'DELAY'))
-                                wifi_clients.append({
-                                    "conn_type": "wifi",
-                                    "band": "2.4 GHz" if is_24 else "5 GHz",
-                                    "iface": "wlan",
-                                    "mac": n_mac,
-                                    "ip": n_ip,
-                                    "name": d_name,
-                                    "tx_bytes": 0,
-                                    "rx_bytes": 0,
-                                    "rssi": -62 if is_active else -75,
-                                    "in_network": int(time.time() - BOOT_TIME),
-                                    "dev_type": c_meta['type'],
-                                    "dev_icon": c_meta['icon'],
-                                    "brand": c_meta.get('brand', 'generic'),
-                                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
-                                    "status": "online" if is_active else "idle"
-                                })
-                except Exception:
-                    pass
+            all_clients = cable_clients + wifi_clients
+            all_clients.sort(key=lambda x: (x.get('speed_down', 0), x.get('tx_bytes', 0), x.get('ip', '')), reverse=True)
 
-                # 4. Asegurar que consolas registradas en reposo aparezcan (sin duplicar ninguna IP ni MAC)
-                for r_mac, d_name in DEVICE_FRIENDLY_NAMES.items():
-                    r_mac = r_mac.upper()
-                    if r_mac not in known_macs:
-                        info = arp_map.get(r_mac, {})
-                        r_ip = info.get('ip')
-                        if r_ip and r_ip.startswith('192.168.50.') and r_ip not in known_ips:
-                            if any(k in d_name.lower() for k in ["switch", "xbox", "3ds", "playstation"]):
-                                known_macs.add(r_mac)
-                                known_ips.add(r_ip)
-                                c_meta = classify_device(d_name, r_mac)
-                                is_24 = any(k in d_name.lower() for k in ["3ds", "esp", "tapo", "enchufe", "bombilla", "switch"])
-                                wifi_clients.append({
-                                    "conn_type": "wifi",
-                                    "band": "2.4 GHz" if is_24 else "5 GHz",
-                                    "iface": "wlan",
-                                    "mac": r_mac,
-                                    "ip": r_ip,
-                                    "name": d_name,
-                                    "tx_bytes": 0,
-                                    "rx_bytes": 0,
-                                    "rssi": -85,
-                                    "in_network": 0,
-                                    "dev_type": c_meta['type'],
-                                    "dev_icon": c_meta['icon'],
-                                    "brand": c_meta.get('brand', 'generic'),
-                                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
-                                    "status": "idle"
-                                })
+            summary = {
+                "total_clients": len(all_clients),
+                "clients_cable": len(cable_clients),
+                "clients_24g": c_24,
+                "clients_5g": c_5,
+                "total_tx_bytes": cable_tx + wifi_tx,
+                "total_rx_bytes": cable_rx + wifi_rx,
+                "cable_tx_bytes": cable_tx,
+                "cable_rx_bytes": cable_rx,
+                "wifi_tx_bytes": wifi_tx,
+                "wifi_rx_bytes": wifi_rx,
+                "last_update": datetime.now().strftime("%H:%M:%S")
+            }
 
-                # Enlazar estadísticas de Flow Cache L2 a todos los clientes (Wi-Fi, 3DS, Switch, etc.)
-                for c in cable_clients + wifi_clients:
-                    mac = c.get('mac', '').upper()
-                    if mac in fcache_stats:
-                        fc = fcache_stats[mac]
-                        c['tx_bytes'] = max(c.get('tx_bytes', 0), fc['tx_bytes'])
-                        c['rx_bytes'] = max(c.get('rx_bytes', 0), fc['rx_bytes'])
-                        c['speed_down'] = fc.get('speed_down', 0)
-                        c['speed_up'] = fc.get('speed_up', 0)
-                        if c['speed_down'] > 30000 or c['speed_up'] > 20000:
-                            c['status'] = 'online'
-
-                wifi_tx = sum(c.get('tx_bytes', 0) for c in wifi_clients)
-                wifi_rx = sum(c.get('rx_bytes', 0) for c in wifi_clients)
-
-                # Tráfico acumulado de cable (todos los puertos físicos)
-                cable_tx = asus_eth4_tx + asus_eth0_tx + asus_eth3_tx + local_server_tx
-                cable_rx = asus_eth4_rx + asus_eth0_rx + asus_eth3_rx + local_server_rx
-
-                all_clients = cable_clients + wifi_clients
-                all_clients.sort(key=lambda x: (x.get('speed_down', 0), x.get('tx_bytes', 0), x.get('ip', '')), reverse=True)
-
-                summary = {
-                    "total_clients": len(all_clients),
-                    "clients_cable": len(cable_clients),
-                    "clients_24g": c_24,
-                    "clients_5g": c_5,
-                    "total_tx_bytes": cable_tx + wifi_tx,
-                    "total_rx_bytes": cable_rx + wifi_rx,
-                    "cable_tx_bytes": cable_tx,
-                    "cable_rx_bytes": cable_rx,
-                    "wifi_tx_bytes": wifi_tx,
-                    "wifi_rx_bytes": wifi_rx,
-                    "last_update": datetime.now().strftime("%H:%M:%S")
+            with WIFI_LOCK:
+                WIFI_CACHE = {
+                    "clients": all_clients,
+                    "summary": summary
                 }
-
-                with WIFI_LOCK:
-                    WIFI_CACHE = {
-                        "clients": all_clients,
-                        "summary": summary
-                    }
         except Exception:
             pass
         time.sleep(12)
@@ -7087,10 +7161,8 @@ VALID_WEB_ROUTES = {
 
 def send_wol_magic_packet(mac_str):
     """
-    Envía paquetes mágicos Wake-on-LAN multivía y multired:
-    1. Socket UDP broadcast a la subred LAN directa (192.168.50.255:9 y :7).
-    2. Socket UDP broadcast global (255.255.255.255:9).
-    3. Binario wakeonlan apuntando explícitamente a la subred 192.168.50.255.
+    Envía paquetes mágicos Wake-on-LAN multivía y multired calculando
+    dinámicamente las direcciones de broadcast de la subred local.
     """
     clean_mac = re.sub(r'[^0-9A-Fa-f]', '', mac_str)
     if len(clean_mac) != 12:
@@ -7099,11 +7171,12 @@ def send_wol_magic_packet(mac_str):
     hw_addr = bytes.fromhex(clean_mac)
     magic = b'\xff' * 6 + hw_addr * 16
 
-    targets = [
-        ('192.168.50.255', 9),
-        ('192.168.50.255', 7),
-        ('255.255.255.255', 9)
-    ]
+    bcasts = get_lan_broadcast_addresses()
+    targets = []
+    for b_ip in bcasts:
+        targets.append((b_ip, 9))
+        targets.append((b_ip, 7))
+
     for bcast_ip, port in targets:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -7113,12 +7186,176 @@ def send_wol_magic_packet(mac_str):
         except Exception:
             pass
 
-    try:
-        subprocess.run(["wakeonlan", "-i", "192.168.50.255", mac_str], capture_output=True, timeout=3)
-    except Exception:
-        pass
+    if shutil.which("wakeonlan"):
+        for b_ip in bcasts:
+            try:
+                subprocess.run(["wakeonlan", "-i", b_ip, mac_str], capture_output=True, timeout=3)
+            except Exception:
+                pass
 
     return True
+
+
+def _get_host_local_ips_and_macs():
+    host_ips = {"127.0.0.1", "::1"}
+    host_macs = set()
+    if SERVER_LOCAL_IP:
+        host_ips.add(SERVER_LOCAL_IP)
+    if psutil:
+        try:
+            for addrs in psutil.net_if_addrs().values():
+                for a in addrs:
+                    if a.family == socket.AF_INET and a.address:
+                        host_ips.add(a.address)
+                    elif hasattr(psutil, "AF_LINK") and a.family == psutil.AF_LINK and a.address:
+                        cm = re.sub(r'[^0-9A-Fa-f]', '', a.address).lower()
+                        if len(cm) == 12:
+                            host_macs.add(cm)
+        except Exception:
+            pass
+    return host_ips, host_macs
+
+
+def send_device_shutdown_signal(ip_str="", mac_str="", name_str=""):
+    """
+    Envía señal de apagado remota de forma 100% dinámica (Zero-Hardcoding):
+    1) Webhook HTTP opcional configurado en RECURSOS_SHUTDOWN_HOOKS_FILE
+    2) SSH no interactivo (BatchMode=yes) si puerto SSH responde y hay clave autorizada
+    3) RPC Samba (`net rpc shutdown`) si existen credenciales en RECURSOS_RPC_USER/PASS
+    4) Paquete mágico Sleep-on-LAN (MAC invertida vía UDP puertos 9 y 7)
+    Protege explícitamente la IP y MAC del servidor anfitrión.
+    """
+    ip_clean = str(ip_str or "").strip()
+    mac_clean = re.sub(r'[^0-9A-Fa-f]', '', str(mac_str or "")).lower()
+    target_label = str(name_str or ip_clean or mac_str or "dispositivo").strip()
+
+    valid_ip = None
+    if ip_clean:
+        try:
+            ip_obj = ipaddress.ip_address(ip_clean)
+            if ip_obj.is_loopback or ip_obj.is_unspecified:
+                return False, "No se puede enviar señal de apagado a loopback o al servidor anfitrión", []
+            valid_ip = str(ip_obj)
+        except ValueError:
+            valid_ip = None
+
+    if not valid_ip and len(mac_clean) != 12:
+        return False, "Se requiere una dirección IP o MAC válida", []
+
+    host_ips, host_macs = _get_host_local_ips_and_macs()
+    if (valid_ip and valid_ip in host_ips) or (len(mac_clean) == 12 and mac_clean in host_macs):
+        return False, "Operación bloqueada: no se puede apagar el servidor anfitrión desde la lista de red", []
+
+    channels_ok = []
+
+    # 1. Webhook HTTP opcional por IP o MAC (sin URLs hardcodeadas)
+    hooks_file = os.environ.get("RECURSOS_SHUTDOWN_HOOKS_FILE", "").strip()
+    if hooks_file and os.path.isfile(hooks_file):
+        try:
+            with open(hooks_file, "r", encoding="utf-8") as hf:
+                hooks_cfg = json.load(hf)
+            hook_entry = None
+            if isinstance(hooks_cfg, dict):
+                for key_cand in [valid_ip, str(mac_str or "").lower(), str(mac_str or "").upper(), mac_clean]:
+                    if key_cand and key_cand in hooks_cfg:
+                        hook_entry = hooks_cfg[key_cand]
+                        break
+            if isinstance(hook_entry, dict) and hook_entry.get("url"):
+                req_url = str(hook_entry["url"]).strip()
+                if req_url.startswith(("http://", "https://")):
+                    req_method = str(hook_entry.get("method", "POST")).upper()
+                    req_hdrs = hook_entry.get("headers") if isinstance(hook_entry.get("headers"), dict) else {}
+                    req_body = json.dumps(hook_entry.get("body")).encode("utf-8") if "body" in hook_entry else None
+                    if req_body and "Content-Type" not in req_hdrs:
+                        req_hdrs["Content-Type"] = "application/json"
+                    req = urllib.request.Request(req_url, data=req_body, headers=req_hdrs, method=req_method)
+                    with urllib.request.urlopen(req, timeout=3.0) as resp:
+                        if 200 <= resp.status < 300:
+                            channels_ok.append("webhook")
+        except Exception:
+            pass
+
+    # 2. SSH no interactivo (solo si puerto SSH está abierto y acepta BatchMode)
+    if valid_ip and shutil.which("ssh"):
+        try:
+            ssh_port = int(os.environ.get("RECURSOS_SSH_PORT", "22") or 22)
+        except ValueError:
+            ssh_port = 22
+        ssh_reachable = False
+        try:
+            with socket.create_connection((valid_ip, ssh_port), timeout=0.6):
+                ssh_reachable = True
+        except Exception:
+            ssh_reachable = False
+        if ssh_reachable:
+            ssh_user = os.environ.get("RECURSOS_SSH_USER", "").strip()
+            ssh_target = f"{ssh_user}@{valid_ip}" if ssh_user else valid_ip
+            try:
+                p = subprocess.run(
+                    [
+                        "ssh",
+                        "-p", str(ssh_port),
+                        "-o", "BatchMode=yes",
+                        "-o", "ConnectTimeout=2",
+                        "-o", "StrictHostKeyChecking=accept-new",
+                        ssh_target,
+                        "sudo -n poweroff || systemctl poweroff",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=4,
+                )
+                if p.returncode == 0:
+                    channels_ok.append("ssh")
+            except Exception:
+                pass
+
+    # 3. Samba / Windows RPC shutdown opcional por variables de entorno
+    rpc_user = os.environ.get("RECURSOS_RPC_USER", "").strip()
+    rpc_pass = os.environ.get("RECURSOS_RPC_PASS", "").strip()
+    if valid_ip and rpc_user and rpc_pass and shutil.which("net"):
+        try:
+            p = subprocess.run(
+                ["net", "rpc", "shutdown", "-I", valid_ip, "-U", f"{rpc_user}%{rpc_pass}", "-f", "-t", "0"],
+                capture_output=True,
+                text=True,
+                timeout=4,
+            )
+            if p.returncode == 0:
+                channels_ok.append("rpc")
+        except Exception:
+            pass
+
+    # 4. Paquete mágico Sleep-on-LAN (MAC invertida vía UDP puerto 9/7)
+    if len(mac_clean) == 12:
+        hw_addr = bytes.fromhex(mac_clean)
+        sol_magic = b'\xff' * 6 + hw_addr[::-1] * 16
+        udp_targets = []
+        if valid_ip and ":" not in valid_ip:
+            udp_targets.append((valid_ip, 9))
+            udp_targets.append((valid_ip, 7))
+        for b_ip in get_lan_broadcast_addresses():
+            udp_targets.append((b_ip, 9))
+            udp_targets.append((b_ip, 7))
+        sol_sent = False
+        for dst_ip, port in udp_targets:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                    s.settimeout(1.0)
+                    s.sendto(sol_magic, (dst_ip, port))
+                    sol_sent = True
+            except Exception:
+                pass
+        if sol_sent:
+            channels_ok.append("sol_udp")
+
+    if any(ch in channels_ok for ch in ("webhook", "ssh", "rpc")):
+        active_ch = ", ".join(channels_ok)
+        return True, f"Señal de apagado enviada a {target_label} ({active_ch})", channels_ok
+    if "sol_udp" in channels_ok:
+        return True, f"Señal Sleep-on-LAN (SoL) enviada por red a {target_label}", channels_ok
+    return False, f"No se pudo emitir la señal de apagado a {target_label} (requiere agente SoL, SSH o webhook)", channels_ok
 
 class DashboardHTTPHandler(BaseHTTPRequestHandler):
     def handle(self):
@@ -7127,30 +7364,44 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def _read_json_body(self, max_bytes=65536):
+        try:
+            content_length = int(self.headers.get('Content-Length', 0) or 0)
+        except (ValueError, TypeError):
+            return None, 400
+        if content_length < 0 or content_length > max_bytes:
+            return None, 413
+        if content_length == 0:
+            return {}, None
+        raw = self.rfile.read(content_length).decode('utf-8', errors='ignore')
+        try:
+            parsed = json.loads(raw)
+            return (parsed if isinstance(parsed, dict) else {}), None
+        except Exception:
+            return {}, None
+
     def send_security_headers(self):
         dom = resolve_request_domain(self)
-        self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
-        
-        # Permitir que el dashboard sea embebido de forma segura como Web App en Nextcloud Hub y accesos LAN/WAN
+        env_origins = os.environ.get("RECURSOS_ALLOWED_ORIGINS", "").strip()
+        host_origins = f"https://{SERVER_LOCAL_IP} http://{SERVER_LOCAL_IP} https://{HOSTNAME} https://{HOSTNAME}.local"
         csp_ancestors = (
             "'self' "
-            "https://cminewar.duckdns.org "
-            "https://*.cminewar.duckdns.org "
             "https://*.duckdns.org "
-            "https://192.168.50.2 http://192.168.50.2 "
-            "https://servidor https://servidor.lan "
+            f"{host_origins} "
             "http://localhost:* http://127.0.0.1:* "
-            f"https://{dom} https://*.{dom}"
-        )
+            f"https://{dom} https://*.{dom} "
+            f"{env_origins}"
+        ).strip()
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
         self.send_header(
             'Content-Security-Policy',
             f"default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://maps.googleapis.com https://*.googleapis.com data: blob:; "
             f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://maps.googleapis.com https://*.googleapis.com; "
             f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
             f"img-src 'self' data: blob: https: http:; "
-            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://maps.googleapis.com https://*.googleapis.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de http://ip-api.com https://ip-api.com ws: wss: https://*.cminewar.duckdns.org https://*.duckdns.org; "
-            f"frame-src 'self' https://cminewar.duckdns.org https://*.cminewar.duckdns.org https://*.duckdns.org https://*.{dom}; "
+            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://maps.googleapis.com https://*.googleapis.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
+            f"frame-src 'self' https://*.duckdns.org https://{dom} https://*.{dom}; "
             f"frame-ancestors {csp_ancestors};"
         )
 
@@ -7197,7 +7448,6 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 }).encode('utf-8')
                 self.send_response(403)
                 self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
                 self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
                 self.send_security_headers()
                 self.send_header('Content-Length', str(len(err_resp)))
@@ -7234,7 +7484,6 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_security_headers()
             if auth.get("new_token"):
@@ -7670,6 +7919,29 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # 2i. TELEMETRÍA E IDENTIDAD DE ENTORNO NATIVO / SANDBOX WEB
+        elif clean_path == "/api/native/device-info":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            hdr_tel = extract_header_telemetry(self)
+            c_type = hdr_tel.get("client_type") or (auth.get("device_info") or {}).get("client_type") or "web_browser"
+            is_nat = c_type in ("ubuntu_native", "android_native") or bool(hdr_tel.get("full_access"))
+            info_payload = dict(hdr_tel)
+            info_payload.setdefault("client_type", c_type)
+            info_payload.setdefault("is_native", is_nat)
+            info_payload.setdefault("access_level", "FULL_NATIVE_ACCESS" if is_nat else "WEB_SANDBOX")
+            resp = json.dumps(info_payload, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # 3. RUTAS WEB LIMPIAS MULTIPÁGINA (History API + Acceso Directo)
         elif clean_path in VALID_WEB_ROUTES:
             if not auth["is_trusted"]:
@@ -7956,20 +8228,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(resp)
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 2048:
-                self.send_response(413)
+            body, err_code = self._read_json_body(max_bytes=2048)
+            if err_code:
+                self.send_response(err_code)
                 self.send_security_headers()
                 self.end_headers()
                 return
-
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            try:
-                body = json.loads(post_data)
-            except Exception:
-                body = {}
-            
-            entered_key = body.get('key', '').strip()
+            entered_key = str((body or {}).get('key', '')).strip()
             ua = self.headers.get('User-Agent', '')
             
             if hmac.compare_digest(entered_key, ADMIN_MASTER_KEY):
@@ -8045,21 +8310,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 2048:
-                self.send_response(413)
+            body, err_code = self._read_json_body(max_bytes=2048)
+            if err_code:
+                self.send_response(err_code)
                 self.send_security_headers()
                 self.end_headers()
                 return
-
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            try:
-                body = json.loads(post_data)
-                dev_id = str(body.get('id') or '').strip()
-                client_key = str(body.get('client_key') or '').strip()
-            except Exception:
-                dev_id = ''
-                client_key = ''
+            dev_id = str((body or {}).get('id') or '').strip()
+            client_key = str((body or {}).get('client_key') or '').strip()
 
             with TRUST_LOCK:
                 devices = load_trusted_devices()
@@ -8147,18 +8405,12 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 32768:
-                self.send_response(413)
+            body, err_code = self._read_json_body(max_bytes=32768)
+            if err_code:
+                self.send_response(err_code)
                 self.send_security_headers()
                 self.end_headers()
                 return
-
-            raw_post = self.rfile.read(content_length).decode('utf-8', errors='ignore') if content_length > 0 else "{}"
-            try:
-                body = json.loads(raw_post)
-            except Exception:
-                body = {}
 
             telemetry = body.get("device_telemetry") if isinstance(body.get("device_telemetry"), dict) else body
             caller_dev_id = auth.get("device_id")
@@ -8243,18 +8495,12 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 4096:
-                self.send_response(413)
+            body, err_code = self._read_json_body(max_bytes=4096)
+            if err_code:
+                self.send_response(err_code)
                 self.send_security_headers()
                 self.end_headers()
                 return
-
-            raw_post = self.rfile.read(content_length).decode('utf-8', errors='ignore') if content_length > 0 else "{}"
-            try:
-                body = json.loads(raw_post)
-            except Exception:
-                body = {}
 
             dev_id = str(body.get("id") or "").strip()
             alias = str(body.get("alias") or body.get("name") or "").strip()[:80]
@@ -8292,21 +8538,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 2048:
-                self.send_response(413)
+            body, err_code = self._read_json_body(max_bytes=2048)
+            if err_code:
+                self.send_response(err_code)
                 self.send_security_headers()
                 self.end_headers()
                 return
-
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            try:
-                body = json.loads(post_data)
-                target_ip = body.get('ip', '').strip()
-                jail = body.get('jail', '').strip()
-            except Exception:
-                target_ip = ''
-                jail = ''
+            target_ip = str((body or {}).get('ip', '')).strip()
+            jail = str((body or {}).get('jail', '')).strip()
 
             try:
                 ipaddress.ip_address(target_ip)
@@ -8355,21 +8594,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 2048:
-                self.send_response(413)
+            body, err_code = self._read_json_body(max_bytes=2048)
+            if err_code:
+                self.send_response(err_code)
                 self.send_security_headers()
                 self.end_headers()
                 return
-
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            try:
-                body = json.loads(post_data)
-                target_ip = body.get('ip', '').strip()
-                jail = body.get('jail', 'caddy-scan').strip()
-            except Exception:
-                target_ip = ''
-                jail = 'caddy-scan'
+            target_ip = str((body or {}).get('ip', '')).strip()
+            jail = str((body or {}).get('jail', 'caddy-scan')).strip()
 
             try:
                 ipaddress.ip_address(target_ip)
@@ -8435,7 +8667,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 5. Fail2ban: Importación masiva de IPs (Synology Blocklist / Archivo TXT o CSV)
+        # 5. Fail2ban: Importación masiva de IPs (Blocklist / Archivo TXT o CSV)
         elif clean_path == "/api/fail2ban/import":
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
@@ -8444,14 +8676,20 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 5 * 1024 * 1024:  # Hasta 5 MB
+            try:
+                content_length = int(self.headers.get('Content-Length', 0) or 0)
+            except (ValueError, TypeError):
+                self.send_response(400)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            if content_length < 0 or content_length > 5 * 1024 * 1024:  # Hasta 5 MB
                 self.send_response(413)
                 self.send_security_headers()
                 self.end_headers()
                 return
 
-            post_data = self.rfile.read(content_length).decode('utf-8', errors='ignore')
+            post_data = self.rfile.read(content_length).decode('utf-8', errors='ignore') if content_length > 0 else ""
             try:
                 body = json.loads(post_data)
                 raw_text = body.get('text', '')
@@ -8509,7 +8747,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     for vip in valid_ips:
                         cur.execute("""
                             INSERT OR REPLACE INTO bips(ip, jail, timeofban, bantime, bancount, data)
-                            VALUES (?, ?, ?, 172800, 1, '{"source": "synology_import"}')
+                            VALUES (?, ?, ?, 172800, 1, '{"source": "manual_import"}')
                         """, (vip, jail, now_ts))
                     conn.commit()
                     conn.close()
@@ -8525,7 +8763,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
 
             resp = json.dumps({
                 "success": True,
-                "message": f"Se procesaron {len(valid_ips)} IPs del Synology: {banned_success} añadidas activamente al cortafuegos de Fail2ban ({jail}).",
+                "message": f"Se procesaron {len(valid_ips)} IPs: {banned_success} añadidas activamente al cortafuegos de Fail2ban ({jail}).",
                 "total_imported": len(valid_ips),
                 "active_banned": banned_success
             }).encode('utf-8')
@@ -8547,13 +8785,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            try:
-                body = json.loads(post_data)
-                mac = body.get('mac', '').strip()
-            except Exception:
-                mac = ''
+            body, err_code = self._read_json_body(max_bytes=2048)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            mac = str((body or {}).get('mac', '')).strip()
 
             clean_mac = re.sub(r'[^0-9A-Fa-f]', '', mac)
             if len(clean_mac) == 12:
@@ -8566,6 +8804,42 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 resp = json.dumps({"success": False, "error": "Dirección MAC inválida"}).encode('utf-8')
 
             self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Señal de Apagado por Red (Sleep-on-LAN / SSH / RPC / Webhook)
+        elif clean_path in ("/api/wol/shutdown", "/api/device/shutdown"):
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            body, err_code = self._read_json_body(max_bytes=2048)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            target_ip = str((body or {}).get('ip', '')).strip()
+            target_mac = str((body or {}).get('mac', '')).strip()
+            target_name = str((body or {}).get('name', '')).strip()
+            ok, msg, channels = send_device_shutdown_signal(target_ip, target_mac, target_name)
+
+            if ok:
+                resp = json.dumps({"success": True, "message": msg, "channels": channels}).encode('utf-8')
+                status_code = 200
+            else:
+                resp = json.dumps({"success": False, "error": msg, "channels": channels}).encode('utf-8')
+                status_code = 400 if ("bloqueada" in msg.lower() or "requiere una dirección" in msg.lower()) else 200
+
+            self.send_response(status_code)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
             self.send_header('Content-Length', str(len(resp)))
@@ -8617,13 +8891,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            try:
-                body = json.loads(post_data)
-                raw_text = (body.get('message') or body.get('text') or '').strip()
-            except Exception:
-                raw_text = ''
+            body, err_code = self._read_json_body(max_bytes=16384)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            raw_text = str((body or {}).get('message') or (body or {}).get('text') or '').strip()
 
             if not raw_text:
                 resp = json.dumps({"success": False, "error": "El mensaje no puede estar vacío"}).encode('utf-8')
@@ -8665,11 +8939,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length).decode('utf-8')
+            body, err_code = self._read_json_body(max_bytes=2048)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
             try:
-                body = json.loads(post_data)
-                user_id = int(str(body.get('user_id', '')).strip())
+                user_id = int(str((body or {}).get('user_id', '')).strip())
             except Exception:
                 user_id = 0
 
@@ -8715,11 +8992,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length).decode('utf-8')
+            body, err_code = self._read_json_body(max_bytes=2048)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
             try:
-                body = json.loads(post_data)
-                user_id = int(str(body.get('user_id', '')).strip())
+                user_id = int(str((body or {}).get('user_id', '')).strip())
             except Exception:
                 user_id = 0
 
@@ -8766,12 +9046,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            try:
-                body = json.loads(post_data)
-            except Exception:
-                body = {}
+            body, err_code = self._read_json_body(max_bytes=4096)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            body = body or {}
 
             cfg = load_tg_config()
             if "notify_completed_torrents" in body:
@@ -8857,15 +9138,15 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            try:
-                body = json.loads(post_data)
-                stype = body.get('type', '').strip()
-                target = body.get('target', '').strip()
-                action = body.get('action', 'restart').strip()
-            except Exception:
-                stype, target, action = '', '', ''
+            body, err_code = self._read_json_body(max_bytes=4096)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            stype = str((body or {}).get('type', '')).strip()
+            target = str((body or {}).get('target', '')).strip()
+            action = str((body or {}).get('action', 'restart')).strip()
 
             if action not in ('start', 'restart', 'stop') or not re.match(r'^[a-zA-Z0-9_.-]+$', target):
                 resp = json.dumps({"success": False, "error": "Parámetros inválidos"}).encode('utf-8')
@@ -8926,7 +9207,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.send_security_headers()
                 self.end_headers()
                 return
-            enabled = bool(body.get("enabled", True))
+            body, err_code = self._read_json_body(max_bytes=4096)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            enabled = bool((body or {}).get("enabled", True))
             saved = save_auto_install_preference(enabled)
             if saved:
                 threading.Thread(
@@ -8974,20 +9261,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 4 * 1024 * 1024:  # Hasta 4 MB para archivos de imagen locales
-                self.send_response(413)
+            body, err_code = self._read_json_body(max_bytes=4 * 1024 * 1024)
+            if err_code:
+                self.send_response(err_code)
                 self.send_security_headers()
                 self.end_headers()
                 return
-
-            post_data = self.rfile.read(content_length).decode('utf-8', errors='ignore')
-            try:
-                body = json.loads(post_data)
-                target_key = (body.get('key') or '').strip()
-                logo_val = (body.get('logo') or '').strip()
-            except Exception:
-                target_key, logo_val = '', ''
+            target_key = str((body or {}).get('key') or '').strip()
+            logo_val = str((body or {}).get('logo') or '').strip()
 
             if not target_key or len(target_key) > 120:
                 resp = json.dumps({"success": False, "error": "Identificador de elemento inválido"}).encode('utf-8')
@@ -9019,21 +9300,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 65536:
-                self.send_response(413)
+            body, err_code = self._read_json_body(max_bytes=65536)
+            if err_code:
+                self.send_response(err_code)
                 self.send_security_headers()
                 self.end_headers()
                 return
-
-            post_data = self.rfile.read(content_length).decode('utf-8', errors='ignore') if content_length > 0 else "{}"
-            try:
-                body = json.loads(post_data)
-                req_ips = body.get("ips", [])
-                force_sync = bool(body.get("force_sync", False))
-            except Exception:
-                req_ips = []
-                force_sync = False
+            req_ips = (body or {}).get("ips", [])
+            force_sync = bool((body or {}).get("force_sync", False))
 
             if not isinstance(req_ips, list):
                 req_ips = []
@@ -9100,6 +9374,12 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
 
         # 10. Configuración del Motor de Mapas (Modo Libre Fijo)
         elif clean_path == "/api/maps/config":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
             resp = json.dumps({"success": True, "engine": "leaflet", "provider": "OpenStreetMap"}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -9117,12 +9397,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.send_security_headers()
                 self.end_headers()
                 return
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length).decode('utf-8', errors='ignore') if content_length > 0 else "{}"
-            try:
-                body = json.loads(post_data)
-            except Exception:
-                body = {}
+            body, err_code = self._read_json_body(max_bytes=8192)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            body = body or {}
             try:
                 from desktop_app.dex_controller import DexController
                 if not hasattr(DashboardHTTPHandler, "_shared_dex_ctrl"):
