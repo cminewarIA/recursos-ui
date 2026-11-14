@@ -125,6 +125,22 @@ def get_display_version(raw_ver=None):
     return v
 
 
+def parse_semver_tuple(ver_str):
+    clean = str(ver_str or "").strip().lstrip("vV")
+    if clean.startswith("2B."):
+        clean = "12." + clean[3:]
+    clean = clean.split("-")[0].split("+")[0]
+    parts = []
+    for p in clean.split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            parts.append(0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
 def resolve_bundled_html_path():
     """Localiza el archivo HTML5 canónico compilado (static/index.html tiene prioridad)."""
     candidates = [
@@ -447,6 +463,88 @@ headerbar {
     background-color: #ffffff;
     color: #0f172a;
     border-bottom: 1px solid #e2e8f0;
+    min-height: 46px;
+    padding: 0 8px;
+}
+headerbar .title {
+    color: #0f172a;
+    font-weight: 700;
+}
+headerbar .subtitle {
+    color: #475569;
+    font-size: 11px;
+}
+headerbar button {
+    color: #0f172a;
+}
+headerbar:backdrop {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+headerbar:backdrop .title {
+    color: #0f172a;
+}
+headerbar:backdrop .subtitle {
+    color: #64748b;
+}
+headerbar button.titlebutton,
+headerbar .titlebutton,
+headerbar:backdrop button.titlebutton,
+headerbar:backdrop .titlebutton {
+    background-image: none;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    border-radius: 9999px;
+    min-width: 28px;
+    min-height: 28px;
+    margin: 0 3px;
+    padding: 2px;
+    box-shadow: none;
+    opacity: 1;
+}
+headerbar button.titlebutton:hover,
+headerbar .titlebutton:hover {
+    background-color: #e2e8f0;
+    border-color: #94a3b8;
+    color: #0f172a;
+}
+headerbar button.titlebutton.close,
+headerbar .titlebutton.close,
+headerbar:backdrop button.titlebutton.close,
+headerbar:backdrop .titlebutton.close {
+    background-color: #fee2e2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+headerbar button.titlebutton.close:hover,
+headerbar .titlebutton.close:hover {
+    background-color: #ef4444;
+    border-color: #dc2626;
+    color: #ffffff;
+}
+headerbar button.titlebutton image,
+headerbar .titlebutton image,
+headerbar:backdrop button.titlebutton image,
+headerbar:backdrop .titlebutton image {
+    color: #0f172a;
+    opacity: 1;
+    -gtk-icon-style: symbolic;
+    -gtk-icon-shadow: none;
+}
+headerbar button.titlebutton.close image,
+headerbar .titlebutton.close image,
+headerbar:backdrop button.titlebutton.close image,
+headerbar:backdrop .titlebutton.close image {
+    color: #b91c1c;
+}
+headerbar button.titlebutton.close:hover image,
+headerbar .titlebutton.close:hover image {
+    color: #ffffff;
+}
+.btn-nav image {
+    color: #0f172a;
+    -gtk-icon-style: symbolic;
 }
 .launcher-card {
     background-color: #ffffff;
@@ -570,6 +668,7 @@ class ServerConnectionManager:
         self.is_revoked = False
         self._last_net_io = psutil.net_io_counters() if psutil else None
         self._last_net_ts = time.time()
+        self.github_update_info = None
         self.device_telemetry = collect_native_device_telemetry()
         self._load_config()
 
@@ -639,10 +738,25 @@ class ServerConnectionManager:
             pass
         return str(self.device_telemetry.get("local_ip") or "127.0.0.1")
 
+    def get_installed_deb_version(self):
+        try:
+            p = subprocess.run(
+                ["dpkg-query", "-W", "-f=${Version}", "recursos-cockpit"],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+            )
+            if p.returncode == 0 and p.stdout.strip():
+                return p.stdout.strip()
+        except Exception:
+            pass
+        return ""
+
     def detect_local_node_status(self):
-        """Comprueba si existe un nodo local instalado o activo en esta máquina Ubuntu."""
+        """Comprueba si existe un nodo local o la aplicación .deb instalada en esta máquina Ubuntu."""
         service_exists = os.path.isfile("/etc/systemd/system/system-dashboard.service")
         server_py_path = ""
+        repo_dir = ""
         for cand in (
             os.path.join(SCRIPT_DIR, "..", "server.py"),
             "/usr/lib/recursos-cockpit/server.py",
@@ -650,7 +764,15 @@ class ServerConnectionManager:
         ):
             if os.path.isfile(cand):
                 server_py_path = os.path.abspath(cand)
+                parent_dir = os.path.dirname(server_py_path)
+                if os.path.isdir(os.path.join(parent_dir, ".git")):
+                    repo_dir = parent_dir
                 break
+        if not repo_dir:
+            root_cand = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+            if os.path.isdir(os.path.join(root_cand, ".git")):
+                repo_dir = root_cand
+
         running, _ = self._probe(f"http://127.0.0.1:{self.node_port}", timeout=0.5)
         service_active = False
         if service_exists:
@@ -664,6 +786,8 @@ class ServerConnectionManager:
                 service_active = p.returncode == 0
             except Exception:
                 pass
+        installed_deb_version = self.get_installed_deb_version()
+        app_installed_deb = bool(installed_deb_version) or os.path.isfile("/usr/bin/recursos-cockpit")
         installed = bool(service_exists or running)
         lan_ip = self.get_primary_lan_ip()
         return {
@@ -671,10 +795,222 @@ class ServerConnectionManager:
             "running": bool(running or service_active),
             "service_exists": service_exists,
             "server_py_path": server_py_path,
+            "repo_dir": repo_dir,
+            "app_installed_deb": app_installed_deb,
+            "installed_deb_version": installed_deb_version,
             "lan_ip": lan_ip,
             "port": self.node_port,
             "lan_url": f"http://{lan_ip}:{self.node_port}",
         }
+
+    def check_github_app_update(self):
+        """Consulta GitHub Releases / VERSION oficial para comprobar actualizaciones disponibles."""
+        local_ver = get_app_version()
+        installed_deb = self.get_installed_deb_version()
+        baseline_ver = installed_deb or local_ver
+        gh_ver = ""
+        deb_url = "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb"
+        deb_asset_name = "recursos-cockpit.deb"
+        sha_url = ""
+        release_url = "https://github.com/cminewarIA/recursos-ui/releases/latest"
+        err_msg = ""
+
+        try:
+            req = urllib.request.Request(
+                "https://api.github.com/repos/cminewarIA/recursos-ui/releases/latest",
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "User-Agent": f"RecursosCockpit-Ubuntu/{local_ver}",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=4.0) as resp:
+                rel = json.loads(resp.read().decode("utf-8"))
+                tag = str(rel.get("tag_name") or "").strip()
+                gh_ver = tag.lstrip("vV")
+                release_url = str(rel.get("html_url") or release_url)
+                for asset in rel.get("assets", []) or []:
+                    name = str(asset.get("name") or "")
+                    dl = str(asset.get("browser_download_url") or "")
+                    if not dl:
+                        continue
+                    if name.endswith(".deb") and "amd64" in name:
+                        deb_url = dl
+                        deb_asset_name = name
+                    elif name == "recursos-cockpit.deb" and not deb_asset_name.endswith("_amd64.deb"):
+                        deb_url = dl
+                        deb_asset_name = name
+                    elif name == "SHA256SUMS.txt":
+                        sha_url = dl
+        except Exception as e:
+            err_msg = str(e)
+
+        if not gh_ver:
+            try:
+                req_ver = urllib.request.Request(
+                    "https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/VERSION",
+                    headers={"User-Agent": f"RecursosCockpit-Ubuntu/{local_ver}"},
+                )
+                with urllib.request.urlopen(req_ver, timeout=3.5) as resp:
+                    gh_ver = resp.read().decode("utf-8").strip().lstrip("vV")
+                    err_msg = ""
+            except Exception as e2:
+                if not err_msg:
+                    err_msg = str(e2)
+
+        update_available = False
+        if gh_ver:
+            update_available = parse_semver_tuple(gh_ver) > parse_semver_tuple(baseline_ver)
+
+        info = {
+            "local_version": local_ver,
+            "local_display_version": get_display_version(local_ver),
+            "installed_deb_version": installed_deb,
+            "installed_display_version": get_display_version(installed_deb) if installed_deb else "",
+            "app_installed_deb": bool(installed_deb) or os.path.isfile("/usr/bin/recursos-cockpit"),
+            "github_version": gh_ver,
+            "github_display_version": get_display_version(gh_ver) if gh_ver else "",
+            "update_available": update_available,
+            "deb_download_url": deb_url,
+            "deb_asset_name": deb_asset_name,
+            "sha256_url": sha_url,
+            "release_url": release_url,
+            "error": err_msg,
+        }
+        self.github_update_info = info
+        return info
+
+    def update_installed_app_from_github(self, gh_info=None):
+        """
+        Actualiza la aplicación y/o el nodo local instalado desde GitHub sin desinstalar previamente:
+        1. Si existe repositorio git local del nodo, actualiza el código con git pull y reinicia el servicio.
+        2. Descarga el paquete .deb firmado oficial desde GitHub Releases, verifica SHA-256 e instala en sitio.
+        """
+        info = gh_info or self.check_github_app_update()
+        st = self.detect_local_node_status()
+        updated_parts = []
+
+        # 1. Actualizar nodo local en repositorio Git si existe
+        repo_dir = st.get("repo_dir")
+        if repo_dir and os.path.isdir(os.path.join(repo_dir, ".git")):
+            try:
+                status_p = subprocess.run(
+                    ["git", "-C", repo_dir, "status", "--porcelain"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                had_dirty = bool(status_p.stdout.strip())
+                if had_dirty:
+                    subprocess.run(
+                        ["git", "-C", repo_dir, "stash", "push", "-u", "-m", "recursos-auto-update"],
+                        capture_output=True,
+                        timeout=10,
+                    )
+                pull_p = subprocess.run(
+                    ["git", "-C", repo_dir, "pull", "--rebase", "origin", "main"],
+                    capture_output=True,
+                    text=True,
+                    timeout=45,
+                )
+                if pull_p.returncode != 0:
+                    subprocess.run(
+                        ["git", "-C", repo_dir, "pull", "origin", "main"],
+                        capture_output=True,
+                        text=True,
+                        timeout=45,
+                    )
+                if os.path.isfile(os.path.join(repo_dir, "package.json")) and subprocess.run(
+                    ["which", "npm"], capture_output=True
+                ).returncode == 0:
+                    subprocess.run(["npm", "run", "build"], cwd=repo_dir, capture_output=True, timeout=90)
+                if st.get("service_exists"):
+                    runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
+                    subprocess.run([runner, "systemctl", "restart", "system-dashboard.service"], capture_output=True, timeout=20)
+                updated_parts.append("nodo local")
+            except Exception:
+                pass
+
+        # 2. Actualizar paquete .deb de la aplicación de Ubuntu desde GitHub Releases sin desinstalar
+        deb_url = info.get("deb_download_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb"
+        tmp_deb = "/tmp/recursos-cockpit-github-update.deb"
+        try:
+            req = urllib.request.Request(
+                deb_url,
+                headers={"User-Agent": f"RecursosCockpit-Updater/{get_app_version()}"},
+            )
+            with urllib.request.urlopen(req, timeout=30.0) as resp:
+                deb_bytes = resp.read()
+            if len(deb_bytes) < 10240 or not deb_bytes.startswith(b"!<arch>\n"):
+                return False, "El archivo descargado desde GitHub no es un paquete .deb válido.", info
+            with open(tmp_deb, "wb") as f:
+                f.write(deb_bytes)
+
+            # Verificar suma SHA-256 si está disponible en la release
+            sha_url = info.get("sha256_url")
+            if sha_url:
+                try:
+                    req_sha = urllib.request.Request(
+                        sha_url,
+                        headers={"User-Agent": f"RecursosCockpit-Updater/{get_app_version()}"},
+                    )
+                    with urllib.request.urlopen(req_sha, timeout=10.0) as rsha:
+                        sums_txt = rsha.read().decode("utf-8", errors="ignore")
+                    expected = ""
+                    target_name = info.get("deb_asset_name") or "recursos-cockpit.deb"
+                    for line in sums_txt.splitlines():
+                        parts = line.strip().split()
+                        if len(parts) >= 2 and (parts[1].lstrip("*") == target_name or parts[1].endswith(".deb")):
+                            expected = parts[0].lower()
+                            break
+                    if expected:
+                        actual = hashlib.sha256(deb_bytes).hexdigest().lower()
+                        if actual != expected:
+                            return False, "Error de verificación SHA-256 en el paquete descargado de GitHub.", info
+                except Exception:
+                    pass
+
+            check_p = subprocess.run(["dpkg-deb", "--info", tmp_deb], capture_output=True, text=True, timeout=5)
+            if check_p.returncode != 0:
+                return False, "El paquete .deb descargado está corrupto o incompleto.", info
+
+            runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
+            # Instalación limpia en el mismo sitio (sin desinstalar), manteniendo configuración y datos
+            relaunch = "/usr/bin/recursos-cockpit" if os.path.isfile("/usr/bin/recursos-cockpit") else ""
+            helper_script = "/tmp/recursos-cockpit-apply-update.sh"
+            with open(helper_script, "w", encoding="utf-8") as hf:
+                hf.write(
+                    "#!/usr/bin/env bash\n"
+                    "set -e\n"
+                    "apt-get install -y --allow-downgrades "
+                    f"'{tmp_deb}' || dpkg -i --force-overwrite '{tmp_deb}'\n"
+                    f"rm -f '{tmp_deb}'\n"
+                )
+            os.chmod(helper_script, 0o755)
+            inst = subprocess.run([runner, "bash", helper_script], capture_output=True, text=True, timeout=120)
+            try:
+                os.remove(helper_script)
+            except Exception:
+                pass
+            if inst.returncode == 0:
+                new_ver = self.get_installed_deb_version() or info.get("github_version") or get_app_version()
+                updated_parts.append(f"app Ubuntu v{get_display_version(new_ver)}")
+                if relaunch and os.environ.get("DISPLAY"):
+                    try:
+                        subprocess.Popen(
+                            [relaunch],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True,
+                        )
+                    except Exception:
+                        pass
+                return True, f"Actualización completada desde GitHub ({', '.join(updated_parts)}).", info
+            err_detail = (inst.stderr or inst.stdout or "").strip()
+            return False, f"No se pudo completar la instalación de actualización: {err_detail[:180]}", info
+        except Exception as e:
+            if updated_parts:
+                return True, f"Se actualizó correctamente ({', '.join(updated_parts)}).", info
+            return False, f"Error descargando actualización desde GitHub: {e}", info
 
     def install_or_enable_local_node(self):
         """Instala y arranca el nodo local como servicio si no existe, o devuelve sus datos LAN si ya está instalado."""
@@ -1258,23 +1594,27 @@ class LocalHtmlBridgeServer:
                     if clean_path == "/api/version":
                         ver = get_app_version()
                         disp_ver = get_display_version(ver)
+                        gh = parent.conn_mgr.github_update_info or {}
+                        inst_ver = parent.conn_mgr.get_installed_deb_version() or ver
+                        rem_ver = gh.get("github_version") or ver
+                        rem_disp = gh.get("github_display_version") or get_display_version(rem_ver)
                         self._send_json(
                             {
                                 "current_version": ver,
                                 "display_version": disp_ver,
                                 "version": ver,
                                 "local_version": ver,
-                                "remote_version": ver,
-                                "remote_display_version": disp_ver,
-                                "update_available": False,
+                                "remote_version": rem_ver,
+                                "remote_display_version": rem_disp,
+                                "update_available": bool(gh.get("update_available", False)),
                                 "ahead_of_remote": False,
                                 "has_git": False,
                                 "recent_commits": [],
                                 "auto_install_enabled": parent.conn_mgr.auto_install_enabled,
-                                "auto_install_status": "Modo sin conexión al nodo",
-                                "installed_deb_version": ver,
-                                "package_installed": True,
-                                "package_needs_install": False,
+                                "auto_install_status": "Comprobación directa por GitHub",
+                                "installed_deb_version": inst_ver,
+                                "package_installed": bool(inst_ver),
+                                "package_needs_install": bool(gh.get("update_available", False)),
                                 "branch": "main",
                             }
                         )
@@ -1455,6 +1795,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
         GLib.idle_add(self._refresh_config_labels)
         GLib.idle_add(self._refresh_local_node_panel)
+        GLib.idle_add(self._trigger_github_check_async)
         if self.start_in_dex:
             self._connect_and_open_webview(target_view="dex")
         GLib.timeout_add(3000, self._refresh_connection_badge)
@@ -1518,6 +1859,12 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
                     pass
 
     def _apply_css(self):
+        try:
+            gtk_settings = Gtk.Settings.get_default()
+            if gtk_settings is not None:
+                gtk_settings.set_property("gtk-application-prefer-dark-theme", False)
+        except Exception:
+            pass
         provider = Gtk.CssProvider()
         provider.load_from_data(NATIVE_CSS)
         screen = Gdk.Screen.get_default()
@@ -1529,6 +1876,8 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
     def _build_headerbar(self):
         hb = Gtk.HeaderBar()
         hb.set_show_close_button(True)
+        if hasattr(hb, "set_decoration_layout"):
+            hb.set_decoration_layout(":minimize,maximize,close")
         disp_ver = get_display_version()
         hb.props.title = "Recursos"
         hb.props.subtitle = f"v{disp_ver} · Aplicación Nativa Ubuntu"
@@ -1550,6 +1899,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         hb.pack_start(btn_dex)
 
         btn_about = Gtk.Button.new_from_icon_name("help-about-symbolic", Gtk.IconSize.BUTTON)
+        btn_about.get_style_context().add_class("btn-nav")
         btn_about.set_tooltip_text(f"Acerca de Recursos (v{disp_ver})")
         btn_about.connect("clicked", self._show_about_dialog)
         hb.pack_end(btn_about)
@@ -1670,26 +2020,41 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         card1.pack_end(btn_opt1, False, False, 0)
         center_box.pack_start(card1, False, False, 0)
 
-        # Opción 2: Instalar nodo local (o mostrar IP y puerto si ya está instalado)
+        # Opción 2: Instalar nodo local (y actualizar desde GitHub cuando ya está instalada)
         card2 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         card2.get_style_context().add_class("launcher-card")
         c2_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         c2_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        c2_t = Gtk.Label(label="2. Instalar nodo local", xalign=0)
+        c2_t = Gtk.Label(label="2. Nodo local y aplicación en este equipo", xalign=0)
         self.lbl_node_info = Gtk.Label(
-            label="Comprobando si ya hay un nodo servidor instalado en este ordenador...",
+            label="Comprobando instalación y nodo servidor en este ordenador...",
             xalign=0,
         )
         self.lbl_node_info.set_line_wrap(True)
         self.lbl_node_info.get_style_context().add_class("launcher-subtitle")
+        self.lbl_github_info = Gtk.Label(
+            label="Comprobando versión publicada en GitHub...",
+            xalign=0,
+        )
+        self.lbl_github_info.set_line_wrap(True)
+        self.lbl_github_info.get_style_context().add_class("launcher-subtitle")
         c2_text.pack_start(c2_t, False, False, 0)
         c2_text.pack_start(self.lbl_node_info, False, False, 0)
-        self.btn_opt2 = Gtk.Button(label="Instalar nodo")
+        c2_text.pack_start(self.lbl_github_info, False, False, 0)
+
+        c2_btns = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        c2_btns.set_valign(Gtk.Align.CENTER)
+        self.btn_opt2 = Gtk.Button(label="Instalar nodo local")
         self.btn_opt2.get_style_context().add_class("btn-nav")
-        self.btn_opt2.set_valign(Gtk.Align.CENTER)
         self.btn_opt2.connect("clicked", self._on_install_local_node_clicked)
+        self.btn_opt2_update = Gtk.Button(label="Actualizar desde GitHub")
+        self.btn_opt2_update.get_style_context().add_class("btn-nav")
+        self.btn_opt2_update.connect("clicked", self._on_update_from_github_clicked)
+        c2_btns.pack_start(self.btn_opt2, False, False, 0)
+        c2_btns.pack_start(self.btn_opt2_update, False, False, 0)
+
         c2_top.pack_start(c2_text, True, True, 0)
-        c2_top.pack_end(self.btn_opt2, False, False, 0)
+        c2_top.pack_end(c2_btns, False, False, 0)
         card2.pack_start(c2_top, False, False, 0)
         center_box.pack_start(card2, False, False, 0)
 
@@ -1764,19 +2129,83 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         self.main_stack.set_visible_child_name("webview" if self.start_in_dex else "home")
         self.add(self.main_stack)
 
-    def _refresh_local_node_panel(self):
+    def _trigger_github_check_async(self):
+        def worker():
+            gh = self.conn_mgr.check_github_app_update()
+            GLib.idle_add(self._refresh_local_node_panel, gh)
+
+        threading.Thread(target=worker, daemon=True).start()
+        return False
+
+    def _refresh_local_node_panel(self, gh_info=None):
         st = self.conn_mgr.detect_local_node_status()
+        gh = gh_info or self.conn_mgr.github_update_info
+        app_installed = bool(st.get("app_installed_deb") or st.get("installed"))
+
         if st["installed"]:
             state_txt = "activo" if st["running"] else "instalado"
             self.lbl_node_info.set_text(
-                f"Nodo local ya {state_txt}. Dirección para conectar en tu red Wi-Fi (LAN): {st['lan_ip']} · Puerto {st['port']}"
+                f"Nodo local ya {state_txt}. Conecta en tu Wi-Fi con: {st['lan_ip']} · Puerto {st['port']}"
             )
             self.btn_opt2.set_label("Conectar al nodo local" if st["running"] else "Iniciar nodo local")
+        elif st.get("app_installed_deb"):
+            inst_ver = get_display_version(st.get("installed_deb_version") or get_app_version())
+            self.lbl_node_info.set_text(
+                f"Aplicación ya instalada en Ubuntu (v{inst_ver}). También puedes instalar el nodo servidor aquí si lo deseas."
+            )
+            self.btn_opt2.set_label("Instalar nodo local")
         else:
             self.lbl_node_info.set_text(
                 "No hay ningún nodo instalado en este equipo. Puedes instalarlo para gestionar este ordenador desde la red."
             )
             self.btn_opt2.set_label("Instalar nodo local")
+
+        if hasattr(self, "lbl_github_info") and hasattr(self, "btn_opt2_update"):
+            self.btn_opt2_update.set_visible(app_installed)
+            ctx = self.btn_opt2_update.get_style_context()
+            ctx.remove_class("btn-primary")
+            ctx.remove_class("btn-nav")
+            if gh and gh.get("github_version"):
+                gh_disp = gh.get("github_display_version") or gh.get("github_version")
+                if gh.get("update_available"):
+                    self.lbl_github_info.set_text(
+                        f"Nueva versión disponible en GitHub: v{gh_disp}. Pulsa para actualizar sin desinstalar."
+                    )
+                    self.btn_opt2_update.set_label(f"Actualizar a v{gh_disp} (GitHub)")
+                    ctx.add_class("btn-primary")
+                else:
+                    self.lbl_github_info.set_text(
+                        f"GitHub al día (v{gh_disp}). Puedes reinstalar o actualizar desde GitHub cuando quieras."
+                    )
+                    self.btn_opt2_update.set_label("Actualizar desde GitHub")
+                    ctx.add_class("btn-nav")
+            else:
+                self.lbl_github_info.set_text("Actualización directa mediante GitHub disponible para instalaciones existentes.")
+                self.btn_opt2_update.set_label("Actualizar desde GitHub")
+                ctx.add_class("btn-nav")
+        return False
+
+    def _on_update_from_github_clicked(self, _widget):
+        if hasattr(self, "btn_opt2_update"):
+            self.btn_opt2_update.set_sensitive(False)
+            self.btn_opt2_update.set_label("Actualizando desde GitHub...")
+        if hasattr(self, "lbl_github_info"):
+            self.lbl_github_info.set_text("Descargando el paquete firmado desde GitHub Releases y aplicando actualización en sitio...")
+
+        def worker():
+            ok, msg, gh = self.conn_mgr.update_installed_app_from_github()
+            GLib.idle_add(self._on_github_update_finished, ok, msg, gh)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_github_update_finished(self, ok, msg, gh):
+        if hasattr(self, "lbl_home_status"):
+            self.lbl_home_status.set_text(msg)
+        if hasattr(self, "btn_opt2_update"):
+            self.btn_opt2_update.set_sensitive(True)
+        self._refresh_local_node_panel(gh)
+        if ok:
+            self._refresh_config_labels()
         return False
 
     def _refresh_config_labels(self):

@@ -3,6 +3,19 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val canonicalVersionFile = file("../../VERSION")
+val canonicalVersion = if (canonicalVersionFile.exists()) {
+    canonicalVersionFile.readText().trim().ifEmpty { "12.0.1" }
+} else {
+    "12.0.1"
+}
+val verParts = canonicalVersion.split(".").mapNotNull { it.toIntOrNull() }
+val computedVersionCode = if (verParts.size >= 3) {
+    verParts[0] * 10000 + verParts[1] * 100 + verParts[2]
+} else {
+    120001
+}
+
 android {
     namespace = "com.cminewar.recursoscockpit"
     compileSdk = 34
@@ -11,8 +24,8 @@ android {
         applicationId = "com.cminewar.recursoscockpit"
         minSdk = 26
         targetSdk = 34
-        versionCode = 120000
-        versionName = "12.0.0"
+        versionCode = computedVersionCode
+        versionName = canonicalVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -23,9 +36,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("../keystore/recursos-release.jks")
-            storePassword = "recursoscockpit"
-            keyAlias = "recursos"
-            keyPassword = "recursoscockpit"
+            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: "recursoscockpit"
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: "recursos"
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: "recursoscockpit"
             enableV1Signing = true
             enableV2Signing = true
             enableV3Signing = true
@@ -40,11 +53,10 @@ android {
                 "proguard-rules.pro"
             )
             val releaseKeystore = file("../keystore/recursos-release.jks")
-            signingConfig = if (releaseKeystore.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            if (!releaseKeystore.exists()) {
+                throw GradleException("No se encontró el keystore oficial en ${releaseKeystore.absolutePath} para firmar la APK.")
             }
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             applicationIdSuffix = ""
