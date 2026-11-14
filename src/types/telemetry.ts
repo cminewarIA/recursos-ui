@@ -213,6 +213,8 @@ export interface WifiSummary {
   router_model?: string;
   router_ip?: string;
   router_online?: boolean;
+  router_encrypted?: boolean;
+  router_auth_mode?: string;
   band_24g?: number;
   band_5g?: number;
   wired_clients?: number;

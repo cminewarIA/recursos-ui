@@ -23,6 +23,11 @@ import shutil
 import urllib.request
 import urllib.parse
 
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+except Exception:
+    AESGCM = None
+
 
 # ==============================================================================
 # Global Caches, Concurrency Locks & Configuration
@@ -95,32 +100,8 @@ def _detect_default_gateway_ip():
         pass
     return ""
 
-# Directorio base del proyecto y credenciales opcionales del router/AP (Zero-Hardcoding)
+# Directorio base del proyecto, clave maestra y credenciales cifradas del router/AP (Zero-Hardcoding)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-def _load_router_credentials():
-    """Carga IP/usuario/clave del router desde env o .router_credentials.json local."""
-    cfg_ip = os.environ.get("RECURSOS_ROUTER_IP", "").strip()
-    cfg_user = os.environ.get("RECURSOS_ROUTER_USER", "").strip()
-    cfg_pass = os.environ.get("RECURSOS_ROUTER_PASS", "").strip()
-    creds_file = os.path.join(BASE_DIR, ".router_credentials.json")
-    if os.path.isfile(creds_file):
-        try:
-            with open(creds_file, "r", encoding="utf-8") as f:
-                creds = json.load(f)
-                if isinstance(creds, dict):
-                    cfg_ip = cfg_ip or str(creds.get("router_ip", "")).strip()
-                    cfg_user = cfg_user or str(creds.get("router_user", "")).strip()
-                    cfg_pass = cfg_pass or str(creds.get("router_pass", "")).strip()
-        except Exception:
-            pass
-    if not cfg_ip:
-        cfg_ip = _detect_default_gateway_ip()
-    return cfg_ip, cfg_user, cfg_pass
-
-ROUTER_IP, ROUTER_USER, ROUTER_PASS = _load_router_credentials()
-
-# Zero-Trust Local Pairing Storage & Master Key
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TRUSTED_FILE = os.path.join(BASE_DIR, "trusted_devices.json")
 TRUST_LOCK = threading.Lock()
@@ -151,6 +132,101 @@ def _load_or_create_admin_master_key():
     return generated
 
 ADMIN_MASTER_KEY = _load_or_create_admin_master_key()
+_ROUTER_VAULT_AAD = b"recursos-router-vault-v1"
+
+def _get_router_vault_secret():
+    """Combina ADMIN_MASTER_KEY con /etc/machine-id para ligar la bóveda al servidor físico."""
+    machine_id = ""
+    if os.path.isfile("/etc/machine-id"):
+        try:
+            with open("/etc/machine-id", "r", encoding="utf-8") as f:
+                machine_id = f.read().strip()
+        except Exception:
+            pass
+    return f"{ADMIN_MASTER_KEY}:{machine_id}".encode("utf-8")
+
+def _encrypt_router_credentials_dict(payload):
+    """Cifra credenciales del router con AES-256-GCM y PBKDF2-HMAC-SHA256."""
+    if AESGCM is None or not isinstance(payload, dict):
+        return {}
+    salt = os.urandom(16)
+    nonce = os.urandom(12)
+    iterations = 200000
+    key = hashlib.pbkdf2_hmac("sha256", _get_router_vault_secret(), salt, iterations, dklen=32)
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    ciphertext = AESGCM(key).encrypt(nonce, raw, _ROUTER_VAULT_AAD)
+    return {
+        "encrypted": True,
+        "cipher": "AES-256-GCM",
+        "kdf": "PBKDF2-HMAC-SHA256",
+        "iterations": iterations,
+        "salt": base64.b64encode(salt).decode("ascii"),
+        "nonce": base64.b64encode(nonce).decode("ascii"),
+        "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
+    }
+
+def _decrypt_router_credentials_dict(enc_data):
+    """Descifra el sobre AES-256-GCM de credenciales del router."""
+    if AESGCM is None or not isinstance(enc_data, dict):
+        return {}
+    try:
+        salt = base64.b64decode(str(enc_data.get("salt", "")))
+        nonce = base64.b64decode(str(enc_data.get("nonce", "")))
+        ciphertext = base64.b64decode(str(enc_data.get("ciphertext", "")))
+        iterations = int(enc_data.get("iterations", 200000))
+        key = hashlib.pbkdf2_hmac("sha256", _get_router_vault_secret(), salt, iterations, dklen=32)
+        raw = AESGCM(key).decrypt(nonce, ciphertext, _ROUTER_VAULT_AAD)
+        decoded = json.loads(raw.decode("utf-8"))
+        return decoded if isinstance(decoded, dict) else {}
+    except Exception:
+        return {}
+
+def _load_router_credentials():
+    """Carga IP/usuario/clave del router desde env o .router_credentials.json cifrado en AES-256-GCM."""
+    cfg_ip = os.environ.get("RECURSOS_ROUTER_IP", "").strip()
+    cfg_user = os.environ.get("RECURSOS_ROUTER_USER", "").strip()
+    cfg_pass = os.environ.get("RECURSOS_ROUTER_PASS", "").strip()
+    creds_encrypted = False
+    creds_file = os.path.join(BASE_DIR, ".router_credentials.json")
+    if os.path.isfile(creds_file):
+        try:
+            with open(creds_file, "r", encoding="utf-8") as f:
+                raw_creds = json.load(f)
+            if isinstance(raw_creds, dict):
+                if raw_creds.get("encrypted") is True:
+                    dec = _decrypt_router_credentials_dict(raw_creds)
+                    if dec:
+                        creds_encrypted = True
+                        cfg_ip = cfg_ip or str(dec.get("router_ip", "")).strip()
+                        cfg_user = cfg_user or str(dec.get("router_user", "")).strip()
+                        cfg_pass = cfg_pass or str(dec.get("router_pass", "")).strip()
+                else:
+                    plain_ip = str(raw_creds.get("router_ip", "")).strip()
+                    plain_user = str(raw_creds.get("router_user", "")).strip()
+                    plain_pass = str(raw_creds.get("router_pass", "")).strip()
+                    cfg_ip = cfg_ip or plain_ip
+                    cfg_user = cfg_user or plain_user
+                    cfg_pass = cfg_pass or plain_pass
+                    if plain_ip and plain_user and plain_pass and AESGCM is not None:
+                        try:
+                            enc_blob = _encrypt_router_credentials_dict({
+                                "router_ip": plain_ip,
+                                "router_user": plain_user,
+                                "router_pass": plain_pass,
+                            })
+                            with open(creds_file, "w", encoding="utf-8") as wf:
+                                json.dump(enc_blob, wf, indent=2)
+                            os.chmod(creds_file, 0o600)
+                            creds_encrypted = True
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+    if not cfg_ip:
+        cfg_ip = _detect_default_gateway_ip()
+    return cfg_ip, cfg_user, cfg_pass, creds_encrypted
+
+ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_CREDS_ENCRYPTED = _load_router_credentials()
 # Hash criptográfico con sal (PBKDF2-HMAC-SHA256) para clave maestra secundaria de respaldo
 _DEFAULT_SECONDARY_KEY_HASH = "pbkdf2_sha256$200000$d5d02ed57d1232f3da8f212fb615ad59$c1f752cd0c3ffe58203801901e98f7263401f847c74e815d375a8a3e5227ae3f"
 
@@ -6551,8 +6627,10 @@ def fetch_wifi_worker():
             # Sondeo opcional de AP/router vía SSH sólo si está explícitamente configurado
             if ROUTER_IP and ROUTER_USER and ROUTER_PASS and shutil.which("sshpass"):
                 try:
+                    ssh_env = os.environ.copy()
+                    ssh_env["SSHPASS"] = ROUTER_PASS
                     ssh_cmd = [
-                        'sshpass', '-p', ROUTER_PASS,
+                        'sshpass', '-e',
                         'ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=4',
                         f'{ROUTER_USER}@{ROUTER_IP}',
                         '''
@@ -6573,7 +6651,7 @@ def fetch_wifi_worker():
                         cat /proc/fcache/l2list 2>/dev/null
                         '''
                     ]
-                    p = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=8)
+                    p = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=8, env=ssh_env)
                     if p.returncode == 0:
                         router_ssh_ok = True
                         current = None
@@ -6913,6 +6991,10 @@ def fetch_wifi_worker():
             try:
                 p_neigh = subprocess.run(['ip', 'neigh'], capture_output=True, text=True, timeout=2)
                 for nline in p_neigh.stdout.splitlines():
+                    m_dev = re.search(r'\bdev\s+(\S+)', nline)
+                    n_dev = m_dev.group(1) if m_dev else ""
+                    if n_dev.startswith(("docker", "br-", "veth", "virbr", "tailscale", "tun", "wg")):
+                        continue
                     m_n = re.search(r'^(\d+\.\d+\.\d+\.\d+)\s+.*lladdr\s+([0-9a-fA-F:]{17})\s+(\w+)', nline)
                     if m_n and _is_lan_ipv4(m_n.group(1)):
                         n_ip, n_mac, n_state = m_n.group(1), m_n.group(2).upper(), m_n.group(3)
@@ -7017,6 +7099,8 @@ def fetch_wifi_worker():
                 "band_5g": c_5,
                 "router_ip": detected_router_ip,
                 "router_online": bool(router_ssh_ok or any(c.get('is_gateway') for c in cable_clients)),
+                "router_encrypted": bool(ROUTER_CREDS_ENCRYPTED),
+                "router_auth_mode": "SSH + AES-256-GCM" if ROUTER_CREDS_ENCRYPTED else "SSH",
                 "total_tx_bytes": cable_tx + wifi_tx,
                 "total_rx_bytes": cable_rx + wifi_rx,
                 "cable_tx_bytes": cable_tx,

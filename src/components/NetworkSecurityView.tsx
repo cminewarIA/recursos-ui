@@ -527,6 +527,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               <div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs font-mono tabular-nums text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
                 Tráfico acumulado: ↓ {formatBytes(metrics?.net?.rx_total_bytes)} · ↑ {formatBytes(metrics?.net?.tx_total_bytes)}
                 {metrics?.wifi_summary?.router_ip ? ` · Puerta de enlace: ${metrics.wifi_summary.router_ip}` : ''}
+                {metrics?.wifi_summary?.router_encrypted ? ` · Credenciales cifradas (${metrics.wifi_summary.router_auth_mode || 'AES-256-GCM'})` : ''}
               </div>
             )}
           </section>
