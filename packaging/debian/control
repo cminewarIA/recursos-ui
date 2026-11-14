@@ -1,14 +1,14 @@
 Package: recursos-cockpit
-Version: 12.0.2
+Version: 12.0.3
 Section: utils
 Priority: optional
 Architecture: amd64
 Maintainer: cminewarIA <cminewarIA@users.noreply.github.com>
 Homepage: https://github.com/cminewarIA/recursos-ui
 Depends: python3, python3-gi, python3-gi-cairo, python3-cairo, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, python3-psutil, scrcpy, adb
-Replaces: recursos-cockpit (<< 12.0.2)
+Replaces: recursos-cockpit (<< 12.0.3)
 Provides: recursos-cockpit
-Description: Recursos Cockpit (v2B.0.2) - Panel Unificado y Control DeX
+Description: Recursos Cockpit (v2B.0.3) - Panel Unificado y Control DeX
  Aplicacion nativa de escritorio para Linux/Ubuntu construida en GTK 3 y WebKit2
  con aceleracion por hardware que renderiza el panel unificado minimalista en español
  e incluye selector de conexion con el nodo, actualizacion desde GitHub y control DeX USB.

@@ -3501,8 +3501,8 @@ def get_display_version(pkg_ver=None):
     env_disp = os.environ.get("RECURSOS_DISPLAY_VERSION", "").strip()
     if env_disp:
         return env_disp
-    if ver == "12.0.0":
-        return "2B.0.0"
+    if ver.startswith("12."):
+        return "2B." + ver[3:]
     return ver
 
 AUTO_INSTALL_CONFIG_FILE = os.path.join(BASE_DIR, "auto_install_config.json")

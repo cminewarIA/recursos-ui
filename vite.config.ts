@@ -84,7 +84,7 @@ function readAppVersion(): string {
 
 function getDisplayVersion(pkgVer?: string): string {
   const ver = (pkgVer || readAppVersion()).trim();
-  if (ver === '12.0.0') return '2B.0.0';
+  if (ver.startsWith('12.')) return `2B.${ver.slice(3)}`;
   return ver;
 }
 
