@@ -678,7 +678,7 @@
         <div>
           <div class="brand-title">Manual Interactivo · Panel de Recursos</div>
           <div class="brand-sub">
-            <span class="pill accent mono" id="manualVersionBadge">v2B.1.0 (12.1.0)</span>
+            <span class="pill accent mono" id="manualVersionBadge">v2B.1.1 (12.1.1)</span>
             <span class="pill emerald" id="liveServerBadge">Modo autónomo</span>
           </div>
         </div>
@@ -1040,12 +1040,12 @@
           <div class="panel-box">
             <div style="font-size:14px; font-weight:700; margin-bottom:10px;">Descarga directa y actualización limpia</div>
             <div style="display:grid; gap:8px; margin-bottom:12px;">
-              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.1.0</a>
-              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android (.apk) · 12.1.0</a>
+              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.1.1</a>
+              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android (.apk) · 12.1.1</a>
             </div>
             <div class="code-wrap">
               <button type="button" class="copy-btn" data-copy-target="cmdInstallBlock">Copiar</button>
-              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.1.0_amd64.deb</pre>
+              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.1.1_amd64.deb</pre>
             </div>
           </div>
         </div>
@@ -1162,7 +1162,7 @@
 
       function setVersionText(ver, disp, extra) {
         const badge = document.getElementById('manualVersionBadge');
-        if (badge) badge.textContent = 'v' + (disp || '2B.1.0') + ' (' + (ver || '12.1.0') + ')' + (extra ? ' · ' + extra : '');
+        if (badge) badge.textContent = 'v' + (disp || '2B.1.1') + ' (' + (ver || '12.1.1') + ')' + (extra ? ' · ' + extra : '');
       }
 
       if (window.__INITIAL_APP_VERSION__) {
@@ -1186,7 +1186,7 @@
           if (r.ok) {
             const d = await r.json();
             serverOnline = true;
-            setVersionText(d.current_version || '12.1.0', d.display_version || '2B.1.0', d.local_commit || '');
+            setVersionText(d.current_version || '12.1.1', d.display_version || '2B.1.1', d.local_commit || '');
             const b = document.getElementById('liveServerBadge');
             b.textContent = 'Conectado al nodo en vivo';
             b.className = 'pill emerald';
@@ -1677,7 +1677,7 @@
             'Lanzador inteligente en 3 tarjetas con autodescubrimiento LAN y gestor local.',
             'Paquete firmado con GPG (_gpgorigin) compatible con apt y Ubuntu App Center.'
           ],
-          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.1.0_amd64.deb'
+          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.1.1_amd64.deb'
         },
         android: {
           title: 'App Nativa Android (.apk)',
@@ -1688,7 +1688,7 @@
             'Conmutación transparente entre red Wi-Fi local y dominio DuckDNS al salir de casa.',
             'Firmada con keystore oficial v1/v2/v3 para actualizar encima sin desinstalar.'
           ],
-          cmd: 'adb install -r dist/recursos-cockpit_12.1.0.apk'
+          cmd: 'adb install -r dist/recursos-cockpit_12.1.1.apk'
         },
         web: {
           title: 'Navegador Web Moderno (SPA React 19)',
@@ -1739,8 +1739,8 @@
 
       // 8. Consola API REST en Vivo
       const API_ENDPOINTS = [
-        { method: 'GET', path: '/api/version', desc: 'Versión canónica, commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.1.0', display_version: '2B.1.0', branch: 'main', update_available: false } },
-        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { display_version: '2B.1.0' } } },
+        { method: 'GET', path: '/api/version', desc: 'Versión canónica, commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.1.1', display_version: '2B.1.1', branch: 'main', update_available: false } },
+        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { display_version: '2B.1.1' } } },
         { method: 'GET', path: '/api/system/logs?limit=10', desc: 'Agregador unificado de fallos de Systemd, Docker y Kernel', sample: { ok: true, total_errors: 0, counts_by_category: { systemd: 0, docker: 0, kernel: 0 } } },
         { method: 'GET', path: '/api/auth/devices', desc: 'Listado de dispositivos físicos agrupados con certificados HMAC', sample: [{ id: 'dev_ejemplo', access_level: 'FULL_NATIVE_ACCESS', certificate_scope: 'PER_PHYSICAL_DEVICE' }] },
         { method: 'GET', path: '/api/dns/duckdns', desc: 'Estado y última sincronización del dominio dinámico DuckDNS', sample: { available: true, online: true, message: 'DuckDNS sincronizado correctamente' } },
@@ -1792,6 +1792,7 @@
 
       // 9. Changelog interactivo filtrado por tipo SemVer
       const CHANGELOG = [
+        { ver: 'v12.1.1 (v2B.1.1)', type: 'PATCH', desc: 'Reescritura integral desde cero de README.md con arquitectura visual Mermaid en 3 diagramas, matriz comparativa multiplataforma, guía Zero-Hardcoding y resumen limpio de hitos SemVer.' },
         { ver: 'v12.1.0 (v2B.1.0)', type: 'MINOR', desc: 'Nuevo Manual Web Interactivo (/manual, /readme y docs/index.html) con explorador SVG de arquitectura, simulador HiDPI de CPU/RAM/Disco, donut interactivo ASUS AiMesh, simulador Zero-Trust HMAC, consola API en vivo y modernización visual de README.md.' },
         { ver: 'v12.0.6 (v2B.0.6)', type: 'PATCH', desc: 'Erradicación total de spam sudo PAM en journalctl (capacidades CAP_NET_ADMIN), poda SQLite acotada cada 60s, caché de Fail2ban/Pi-hole, caché byte-splicing (<18 ms), serie histórica real disk_pct y reactividad de subpestañas en React 19.' },
         { ver: 'v12.0.5 (v2B.0.5)', type: 'PATCH', desc: 'Bóveda cifrada AES-256-GCM + PBKDF2-HMAC-SHA256 para credenciales del router ASUS AiMesh, SSH sin exposición en cmdline y filtrado de puentes virtuales Docker.' },

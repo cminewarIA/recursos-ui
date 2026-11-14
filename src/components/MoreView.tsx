@@ -424,7 +424,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             {showTechUpdate && (
               <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                 <div>
-                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.1.0'} · Commit local:{' '}
+                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.1.1'} · Commit local:{' '}
                   {activeVer?.local_commit || activeVer?.local_hash || 'local'} · Remoto:{' '}
                   {activeVer?.remote_commit || activeVer?.remote_hash || '--'}
                 </div>
