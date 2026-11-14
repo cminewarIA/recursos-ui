@@ -18,6 +18,7 @@ import http.server
 import json
 import os
 import platform
+import re
 import socket
 import socketserver
 import subprocess
@@ -206,17 +207,19 @@ def _read_sysfs_str(path):
     return ""
 
 
-def collect_native_device_telemetry():
-    """
-    Recopila con acceso total al sistema operativo todos los metadatos de hardware,
-    silicio, red, energía y entorno gráfico del equipo Ubuntu Linux sin ningún valor hardcodeado.
-    """
-    ver = get_app_version()
+_STATIC_HW_TELEMETRY_CACHE = None
+
+
+def _collect_static_hw_telemetry():
+    """Recopila una sola vez por proceso los campos DMI, CPU y GPU sin re-spawnear lspci en cada poll."""
+    global _STATIC_HW_TELEMETRY_CACHE
+    if _STATIC_HW_TELEMETRY_CACHE is not None:
+        return _STATIC_HW_TELEMETRY_CACHE
+
     hostname = socket.gethostname()
     arch = platform.machine() or "x86_64"
     kernel = f"{platform.system()} {platform.release()}"
 
-    # 1. OS Distro desde /etc/os-release
     os_distro = kernel
     if os.path.isfile("/etc/os-release"):
         try:
@@ -228,7 +231,6 @@ def collect_native_device_telemetry():
         except Exception:
             pass
 
-    # 2. Identidad DMI / SMBIOS de placa y fabricante
     dmi_base = "/sys/devices/virtual/dmi/id"
     if not os.path.isdir(dmi_base):
         dmi_base = "/sys/class/dmi/id"
@@ -262,7 +264,6 @@ def collect_native_device_telemetry():
     }
     chassis_type = chassis_map.get(chassis_code, "Linux Workstation")
 
-    # 3. CPU & GPU
     cpu_model = ""
     if os.path.isfile("/proc/cpuinfo"):
         try:
@@ -292,6 +293,45 @@ def collect_native_device_telemetry():
             gpu_model = out.split(":", 2)[-1].strip()
     except Exception:
         pass
+
+    _STATIC_HW_TELEMETRY_CACHE = {
+        "hostname": hostname,
+        "arch": arch,
+        "kernel": kernel,
+        "os_distro": os_distro,
+        "manufacturer": manufacturer,
+        "product_name": product_name,
+        "board_name": board_name,
+        "bios_version": bios_version,
+        "chassis_type": chassis_type,
+        "cpu_model": cpu_model,
+        "phys_cores": phys_cores,
+        "log_cores": log_cores,
+        "gpu_model": gpu_model,
+    }
+    return _STATIC_HW_TELEMETRY_CACHE
+
+
+def collect_native_device_telemetry():
+    """
+    Recopila con acceso total al sistema operativo todos los metadatos de hardware,
+    silicio, red, energía y entorno gráfico del equipo Ubuntu Linux sin ningún valor hardcodeado.
+    """
+    ver = get_app_version()
+    hw = _collect_static_hw_telemetry()
+    hostname = hw["hostname"]
+    arch = hw["arch"]
+    kernel = hw["kernel"]
+    os_distro = hw["os_distro"]
+    manufacturer = hw["manufacturer"]
+    product_name = hw["product_name"]
+    board_name = hw["board_name"]
+    bios_version = hw["bios_version"]
+    chassis_type = hw["chassis_type"]
+    cpu_model = hw["cpu_model"]
+    phys_cores = hw["phys_cores"]
+    log_cores = hw["log_cores"]
+    gpu_model = hw["gpu_model"]
 
     # 4. RAM & Almacenamiento (con respaldo directo /proc/meminfo y os.statvfs)
     vm = psutil.virtual_memory() if psutil else None
@@ -397,9 +437,14 @@ def collect_native_device_telemetry():
     screen_resolution = ""
     if HAS_GTK:
         try:
-            scr = Gdk.Screen.get_default()
-            if scr:
-                screen_resolution = f"{scr.get_width()}x{scr.get_height()}"
+            disp = Gdk.Display.get_default()
+            if disp:
+                mon = disp.get_primary_monitor()
+                if mon is None and disp.get_n_monitors() > 0:
+                    mon = disp.get_monitor(0)
+                if mon:
+                    geo = mon.get_geometry()
+                    screen_resolution = f"{geo.width}x{geo.height}"
         except Exception:
             pass
 
@@ -1282,7 +1327,6 @@ class ServerConnectionManager:
                 return False, "El paquete .deb descargado está corrupto o incompleto.", ""
 
             runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
-            relaunch = "/usr/bin/recursos-cockpit" if (relaunch_on_deb and os.path.isfile("/usr/bin/recursos-cockpit")) else ""
             helper_script = "/tmp/recursos-cockpit-apply-update.sh"
             with open(helper_script, "w", encoding="utf-8") as hf:
                 hf.write(
@@ -1300,16 +1344,6 @@ class ServerConnectionManager:
                 pass
             if inst.returncode == 0:
                 new_ver = self.get_installed_deb_version() or info.get("github_version") or get_app_version()
-                if relaunch and os.environ.get("DISPLAY"):
-                    try:
-                        subprocess.Popen(
-                            [relaunch],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            start_new_session=True,
-                        )
-                    except Exception:
-                        pass
                 return True, f"app Ubuntu v{get_display_version(new_ver)}", new_ver
             err_detail = (inst.stderr or inst.stdout or "").strip()
             return False, f"No se pudo completar la instalación de actualización: {err_detail[:180]}", ""
@@ -1439,16 +1473,29 @@ class ServerConnectionManager:
             except Exception as ge:
                 logs.append(f"[!] Aviso al actualizar repositorio git local: {ge}")
 
-        # Si todo estaba igualado o la app ya va por encima de GitHub y el servidor ya está igualado
+        # Si todo estaba igualado o la app supera GitHub y el usuario solicita sincronizar web local
         if not updated_parts:
             if app_above_github:
-                msg = (
-                    f"La App Ubuntu y la web local ya están en v{get_display_version(app_ver)} "
-                    f"(por encima de GitHub v{get_display_version(gh_ver)}). Sin cambios pendientes."
-                )
-                logs.append(f"[✓] {msg}")
-                new_info = self.check_github_app_update(target_url=srv_url, refresh_server=True)
-                return True, msg, new_info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
+                if server_reachable:
+                    sync_ok, sync_msg, _ = self.sync_web_bundle_to_server(
+                        target_url=srv_url,
+                        force=True,
+                        version_override=app_ver,
+                    )
+                    if sync_ok:
+                        web_synced = True
+                        updated_parts.append(f"web local v{get_display_version(app_ver)}")
+                        logs.append(f"[✓] {sync_msg}")
+                    else:
+                        return False, sync_msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
+                else:
+                    msg = (
+                        f"La App Ubuntu está en v{get_display_version(app_ver)} "
+                        f"(por encima de GitHub v{get_display_version(gh_ver)}). Conecta el servidor local para sincronizar la web."
+                    )
+                    logs.append(f"[i] {msg}")
+                    new_info = self.check_github_app_update(target_url=srv_url, refresh_server=True)
+                    return True, msg, new_info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
 
             if gh_ver and parse_semver_tuple(gh_ver) == parse_semver_tuple(app_ver) and server_reachable:
                 # Re-sincronización limpia explícita cuando el usuario pulsa el botón estando al día
@@ -2039,7 +2086,24 @@ class LocalHtmlBridgeServer:
                         parent.conn_mgr.is_revoked = True
                         parent.conn_mgr.connection_mode = "REVOKED"
                         parent.conn_mgr._save_config()
-                    return False
+                    try:
+                        err_body = he.read()
+                    except Exception:
+                        err_body = b""
+                    if not err_body:
+                        err_body = json.dumps({
+                            "ok": False,
+                            "success": False,
+                            "error": f"Error HTTP {he.code} en el servidor remoto",
+                        }).encode("utf-8")
+                    ctype = he.headers.get("Content-Type", "application/json") if he.headers else "application/json"
+                    self.send_response(he.code)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(err_body)))
+                    self.end_headers()
+                    self.wfile.write(err_body)
+                    return True
                 except Exception:
                     return False
 
@@ -2086,6 +2150,18 @@ class LocalHtmlBridgeServer:
                             "environment": "ubuntu_native",
                             "session_running": parent.dex.is_running,
                             "dependencies": deps,
+                            "devices": devices,
+                        }
+                    )
+                    return
+
+                if clean_path == "/api/dex/devices":
+                    devices = parent.dex.list_connected_devices(usb_only=True)
+                    self._send_json(
+                        {
+                            "ok": True,
+                            "success": True,
+                            "usb_only": True,
                             "devices": devices,
                         }
                     )
@@ -2262,6 +2338,16 @@ class LocalHtmlBridgeServer:
                             }
                         )
                         return
+                    if clean_path == "/api/maps/config":
+                        self._send_json(
+                            {
+                                "ok": True,
+                                "provider": "leaflet_osm",
+                                "requires_api_key": False,
+                                "tile_url": "/api/maps/tile/{theme}/{z}/{x}/{y}.png",
+                            }
+                        )
+                        return
                     if clean_path == "/api/system/logs":
                         self._send_json(
                             {
@@ -2282,7 +2368,7 @@ class LocalHtmlBridgeServer:
                             }
                         )
                         return
-                    self._send_json({"ok": True, "logs": [], "entries": [], "connections": []})
+                    self._send_json({"ok": False, "success": False, "error": f"Endpoint no encontrado: {clean_path}"}, status=404)
                     return
 
                 # 2b. Manual Web Interactivo (/manual, /manual.html, /readme)
@@ -2387,6 +2473,36 @@ class LocalHtmlBridgeServer:
 
                 self._send_json({"ok": False, "error": "Modo sin conexión al servidor remoto"}, 503)
 
+            def _handle_body_proxy(self, method):
+                try:
+                    length = int(self.headers.get("Content-Length", 0) or 0)
+                except (ValueError, TypeError):
+                    self._send_json({"ok": False, "error": "Content-Length inválido"}, 400)
+                    return
+                if length < 0 or length > 5 * 1024 * 1024:
+                    self._send_json({"ok": False, "error": "Payload demasiado grande"}, 413)
+                    return
+                raw_body = self.rfile.read(length) if length > 0 else b""
+                if self._proxy_to_remote(method, body=(raw_body if length > 0 else None)):
+                    return
+                self._send_json({"ok": False, "error": "Modo sin conexión al servidor remoto"}, 503)
+
+            def do_PUT(self):
+                self._handle_body_proxy("PUT")
+
+            def do_DELETE(self):
+                self._handle_body_proxy("DELETE")
+
+            def do_PATCH(self):
+                self._handle_body_proxy("PATCH")
+
+            def do_OPTIONS(self):
+                self.send_response(204)
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Device-Token")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
         self.server = _ThreadedTCPServer(("127.0.0.1", 0), BridgeHandler)
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -2442,11 +2558,13 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         )
         self.set_default_size(1280, 820)
         self.set_position(Gtk.WindowPosition.CENTER)
-        self.set_wmclass("recursos-cockpit", "recursos-cockpit")
         self.is_fullscreen = False
         self.start_in_dex = start_in_dex
         self.webview = None
         self.main_stack = None
+        self._webview_uri_loaded = False
+        self._pending_nav_view = "dex" if start_in_dex else None
+        self._target_webview_uri = ""
 
         self._apply_css()
         self._set_app_icon()
@@ -2461,6 +2579,9 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
         self.connect("key-press-event", self._on_key_press)
         self.connect("destroy", lambda *_: self.bridge.stop())
+        if hasattr(self, "btn_back_home"):
+            self.btn_back_home.set_no_show_all(True)
+            self.btn_back_home.set_visible(bool(self.start_in_dex))
         self.show_all()
 
         GLib.idle_add(self._refresh_config_labels)
@@ -2486,14 +2607,46 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
     def _on_node_connected_ui(self, target_view="inicio"):
         self._refresh_connection_badge()
         self._refresh_config_labels()
-        self._sync_webview_session()
+        if target_view:
+            self._pending_nav_view = target_view
+        if self.webview and HAS_WEBKIT2:
+            if not self._webview_uri_loaded and self._target_webview_uri:
+                nav_view = target_view or ("dex" if self.start_in_dex else "inicio")
+                base_uri = self._target_webview_uri.split("?")[0]
+                self.webview.load_uri(f"{base_uri}?env=ubuntu_native&view={nav_view}")
+            else:
+                self._set_webview_paused(False)
+                self._sync_webview_session()
+                if target_view:
+                    self._navigate_spa(target_view)
+                    self._pending_nav_view = None
         if self.main_stack:
             self.main_stack.set_visible_child_name("webview")
         if hasattr(self, "btn_back_home"):
             self.btn_back_home.set_visible(True)
-        if target_view:
-            self._navigate_spa(target_view)
         return False
+
+    def _on_webview_load_changed(self, _webview, load_event):
+        if HAS_WEBKIT2 and WebKit2 is not None and load_event == WebKit2.LoadEvent.FINISHED:
+            self._webview_uri_loaded = True
+            self._set_webview_paused(False)
+            self._sync_webview_session()
+            if self._pending_nav_view:
+                nav = self._pending_nav_view
+                self._pending_nav_view = None
+                self._navigate_spa(nav)
+
+    def _set_webview_paused(self, paused):
+        if self.webview and HAS_WEBKIT2 and self._webview_uri_loaded:
+            flag = "true" if paused else "false"
+            js = f"window.__RECURSOS_PAUSED__={flag};window.dispatchEvent(new CustomEvent('recursos-visibility',{{detail:{{paused:{flag}}}}}));"
+            try:
+                if hasattr(self.webview, "evaluate_javascript"):
+                    self.webview.evaluate_javascript(js, -1, None, None, None, None, None)
+                elif hasattr(self.webview, "run_javascript"):
+                    self.webview.run_javascript(js, None, None, None)
+            except Exception:
+                pass
 
     def _sync_webview_session(self):
         if self.webview and HAS_WEBKIT2:
@@ -2585,12 +2738,21 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
     def _show_launcher_view(self, stack_name="home"):
         if self.main_stack:
             self.main_stack.set_visible_child_name(stack_name)
-        if stack_name == "home":
+        is_home = (stack_name == "home")
+        if hasattr(self, "btn_back_home"):
+            self.btn_back_home.set_visible(not is_home)
+        if is_home:
+            self._set_webview_paused(True)
             self._refresh_config_labels()
             self._refresh_local_node_panel()
+        else:
+            self._set_webview_paused(False)
 
     def _navigate_spa(self, view_name):
         if self.webview and HAS_WEBKIT2:
+            if not self._webview_uri_loaded:
+                self._pending_nav_view = view_name
+                return
             js = f"if(typeof window.switchView==='function'){{window.switchView('{view_name}');}}"
             try:
                 if hasattr(self.webview, "evaluate_javascript"):
@@ -2782,7 +2944,11 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
                 rgba.parse("#f6f7f9")
                 self.webview.set_background_color(rgba)
 
-            self.webview.load_uri(target_uri)
+            self._target_webview_uri = target_uri
+            self.webview.connect("load-changed", self._on_webview_load_changed)
+            # Carga diferida: no cargar HTML5/animations hasta entrar al panel o --dex (evita consumo CPU en menú inicio)
+            if self.start_in_dex:
+                self.webview.load_uri(target_uri)
             self.main_stack.add_named(self.webview, "webview")
         else:
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
@@ -2876,12 +3042,34 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             )
 
         def worker():
-            ok, msg, gh = self.conn_mgr.update_installed_app_from_github()
-            GLib.idle_add(self._on_github_update_finished, ok, msg, gh)
+            ok, msg, gh, flags = self.conn_mgr.perform_unified_update(relaunch_on_deb=False)
+            GLib.idle_add(self._on_github_update_finished, ok, msg, gh, flags)
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _on_github_update_finished(self, ok, msg, gh):
+    def _reexec_after_update(self):
+        try:
+            self.bridge.stop()
+        except Exception:
+            pass
+        exe = "/usr/bin/recursos-cockpit" if os.path.isfile("/usr/bin/recursos-cockpit") else f"{sys.executable} {os.path.abspath(__file__)}"
+        args = " ".join(f"'{a}'" for a in sys.argv[1:])
+        cmd_str = f"sleep 0.6 && {exe} {args} >/dev/null 2>&1"
+        try:
+            subprocess.Popen(["bash", "-c", cmd_str], start_new_session=True)
+        except Exception:
+            pass
+        try:
+            app = self.get_application()
+            if app:
+                app.quit()
+            else:
+                self.destroy()
+        except Exception:
+            pass
+        return False
+
+    def _on_github_update_finished(self, ok, msg, gh, flags=None):
         if hasattr(self, "lbl_home_status"):
             self.lbl_home_status.set_text(msg)
         if hasattr(self, "btn_opt2_update"):
@@ -2889,6 +3077,10 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         self._refresh_local_node_panel(gh)
         if ok:
             self._refresh_config_labels()
+            if isinstance(flags, dict) and flags.get("deb_installed") and os.environ.get("DISPLAY"):
+                if hasattr(self, "lbl_home_status"):
+                    self.lbl_home_status.set_text(f"{msg} Reiniciando aplicación...")
+                GLib.timeout_add(450, self._reexec_after_update)
         return False
 
     def _refresh_config_labels(self):
@@ -2988,7 +3180,8 @@ class RecursosNativeApp(Gtk.Application):
     def do_startup(self):
         Gtk.Application.do_startup(self)
         GLib.set_prgname("recursos-cockpit")
-        GLib.set_application_name("Recursos Cockpit")
+        if not GLib.get_application_name():
+            GLib.set_application_name("Recursos Cockpit")
 
     def do_activate(self):
         if not self.win:

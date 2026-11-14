@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   Activity,
   AlertTriangle,
@@ -46,6 +46,7 @@ export interface ExpandChartSpec {
   maxRight?: number;
   chartKind?: 'cpu' | 'ram' | 'gpu' | 'storage' | 'net';
   nicName?: string;
+  diskMountpoint?: string;
 }
 
 interface OverviewViewProps {
@@ -214,9 +215,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     };
   }, [disks]);
 
-  const sortedDisks = useMemo(() => {
+  const independentDisks = useMemo(() => {
+    const seenKeys = new Set<string>();
+    const unique: DiskInfo[] = [];
+    for (const d of disks) {
+      if (d.pool_primary === false) continue;
+      const key = d.pool_key || d.mountpoint || d.device || '';
+      if (!key || seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      unique.push(d);
+    }
     const order = (d: DiskInfo) => (d.kind === 'removable' ? 1 : d.kind === 'network' ? 2 : 0);
-    return [...disks].sort((a, b) => {
+    return unique.sort((a, b) => {
       const oa = order(a);
       const ob = order(b);
       if (oa !== ob) return oa - ob;
@@ -226,8 +236,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     });
   }, [disks]);
 
-  const readRateBytes = Number(metrics?.disk_io?.read_bytes_sec ?? 0);
-  const writeRateBytes = Number(metrics?.disk_io?.write_bytes_sec ?? 0);
   const netRxBytes = Number(metrics?.net?.rx_bytes_sec ?? 0);
   const netTxBytes = Number(metrics?.net?.tx_bytes_sec ?? 0);
 
@@ -246,13 +254,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const gpuHist = hist?.gpu ?? [];
   const netRxHist = hist?.net_rx ?? [];
   const netTxHist = hist?.net_tx ?? [];
-  const diskReadHist = hist?.disk_r ?? [];
-  const diskWriteHist = hist?.disk_w ?? [];
-  const diskPctHist = useMemo(() => {
-    if (hist?.disk_pct && hist.disk_pct.length > 0) return hist.disk_pct;
-    const len = Math.max(diskReadHist.length, timestamps.length);
-    return len > 0 ? Array.from({ length: len }, () => storageSummary.localPercent) : [];
-  }, [hist?.disk_pct, diskReadHist.length, timestamps.length, storageSummary.localPercent]);
 
   const cpuSeries: ChartSeries[] = useMemo(
     () => [{ id: 'cpu', metricKey: 'cpu', label: 'Procesador', data: cpuHist, color: '#0284c7', unit: '%' }],
@@ -273,19 +274,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     ],
     [netRxHist, netTxHist]
   );
-  const storageSeries: ChartSeries[] = useMemo(
-    () => [
-      { id: 'disk_r', metricKey: 'disk_r', label: 'Lectura', data: diskReadHist, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.16, axis: 'left' },
-      { id: 'disk_w', metricKey: 'disk_w', label: 'Escritura', data: diskWriteHist, color: '#ea580c', unit: 'MB/s', decimals: 2, fillAlpha: 0.08, axis: 'left' },
-      { id: 'disk_pct', metricKey: 'disk_pct', label: 'Espacio usado', data: diskPctHist, color: '#64748b', unit: '%', decimals: 1, fillAlpha: 0, dashed: true, axis: 'right' },
-    ],
-    [diskReadHist, diskWriteHist, diskPctHist]
-  );
 
   const cpuTone = getHealthTone(cpuPct);
   const ramTone = getHealthTone(ramPct);
   const gpuTone = getHealthTone(gpuPct);
-  const diskTone = getHealthTone(storageSummary.localPercent);
 
   const onlineWifi = useMemo(
     () => (metrics?.wifi_clients ?? []).filter((c) => c.online !== false && c.is_online !== false),
@@ -763,260 +755,239 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
         </motion.article>
 
-        {/* 5. Almacenamiento + Unidades Separadas (Locales, Extraíbles USB/SD y Red/NAS deduplicado) */}
-        <motion.article
-          initial={{ opacity: 0, y: 16, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.44, delay: 0.2, ease: COCKPIT_EASE }}
-          className="cockpit-bento md:col-span-2 flex flex-col justify-between p-5"
-        >
-          <div>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                  <span className="cockpit-pill-amber inline-flex h-6 w-6 items-center justify-center rounded-lg">
-                    <HardDrive className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">
-                    Almacenamiento y discos disponibles
-                  </span>
-                  <span aria-hidden="true">·</span>
-                  <span className={diskTone.textClass}>{diskTone.label}</span>
-                </div>
+        {/* 5+. Widgets independientes y completos de almacenamiento (Locales, USB/SD Extraíbles y NAS único) */}
+        <AnimatePresence mode="popLayout">
+          {independentDisks.map((d) => {
+            const widgetKey = d.pool_key || d.mountpoint || d.device || 'disk';
+            const isNet = d.kind === 'network';
+            const isRem = d.kind === 'removable' || Boolean(d.is_removable);
+            const isMounted = d.mounted !== false;
+            const pct = Math.min(100, Math.max(0, Number(d.percent ?? 0)));
+            const tone = getHealthTone(pct);
+            const readMb = Number(d.read_bytes_sec ?? 0) / (1024 * 1024);
+            const writeMb = Number(d.write_bytes_sec ?? 0) / (1024 * 1024);
 
-                <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
-                  <AnimatedMetricValue
-                    value={storageSummary.localTotalBytes > 0 ? storageSummary.localPercent : storageSummary.percent}
-                    decimals={1}
-                    suffix=" %"
-                    className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white"
-                  />
-                  <span className="cockpit-pill-amber rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
-                    L {formatMbRate(readRateBytes / (1024 * 1024))} · E {formatMbRate(writeRateBytes / (1024 * 1024))}
-                  </span>
-                  <span className="cockpit-subtile rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-slate-700 dark:text-slate-200">
-                    Local: {formatBytes(storageSummary.localUsedBytes)} / {formatBytes(storageSummary.localTotalBytes)}
-                  </span>
-                  {storageSummary.netPoolsCount > 0 && (
-                    <span
-                      title="Los recursos compartidos del mismo servidor NAS comparten el mismo espacio físico y no se multiplican en el total"
-                      className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums"
-                    >
-                      NAS único ({storageSummary.netMountsCount} carpetas): {formatBytes(storageSummary.netUsedBytes)} / {formatBytes(storageSummary.netTotalBytes)}
-                    </span>
-                  )}
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums ${
-                      storageSummary.removableCount > 0 ? 'cockpit-pill-violet' : 'cockpit-subtile text-slate-500 dark:text-slate-400'
-                    }`}
-                  >
-                    Extraíbles USB/SD: {storageSummary.removableCount > 0 ? `${storageSummary.removableCount} (${formatBytes(storageSummary.removableTotalBytes)})` : '0 conectadas'}
-                  </span>
-                </div>
+            const pillClass = isRem
+              ? 'cockpit-pill-violet'
+              : isNet
+                ? 'cockpit-pill-cyan'
+                : 'cockpit-pill-amber';
+            const readColor = isRem ? '#7c3aed' : isNet ? '#0284c7' : '#f59e0b';
+            const writeColor = isRem ? '#a855f7' : isNet ? '#06b6d4' : '#ea580c';
+            const barClass =
+              pct >= 90
+                ? 'bg-[#ef4444]'
+                : isRem
+                  ? 'bg-[#7c3aed] dark:bg-[#a78bfa]'
+                  : isNet
+                    ? 'bg-[#0284c7] dark:bg-[#38bdf8]'
+                    : 'bg-[#f59e0b] dark:bg-[#fbbf24]';
 
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                  <span>
-                    Capacidad total combinada (sin duplicar NAS):{' '}
-                    <strong className="font-mono text-slate-800 dark:text-slate-200">
-                      {formatBytes(storageSummary.usedBytes)} / {formatBytes(storageSummary.totalBytes)}
-                    </strong>
-                  </span>
-                  <span aria-hidden="true">·</span>
-                  <span className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-amber-500" /> Lectura
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-orange-600" /> Escritura
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-0.5 w-3 bg-slate-500" /> Espacio
-                    </span>
-                  </span>
-                </div>
-              </div>
+            const devStr = String(d.device || '');
+            const netHost = isNet
+              ? devStr.startsWith('//')
+                ? devStr.replace(/^\/+/, '').split('/')[0]
+                : devStr.includes(':/')
+                  ? devStr.split(':')[0]
+                  : devStr
+              : '';
+            const sharedLabels = (d.shared_labels || []).filter(Boolean);
+            const widgetTitle =
+              d.mountpoint === '/'
+                ? 'Disco Sistema (/)'
+                : isNet
+                  ? `NAS ${netHost || d.mountpoint}`
+                  : isRem
+                    ? d.label || 'Memoria extraíble USB'
+                    : d.label || d.mountpoint;
+            const statusText = !isMounted
+              ? 'Sin montar'
+              : isNet && sharedLabels.length > 1
+                ? `${sharedLabels.length} carpetas`
+                : isRem
+                  ? 'Extraíble'
+                  : tone.label;
+            const statusClass = !isMounted
+              ? 'text-violet-600 dark:text-violet-400'
+              : isNet
+                ? 'text-sky-600 dark:text-sky-400'
+                : tone.textClass;
 
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                type="button"
-                aria-label="Ampliar gráfica de almacenamiento"
-                onClick={() =>
-                  onExpandChart({
-                    title: 'Actividad de discos y espacio usado',
-                    subtitle: `Local libre: ${formatBytes(storageSummary.localFreeBytes)} · Combinado real: ${formatBytes(storageSummary.totalBytes)}`,
-                    series: storageSeries,
-                    timestamps,
-                    epochTs,
-                    leftUnit: 'MB/s',
-                    maxRight: 100,
-                    chartKind: 'storage',
-                  })
-                }
-                className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-amber-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-amber-300"
+            const ioHist = d.io_history || [];
+            const diskReadPoints =
+              ioHist.length >= 2
+                ? ioHist.map((b) => Math.round(((b.r || 0) / (1024 * 1024)) * 100) / 100)
+                : [Math.round(readMb * 100) / 100, Math.round(readMb * 100) / 100];
+            const diskWritePoints =
+              ioHist.length >= 2
+                ? ioHist.map((b) => Math.round(((b.w || 0) / (1024 * 1024)) * 100) / 100)
+                : [Math.round(writeMb * 100) / 100, Math.round(writeMb * 100) / 100];
+            const diskTimestamps =
+              ioHist.length >= 2
+                ? ioHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES'))
+                : timestamps.slice(-2);
+            const diskEpochTs =
+              ioHist.length >= 2
+                ? ioHist.map((b) => Math.round(b.t / 1000))
+                : epochTs.slice(-2);
+
+            const diskSeries: ChartSeries[] = [
+              {
+                id: 'disk_r',
+                metricKey: 'disk_r',
+                label: 'Lectura',
+                data: diskReadPoints,
+                color: readColor,
+                unit: 'MB/s',
+                decimals: 2,
+                fillAlpha: 0.16,
+              },
+              {
+                id: 'disk_w',
+                metricKey: 'disk_w',
+                label: 'Escritura',
+                data: diskWritePoints,
+                color: writeColor,
+                unit: 'MB/s',
+                decimals: 2,
+                fillAlpha: 0.08,
+              },
+            ];
+
+            const subtitleText = isNet && sharedLabels.length > 0
+              ? `${sharedLabels.join(' · ')}${d.transport ? ` · ${d.transport}` : ''}`
+              : `${d.mountpoint}${d.transport ? ` · ${d.transport}` : ''}${d.fstype ? ` · ${d.fstype.toUpperCase()}` : ''}`;
+
+            return (
+              <motion.article
+                layout
+                key={widgetKey}
+                initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -12, scale: 0.94 }}
+                transition={{ duration: 0.36, ease: COCKPIT_EASE }}
+                whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                className="cockpit-bento flex flex-col justify-between p-5"
               >
-                <Maximize2 className="h-4 w-4" />
-              </motion.button>
-            </div>
-
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{
-                  width: `${Math.max(
-                    2,
-                    Math.min(100, storageSummary.localTotalBytes > 0 ? storageSummary.localPercent : storageSummary.percent)
-                  )}%`,
-                }}
-                transition={{ type: 'spring', stiffness: 120, damping: 22 }}
-                className="cockpit-progress-fill h-full rounded-full bg-[#f59e0b] dark:bg-[#fbbf24]"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <TelemetryChart
-              series={storageSeries}
-              timestamps={timestamps}
-              epochTs={epochTs}
-              height={165}
-              maxRight={100}
-              leftUnit="MB/s"
-              theme={theme}
-              onExpandClick={() =>
-                onExpandChart({
-                  title: 'Actividad de discos y espacio usado',
-                  subtitle: `Local libre: ${formatBytes(storageSummary.localFreeBytes)} · Combinado real: ${formatBytes(storageSummary.totalBytes)}`,
-                  series: storageSeries,
-                  timestamps,
-                  epochTs,
-                  leftUnit: 'MB/s',
-                  maxRight: 100,
-                  chartKind: 'storage',
-                })
-              }
-            />
-          </div>
-
-          {/* Unidades disponibles por separado: discos locales, memorias extraíbles y recursos compartidos NAS */}
-          {sortedDisks.length > 0 && (
-            <div className="mt-5 border-t border-slate-200/70 pt-4 dark:border-slate-800">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Unidades detectadas en el sistema ({sortedDisks.length})
-                </p>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('equipo', 'storage')}
-                  className="text-xs font-semibold text-sky-600 hover:underline dark:text-sky-400"
-                >
-                  Gestionar discos en detalle →
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                {sortedDisks.map((d, idx) => {
-                  const pct = Math.min(100, Math.max(0, Number(d.percent || 0)));
-                  const isNet = d.kind === 'network';
-                  const isRem = d.kind === 'removable' || Boolean(d.is_removable);
-                  const isMounted = d.mounted !== false;
-                  const barColor =
-                    pct >= 90 ? '#ef4444' : isRem ? '#7c3aed' : isNet ? '#0284c7' : '#f59e0b';
-                  const iconPillClass = isRem
-                    ? 'cockpit-pill-violet'
-                    : isNet
-                      ? 'cockpit-pill-cyan'
-                      : 'cockpit-pill-amber';
-                  return (
-                    <motion.div
-                      key={`${d.mountpoint}-${d.device || idx}`}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.28, delay: Math.min(idx * 0.03, 0.24), ease: COCKPIT_EASE }}
-                      className="cockpit-subtile flex flex-col justify-between p-3"
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconPillClass}`}>
-                              {isRem ? (
-                                <Usb className="h-3.5 w-3.5" />
-                              ) : isNet ? (
-                                <Server className="h-3.5 w-3.5" />
-                              ) : (
-                                <HardDrive className="h-3.5 w-3.5" />
-                              )}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-semibold text-slate-900 dark:text-white">
-                                {d.label || d.mountpoint}
-                              </p>
-                              <p className="truncate font-mono text-[10px] text-slate-500 dark:text-slate-400">
-                                {d.mountpoint}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-slate-800 dark:text-slate-100">
-                            {isMounted ? formatPct(pct) : 'Libre'}
-                          </span>
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap items-center gap-1">
-                          {d.transport && (
-                            <span className="rounded-md bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                              {d.transport}
-                            </span>
+                <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                        <span className={`${pillClass} inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg`}>
+                          {isRem ? (
+                            <Usb className="h-3.5 w-3.5" />
+                          ) : isNet ? (
+                            <Server className="h-3.5 w-3.5" />
+                          ) : (
+                            <HardDrive className="h-3.5 w-3.5" />
                           )}
-                          {d.fstype && (
-                            <span className="rounded-md bg-slate-200/50 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 dark:bg-slate-800/80 dark:text-slate-400">
-                              {d.fstype.toUpperCase()}
-                            </span>
-                          )}
-                          {!isMounted && (
-                            <span className="cockpit-pill-violet rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
-                              Conectada · Sin montar
-                            </span>
-                          )}
-                          {isNet && d.pool_primary === false && (
-                            <span
-                              title={`Comparte capacidad física con ${d.pool_shared_with || 'otro recurso del mismo NAS'}`}
-                              className="cockpit-pill-cyan rounded-md px-1.5 py-0.5 text-[10px] font-semibold"
-                            >
-                              Mismo pool NAS
-                            </span>
-                          )}
-                          {d.temp_c !== null && d.temp_c !== undefined && (
-                            <span className="cockpit-pill-amber rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold">
-                              {formatTemp(d.temp_c)}
-                            </span>
-                          )}
-                        </div>
+                        </span>
+                        <span className="truncate font-semibold text-slate-700 dark:text-slate-200">
+                          {widgetTitle}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span className={`shrink-0 ${statusClass}`}>{statusText}</span>
                       </div>
 
-                      <div className="mt-2.5">
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${isMounted ? Math.max(2, pct) : 100}%` }}
-                            transition={{ duration: 0.45, ease: COCKPIT_EASE }}
-                            className="h-full rounded-full"
-                            style={{
-                              backgroundColor: barColor,
-                              opacity: isMounted ? 1 : 0.35,
-                            }}
+                      <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
+                        {isMounted ? (
+                          <AnimatedMetricValue
+                            value={pct}
+                            decimals={1}
+                            suffix=" %"
+                            className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white"
                           />
-                        </div>
-                        <p className="mt-1.5 font-mono text-[10px] tabular-nums text-slate-500 dark:text-slate-400">
+                        ) : (
+                          <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white sm:text-3xl">
+                            {formatBytes(d.total_bytes)}
+                          </span>
+                        )}
+                        <span className={`${pillClass} rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums`}>
                           {isMounted
-                            ? `${formatBytes(d.used_bytes)} usados · ${formatBytes(d.free_bytes)} libres de ${formatBytes(d.total_bytes)}`
-                            : `Capacidad total detectada: ${formatBytes(d.total_bytes)}`}
-                        </p>
+                            ? `${formatBytes(d.used_bytes)} / ${formatBytes(d.total_bytes)}`
+                            : d.transport || 'Conectada'}
+                        </span>
+                        {d.temp_c !== null && d.temp_c !== undefined && (
+                          <span className="cockpit-pill-amber rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                            {formatTemp(d.temp_c)}
+                          </span>
+                        )}
                       </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </motion.article>
+
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="truncate max-w-[260px]" title={subtitleText}>
+                          {subtitleText}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
+                          L {formatMbRate(readMb)} · E {formatMbRate(writeMb)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      type="button"
+                      aria-label={`Ampliar gráfica de ${widgetTitle}`}
+                      onClick={() =>
+                        onExpandChart({
+                          title: `${widgetTitle} · Actividad y capacidad`,
+                          subtitle: isMounted
+                            ? `${formatBytes(d.free_bytes)} libres de ${formatBytes(d.total_bytes)} (${d.mountpoint})`
+                            : `Dispositivo detectado: ${d.device || d.mountpoint}`,
+                          series: diskSeries,
+                          timestamps: diskTimestamps,
+                          epochTs: diskEpochTs,
+                          leftUnit: 'MB/s',
+                          chartKind: 'storage',
+                          diskMountpoint: d.mountpoint,
+                        })
+                      }
+                      className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-amber-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-amber-300"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                    </motion.button>
+                  </div>
+
+                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${isMounted ? Math.max(2, pct) : 100}%` }}
+                      transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+                      className={`cockpit-progress-fill h-full rounded-full ${barClass}`}
+                      style={{ opacity: isMounted ? 1 : 0.35 }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <TelemetryChart
+                    series={diskSeries}
+                    timestamps={diskTimestamps}
+                    epochTs={diskEpochTs}
+                    height={160}
+                    leftUnit="MB/s"
+                    theme={theme}
+                    onExpandClick={() =>
+                      onExpandChart({
+                        title: `${widgetTitle} · Actividad y capacidad`,
+                        subtitle: isMounted
+                          ? `${formatBytes(d.free_bytes)} libres de ${formatBytes(d.total_bytes)} (${d.mountpoint})`
+                          : `Dispositivo detectado: ${d.device || d.mountpoint}`,
+                        series: diskSeries,
+                        timestamps: diskTimestamps,
+                        epochTs: diskEpochTs,
+                        leftUnit: 'MB/s',
+                        chartKind: 'storage',
+                        diskMountpoint: d.mountpoint,
+                      })
+                    }
+                  />
+                </div>
+              </motion.article>
+            );
+          })}
+        </AnimatePresence>
       </section>
 
       {/* Quick Control Row: Aparatos en casa con botones simétricos Encender / Apagar */}

@@ -246,6 +246,14 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     return iface?.history_2h ?? null;
   }, [spec.chartKind, spec.nicName, liveMetrics?.net?.interfaces_list]);
 
+  const liveDiskHist = useMemo(() => {
+    if (spec.chartKind !== 'storage' || !spec.diskMountpoint) return null;
+    const matched = (liveMetrics?.disks || []).find(
+      (d) => d.mountpoint === spec.diskMountpoint || (d.shared_mounts || []).includes(spec.diskMountpoint || '')
+    );
+    return matched?.io_history ?? null;
+  }, [spec.chartKind, spec.diskMountpoint, liveMetrics?.disks]);
+
   const resolvedSeries: ChartSeries[] = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
       if (spec.chartKind === 'net' && liveNicHist) {
@@ -255,6 +263,17 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
           }
           if (s.metricKey === 'net_tx') {
             return { ...s, data: liveNicHist.map((b) => Math.round((b.tx / (1024 * 1024)) * 100) / 100) };
+          }
+          return s;
+        });
+      }
+      if (spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 0) {
+        return spec.series.map((s) => {
+          if (s.id === 'disk_r' || s.metricKey === 'disk_r') {
+            return { ...s, data: liveDiskHist.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
+          }
+          if (s.id === 'disk_w' || s.metricKey === 'disk_w') {
+            return { ...s, data: liveDiskHist.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
           }
           return s;
         });
@@ -279,12 +298,15 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       return s;
     });
-  }, [preset, cursorEndTs, liveMetrics?.history, liveNicHist, spec.chartKind, spec.series, historyData]);
+  }, [preset, cursorEndTs, liveMetrics?.history, liveNicHist, liveDiskHist, spec.chartKind, spec.series, historyData]);
 
   const resolvedTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
       if (spec.chartKind === 'net' && liveNicHist?.length) {
         return liveNicHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
+      }
+      if (spec.chartKind === 'storage' && liveDiskHist?.length) {
+        return liveDiskHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
       }
       if (spec.chartKind !== 'net' && liveMetrics?.history?.timestamps?.length) {
         return liveMetrics.history.timestamps;
@@ -292,7 +314,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       return spec.timestamps;
     }
     return historyData?.series?.timestamps ?? [];
-  }, [preset, cursorEndTs, spec.chartKind, spec.timestamps, liveNicHist, liveMetrics?.history?.timestamps, historyData]);
+  }, [preset, cursorEndTs, spec.chartKind, spec.timestamps, liveNicHist, liveDiskHist, liveMetrics?.history?.timestamps, historyData]);
 
   const resolvedDateTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) return undefined;
@@ -304,13 +326,16 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       if (spec.chartKind === 'net' && liveNicHist?.length) {
         return liveNicHist.map((b) => Math.round(b.t / 1000));
       }
+      if (spec.chartKind === 'storage' && liveDiskHist?.length) {
+        return liveDiskHist.map((b) => Math.round(b.t / 1000));
+      }
       if (spec.chartKind !== 'net' && liveMetrics?.history?.epoch_ts?.length) {
         return liveMetrics.history.epoch_ts;
       }
       return spec.epochTs;
     }
     return historyData?.series?.epoch_ts;
-  }, [preset, cursorEndTs, spec.chartKind, spec.epochTs, liveNicHist, liveMetrics?.history?.epoch_ts, historyData]);
+  }, [preset, cursorEndTs, spec.chartKind, spec.epochTs, liveNicHist, liveDiskHist, liveMetrics?.history?.epoch_ts, historyData]);
 
   // Para velocidades/flujos delegamos en TelemetryChart el autoajuste exacto al pico visible en la ventana
   const dynamicMaxLeft = useMemo(() => {

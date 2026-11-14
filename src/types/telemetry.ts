@@ -87,6 +87,12 @@ export interface RamInfo {
   disk_swap_used_bytes?: number;
 }
 
+export interface DiskIoSample {
+  t: number;
+  r: number;
+  w: number;
+}
+
 export interface DiskInfo {
   mountpoint: string;
   label?: string;
@@ -100,6 +106,12 @@ export interface DiskInfo {
   pool_key?: string;
   pool_primary?: boolean;
   pool_shared_with?: string | null;
+  shared_mounts?: string[];
+  shared_labels?: string[];
+  io_device?: string;
+  read_bytes_sec?: number;
+  write_bytes_sec?: number;
+  io_history?: DiskIoSample[];
   temp_c?: number | null;
   total_bytes?: number;
   used_bytes?: number;

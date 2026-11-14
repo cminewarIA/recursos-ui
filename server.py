@@ -427,6 +427,150 @@ NIC_BUCKET_INTERVAL_MS = 5000   # cubetas de 5 segundos (240 cubetas en 20 minut
 NIC_HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nic_history_2h.json")
 _LAST_NIC_HISTORY_SAVE_TS = 0.0
 
+# Rolling per-Disk / Pool I/O History Buffer (100% OS-driven from psutil / /proc/fs/cifs/Stats)
+DISK_BANDWIDTH_HISTORY = {}   # { io_key: [ {"t": ms_epoch, "r": float_bytes_sec, "w": float_bytes_sec}, ... ] }
+DISK_PREV_COUNTERS = {}       # { io_key: (ts_float, read_bytes, write_bytes) }
+DISK_BANDWIDTH_LOCK = threading.Lock()
+MAX_DISK_HISTORY_SAMPLES = 90
+
+
+def _read_cifs_stats_by_host():
+    """Lee contadores reales de lectura/escritura CIFS/SMB desde /proc/fs/cifs/Stats por host y por recurso UNC."""
+    stats_path = "/proc/fs/cifs/Stats"
+    by_host = {}
+    by_share = {}
+    if not os.path.exists(stats_path):
+        return by_host, by_share
+    try:
+        with open(stats_path, "r", encoding="utf-8", errors="ignore") as f:
+            current_host = None
+            current_share = None
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                m_share = re.match(r"^\d+\)\s+(\\\\[^\\/\s]+[\\/][^\s]+)", line)
+                if m_share:
+                    unc = m_share.group(1).replace("\\", "/").lower().rstrip("/")
+                    parts = [p for p in unc.split("/") if p]
+                    current_host = parts[0] if parts else None
+                    current_share = "//" + "/".join(parts) if parts else None
+                    continue
+                m_bytes = re.search(r"Bytes read:\s*(\d+)\s+Bytes written:\s*(\d+)", line)
+                if m_bytes and current_host:
+                    r_b = int(m_bytes.group(1))
+                    w_b = int(m_bytes.group(2))
+                    h_acc = by_host.setdefault(current_host, [0, 0])
+                    h_acc[0] += r_b
+                    h_acc[1] += w_b
+                    if current_share:
+                        s_acc = by_share.setdefault(current_share, [0, 0])
+                        s_acc[0] += r_b
+                        s_acc[1] += w_b
+                    current_host = None
+                    current_share = None
+    except Exception:
+        pass
+    return (
+        {k: (v[0], v[1]) for k, v in by_host.items()},
+        {k: (v[0], v[1]) for k, v in by_share.items()},
+    )
+
+
+def _resolve_disk_io_counters(disk_entry, per_disk, cifs_by_host, cifs_by_share):
+    """Resuelve clave I/O única y contadores acumulados (read_bytes, write_bytes) para un disco o pool."""
+    dev = str(disk_entry.get("device") or "").strip()
+    fs_type = str(disk_entry.get("fs_type") or disk_entry.get("fstype") or "").lower()
+    is_net = bool(disk_entry.get("is_network")) or dev.startswith("//") or dev.startswith("\\\\") or fs_type in ("cifs", "smb3", "smbfs", "nfs", "nfs4")
+    if is_net:
+        norm = "//" + "/".join([p for p in dev.replace("\\", "/").lower().split("/") if p])
+        host = norm.lstrip("/").split("/", 1)[0] if norm else ""
+        if host and host in cifs_by_host:
+            r_b, w_b = cifs_by_host[host]
+            return f"cifs:{host}", r_b, w_b
+        if norm and norm in cifs_by_share:
+            r_b, w_b = cifs_by_share[norm]
+            return f"cifs:{norm}", r_b, w_b
+        return f"net:{host or norm or disk_entry.get('mountpoint', 'net')}", None, None
+
+    dev_real = dev
+    try:
+        if dev.startswith("/dev/") and os.path.exists(dev):
+            dev_real = os.path.realpath(dev)
+    except Exception:
+        pass
+    base = os.path.basename(dev_real)
+    candidates = [base]
+    m_nvme = re.match(r"^(nvme\d+n\d+)p\d+$", base)
+    if m_nvme:
+        candidates.append(m_nvme.group(1))
+    m_sd = re.match(r"^([a-z]+)\d+$", base)
+    if m_sd:
+        candidates.append(m_sd.group(1))
+    for cand in candidates:
+        st = per_disk.get(cand)
+        if st is not None:
+            return f"blk:{cand}", int(st.read_bytes), int(st.write_bytes)
+    return f"blk:{base or disk_entry.get('mountpoint', 'disk')}", None, None
+
+
+def _update_disk_io_history(disks_list, now_ts=None):
+    """Calcula tasas L/E reales por disco/pool, actualiza historial y enriquece cada dict."""
+    if not disks_list:
+        return
+    ts = float(now_ts if now_ts is not None else time.time())
+    ts_ms = int(ts * 1000)
+    try:
+        per_disk = psutil.disk_io_counters(perdisk=True) or {}
+    except Exception:
+        per_disk = {}
+    cifs_by_host, cifs_by_share = _read_cifs_stats_by_host()
+
+    active_keys = set()
+    computed_tick = {}
+    with DISK_BANDWIDTH_LOCK:
+        for d in disks_list:
+            io_key, r_total, w_total = _resolve_disk_io_counters(d, per_disk, cifs_by_host, cifs_by_share)
+            active_keys.add(io_key)
+            if io_key not in computed_tick:
+                r_sec = 0.0
+                w_sec = 0.0
+                if r_total is not None and w_total is not None:
+                    prev = DISK_PREV_COUNTERS.get(io_key)
+                    if prev is not None:
+                        prev_ts, prev_r, prev_w = prev
+                        dt = ts - prev_ts
+                        if dt > 0.2:
+                            dr = max(0, r_total - prev_r) if r_total >= prev_r else 0
+                            dw = max(0, w_total - prev_w) if w_total >= prev_w else 0
+                            r_sec = dr / dt
+                            w_sec = dw / dt
+                    DISK_PREV_COUNTERS[io_key] = (ts, r_total, w_total)
+                hist = DISK_BANDWIDTH_HISTORY.setdefault(io_key, [])
+                if not hist or (ts_ms - hist[-1]["t"]) >= 1200:
+                    hist.append({
+                        "t": ts_ms,
+                        "r": round(r_sec, 1),
+                        "w": round(w_sec, 1),
+                    })
+                    if len(hist) > MAX_DISK_HISTORY_SAMPLES:
+                        del hist[:-MAX_DISK_HISTORY_SAMPLES]
+                computed_tick[io_key] = (round(r_sec, 1), round(w_sec, 1), list(hist))
+
+            r_val, w_val, hist_copy = computed_tick[io_key]
+            d["io_device"] = io_key
+            d["read_bytes_sec"] = r_val
+            d["write_bytes_sec"] = w_val
+            d["io_history"] = hist_copy
+
+        # Limpiar contadores de discos desmontados/desconectados
+        for old_k in list(DISK_PREV_COUNTERS.keys()):
+            if old_k not in active_keys:
+                DISK_PREV_COUNTERS.pop(old_k, None)
+        for old_k in list(DISK_BANDWIDTH_HISTORY.keys()):
+            if old_k not in active_keys:
+                DISK_BANDWIDTH_HISTORY.pop(old_k, None)
+
 def _load_nic_history_2h():
     if not os.path.exists(NIC_HISTORY_FILE):
         return
@@ -3874,7 +4018,7 @@ def fetch_cached_map_tile(style, z, x, y):
             ("arcgis-light", f"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{zi}/{yi}/{xi}"),
         ]
 
-    ver_ua = get_app_version() if callable(globals().get("get_app_version")) else "12.6.0"
+    ver_ua = get_app_version() if callable(globals().get("get_app_version")) else "12.7.0"
     headers = {
         "User-Agent": f"RecursosCockpit/{ver_ua} (+https://github.com/cminewarIA/recursos-ui)",
         "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
@@ -4039,23 +4183,57 @@ def detect_local_server_ip():
 
 SERVER_LOCAL_IP = detect_local_server_ip()
 
-def get_lan_broadcast_addresses():
-    """Obtiene dinámicamente las direcciones de broadcast IPv4 de las interfaces de red locales."""
-    bcasts = set()
+_VIRTUAL_NIC_PREFIXES = (
+    "lo", "docker", "veth", "br-", "virbr", "tun", "tap", "wg",
+    "tailscale", "podman", "cni", "flannel", "kube", "dummy"
+)
+
+
+def get_lan_broadcast_entries():
+    """Devuelve dinámicamente [(local_ip, broadcast_ip, nic_name)] de NICs físicas activas."""
+    entries = []
+    seen = set()
     try:
-        for _iface, addrs in psutil.net_if_addrs().items():
-            for a in addrs:
-                if a.family == socket.AF_INET and a.address and not a.address.startswith("127."):
-                    if getattr(a, "broadcast", None):
-                        bcasts.add(a.broadcast)
-                    elif getattr(a, "netmask", None):
-                        try:
-                            net = ipaddress.IPv4Network(f"{a.address}/{a.netmask}", strict=False)
-                            bcasts.add(str(net.broadcast_address))
-                        except Exception:
-                            pass
+        stats = psutil.net_if_stats() or {}
+        addrs_map = psutil.net_if_addrs() or {}
+        for pass_idx in (0, 1):
+            for iface, addrs in addrs_map.items():
+                iface_low = (iface or "").lower()
+                is_virtual = iface_low.startswith(_VIRTUAL_NIC_PREFIXES)
+                st = stats.get(iface)
+                is_up = True if st is None else bool(st.isup)
+                if pass_idx == 0 and (not is_up or is_virtual):
+                    continue
+                if pass_idx == 1 and iface_low == "lo":
+                    continue
+                for a in addrs:
+                    if a.family == socket.AF_INET and a.address and not a.address.startswith("127."):
+                        bcast = None
+                        if getattr(a, "broadcast", None):
+                            bcast = a.broadcast
+                        elif getattr(a, "netmask", None):
+                            try:
+                                net = ipaddress.IPv4Network(f"{a.address}/{a.netmask}", strict=False)
+                                bcast = str(net.broadcast_address)
+                            except Exception:
+                                bcast = None
+                        if bcast:
+                            key = (a.address, bcast)
+                            if key not in seen:
+                                seen.add(key)
+                                entries.append((a.address, bcast, iface))
+            if entries:
+                break
     except Exception:
         pass
+    return entries
+
+
+def get_lan_broadcast_addresses():
+    """Obtiene dinámicamente las direcciones de broadcast IPv4 de las NICs físicas activas."""
+    bcasts = set()
+    for _local_ip, bcast, _iface in get_lan_broadcast_entries():
+        bcasts.add(bcast)
     bcasts.add("255.255.255.255")
     return sorted(bcasts)
 
@@ -6513,6 +6691,25 @@ def fetch_disks_worker():
                 except Exception:
                     continue
 
+            # Anotar puntos compartidos/subcarpetas dentro de cada entrada pool_primary (CIFS/bind-mounts)
+            pool_groups = {}
+            for d_item in disks:
+                pk = d_item.get("pool_key")
+                if not pk:
+                    continue
+                grp = pool_groups.setdefault(pk, {"mounts": [], "labels": []})
+                mp_val = d_item.get("mountpoint")
+                if mp_val and mp_val not in grp["mounts"]:
+                    grp["mounts"].append(mp_val)
+                leaf_val = os.path.basename(str(mp_val or "").rstrip("/")) or d_item.get("label") or mp_val
+                if leaf_val and leaf_val not in grp["labels"]:
+                    grp["labels"].append(leaf_val)
+            for d_item in disks:
+                if d_item.get("pool_primary"):
+                    grp = pool_groups.get(d_item.get("pool_key"), {})
+                    d_item["shared_mounts"] = list(grp.get("mounts") or [])
+                    d_item["shared_labels"] = list(grp.get("labels") or [])
+
             # Incluir también memorias extraíbles USB/SD o discos de datos conectados en el sistema aunque no estén montados aún
             for blk in blk_candidates:
                 bpath = blk.get("path") or ""
@@ -6598,7 +6795,7 @@ def fetch_disks_worker():
                 DISKS_CACHE = disks
         except Exception:
             pass
-        time.sleep(10)
+        time.sleep(4)
 
 SYSTEMD_MONITORED_UNITS = [
     ("emby-server.service", "Emby Media Server", "🎬 Multimedia NVENC"),
@@ -6960,7 +7157,7 @@ def get_arp_and_pihole_names():
         conn_pi = sqlite3.connect("file:/etc/pihole/pihole-FTL.db?mode=ro", uri=True, timeout=2.0)
         cur_pi = conn_pi.cursor()
         cur_pi.execute(
-            "SELECT network.hwaddr, network.macVendor, network_addresses.name, network_addresses.ip "
+            "SELECT network.hwaddr, network.macVendor, network_addresses.name, network_addresses.ip, network_addresses.lastSeen "
             "FROM network JOIN network_addresses ON network.id = network_addresses.network_id "
             "ORDER BY network_addresses.lastSeen DESC;"
         )
@@ -6969,13 +7166,16 @@ def get_arp_and_pihole_names():
             vendor = row[1] or ""
             name = row[2] or ""
             ip = row[3] or ""
+            last_seen = int(row[4] or 0) if len(row) > 4 and row[4] is not None else 0
             if _is_lan_ipv4(ip):
                 final_name = friendly_names.get(mac) or hosts_ip_to_name.get(ip) or name or vendor or ip
                 if mac not in arp_map:
-                    arp_map[mac] = {'ip': ip, 'name': final_name, 'vendor': vendor}
+                    arp_map[mac] = {'ip': ip, 'name': final_name, 'vendor': vendor, 'last_seen': last_seen}
                 else:
                     if vendor and not arp_map[mac].get('vendor'):
                         arp_map[mac]['vendor'] = vendor
+                    if last_seen and not arp_map[mac].get('last_seen'):
+                        arp_map[mac]['last_seen'] = last_seen
                     if friendly_names.get(mac):
                         arp_map[mac]['name'] = friendly_names[mac]
                     elif hosts_ip_to_name.get(ip):
@@ -8017,6 +8217,59 @@ def fetch_wifi_worker():
             except Exception:
                 pass
 
+            # Incorporar dispositivos LAN offline vistos recientemente en Pi-hole (<24h) o con alias conocido para mantener targets WoL tras expirar ARP
+            now_epoch = time.time()
+            for r_mac, r_info in arp_map.items():
+                if not r_mac or r_mac in known_macs:
+                    continue
+                r_ip = str(r_info.get('ip') or '').strip()
+                if not r_ip or r_ip in known_ips or not _is_lan_ipv4(r_ip):
+                    continue
+                # Excluir rango típico Docker bridge 172.16.0.0/12
+                try:
+                    ip_obj_r = ipaddress.ip_address(r_ip)
+                    octs = r_ip.split('.')
+                    if ip_obj_r.is_loopback or (len(octs) == 4 and octs[0] == '172' and 16 <= int(octs[1]) <= 31):
+                        continue
+                except Exception:
+                    continue
+                last_seen = int(r_info.get('last_seen') or 0)
+                has_friendly = r_mac in friendly_names
+                if not has_friendly and (not last_seen or (now_epoch - last_seen) > 86400):
+                    continue
+                known_macs.add(r_mac)
+                known_ips.add(r_ip)
+                d_name = friendly_names.get(r_mac) or r_info.get('name') or r_ip
+                c_meta = classify_device(d_name, r_mac)
+                dev_type = c_meta.get("type", "generic")
+                is_wired_off = (dev_type in ("server", "pc", "nas", "network", "tv", "console")) or has_friendly
+                off_entry = {
+                    "conn_type": "cable" if is_wired_off else "wifi",
+                    "band": "LAN (Offline)" if is_wired_off else "Wi-Fi (Offline)",
+                    "iface": "pihole-wol",
+                    "mac": r_mac,
+                    "ip": r_ip,
+                    "name": d_name,
+                    "tx_bytes": 0,
+                    "rx_bytes": 0,
+                    "rssi": 0 if is_wired_off else -85,
+                    "in_network": 0,
+                    "dev_type": dev_type,
+                    "dev_icon": c_meta['icon'],
+                    "brand": c_meta.get('brand', 'generic'),
+                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
+                    "vendor": r_info.get('vendor') or c_meta.get('brand_name', 'Dispositivo'),
+                    "status": "offline",
+                    "online": False,
+                    "is_online": False,
+                    "is_server": False,
+                    "is_gateway": False,
+                }
+                if is_wired_off:
+                    cable_clients.append(off_entry)
+                else:
+                    wifi_clients.append(off_entry)
+
             for c in cable_clients + wifi_clients:
                 mac = c.get('mac', '').upper()
                 if mac in fcache_stats:
@@ -8559,7 +8812,8 @@ def background_collector():
                 c["vram_mb"] = round(container_vram.get(cid_short, 0.0), 1)
                 
             with DISKS_LOCK:
-                disks_info = list(DISKS_CACHE)
+                disks_info = [dict(item) for item in DISKS_CACHE]
+            _update_disk_io_history(disks_info, now_ts=time.time())
             
             with WIFI_LOCK:
                 wifi_data = dict(WIFI_CACHE)
@@ -8731,41 +8985,146 @@ VALID_WEB_ROUTES = {
     "/dex"
 }
 
-def send_wol_magic_packet(mac_str):
+def send_wol_magic_packet(mac_str, target_ip="", details_out=None):
     """
     Envía paquetes mágicos Wake-on-LAN multivía y multired calculando
-    dinámicamente las direcciones de broadcast de la subred local.
+    dinámicamente las NICs físicas y broadcasts reales de la subred local.
     """
-    clean_mac = re.sub(r'[^0-9A-Fa-f]', '', mac_str)
-    if len(clean_mac) != 12:
+    clean_mac = re.sub(r'[^0-9A-Fa-f]', '', str(mac_str or "")).lower()
+    if len(clean_mac) != 12 or clean_mac in ("000000000000", "ffffffffffff"):
+        if isinstance(details_out, dict):
+            details_out["channels"] = []
+            details_out["targets"] = []
+            details_out["error"] = "Dirección MAC inválida"
         return False
 
+    mac_std = ":".join(clean_mac[i:i+2].upper() for i in range(0, 12, 2))
     hw_addr = bytes.fromhex(clean_mac)
     magic = b'\xff' * 6 + hw_addr * 16
 
-    bcasts = get_lan_broadcast_addresses()
-    targets = []
-    for b_ip in bcasts:
-        targets.append((b_ip, 9))
-        targets.append((b_ip, 7))
+    channels = []
+    sent_targets = []
+    errors = []
 
-    for bcast_ip, port in targets:
+    def _add_ch(ch_name):
+        if ch_name not in channels:
+            channels.append(ch_name)
+
+    entries = get_lan_broadcast_entries()
+    bcasts = get_lan_broadcast_addresses()
+
+    # 1. UDP Broadcast vinculado explícitamente a cada NIC física activa (evita enrutar por bridges Docker)
+    for local_ip, bcast_ip, nic_name in entries:
+        for port in (9, 7):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                    s.settimeout(1.0)
+                    s.bind((local_ip, 0))
+                    s.sendto(magic, (bcast_ip, port))
+                _add_ch("udp_broadcast")
+                if port == 9:
+                    sent_targets.append(f"{bcast_ip}:9 ({nic_name})")
+            except Exception as e:
+                errors.append(f"{nic_name}->{bcast_ip}:{port}: {e}")
+
+    # 2. Fallback UDP broadcast global 255.255.255.255 (puertos 9 y 7)
+    for port in (9, 7):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
                 s.settimeout(1.0)
-                s.sendto(magic, (bcast_ip, port))
+                s.sendto(magic, ("255.255.255.255", port))
+            _add_ch("udp_broadcast")
+            if port == 9:
+                sent_targets.append("255.255.255.255:9")
+        except Exception as e:
+            errors.append(f"global:255.255.255.255:{port}: {e}")
+
+    # 3. UDP Unicast directo opcional si se conoce la IP LAN del dispositivo
+    ip_clean = str(target_ip or "").strip()
+    if ip_clean:
+        try:
+            ip_obj = ipaddress.ip_address(ip_clean)
+            if ip_obj.version == 4 and not ip_obj.is_loopback and not ip_obj.is_unspecified:
+                for port in (9, 7):
+                    try:
+                        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                            s.settimeout(1.0)
+                            s.sendto(magic, (str(ip_obj), port))
+                        _add_ch("udp_unicast")
+                        if port == 9:
+                            sent_targets.append(f"{ip_obj}:9")
+                    except Exception as e:
+                        errors.append(f"unicast:{ip_obj}:{port}: {e}")
+        except ValueError:
+            pass
+
+    # 4. Frame Layer-2 Ethernet EtherType 0x0842 (best-effort si hay permiso CAP_NET_RAW)
+    if hasattr(socket, "AF_PACKET") and entries:
+        try:
+            addrs_map = psutil.net_if_addrs() or {}
+            link_family = getattr(psutil, "AF_LINK", getattr(socket, "AF_PACKET", None))
+            for _local_ip, _bcast_ip, nic_name in entries:
+                src_mac_bytes = None
+                for a in addrs_map.get(nic_name, []):
+                    if link_family is not None and a.family == link_family and a.address:
+                        src_clean = re.sub(r'[^0-9A-Fa-f]', '', a.address)
+                        if len(src_clean) == 12:
+                            src_mac_bytes = bytes.fromhex(src_clean)
+                            break
+                if src_mac_bytes is None:
+                    src_mac_bytes = b'\x02\x00\x00\x00\x00\x01'
+                try:
+                    with socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0842)) as l2:
+                        l2.bind((nic_name, 0))
+                        frame = b'\xff' * 6 + src_mac_bytes + b'\x08\x42' + magic
+                        l2.send(frame)
+                    _add_ch("l2_ethernet")
+                    sent_targets.append(f"L2:0x0842 ({nic_name})")
+                except Exception:
+                    pass
         except Exception:
             pass
 
+    # 5. Herramienta wakeonlan solo sobre broadcasts físicos reales
     if shutil.which("wakeonlan"):
         for b_ip in bcasts:
             try:
-                subprocess.run(["wakeonlan", "-i", b_ip, mac_str], capture_output=True, timeout=3)
-            except Exception:
-                pass
+                p = subprocess.run(["wakeonlan", "-i", b_ip, mac_std], capture_output=True, text=True, timeout=3)
+                if p.returncode == 0:
+                    _add_ch("wakeonlan_cli")
+            except Exception as e:
+                errors.append(f"wakeonlan:{b_ip}: {e}")
 
-    return True
+    # 6. Refuerzo opcional desde el router gateway ASUS vía SSH (ether-wake) si hay credenciales configuradas
+    if ROUTER_IP and ROUTER_USER and ROUTER_PASS and shutil.which("sshpass"):
+        try:
+            ssh_env = os.environ.copy()
+            ssh_env["SSHPASS"] = ROUTER_PASS
+            p_gw = subprocess.run(
+                [
+                    "sshpass", "-e", "ssh",
+                    "-o", "StrictHostKeyChecking=no",
+                    "-o", "ConnectTimeout=2",
+                    f"{ROUTER_USER}@{ROUTER_IP}",
+                    f"ether-wake -b -i br0 {mac_std} 2>/dev/null || ether-wake -b {mac_std} 2>/dev/null"
+                ],
+                capture_output=True, text=True, timeout=4, env=ssh_env
+            )
+            if p_gw.returncode == 0:
+                _add_ch("router_ether_wake")
+                sent_targets.append(f"router:{ROUTER_IP}")
+        except Exception:
+            pass
+
+    ok = len(channels) > 0
+    if isinstance(details_out, dict):
+        details_out["mac"] = mac_std
+        details_out["channels"] = channels
+        details_out["targets"] = sent_targets
+        details_out["errors"] = errors if not ok else []
+    return ok
 
 
 def _get_host_local_ips_and_macs():
@@ -8898,18 +9257,28 @@ def send_device_shutdown_signal(ip_str="", mac_str="", name_str=""):
         except Exception:
             pass
 
-    # 4. Paquete mágico Sleep-on-LAN (MAC invertida vía UDP puerto 9/7)
-    if len(mac_clean) == 12:
+    # 4. Paquete mágico Sleep-on-LAN (MAC invertida vía UDP puerto 9/7 por NIC física y unicast)
+    if len(mac_clean) == 12 and mac_clean not in ("000000000000", "ffffffffffff"):
         hw_addr = bytes.fromhex(mac_clean)
         sol_magic = b'\xff' * 6 + hw_addr[::-1] * 16
+        sol_sent = False
+        for local_ip, bcast_ip, _nic_name in get_lan_broadcast_entries():
+            for port in (9, 7):
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                        s.settimeout(1.0)
+                        s.bind((local_ip, 0))
+                        s.sendto(sol_magic, (bcast_ip, port))
+                        sol_sent = True
+                except Exception:
+                    pass
         udp_targets = []
         if valid_ip and ":" not in valid_ip:
             udp_targets.append((valid_ip, 9))
             udp_targets.append((valid_ip, 7))
-        for b_ip in get_lan_broadcast_addresses():
-            udp_targets.append((b_ip, 9))
-            udp_targets.append((b_ip, 7))
-        sol_sent = False
+        udp_targets.append(("255.255.255.255", 9))
+        udp_targets.append(("255.255.255.255", 7))
         for dst_ip, port in udp_targets:
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -10463,18 +10832,34 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             mac = str((body or {}).get('mac', '')).strip()
+            target_ip = str((body or {}).get('ip', '')).strip()
 
-            clean_mac = re.sub(r'[^0-9A-Fa-f]', '', mac)
-            if len(clean_mac) == 12:
-                ok = send_wol_magic_packet(mac)
+            clean_mac = re.sub(r'[^0-9A-Fa-f]', '', mac).lower()
+            if len(clean_mac) == 12 and clean_mac not in ("000000000000", "ffffffffffff"):
+                wol_details = {}
+                ok = send_wol_magic_packet(mac, target_ip=target_ip, details_out=wol_details)
                 if ok:
-                    resp = json.dumps({"success": True, "message": f"Paquete mágico Wake-on-LAN enviado a {mac}"}).encode('utf-8')
+                    ch_txt = ", ".join(wol_details.get("channels") or ["udp"])
+                    resp = json.dumps({
+                        "success": True,
+                        "message": f"Paquete mágico Wake-on-LAN enviado a {wol_details.get('mac', mac)} ({ch_txt})",
+                        "channels": wol_details.get("channels", []),
+                        "targets": wol_details.get("targets", []),
+                    }).encode('utf-8')
+                    status_code = 200
                 else:
-                    resp = json.dumps({"success": False, "error": f"Error al emitir paquete WoL a {mac}"}).encode('utf-8')
+                    resp = json.dumps({
+                        "success": False,
+                        "error": f"Error al emitir paquete WoL a {mac}",
+                        "channels": wol_details.get("channels", []),
+                        "errors": wol_details.get("errors", []),
+                    }).encode('utf-8')
+                    status_code = 500
             else:
                 resp = json.dumps({"success": False, "error": "Dirección MAC inválida"}).encode('utf-8')
+                status_code = 400
 
-            self.send_response(200)
+            self.send_response(status_code)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
             self.send_header('Content-Length', str(len(resp)))

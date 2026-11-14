@@ -38,13 +38,15 @@ export function App() {
 
   const [activeTab, setActiveTab] = useState<MainTabId>(() => {
     if (typeof window !== 'undefined') {
-      return normalizeExternalRoute(window.location.pathname);
+      const qView = new URLSearchParams(window.location.search).get('view');
+      return normalizeExternalRoute(qView || window.location.pathname);
     }
     return 'inicio';
   });
   const [subTabHint, setSubTabHint] = useState<string | undefined>(() => {
     if (typeof window !== 'undefined') {
-      return extractInitialSubTabFromRoute(window.location.pathname);
+      const qView = new URLSearchParams(window.location.search).get('view');
+      return extractInitialSubTabFromRoute(qView || window.location.pathname);
     }
     return undefined;
   });
@@ -106,11 +108,45 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void fetchMetrics();
-    const timer = setInterval(() => {
+    const isPaused = () =>
+      (typeof document !== 'undefined' && document.hidden) ||
+      Boolean((window as unknown as { __RECURSOS_PAUSED__?: boolean }).__RECURSOS_PAUSED__);
+
+    const syncDomPauseAttr = () => {
+      if (typeof document !== 'undefined') {
+        if (isPaused()) {
+          document.documentElement.setAttribute('data-paused', 'true');
+        } else {
+          document.documentElement.removeAttribute('data-paused');
+        }
+      }
+    };
+
+    syncDomPauseAttr();
+    if (!isPaused()) {
       void fetchMetrics();
+    }
+
+    const timer = setInterval(() => {
+      if (!isPaused()) {
+        void fetchMetrics();
+      }
     }, 1500);
-    return () => clearInterval(timer);
+
+    const onVisibilityOrPause = () => {
+      syncDomPauseAttr();
+      if (!isPaused()) {
+        void fetchMetrics();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityOrPause);
+    window.addEventListener('recursos-visibility', onVisibilityOrPause);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityOrPause);
+      window.removeEventListener('recursos-visibility', onVisibilityOrPause);
+    };
   }, [fetchMetrics]);
 
   // Native bridge helpers (Ubuntu WebKit2 / Android WebView)
@@ -186,7 +222,7 @@ export function App() {
           ? 'android_native'
           : 'web_browser',
       full_access: env.isNativeApp,
-      app_version: window.__INITIAL_APP_VERSION__ || '12.6.0',
+      app_version: window.__INITIAL_APP_VERSION__ || '12.7.0',
       screen_width: window.screen?.width,
       screen_height: window.screen?.height,
     };

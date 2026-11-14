@@ -4,9 +4,9 @@
   <img src="./docs/assets/hero-banner.svg" alt="Recursos Cockpit - Manual Visual e Interactivo" width="100%" />
 </a>
 
-# Panel de Recursos · Manual Interactivo (`v12.6.0`)
+# Panel de Recursos · Manual Interactivo (`v12.7.0`)
 
-[![Versión](https://img.shields.io/badge/Versi%C3%B3n-v12.6.0-0284C7?style=for-the-badge)](./VERSION)
+[![Versión](https://img.shields.io/badge/Versi%C3%B3n-v12.7.0-0284C7?style=for-the-badge)](./VERSION)
 [![Manual HTML5 en Vivo](https://img.shields.io/badge/Manual_HTML5-Simuladores_%2B_API_en_Vivo-059669?style=for-the-badge&logo=readthedocs&logoColor=white)](./docs/index.html)
 [![Frontend](https://img.shields.io/badge/Interfaz-React_19_%2B_Tailwind_v4-0EA5E9?style=for-the-badge&logo=react&logoColor=white)](#-cap%C3%ADtulo-1--tour-visual-e-interactivo-por-las-5-pantallas)
 [![Linux](https://img.shields.io/badge/Ubuntu-.deb_WebKit2_%2B_DeX_USB-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)](#-cap%C3%ADtulo-4--manual-de-aplicaciones-nativas-deb--apk-y-dex-usb)
@@ -54,7 +54,7 @@
     </td>
     <td width="33%" valign="top">
       <b>📦 6. Descargas y Despliegue</b><br/>
-      Descarga los instaladores oficiales <code>12.6.0</code>, configura <code>systemd</code> con capacidades POSIX y consulta las diferencias clave de arquitectura.<br/><br/>
+      Descarga los instaladores oficiales <code>12.7.0</code>, configura <code>systemd</code> con capacidades POSIX y consulta las diferencias clave de arquitectura.<br/><br/>
       <a href="#-cap%C3%ADtulo-6--descargas-oficiales-e-instalaci%C3%B3n-guiada">Ir al Capítulo 6 →</a>
     </td>
   </tr>
@@ -266,8 +266,8 @@ curl -fsS -H "X-Device-Token: $TOKEN" http://127.0.0.1:8085/api/metrics | jq '{v
 ```json
 {
   "version_info": {
-    "current_version": "12.6.0",
-    "display_version": "12.6.0",
+    "current_version": "12.7.0",
+    "display_version": "12.7.0",
     "local_commit": "HEAD",
     "update_available": false
   },
@@ -304,8 +304,8 @@ curl -fsS http://127.0.0.1:8085/api/version | jq .
 ```
 ```json
 {
-  "current_version": "12.6.0",
-  "display_version": "12.6.0",
+  "current_version": "12.7.0",
+  "display_version": "12.7.0",
   "branch": "main",
   "local_commit": "HEAD",
   "update_available": false
@@ -320,7 +320,7 @@ curl -fsS http://127.0.0.1:8085/api/version | jq .
 ```bash
 curl -I http://127.0.0.1:8085/manual
 ```
-Sirve [`static/manual.html`](./static/manual.html) (con respaldo [`docs/index.html`](./docs/index.html)) inyectando `window.__INITIAL_APP_VERSION__ = "12.6.0"`, tanto desde `server.py` como desde el servidor puente nativo `LocalHtmlBridgeServer` de Ubuntu.
+Sirve [`static/manual.html`](./static/manual.html) (con respaldo [`docs/index.html`](./docs/index.html)) inyectando `window.__INITIAL_APP_VERSION__ = "12.7.0"`, tanto desde `server.py` como desde el servidor puente nativo `LocalHtmlBridgeServer` de Ubuntu.
 
 </details>
 
@@ -377,10 +377,10 @@ curl -fsS -X POST -H "Content-Type: application/json" -H "X-Device-Token: $TOKEN
 
 ## 📦 Capítulo 6 · Descargas Oficiales e Instalación Guiada
 
-| Paquete Oficial | Plataforma | Descarga Directa (`v12.6.0`) | Integridad y Firma |
+| Paquete Oficial | Plataforma | Descarga Directa (`v12.7.0`) | Integridad y Firma |
 | :--- | :--- | :--- | :--- |
-| **🐧 Recursos Cockpit (`.deb`)** | Ubuntu / Debian `amd64` | [**`recursos-cockpit_12.6.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.6.0/recursos-cockpit_12.6.0_amd64.deb) | Firma GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.6.0/SHA256SUMS.txt) |
-| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ &amp; Android TV (Leanback) | [**`recursos-cockpit_12.6.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.6.0/recursos-cockpit_12.6.0.apk) | Keystore Permanente (`v1/v2/v3`) |
+| **🐧 Recursos Cockpit (`.deb`)** | Ubuntu / Debian `amd64` | [**`recursos-cockpit_12.7.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.7.0/recursos-cockpit_12.7.0_amd64.deb) | Firma GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.7.0/SHA256SUMS.txt) |
+| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ &amp; Android TV (Leanback) | [**`recursos-cockpit_12.7.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.7.0/recursos-cockpit_12.7.0.apk) | Keystore Permanente (`v1/v2/v3`) |
 | **⚡ Enlaces `latest`** | Última Release | [`.deb Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) · [`.apk Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Actualización directa sobre versión previa |
 
 <details>
@@ -393,10 +393,10 @@ curl -fsS -X POST -H "Content-Type: application/json" -H "X-Device-Token: $TOKEN
 bash packaging/install_all.sh
 
 # O paso a paso manualmente:
-sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.6.0_amd64.deb
+sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.7.0_amd64.deb
 /usr/bin/recursos-cockpit --test-mode
 bash packaging/build_apk.sh
-bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.6.0.apk
+bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.7.0.apk
 ```
 
 #### Opción B · Desplegar tu propio Servidor en cualquier máquina Linux
@@ -453,10 +453,13 @@ Todo el proyecto se rige por [`./GEMINI.md`](./GEMINI.md) manteniendo [`./VERSIO
 * **`0.0.X` (`PATCH`)**: Optimización interna, corrección de errores, reglas o mejoras documentales.
 
 <details open>
-<summary><b>🔄 Diferencias Clave de la Versión Actual (<code>v12.6.0</code>) frente a Arquitecturas Anteriores</b></summary>
+<summary><b>🔄 Diferencias Clave de la Versión Actual (<code>v12.7.0</code>) frente a Arquitecturas Anteriores</b></summary>
 
-| Ámbito | Arquitectura Anterior | Versión Actual (`v12.6.0`) |
+| Ámbito | Arquitectura Anterior | Versión Actual (`v12.7.0`) |
 | :--- | :--- | :--- |
+| **Widgets Independientes de Almacenamiento Plug-and-Play** | Almacenamiento consolidado en un único contenedor ancho (`md:col-span-2`) que mezclaba discos locales, USB y montajes de red. | **Cada unidad física y pool NAS único cuenta con su propio widget `1×1` completo e idéntico en estructura al principal (`%`, L/E reales vía `/proc/diskstats` y `/proc/fs/cifs/Stats`, barra spring y gráfica individual ampliable)**, apareciendo y desapareciendo dinámicamente con `AnimatePresence` al conectar o desconectar discos/memorias USB o montajes NAS sin duplicar capacidad compartida. |
+| **Paquetes Mágicos Wake-on-LAN y Sleep-on-LAN Multivía** | El envío WoL retornaba éxito sin verificar sockets, saturaba interfaces virtuales Docker y ocultaba dispositivos LAN offline cuando expiraba la tabla ARP. | **Transmisión multivía verificada (`udp_broadcast` vinculado a cada NIC física real excluyendo Docker/túneles, `udp_unicast`, trama `L2 0x0842`, `wakeonlan` filtrado y refuerzo SSH `ether-wake` en el router)** con propagación real de errores HTTP (`400`/`500`) y **retención de equipos LAN recientes vía Pi-hole (24 h)** incluso tras expirar ARP. |
+| **App Nativa Ubuntu (`.deb`), WebKit2 y Puente HTTP** | La vista de inicio mantenía animaciones WebKit2 pesadas en segundo plano (~98 % CPU), ejecutaba `lspci` en cada sondeo y ocultaba errores `4xx`/`5xx` tras `503`. | **Carga diferida WebKit2 + pausa de bucle cuando está en reposo (~0 % CPU), caché estática DMI/GPU, sustitución de `Gdk.Screen` obsoleto por `Gdk.Display`, limpieza del puente `LocalHtmlBridgeServer` (reenvío HTTP real + `404` + `/api/dex/devices` + `PUT/DELETE/PATCH`)** y sincronización web directa con reinicio limpio tras actualizar `.deb`. |
 | **Android TV (Leanback / D-Pad) y Despliegue Simultáneo** | La APK Android estaba limitada al launcher táctil móvil, carecía de banner TV y requería instalación manual separada tras actualizar el PC. | **Compatibilidad universal móvil + Android TV (`LEANBACK_LAUNCHER`, banner oficial `640×360`, detección dinámica `UiModeManager`, overscan y navegación con mando D-Pad + anillo de foco en Compose y React 19)** junto con **`packaging/install_all.sh`**, que compila e instala `.deb` en el PC y descubre dinámicamente televisores Android vía ADB en la LAN para actualizarlos automáticamente al mismo tiempo. |
 | **Estética SVG Unificada y Animaciones 60 FPS** | Estilos visuales heterogéneos entre Web, Ubuntu GTK 3 y Android Compose, transiciones CSS estáticas y sin motor coreografiado de layout compartido. | **Lenguaje visual 100 % unificado a los SVG oficiales** en las 4 interfaces (Web React 19, Ubuntu GTK 3, Android Jetpack Compose y Manual) con animaciones fluidas a **60 FPS** (`Motion v12` con `MorphPill`, `ViewStage`, tarjetas Bento con física de resorte, pulso radar GeoIP y barrido horizontal luminoso en gráficas). |
 | **Banner de Red + Almacenamiento Separado y Deduplicación NAS** | El tráfico de red aparecía como tarjeta KPI compacta fuera de la cuadrícula principal; los almacenamientos extraíbles desmontados no se listaban y múltiples carpetas compartidas de un mismo NAS sumaban su capacidad varias veces (p. ej. 4× RAID). | **Gráfica principal dedicada de Red e Internet** (`20m` Rx/Tx) integrada en la cuadrícula `2x2` + detección física real mediante **`lsblk -J -b` y `/sys/class/hwmon`**: separa discos internos (NVMe/SATA), memorias extraíbles USB/SD (montadas o desmontadas) y **deduplica automáticamente por `pool_key` los montajes que comparten el mismo servidor/RAID NAS** evitando multiplicar el total de terabytes. |
