@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
+  <defs>
+    <filter id="appShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.06" />
+    </filter>
+    <style>
+      .bg { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 1.5; }
+      .card { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1.5; filter: url(#appShadow); }
+      .sub { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1; }
+      .h { fill: #0f172a; font-family: Inter, sans-serif; font-weight: 800; }
+      .s { fill: #475569; font-family: Inter, sans-serif; font-weight: 500; }
+      .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+      .dash { stroke: #0284c7; stroke-width: 2.5; stroke-dasharray: 6 6; fill: none; animation: switchAnim 2.2s linear infinite; }
+      @keyframes switchAnim { to { stroke-dashoffset: -24; } }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #020617; stroke: #1e293b; }
+        .card { fill: #0f172a; stroke: #1e293b; }
+        .sub { fill: #1e293b; stroke: #334155; }
+        .h { fill: #f8fafc; }
+        .s { fill: #94a3b8; }
+      }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="360" rx="22" class="bg" />
+  <text x="34" y="42" font-size="18" class="h">Ecosistema Multiplataforma Contractual · Paridad HTML5 y Conmutación Automática LAN ↔ WAN</text>
+
+  <!-- App Nativa Ubuntu .deb -->
+  <g transform="translate(34, 64)">
+    <rect x="0" y="0" width="384" height="270" rx="18" class="card" />
+    <rect x="20" y="18" width="214" height="24" rx="12" fill="#ffedd5" />
+    <text x="127" y="34" text-anchor="middle" font-size="11" font-weight="800" fill="#9a3412" font-family="Inter, sans-serif">UBUNTU / DEBIAN (.DEB) · WEB-KIT2</text>
+
+    <rect x="20" y="54" width="344" height="44" rx="10" class="sub" />
+    <text x="34" y="73" font-size="12.5" class="h">1 · Conectar con Nodo (Auto LAN/DDNS)</text>
+    <text x="34" y="90" font-size="10.5" class="s">Almacena credencial HMAC de forma segura</text>
+
+    <rect x="20" y="106" width="344" height="44" rx="10" class="sub" />
+    <text x="34" y="125" font-size="12.5" class="h">2 · Instalar o Actualizar desde GitHub</text>
+    <text x="34" y="142" font-size="10.5" class="s">Verifica firma GPG + SHA256SUMS sin desinstalar</text>
+
+    <rect x="20" y="158" width="344" height="44" rx="10" class="sub" />
+    <text x="34" y="177" font-size="12.5" class="h">3 · Configuraciones y Puente Local</text>
+    <text x="34" y="194" font-size="10.5" class="s">LocalHtmlBridgeServer inyecta entorno nativo</text>
+
+    <rect x="20" y="212" width="344" height="40" rx="10" fill="#ecfdf5" stroke="#6ee7b7" />
+    <text x="192" y="236" text-anchor="middle" font-size="12" font-weight="800" fill="#065f46" font-family="Inter, sans-serif">EXCLUSIVO: DeX USB Desbloqueado (scrcpy + /dev/uhid)</text>
+  </g>
+
+  <!-- Nodo Central Conmutación LAN <-> WAN -->
+  <g transform="translate(454, 88)">
+    <rect x="0" y="0" width="292" height="222" rx="18" class="card" />
+    <text x="146" y="34" text-anchor="middle" font-size="14" class="h">Motor HTML5 Único</text>
+    <text x="146" y="54" text-anchor="middle" font-size="11" class="s mono">static/index.html + /manual</text>
+
+    <rect x="22" y="74" width="248" height="52" rx="12" fill="#e0f2fe" stroke="#7dd3fc" />
+    <text x="146" y="96" text-anchor="middle" font-size="12.5" font-weight="800" fill="#075985" font-family="Inter, sans-serif">En Wi-Fi / Cable LAN</text>
+    <text x="146" y="114" text-anchor="middle" font-size="10.5" fill="#0369a1" font-family="ui-monospace, monospace">Latencia mínima directa (IP local)</text>
+
+    <rect x="22" y="140" width="248" height="52" rx="12" fill="#ede9fe" stroke="#c4b5fd" />
+    <text x="146" y="162" text-anchor="middle" font-size="12.5" font-weight="800" fill="#5b21b6" font-family="Inter, sans-serif">Fuera de Casa (WAN / 4G / 5G)</text>
+    <text x="146" y="180" text-anchor="middle" font-size="10.5" fill="#6d28d9" font-family="ui-monospace, monospace">Conmutación TLS + Token X-Device-Token</text>
+  </g>
+
+  <path d="M 418 198 L 454 198" class="dash" />
+  <path d="M 746 198 L 782 198" class="dash" />
+
+  <!-- App Nativa Android .apk -->
+  <g transform="translate(782, 64)">
+    <rect x="0" y="0" width="384" height="270" rx="18" class="card" />
+    <rect x="20" y="18" width="240" height="24" rx="12" fill="#d1fae5" />
+    <text x="140" y="34" text-anchor="middle" font-size="11" font-weight="800" fill="#065f46" font-family="Inter, sans-serif">ANDROID (.APK) · COMPOSE + WEBVIEW</text>
+
+    <rect x="20" y="54" width="344" height="44" rx="10" class="sub" />
+    <text x="34" y="73" font-size="12.5" class="h">Conexión Zero-Config Instantánea</text>
+    <text x="34" y="90" font-size="10.5" class="s">Autodescubrimiento automático sin ajustes manuales</text>
+
+    <rect x="20" y="106" width="344" height="44" rx="10" class="sub" />
+    <text x="34" y="125" font-size="12.5" class="h">Android KeyStore + AES256-GCM</text>
+    <text x="34" y="142" font-size="10.5" class="s">EncryptedSharedPreferences sincronizadas</text>
+
+    <rect x="20" y="158" width="344" height="44" rx="10" class="sub" />
+    <text x="34" y="177" font-size="12.5" class="h">Keystore Permanente v1/v2/v3</text>
+    <text x="34" y="194" font-size="10.5" class="s">Actualización limpia con adb install -r sin re-vincular</text>
+
+    <rect x="20" y="212" width="344" height="40" rx="10" fill="#f1f5f9" stroke="#cbd5e1" />
+    <text x="192" y="236" text-anchor="middle" font-size="11.5" font-weight="700" fill="#475569" font-family="Inter, sans-serif">Web &amp; Android: DeX oculto (solo hardware USB Ubuntu)</text>
+  </g>
+</svg>
+

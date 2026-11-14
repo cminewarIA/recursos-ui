@@ -5,10 +5,12 @@ import {
   Cpu,
   HardDrive,
   ListChecks,
+  Maximize2,
   MemoryStick,
   Monitor,
   Search,
 } from 'lucide-react';
+import { ExpandChartSpec } from './OverviewView';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
 import { MetricsPayload, SystemProcess, ThemeMode } from '../types/telemetry';
@@ -32,6 +34,7 @@ interface EquipmentViewProps {
   theme: ThemeMode;
   initialSubTab?: string;
   navTick?: number;
+  onExpandChart?: (spec: ExpandChartSpec) => void;
 }
 
 export const EquipmentView: React.FC<EquipmentViewProps> = ({
@@ -39,6 +42,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
   theme,
   initialSubTab,
   navTick,
+  onExpandChart,
 }) => {
   const [subTab, setSubTab] = useState<EquipmentSubTab>(() => resolveEquipmentSubTab(initialSubTab) || 'cpu');
   const [showTech, setShowTech] = useState(false);
@@ -53,21 +57,22 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
 
   const hist = metrics?.history;
   const timestamps = hist?.timestamps ?? [];
+  const epochTs = hist?.epoch_ts ?? [];
 
   const cpuCores = useMemo(() => metrics?.cpu?.per_core_percent ?? [], [metrics?.cpu?.per_core_percent]);
   const cpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'cpu', label: 'Procesador', data: hist?.cpu ?? [], color: '#2563eb', unit: '%' }],
+    () => [{ id: 'cpu', metricKey: 'cpu', label: 'Procesador', data: hist?.cpu ?? [], color: '#2563eb', unit: '%' }],
     [hist?.cpu]
   );
   const ramSeries: ChartSeries[] = useMemo(
     () => [
-      { id: 'ram', label: 'Memoria activa', data: hist?.ram ?? [], color: '#0ea5e9', unit: '%' },
-      { id: 'ram_tot', label: 'Total ocupada (con caché)', data: hist?.ram_total ?? [], color: '#6366f1', unit: '%', fillAlpha: 0, dashed: true },
+      { id: 'ram', metricKey: 'ram', label: 'Memoria activa', data: hist?.ram ?? [], color: '#0ea5e9', unit: '%' },
+      { id: 'ram_tot', metricKey: 'ram_total', label: 'Total ocupada (con caché)', data: hist?.ram_total ?? [], color: '#6366f1', unit: '%', fillAlpha: 0, dashed: true },
     ],
     [hist?.ram, hist?.ram_total]
   );
   const gpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'gpu', label: 'Tarjeta gráfica', data: hist?.gpu ?? [], color: '#16a34a', unit: '%' }],
+    () => [{ id: 'gpu', metricKey: 'gpu', label: 'Tarjeta gráfica', data: hist?.gpu ?? [], color: '#16a34a', unit: '%' }],
     [hist?.gpu]
   );
 
@@ -82,9 +87,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
 
   const storageSeries: ChartSeries[] = useMemo(
     () => [
-      { id: 'r', label: 'Lectura', data: diskReadHist, color: '#d97706', unit: 'MB/s', axis: 'left' },
-      { id: 'w', label: 'Escritura', data: diskWriteHist, color: '#ea580c', unit: 'MB/s', axis: 'left' },
-      { id: 'p', label: 'Espacio usado', data: diskPctHist, color: '#64748b', unit: '%', dashed: true, fillAlpha: 0, axis: 'right' },
+      { id: 'r', metricKey: 'disk_r', label: 'Lectura', data: diskReadHist, color: '#d97706', unit: 'MB/s', decimals: 2, axis: 'left' },
+      { id: 'w', metricKey: 'disk_w', label: 'Escritura', data: diskWriteHist, color: '#ea580c', unit: 'MB/s', decimals: 2, axis: 'left' },
+      { id: 'p', metricKey: 'disk_pct', label: 'Espacio usado', data: diskPctHist, color: '#64748b', unit: '%', decimals: 1, dashed: true, fillAlpha: 0, axis: 'right' },
     ],
     [diskReadHist, diskWriteHist, diskPctHist]
   );
@@ -148,23 +153,60 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                   {metrics?.cpu?.model || 'Procesador principal'}
                 </p>
               </div>
-              <div className="flex items-baseline gap-4">
+              <div className="flex items-center gap-3">
                 <span className="font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
                   {formatPct(metrics?.cpu?.usage_percent)}
                 </span>
                 <span className="font-mono text-xs tabular-nums text-slate-500 dark:text-slate-400">
                   {formatTemp(metrics?.cpu?.temp_c)}
                 </span>
+                {onExpandChart && (
+                  <button
+                    type="button"
+                    aria-label="Inspeccionar historial completo de procesador"
+                    onClick={() =>
+                      onExpandChart({
+                        title: 'Uso del procesador e historial completo',
+                        subtitle: metrics?.cpu?.model || 'Procesador principal',
+                        series: cpuSeries,
+                        timestamps,
+                        epochTs,
+                        leftUnit: '%',
+                        maxLeft: 100,
+                        chartKind: 'cpu',
+                      })
+                    }
+                    className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
             <div className="mt-4">
               <TelemetryChart
                 series={cpuSeries}
                 timestamps={timestamps}
+                epochTs={epochTs}
                 height={200}
                 maxLeft={100}
                 leftUnit="%"
                 theme={theme}
+                onExpandClick={
+                  onExpandChart
+                    ? () =>
+                        onExpandChart({
+                          title: 'Uso del procesador e historial completo',
+                          subtitle: metrics?.cpu?.model || 'Procesador principal',
+                          series: cpuSeries,
+                          timestamps,
+                          epochTs,
+                          leftUnit: '%',
+                          maxLeft: 100,
+                          chartKind: 'cpu',
+                        })
+                    : undefined
+                }
               />
             </div>
 
@@ -246,18 +288,57 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                 {formatBytes(metrics?.ram?.used_bytes)} ocupados por programas · {formatBytes(metrics?.ram?.available_bytes)} disponibles
               </p>
             </div>
-            <span className="font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
-              {formatPct(metrics?.ram?.percent)}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
+                {formatPct(metrics?.ram?.percent)}
+              </span>
+              {onExpandChart && (
+                <button
+                  type="button"
+                  aria-label="Inspeccionar historial completo de memoria RAM"
+                  onClick={() =>
+                    onExpandChart({
+                      title: 'Uso de memoria RAM e historial completo',
+                      subtitle: `${formatBytes(metrics?.ram?.used_bytes)} ocupados de ${formatBytes(metrics?.ram?.total_bytes)}`,
+                      series: ramSeries,
+                      timestamps,
+                      epochTs,
+                      leftUnit: '%',
+                      maxLeft: 100,
+                      chartKind: 'ram',
+                    })
+                  }
+                  className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
           <div className="mt-4">
             <TelemetryChart
               series={ramSeries}
               timestamps={timestamps}
+              epochTs={epochTs}
               height={210}
               maxLeft={100}
               leftUnit="%"
               theme={theme}
+              onExpandClick={
+                onExpandChart
+                  ? () =>
+                      onExpandChart({
+                        title: 'Uso de memoria RAM e historial completo',
+                        subtitle: `${formatBytes(metrics?.ram?.used_bytes)} ocupados de ${formatBytes(metrics?.ram?.total_bytes)}`,
+                        series: ramSeries,
+                        timestamps,
+                        epochTs,
+                        leftUnit: '%',
+                        maxLeft: 100,
+                        chartKind: 'ram',
+                      })
+                  : undefined
+              }
             />
           </div>
           <div className="mt-5 grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 text-xs dark:border-slate-800 sm:grid-cols-3">
@@ -295,23 +376,60 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                 {metrics?.gpu?.available ? metrics.gpu.name || 'Gráfica detectada' : 'Sin tarjeta gráfica dedicada activa'}
               </p>
             </div>
-            <div className="flex items-baseline gap-4">
+            <div className="flex items-center gap-3">
               <span className="font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
                 {formatPct(metrics?.gpu?.gpu_util_percent)}
               </span>
               <span className="font-mono text-xs tabular-nums text-slate-500 dark:text-slate-400">
                 {formatTemp(metrics?.gpu?.temp_c)}
               </span>
+              {onExpandChart && (
+                <button
+                  type="button"
+                  aria-label="Inspeccionar historial completo de tarjeta gráfica"
+                  onClick={() =>
+                    onExpandChart({
+                      title: 'Actividad de tarjeta gráfica e historial completo',
+                      subtitle: metrics?.gpu?.name || 'Gráfica del sistema',
+                      series: gpuSeries,
+                      timestamps,
+                      epochTs,
+                      leftUnit: '%',
+                      maxLeft: 100,
+                      chartKind: 'gpu',
+                    })
+                  }
+                  className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
           <div className="mt-4">
             <TelemetryChart
               series={gpuSeries}
               timestamps={timestamps}
+              epochTs={epochTs}
               height={200}
               maxLeft={100}
               leftUnit="%"
               theme={theme}
+              onExpandClick={
+                onExpandChart
+                  ? () =>
+                      onExpandChart({
+                        title: 'Actividad de tarjeta gráfica e historial completo',
+                        subtitle: metrics?.gpu?.name || 'Gráfica del sistema',
+                        series: gpuSeries,
+                        timestamps,
+                        epochTs,
+                        leftUnit: '%',
+                        maxLeft: 100,
+                        chartKind: 'gpu',
+                      })
+                  : undefined
+              }
             />
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-xs dark:border-slate-800 sm:grid-cols-4">
@@ -361,15 +479,52 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                   {formatMbRate((metrics?.disk_io?.write_bytes_sec ?? 0) / (1024 * 1024))}
                 </p>
               </div>
+              {onExpandChart && (
+                <button
+                  type="button"
+                  aria-label="Inspeccionar historial completo de almacenamiento"
+                  onClick={() =>
+                    onExpandChart({
+                      title: 'Actividad de discos y espacio usado',
+                      subtitle: `Lectura ${formatMbRate((metrics?.disk_io?.read_bytes_sec ?? 0) / (1024 * 1024))} · Escritura ${formatMbRate((metrics?.disk_io?.write_bytes_sec ?? 0) / (1024 * 1024))}`,
+                      series: storageSeries,
+                      timestamps,
+                      epochTs,
+                      leftUnit: 'MB/s',
+                      maxRight: 100,
+                      chartKind: 'storage',
+                    })
+                  }
+                  className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
             <div className="mt-4">
               <TelemetryChart
                 series={storageSeries}
                 timestamps={timestamps}
+                epochTs={epochTs}
                 height={200}
                 maxRight={100}
                 leftUnit="MB/s"
                 theme={theme}
+                onExpandClick={
+                  onExpandChart
+                    ? () =>
+                        onExpandChart({
+                          title: 'Actividad de discos y espacio usado',
+                          subtitle: `Lectura ${formatMbRate((metrics?.disk_io?.read_bytes_sec ?? 0) / (1024 * 1024))} · Escritura ${formatMbRate((metrics?.disk_io?.write_bytes_sec ?? 0) / (1024 * 1024))}`,
+                          series: storageSeries,
+                          timestamps,
+                          epochTs,
+                          leftUnit: 'MB/s',
+                          maxRight: 100,
+                          chartKind: 'storage',
+                        })
+                    : undefined
+                }
               />
             </div>
           </div>

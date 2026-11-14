@@ -678,7 +678,7 @@
         <div>
           <div class="brand-title">Manual Interactivo · Panel de Recursos</div>
           <div class="brand-sub">
-            <span class="pill accent mono" id="manualVersionBadge">v2B.1.1 (12.1.1)</span>
+            <span class="pill accent mono" id="manualVersionBadge">v12.4.0</span>
             <span class="pill emerald" id="liveServerBadge">Modo autónomo</span>
           </div>
         </div>
@@ -1040,12 +1040,12 @@
           <div class="panel-box">
             <div style="font-size:14px; font-weight:700; margin-bottom:10px;">Descarga directa y actualización limpia</div>
             <div style="display:grid; gap:8px; margin-bottom:12px;">
-              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.1.1</a>
-              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android (.apk) · 12.1.1</a>
+              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.4.0</a>
+              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android (.apk) · 12.4.0</a>
             </div>
             <div class="code-wrap">
               <button type="button" class="copy-btn" data-copy-target="cmdInstallBlock">Copiar</button>
-              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.1.1_amd64.deb</pre>
+              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.4.0_amd64.deb</pre>
             </div>
           </div>
         </div>
@@ -1080,7 +1080,7 @@
           <div>
             <div class="section-kicker">07 · Mapa de Vistas React 19 e Historial</div>
             <h2 class="section-title">Navegación Unificada en 5 Bloques y Criterio Semántico</h2>
-            <p class="section-desc">Resumen de las pantallas del panel v12 (`v2B`) y regla estricta de incremento <code class="mono">MAJOR.MINOR.PATCH</code>.</p>
+            <p class="section-desc">Resumen de las pantallas del panel v12 y regla estricta de incremento <code class="mono">MAJOR.MINOR.PATCH</code>.</p>
           </div>
           <div class="tabs-bar" id="verFilterTabs">
             <button type="button" class="tab-btn active" data-vtype="all">Todas</button>
@@ -1160,13 +1160,13 @@
         document.getElementById('dlApkLink').href = 'https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk';
       }
 
-      function setVersionText(ver, disp, extra) {
+      function setVersionText(ver, extra) {
         const badge = document.getElementById('manualVersionBadge');
-        if (badge) badge.textContent = 'v' + (disp || '2B.1.1') + ' (' + (ver || '12.1.1') + ')' + (extra ? ' · ' + extra : '');
+        if (badge) badge.textContent = 'v' + (ver || '12.4.0') + (extra ? ' · ' + extra : '');
       }
 
       if (window.__INITIAL_APP_VERSION__) {
-        setVersionText(window.__INITIAL_APP_VERSION__, window.__INITIAL_DISPLAY_VERSION__, '');
+        setVersionText(window.__INITIAL_APP_VERSION__, '');
       }
 
       let serverOnline = false;
@@ -1186,7 +1186,7 @@
           if (r.ok) {
             const d = await r.json();
             serverOnline = true;
-            setVersionText(d.current_version || '12.1.1', d.display_version || '2B.1.1', d.local_commit || '');
+            setVersionText(d.current_version || '12.4.0', d.local_commit || '');
             const b = document.getElementById('liveServerBadge');
             b.textContent = 'Conectado al nodo en vivo';
             b.className = 'pill emerald';
@@ -1673,11 +1673,12 @@
           level: 'FULL_NATIVE_ACCESS · DeX USB Desbloqueado',
           bullets: [
             'Motor GTK 3 + WebKit2 acelerado por hardware conectado a LocalHtmlBridgeServer.',
+            'Detección triple (App Ubuntu · Servidor web local · GitHub) y actualización unificada en un clic.',
+            'Sincroniza la web local vía POST /api/system/sync-web si la App Ubuntu supera a GitHub o al servidor.',
             'Desbloquea en exclusiva "Pantalla móvil USB (DeX)" mediante adb, scrcpy y /dev/uhid.',
-            'Lanzador inteligente en 3 tarjetas con autodescubrimiento LAN y gestor local.',
             'Paquete firmado con GPG (_gpgorigin) compatible con apt y Ubuntu App Center.'
           ],
-          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.1.1_amd64.deb'
+          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.4.0_amd64.deb'
         },
         android: {
           title: 'App Nativa Android (.apk)',
@@ -1688,7 +1689,7 @@
             'Conmutación transparente entre red Wi-Fi local y dominio DuckDNS al salir de casa.',
             'Firmada con keystore oficial v1/v2/v3 para actualizar encima sin desinstalar.'
           ],
-          cmd: 'adb install -r dist/recursos-cockpit_12.1.1.apk'
+          cmd: 'adb install -r dist/recursos-cockpit_12.4.0.apk'
         },
         web: {
           title: 'Navegador Web Moderno (SPA React 19)',
@@ -1739,8 +1740,11 @@
 
       // 8. Consola API REST en Vivo
       const API_ENDPOINTS = [
-        { method: 'GET', path: '/api/version', desc: 'Versión canónica, commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.1.1', display_version: '2B.1.1', branch: 'main', update_available: false } },
-        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { display_version: '2B.1.1' } } },
+        { method: 'GET', path: '/api/version', desc: 'Versión canónica (App, Servidor y GitHub), commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.4.0', display_version: '12.4.0', server_version: '12.4.0', remote_version: '12.4.0', branch: 'main', update_available: false } },
+        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { current_version: '12.4.0', display_version: '12.4.0' } } },
+        { method: 'POST', path: '/api/system/sync-web', desc: 'Sincronización en caliente de archivos web desde la App Nativa de Ubuntu verificada con SHA-256 sin tocar recursos_history.db', sample: { success: true, synced: true, version: '12.4.0', updated_files: ['VERSION', 'package.json', 'static/index.html', 'static/manual.html'] } },
+        { method: 'GET', path: '/api/metrics/history?window_sec=3600&limit=180', desc: 'Historial persistente de consumo en recursos_history.db para retroceso temporal en la Inspección Táctil', sample: { ok: true, db_file: 'recursos_history.db', total_samples: 18420, returned_samples: 180, has_older: true } },
+        { method: 'GET', path: '/api/maps/config', desc: 'Motor cartográfico libre OpenStreetMap / Leaflet sin necesidad de API Key', sample: { success: true, engine: 'leaflet', provider: 'OpenStreetMap', free: true, requires_api_key: false } },
         { method: 'GET', path: '/api/system/logs?limit=10', desc: 'Agregador unificado de fallos de Systemd, Docker y Kernel', sample: { ok: true, total_errors: 0, counts_by_category: { systemd: 0, docker: 0, kernel: 0 } } },
         { method: 'GET', path: '/api/auth/devices', desc: 'Listado de dispositivos físicos agrupados con certificados HMAC', sample: [{ id: 'dev_ejemplo', access_level: 'FULL_NATIVE_ACCESS', certificate_scope: 'PER_PHYSICAL_DEVICE' }] },
         { method: 'GET', path: '/api/dns/duckdns', desc: 'Estado y última sincronización del dominio dinámico DuckDNS', sample: { available: true, online: true, message: 'DuckDNS sincronizado correctamente' } },
@@ -1792,11 +1796,21 @@
 
       // 9. Changelog interactivo filtrado por tipo SemVer
       const CHANGELOG = [
-        { ver: 'v12.1.1 (v2B.1.1)', type: 'PATCH', desc: 'Reescritura integral desde cero de README.md con arquitectura visual Mermaid en 3 diagramas, matriz comparativa multiplataforma, guía Zero-Hardcoding y resumen limpio de hitos SemVer.' },
-        { ver: 'v12.1.0 (v2B.1.0)', type: 'MINOR', desc: 'Nuevo Manual Web Interactivo (/manual, /readme y docs/index.html) con explorador SVG de arquitectura, simulador HiDPI de CPU/RAM/Disco, donut interactivo ASUS AiMesh, simulador Zero-Trust HMAC, consola API en vivo y modernización visual de README.md.' },
-        { ver: 'v12.0.6 (v2B.0.6)', type: 'PATCH', desc: 'Erradicación total de spam sudo PAM en journalctl (capacidades CAP_NET_ADMIN), poda SQLite acotada cada 60s, caché de Fail2ban/Pi-hole, caché byte-splicing (<18 ms), serie histórica real disk_pct y reactividad de subpestañas en React 19.' },
-        { ver: 'v12.0.5 (v2B.0.5)', type: 'PATCH', desc: 'Bóveda cifrada AES-256-GCM + PBKDF2-HMAC-SHA256 para credenciales del router ASUS AiMesh, SSH sin exposición en cmdline y filtrado de puentes virtuales Docker.' },
-        { ver: 'v12.0.0 (v2B.0.0)', type: 'MAJOR', desc: 'Reescritura integral en React 19 + TypeScript + Tailwind CSS v4, diseño Claro Minimalista + Oscuro, idioma español cotidiano, gráfica dual de almacenamiento y nuevo emblema CMineWar.' },
+        { ver: 'v12.4.0', type: 'MINOR', desc: 'Detección triple simultánea en la App Nativa de Ubuntu (App Ubuntu vs. Servidor web local vs. GitHub) y botón único de actualización unificada capaz de instalar .deb desde GitHub o sincronizar la web local en caliente mediante POST /api/system/sync-web con SHA-256 incluso cuando la app supera a la versión publicada en GitHub.' },
+        { ver: 'v12.3.0', type: 'MINOR', desc: 'Todas las gráficas unificadas a una ventana móvil exacta de los últimos 20 minutos (cubetas de 5 s pico-preservantes), ejes visibles de escala temporal (X) y de magnitud/velocidad (Y), y autoajuste dinámico en métricas de velocidad (discos y red) bloqueando el tope de la escala exactamente al punto más alto registrado en esos 20 minutos.' },
+        { ver: 'v12.2.1', type: 'PATCH', desc: 'Blindaje completo de recursos_history.db en instalación y actualizaciones: creación inicial idempotente en postinst, exclusión explícita de archivos .db/.json en el paquete .deb y actualización incremental SQLite (ON CONFLICT DO UPDATE) sin sobrescribir jamás datos previos.' },
+        { ver: 'v12.2.0', type: 'MINOR', desc: 'Base de datos unificada recursos_history.db (migración automática de geoip_history.db + nueva tabla telemetry_history), endpoint /api/metrics/history y Pantalla de Inspección Táctil con retroceso temporal completo, deslizador cronológico, gestos de arrastre y estadísticas.' },
+        { ver: 'v12.1.7', type: 'PATCH', desc: 'Simplificación de README.md para omitir listados de versiones anteriores salvo comparativa de diferencias arquitectónicas clave, reflejando esta pauta en GEMINI.md y cockpit-release.' },
+        { ver: 'v12.1.6', type: 'PATCH', desc: 'Eliminación completa del alias visual 2B (v2B.x.y) en backend, frontend, Ubuntu, Android, manual interactivo y documentación, unificando la numeración SemVer directa.' },
+        { ver: 'v12.1.5', type: 'PATCH', desc: 'Eliminación completa de restos de Google Maps API (VITE_GOOGLE_MAPS_API_KEY, maps_api_key y maps.googleapis.com), CSP actualizada y geomapa libre exclusivo OpenStreetMap / CartoDB con cambio dinámico de tema y respaldo automático.' },
+        { ver: 'v12.1.4', type: 'PATCH', desc: 'Eliminación en GEMINI.md y cockpit-release de la regla de sincronización git pull automática al iniciar una tarea.' },
+        { ver: 'v12.1.3', type: 'PATCH', desc: 'Nuevo README.md visual e interactivo estilo manual con suite de 5 gráficos SVG animados (Claro/Oscuro) en docs/assets/, módulos desplegables por vista y explorador REST paso a paso.' },
+        { ver: 'v12.1.2', type: 'PATCH', desc: 'Supresión de la regla de auto-publicación en GitHub (Regla 9) en GEMINI.md y en la skill del plugin cockpit-release para evitar pushes automáticos sin solicitud expresa.' },
+        { ver: 'v12.1.1', type: 'PATCH', desc: 'Reescritura integral desde cero de README.md con arquitectura visual Mermaid en 3 diagramas, matriz comparativa multiplataforma, guía Zero-Hardcoding y resumen limpio de hitos SemVer.' },
+        { ver: 'v12.1.0', type: 'MINOR', desc: 'Nuevo Manual Web Interactivo (/manual, /readme y docs/index.html) con explorador SVG de arquitectura, simulador HiDPI de CPU/RAM/Disco, donut interactivo ASUS AiMesh, simulador Zero-Trust HMAC, consola API en vivo y modernización visual de README.md.' },
+        { ver: 'v12.0.6', type: 'PATCH', desc: 'Erradicación total de spam sudo PAM en journalctl (capacidades CAP_NET_ADMIN), poda SQLite acotada cada 60s, caché de Fail2ban/Pi-hole, caché byte-splicing (<18 ms), serie histórica real disk_pct y reactividad de subpestañas en React 19.' },
+        { ver: 'v12.0.5', type: 'PATCH', desc: 'Bóveda cifrada AES-256-GCM + PBKDF2-HMAC-SHA256 para credenciales del router ASUS AiMesh, SSH sin exposición en cmdline y filtrado de puentes virtuales Docker.' },
+        { ver: 'v12.0.0', type: 'MAJOR', desc: 'Reescritura integral en React 19 + TypeScript + Tailwind CSS v4, diseño Claro Minimalista + Oscuro, idioma español cotidiano, gráfica dual de almacenamiento y nuevo emblema CMineWar.' },
         { ver: 'v11.3.0', type: 'MINOR', desc: 'Botón simétrico de apagado remoto junto a Wake-on-LAN con soporte Webhook HTTP, SSH BatchMode, RPC y paquetes UDP Sleep-on-LAN.' },
         { ver: 'v11.2.1', type: 'PATCH', desc: 'Auditoría integral Zero-Hardcoding, eliminación de credenciales estáticas y autodescubrimiento dinámico de puerta de enlace e interfaces.' }
       ];

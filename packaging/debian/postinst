@@ -33,6 +33,94 @@ if [ "$1" = "configure" ]; then
             rm -f "$u_home/.local/share/applications/scrcpy-console.desktop" 2>/dev/null || true
         fi
     done
+
+    # Inicializar recursos_history.db al instalar sin sobrescribir jamás datos existentes en actualizaciones
+    SVC_WORKDIR=""
+    if command -v systemctl >/dev/null 2>&1; then
+        SVC_WORKDIR="$(systemctl show -p WorkingDirectory --value system-dashboard.service 2>/dev/null || true)"
+    fi
+    if [ -n "$SVC_WORKDIR" ] && [ -d "$SVC_WORKDIR" ]; then
+        TARGET_DB_DIR="$SVC_WORKDIR"
+    else
+        TARGET_DB_DIR="/var/lib/recursos-cockpit"
+        mkdir -p "$TARGET_DB_DIR" 2>/dev/null || true
+    fi
+
+    if [ -d "$TARGET_DB_DIR" ] && command -v python3 >/dev/null 2>&1; then
+        python3 - "$TARGET_DB_DIR" <<'PYEOF' || true
+import os, sqlite3, sys
+
+db_dir = sys.argv[1]
+db_path = os.path.join(db_dir, "recursos_history.db")
+legacy_path = os.path.join(db_dir, "geoip_history.db")
+
+if not os.path.exists(db_path) and os.path.exists(legacy_path):
+    for suf in ("", "-wal", "-shm"):
+        s = legacy_path + suf
+        d = db_path + suf
+        if os.path.exists(s) and not os.path.exists(d):
+            try:
+                os.replace(s, d)
+            except Exception:
+                pass
+
+db_exists = os.path.exists(db_path)
+if db_exists:
+    try:
+        ro_conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5.0)
+        tables = {r[0] for r in ro_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        ro_conn.close()
+        if {"geoip_locations", "connection_history", "telemetry_history"}.issubset(tables):
+            sys.exit(0)
+    except Exception:
+        pass
+
+conn = sqlite3.connect(db_path, timeout=10.0)
+conn.execute("PRAGMA journal_mode=WAL;")
+conn.execute("PRAGMA synchronous=NORMAL;")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS geoip_locations (
+        ip TEXT PRIMARY KEY, lat REAL NOT NULL, lng REAL NOT NULL,
+        city TEXT DEFAULT '', region TEXT DEFAULT '', postal TEXT DEFAULT '',
+        country TEXT DEFAULT '', country_code TEXT DEFAULT '', isp TEXT DEFAULT '',
+        asn TEXT DEFAULT '', accuracy_source TEXT DEFAULT 'ip-api', updated_at REAL NOT NULL
+    )
+""")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS connection_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, conn_key TEXT UNIQUE NOT NULL,
+        direction TEXT NOT NULL, protocol TEXT DEFAULT 'TCP', local_ip TEXT DEFAULT '',
+        local_hostname TEXT DEFAULT '', local_port INTEGER DEFAULT 0, remote_ip TEXT NOT NULL,
+        remote_port INTEGER DEFAULT 0, domain TEXT DEFAULT '', service TEXT NOT NULL,
+        process TEXT DEFAULT '', jail TEXT DEFAULT '', lat REAL NOT NULL, lng REAL NOT NULL,
+        city TEXT DEFAULT '', region TEXT DEFAULT '', postal TEXT DEFAULT '',
+        country TEXT DEFAULT '', country_code TEXT DEFAULT '', isp TEXT DEFAULT '',
+        asn TEXT DEFAULT '', accuracy_source TEXT DEFAULT 'ip-api',
+        first_seen REAL NOT NULL, last_seen REAL NOT NULL, hit_count INTEGER DEFAULT 1
+    )
+""")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS telemetry_history (
+        ts REAL PRIMARY KEY, time_str TEXT NOT NULL,
+        cpu REAL DEFAULT 0, gpu REAL DEFAULT 0, ram REAL DEFAULT 0, ram_total REAL DEFAULT 0,
+        net_rx REAL DEFAULT 0, net_tx REAL DEFAULT 0, disk_r REAL DEFAULT 0,
+        disk_w REAL DEFAULT 0, disk_pct REAL DEFAULT 0
+    )
+""")
+conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_history_ts ON telemetry_history(ts DESC);")
+conn.commit()
+conn.close()
+
+try:
+    st = os.stat(db_dir)
+    for suf in ("", "-wal", "-shm"):
+        p = db_path + suf
+        if os.path.exists(p):
+            os.chown(p, st.st_uid, st.st_gid)
+except Exception:
+    pass
+PYEOF
+    fi
 fi
 
 exit 0

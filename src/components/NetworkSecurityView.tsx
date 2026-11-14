@@ -7,6 +7,7 @@ import {
   Image as ImageIcon,
   Lock,
   MapPin,
+  Maximize2,
   Power,
   PowerOff,
   RefreshCw,
@@ -18,6 +19,7 @@ import {
   Unlock,
   Wifi,
 } from 'lucide-react';
+import { ExpandChartSpec } from './OverviewView';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
 import {
@@ -47,6 +49,7 @@ interface NetworkSecurityViewProps {
   theme: ThemeMode;
   initialSubTab?: string;
   navTick?: number;
+  onExpandChart?: (spec: ExpandChartSpec) => void;
   onPowerAction: (action: 'wake' | 'shutdown', client: WifiClient) => void;
   actionPendingMac: string | null;
   onRefreshMetrics: () => void;
@@ -74,6 +77,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   theme,
   initialSubTab,
   navTick,
+  onExpandChart,
   onPowerAction,
   actionPendingMac,
   onRefreshMetrics,
@@ -188,15 +192,33 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
     const L = window.L;
     if (!container || !L) return;
 
+    const primaryTileUrl =
+      theme === 'dark'
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    const osmFallbackUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
     if (!mapInstanceRef.current) {
       const map = L.map(container, { zoomControl: true, attributionControl: false }).setView([40.4, -3.7], 3);
-      const tileUrl =
-        theme === 'dark'
-          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-          : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-      tileLayerRef.current = L.tileLayer(tileUrl, { maxZoom: 18 }).addTo(map);
+      const layer = L.tileLayer(primaryTileUrl, { maxZoom: 18 });
+      let switchedToOsm = false;
+      layer.on('tileerror', () => {
+        if (!switchedToOsm) {
+          switchedToOsm = true;
+          layer.setUrl(osmFallbackUrl);
+        }
+      });
+      layer.addTo(map);
+      tileLayerRef.current = layer;
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapInstanceRef.current = map;
+      window.setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 120);
+    } else if (tileLayerRef.current) {
+      tileLayerRef.current.setUrl(primaryTileUrl);
     }
 
     const ro = new ResizeObserver(() => {
@@ -383,10 +405,22 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               const hist2h = nic.history_2h ?? [];
               const rxData = hist2h.map((b) => Math.round((b.rx / (1024 * 1024)) * 100) / 100);
               const txData = hist2h.map((b) => Math.round((b.tx / (1024 * 1024)) * 100) / 100);
+              const nicTimestamps = hist2h.map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
+              const nicEpochTs = hist2h.map((b) => Math.round(b.t / 1000));
               const nicSeries: ChartSeries[] = [
-                { id: 'rx', label: 'Descarga', data: rxData, color: '#2563eb', unit: 'MB/s', decimals: 2 },
-                { id: 'tx', label: 'Subida', data: txData, color: '#16a34a', unit: 'MB/s', decimals: 2, fillAlpha: 0 },
+                { id: 'rx', metricKey: 'net_rx', label: 'Descarga', data: rxData, color: '#2563eb', unit: 'MB/s', decimals: 2 },
+                { id: 'tx', metricKey: 'net_tx', label: 'Subida', data: txData, color: '#16a34a', unit: 'MB/s', decimals: 2, fillAlpha: 0 },
               ];
+              const expandNicSpec: ExpandChartSpec = {
+                title: `Tráfico de red ${nic.name} e historial completo`,
+                subtitle: `${nic.ip || 'Red local'} · Últimos 20 min en vivo + historial en recursos_history.db`,
+                series: nicSeries,
+                timestamps: nicTimestamps,
+                epochTs: nicEpochTs,
+                leftUnit: 'MB/s',
+                chartKind: 'net',
+                nicName: nic.name,
+              };
               return (
                 <div
                   key={nic.name}
@@ -401,18 +435,33 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                         {nic.ip || 'Sin dirección local'} · {nic.is_up ? 'Activa' : 'Desconectada'}
                       </p>
                     </div>
-                    <div className="text-right font-mono text-xs tabular-nums">
-                      <div className="text-blue-600 dark:text-blue-400">↓ {formatSpeed(nic.rx_bytes_sec)}</div>
-                      <div className="text-emerald-600 dark:text-emerald-400">↑ {formatSpeed(nic.tx_bytes_sec)}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right font-mono text-xs tabular-nums">
+                        <div className="text-blue-600 dark:text-blue-400">↓ {formatSpeed(nic.rx_bytes_sec)}</div>
+                        <div className="text-emerald-600 dark:text-emerald-400">↑ {formatSpeed(nic.tx_bytes_sec)}</div>
+                      </div>
+                      {onExpandChart && (
+                        <button
+                          type="button"
+                          aria-label={`Inspeccionar historial completo de ${nic.name}`}
+                          onClick={() => onExpandChart(expandNicSpec)}
+                          className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                        >
+                          <Maximize2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3">
                     <TelemetryChart
                       series={nicSeries}
-                      height={92}
+                      timestamps={nicTimestamps}
+                      epochTs={nicEpochTs}
+                      height={112}
                       leftUnit="MB/s"
                       theme={theme}
-                      emptyMessage="Acumulando historial de últimas 2 horas..."
+                      emptyMessage="Acumulando historial de últimos 20 minutos..."
+                      onExpandClick={onExpandChart ? () => onExpandChart(expandNicSpec) : undefined}
                       formatLabel={(idx) => {
                         const bucket = hist2h[idx];
                         return bucket ? new Date(bucket.t).toLocaleTimeString('es-ES') : `Muestra ${idx + 1}`;
@@ -559,11 +608,16 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white overflow-hidden dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
                 <div>
-                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                    Ubicación de las conexiones activas
-                  </h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                      Ubicación de las conexiones activas
+                    </h2>
+                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      OpenStreetMap · Libre sin API
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     {geoConnections.length} destinos visibles en el mapa mundial
                   </p>

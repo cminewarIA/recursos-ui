@@ -147,6 +147,8 @@ export const MoreView: React.FC<MoreViewProps> = ({
     setInstallingUpdate(true);
     const res = await apiFetchJson<{
       success?: boolean;
+      deb_installed?: boolean;
+      web_synced?: boolean;
       message?: string;
       output?: string;
       version_info?: VersionInfo;
@@ -157,6 +159,11 @@ export const MoreView: React.FC<MoreViewProps> = ({
     if (res.ok && res.data?.success !== false) {
       onNotify(res.data?.message || 'Sistema comprobado y actualizado correctamente.');
       onRefreshMetrics();
+      if (res.data?.web_synced) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 900);
+      }
     } else {
       onNotify(res.error || res.data?.message || 'No se pudo completar la actualización automática.', true);
     }
@@ -334,28 +341,86 @@ export const MoreView: React.FC<MoreViewProps> = ({
             </div>
           </section>
 
-          {/* GitHub Auto-Updater */}
+          {/* Unified App / Server / GitHub Updater */}
           <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
                   <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-                    Actualizaciones desde GitHub
+                    {isUbuntuNative ? 'Actualización unificada' : 'Actualizaciones desde GitHub'}
                   </h2>
                   <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
                     v{displayVer}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {activeVer?.update_available
-                    ? `Hay una versión nueva disponible (v${remoteDisplayVer}).`
-                    : activeVer?.ahead_of_remote
-                      ? 'Tienes cambios locales más recientes que el repositorio.'
-                      : 'Tu sistema está al día con la última versión.'}
+                  {activeVer?.update_summary
+                    ? activeVer.update_summary
+                    : activeVer?.update_available
+                      ? `Hay una versión nueva disponible (v${remoteDisplayVer}).`
+                      : activeVer?.ahead_of_remote
+                        ? 'Tienes cambios locales más recientes que el repositorio.'
+                        : 'Tu sistema está al día con la última versión.'}
                 </p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {activeVer?.auto_install_status || 'Actualización automática activada'}
                 </p>
+
+                {(activeVer?.ubuntu_native_bridge || activeVer?.app_version || activeVer?.server_version) && (
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                        App Ubuntu
+                      </p>
+                      <p className="mt-0.5 font-mono text-xs font-semibold text-slate-900 dark:text-white">
+                        v{getDisplayVersionString(activeVer.app_version || activeVer.current_version, activeVer.app_display_version)}
+                        {activeVer.app_above_github && (
+                          <span className="ml-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                            · sup. GitHub
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div
+                      className={`rounded-xl border px-3 py-2 ${
+                        activeVer.server_needs_update
+                          ? 'border-blue-200 bg-blue-50/80 dark:border-blue-900/60 dark:bg-blue-950/40'
+                          : 'border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/60'
+                      }`}
+                    >
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                        Servidor web local
+                      </p>
+                      <p className="mt-0.5 font-mono text-xs font-semibold text-slate-900 dark:text-white">
+                        {activeVer.server_reachable === false
+                          ? 'Sin conexión'
+                          : `v${getDisplayVersionString(
+                              activeVer.server_version || activeVer.current_version,
+                              activeVer.server_display_version
+                            )}`}
+                        {activeVer.server_needs_update && (
+                          <span className="ml-1.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                            · actualizable
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div
+                      className={`rounded-xl border px-3 py-2 ${
+                        activeVer.github_above_app || activeVer.github_above_server
+                          ? 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/60 dark:bg-emerald-950/40'
+                          : 'border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/60'
+                      }`}
+                    >
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                        GitHub oficial
+                      </p>
+                      <p className="mt-0.5 font-mono text-xs font-semibold text-slate-900 dark:text-white">
+                        {remoteDisplayVer && remoteDisplayVer !== '0.0.0' ? `v${remoteDisplayVer}` : 'Sin acceso'}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -383,10 +448,18 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   type="button"
                   disabled={installingUpdate}
                   onClick={handleApplyUpdate}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900"
+                  className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-50 ${
+                    activeVer?.effective_update_available || activeVer?.update_available
+                      ? 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400'
+                      : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900'
+                  }`}
                 >
                   <Download className="h-3.5 w-3.5" />
-                  <span>{installingUpdate ? 'Actualizando...' : 'Actualizar ahora'}</span>
+                  <span>
+                    {installingUpdate
+                      ? 'Actualizando...'
+                      : activeVer?.update_action_label || 'Actualizar ahora'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -424,7 +497,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             {showTechUpdate && (
               <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                 <div>
-                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.1.1'} · Commit local:{' '}
+                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.4.0'} · Commit local:{' '}
                   {activeVer?.local_commit || activeVer?.local_hash || 'local'} · Remoto:{' '}
                   {activeVer?.remote_commit || activeVer?.remote_hash || '--'}
                 </div>

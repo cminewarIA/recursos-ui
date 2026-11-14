@@ -6,14 +6,13 @@ import {
   Home,
   MoreHorizontal,
   Wifi,
-  X,
 } from 'lucide-react';
 import { OverviewView, ExpandChartSpec } from './components/OverviewView';
 import { EquipmentView } from './components/EquipmentView';
 import { NetworkSecurityView } from './components/NetworkSecurityView';
 import { AppsMediaView } from './components/AppsMediaView';
 import { MoreView } from './components/MoreView';
-import { TelemetryChart } from './components/TelemetryChart';
+import { ExpandedChartModal } from './components/ExpandedChartModal';
 import { MainTabId, MetricsPayload, ThemeMode, WifiClient } from './types/telemetry';
 import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/api';
 import { extractInitialSubTabFromRoute, getDisplayVersionString, normalizeExternalRoute } from './utils/formatters';
@@ -158,7 +157,7 @@ export function App() {
           ? 'android_native'
           : 'web_browser',
       full_access: env.isNativeApp,
-      app_version: window.__INITIAL_APP_VERSION__ || '12.1.1',
+      app_version: window.__INITIAL_APP_VERSION__ || '12.4.0',
       screen_width: window.screen?.width,
       screen_height: window.screen?.height,
     };
@@ -342,7 +341,13 @@ export function App() {
               />
             )}
             {activeTab === 'equipo' && (
-              <EquipmentView metrics={metrics} theme={theme} initialSubTab={subTabHint} navTick={navTick} />
+              <EquipmentView
+                metrics={metrics}
+                theme={theme}
+                initialSubTab={subTabHint}
+                navTick={navTick}
+                onExpandChart={setExpandedChart}
+              />
             )}
             {activeTab === 'red' && (
               <NetworkSecurityView
@@ -350,6 +355,7 @@ export function App() {
                 theme={theme}
                 initialSubTab={subTabHint}
                 navTick={navTick}
+                onExpandChart={setExpandedChart}
                 onPowerAction={handlePowerClick}
                 actionPendingMac={pendingMac}
                 onRefreshMetrics={() => void fetchMetrics()}
@@ -409,45 +415,14 @@ export function App() {
         </div>
       </nav>
 
-      {/* Expanded Chart Modal (Interactive Tooltip included) */}
+      {/* Expanded Chart Modal (Inspección táctil e historial completo SQLite) */}
       {expandedChart && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          onClick={() => setExpandedChart(null)}
-        >
-          <div
-            className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-                  {expandedChart.title}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{expandedChart.subtitle}</p>
-              </div>
-              <button
-                type="button"
-                aria-label="Cerrar gráfica ampliada"
-                onClick={() => setExpandedChart(null)}
-                className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="mt-4">
-              <TelemetryChart
-                series={expandedChart.series}
-                timestamps={expandedChart.timestamps}
-                height={280}
-                leftUnit={expandedChart.leftUnit}
-                maxLeft={expandedChart.maxLeft}
-                maxRight={expandedChart.maxRight}
-                theme={theme}
-              />
-            </div>
-          </div>
-        </div>
+        <ExpandedChartModal
+          spec={expandedChart}
+          liveMetrics={metrics}
+          theme={theme}
+          onClose={() => setExpandedChart(null)}
+        />
       )}
 
       {/* Custom Shutdown Confirmation Modal */}

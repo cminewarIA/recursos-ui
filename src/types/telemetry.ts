@@ -355,8 +355,21 @@ export interface SecurityData {
   };
 }
 
+export type TelemetryMetricKey =
+  | 'cpu'
+  | 'gpu'
+  | 'ram'
+  | 'ram_total'
+  | 'net_rx'
+  | 'net_tx'
+  | 'disk_r'
+  | 'disk_w'
+  | 'disk_pct';
+
 export interface HistorySeries {
   timestamps?: string[];
+  date_timestamps?: string[];
+  epoch_ts?: number[];
   cpu?: number[];
   gpu?: number[];
   ram?: number[];
@@ -366,6 +379,20 @@ export interface HistorySeries {
   disk_r?: number[];
   disk_w?: number[];
   disk_pct?: number[];
+}
+
+export interface TelemetryHistoryResponse {
+  ok: boolean;
+  db_file?: string;
+  oldest_ts: number | null;
+  newest_ts: number | null;
+  window_start_ts: number | null;
+  window_end_ts: number | null;
+  total_samples: number;
+  returned_samples: number;
+  has_older: boolean;
+  has_newer: boolean;
+  series: HistorySeries;
 }
 
 export interface RecentCommitItem {
@@ -380,6 +407,13 @@ export interface VersionInfo {
   current_version: string;
   version?: string;
   display_version?: string;
+  app_version?: string;
+  app_display_version?: string;
+  server_version?: string;
+  server_display_version?: string;
+  server_reachable?: boolean;
+  github_version?: string;
+  github_display_version?: string;
   remote_version?: string;
   remote_display_version?: string;
   local_commit?: string;
@@ -387,7 +421,18 @@ export interface VersionInfo {
   remote_commit?: string;
   remote_hash?: string;
   update_available?: boolean;
+  effective_update_available?: boolean;
   ahead_of_remote?: boolean;
+  app_above_server?: boolean;
+  app_above_github?: boolean;
+  github_above_server?: boolean;
+  github_above_app?: boolean;
+  server_needs_update?: boolean;
+  target_version?: string;
+  update_mode?: string;
+  update_action_label?: string;
+  update_summary?: string;
+  ubuntu_native_bridge?: boolean;
   has_git?: boolean;
   commits_behind?: number;
   recent_commits?: RecentCommitItem[];

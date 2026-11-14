@@ -7,7 +7,7 @@ import http from 'http';
 import nodeNet from 'net';
 import os from 'os';
 import path from 'path';
-import { defineConfig, loadEnv, Plugin } from 'vite';
+import { defineConfig, Plugin } from 'vite';
 
 // Real-time OS Telemetry state for Vite preview server (100% real system calls, zero fake specs)
 let prevCpuTimes: { idle: number; total: number }[] = [];
@@ -22,7 +22,7 @@ function loadNicHistory2hFromDisk() {
     if (!fs.existsSync(nicHistoryFilePath)) return;
     const raw = JSON.parse(fs.readFileSync(nicHistoryFilePath, 'utf-8'));
     if (!raw || typeof raw !== 'object') return;
-    const cutoffMs = Date.now() - 7200 * 1000;
+    const cutoffMs = Date.now() - 1200 * 1000;
     for (const [nicName, pts] of Object.entries(raw)) {
       if (!Array.isArray(pts)) continue;
       const bucketMap = new Map<number, { t: number; rx: number; tx: number }>();
@@ -30,7 +30,7 @@ function loadNicHistory2hFromDisk() {
         if (!pt || typeof pt !== 'object') continue;
         const tVal = Number((pt as { t?: number }).t || 0);
         if (tVal < cutoffMs) continue;
-        const bTs = Math.floor(tVal / 15000) * 15000;
+        const bTs = Math.floor(tVal / 5000) * 5000;
         const rxVal = Math.max(0, Number((pt as { rx?: number }).rx || 0));
         const txVal = Math.max(0, Number((pt as { tx?: number }).tx || 0));
         const prev = bucketMap.get(bTs);
@@ -61,8 +61,77 @@ function saveNicHistory2hToDiskIfNeeded(nowMs: number) {
 }
 
 loadNicHistory2hFromDisk();
+const telemetryHistoryDevPath = path.resolve(__dirname, 'telemetry_history_dev.json');
+interface TelemetryHistoryRow {
+  ts: number;
+  time_str: string;
+  cpu: number;
+  gpu: number;
+  ram: number;
+  ram_total: number;
+  net_rx: number;
+  net_tx: number;
+  disk_r: number;
+  disk_w: number;
+  disk_pct: number;
+}
+let devTelemetrySamples: TelemetryHistoryRow[] = [];
+let lastTelemetryDevSaveMs = 0;
+
+function loadTelemetryHistoryDev() {
+  try {
+    if (fs.existsSync(telemetryHistoryDevPath)) {
+      const parsed = JSON.parse(fs.readFileSync(telemetryHistoryDevPath, 'utf-8'));
+      if (Array.isArray(parsed)) {
+        devTelemetrySamples = parsed.slice(-50000);
+      }
+    }
+  } catch {
+    // Ignore corrupt file
+  }
+}
+
+function appendTelemetrySampleDev(row: TelemetryHistoryRow) {
+  devTelemetrySamples.push(row);
+  if (devTelemetrySamples.length > 50000) {
+    devTelemetrySamples = devTelemetrySamples.slice(-50000);
+  }
+  const nowMs = Date.now();
+  if (nowMs - lastTelemetryDevSaveMs >= 3000) {
+    lastTelemetryDevSaveMs = nowMs;
+    try {
+      const tmp = `${telemetryHistoryDevPath}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(devTelemetrySamples), 'utf-8');
+      fs.renameSync(tmp, telemetryHistoryDevPath);
+    } catch {
+      // Ignore write error
+    }
+  }
+}
+
+loadTelemetryHistoryDev();
+const DEV_HISTORY_WINDOW_SEC = 1200; // 20 minutos
+const DEV_HISTORY_BUCKET_SEC = 5;    // cubetas de 5s pico-preservantes (hasta 240 puntos)
+
+interface HistoryBucketDev {
+  b_ts: number;
+  ts: number;
+  time_str: string;
+  cpu: number;
+  gpu: number;
+  ram: number;
+  ram_total: number;
+  net_rx: number;
+  net_tx: number;
+  disk_r: number;
+  disk_w: number;
+  disk_pct: number;
+}
+
+const historyBuckets20m: HistoryBucketDev[] = [];
 const historyBuffer: Record<string, (number | string)[]> = {
   timestamps: [],
+  epoch_ts: [],
   cpu: [],
   gpu: [],
   ram: [],
@@ -74,6 +143,53 @@ const historyBuffer: Record<string, (number | string)[]> = {
   disk_pct: [],
 };
 
+function syncHistoryBufferDev() {
+  historyBuffer.timestamps = historyBuckets20m.map((b) => b.time_str);
+  historyBuffer.epoch_ts = historyBuckets20m.map((b) => b.ts);
+  historyBuffer.cpu = historyBuckets20m.map((b) => b.cpu);
+  historyBuffer.gpu = historyBuckets20m.map((b) => b.gpu);
+  historyBuffer.ram = historyBuckets20m.map((b) => b.ram);
+  historyBuffer.ram_total = historyBuckets20m.map((b) => b.ram_total);
+  historyBuffer.net_rx = historyBuckets20m.map((b) => b.net_rx);
+  historyBuffer.net_tx = historyBuckets20m.map((b) => b.net_tx);
+  historyBuffer.disk_r = historyBuckets20m.map((b) => b.disk_r);
+  historyBuffer.disk_w = historyBuckets20m.map((b) => b.disk_w);
+  historyBuffer.disk_pct = historyBuckets20m.map((b) => b.disk_pct);
+}
+
+function pushHistoryBucketDev(row: TelemetryHistoryRow, sync = true) {
+  const bTs = Math.floor(row.ts / DEV_HISTORY_BUCKET_SEC) * DEV_HISTORY_BUCKET_SEC;
+  const cutoffBTs = bTs - DEV_HISTORY_WINDOW_SEC;
+  const last = historyBuckets20m[historyBuckets20m.length - 1];
+  if (!last || last.b_ts < bTs) {
+    historyBuckets20m.push({ b_ts: bTs, ...row });
+  } else if (last.b_ts === bTs) {
+    last.ts = row.ts;
+    if (row.time_str) last.time_str = row.time_str;
+    last.cpu = Math.max(last.cpu, row.cpu);
+    last.gpu = Math.max(last.gpu, row.gpu);
+    last.ram = Math.max(last.ram, row.ram);
+    last.ram_total = Math.max(last.ram_total, row.ram_total);
+    last.net_rx = Math.max(last.net_rx, row.net_rx);
+    last.net_tx = Math.max(last.net_tx, row.net_tx);
+    last.disk_r = Math.max(last.disk_r, row.disk_r);
+    last.disk_w = Math.max(last.disk_w, row.disk_w);
+    last.disk_pct = Math.max(last.disk_pct, row.disk_pct);
+  }
+  while (historyBuckets20m.length > 0 && historyBuckets20m[0].b_ts < cutoffBTs) {
+    historyBuckets20m.shift();
+  }
+  if (sync) syncHistoryBufferDev();
+}
+
+const initialCutoffTs = Date.now() / 1000 - DEV_HISTORY_WINDOW_SEC;
+for (const s of devTelemetrySamples) {
+  if (s.ts >= initialCutoffTs) {
+    pushHistoryBucketDev(s, false);
+  }
+}
+syncHistoryBufferDev();
+
 function readAppVersion(): string {
   try {
     return fs.readFileSync(path.resolve(__dirname, 'VERSION'), 'utf-8').trim() || '0.0.0';
@@ -83,9 +199,7 @@ function readAppVersion(): string {
 }
 
 function getDisplayVersion(pkgVer?: string): string {
-  const ver = (pkgVer || readAppVersion()).trim();
-  if (ver.startsWith('12.')) return `2B.${ver.slice(3)}`;
-  return ver;
+  return (pkgVer || readAppVersion()).trim();
 }
 
 let cachedStaticCpu: { model: string; arch: string; vendor: string; cacheSize: string } | null = null;
@@ -295,8 +409,8 @@ function sampleRealNetwork() {
     }
 
     const nHist = nicHistory2h[name] || (nicHistory2h[name] = []);
-    const bucketMs = Math.floor(now / 15000) * 15000;
-    const cutoffMs = bucketMs - 7200 * 1000;
+    const bucketMs = Math.floor(now / 5000) * 5000;
+    const cutoffMs = bucketMs - 1200 * 1000;
     if (nHist.length === 0 || nHist[nHist.length - 1].t < bucketMs) {
       nHist.push({ t: bucketMs, rx: Math.round(rxSec), tx: Math.round(txSec) });
     } else {
@@ -888,7 +1002,7 @@ async function triggerAsyncGeoSync(immediate = false) {
     // 2. Resolve real DNS endpoints for active outbound telemetry/OTA/DNS services
     const activeTargets = [
       { host: 'api.github.com', port: 443, protocol: 'TCP', service: 'GitHub OTA Sync (api.github.com)' },
-      { host: 'maps.googleapis.com', port: 443, protocol: 'TCP', service: 'Google Maps Platform API' },
+      { host: 'tile.openstreetmap.org', port: 443, protocol: 'TCP', service: 'OpenStreetMap Tile CDN (Libre)' },
       { host: 'cdn.simpleicons.org', port: 443, protocol: 'TCP', service: 'SimpleIcons Hardware CDN' },
       { host: 'one.one.one.one', port: 53, protocol: 'UDP', service: 'Cloudflare DNS Upstream (1.1.1.1)' },
       { host: 'dns.google', port: 53, protocol: 'UDP', service: 'Google Public DNS Upstream (8.8.8.8)' },
@@ -1505,7 +1619,12 @@ function getRealVersionPayload(hostHeader: string) {
 
   return {
     version,
+    current_version: version,
     display_version: dispVersion,
+    server_version: version,
+    server_display_version: dispVersion,
+    remote_version: version,
+    remote_display_version: dispVersion,
     installed_deb_version: installedDebVer || version,
     package_installed: Boolean(installedDebVer),
     package_needs_install: packageNeedsInstall,
@@ -1594,7 +1713,7 @@ function writeCustomLogos(logos: Record<string, string>) {
   }
 }
 
-function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
+function realOsTelemetryMiddleware(): Plugin {
   sampleRealCpuUsage();
   startGeoIpBackgroundWorker();
   return {
@@ -1625,6 +1744,125 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
             res.end(fs.readFileSync(chosen, 'utf-8'));
             return;
           }
+        }
+
+        if (url === '/api/metrics/history' && req.method === 'GET') {
+          const params = new URLSearchParams(queryStr || '');
+          const beforeTsRaw = params.get('before_ts');
+          const afterTsRaw = params.get('after_ts');
+          const windowRaw = params.get('window_sec') || params.get('window') || '';
+          const limit = Math.max(20, Math.min(600, Number.parseInt(params.get('limit') || '180', 10) || 180));
+          const beforeTs = beforeTsRaw ? Number.parseFloat(beforeTsRaw) : null;
+          const afterTs = afterTsRaw ? Number.parseFloat(afterTsRaw) : null;
+          const isAll = windowRaw.trim().toLowerCase() === 'all';
+          const windowSec = !isAll && windowRaw && windowRaw !== 'live' ? Number.parseFloat(windowRaw) : null;
+
+          const totalSamples = devTelemetrySamples.length;
+          const oldestTs = totalSamples > 0 ? devTelemetrySamples[0].ts : null;
+          const newestTs = totalSamples > 0 ? devTelemetrySamples[totalSamples - 1].ts : null;
+
+          let filtered = devTelemetrySamples;
+          if (isAll) {
+            filtered = devTelemetrySamples;
+          } else if (windowSec && Number.isFinite(windowSec) && windowSec > 0 && newestTs !== null) {
+            const endRef = beforeTs !== null && Number.isFinite(beforeTs) ? beforeTs : newestTs;
+            const startRef = Math.max(oldestTs ?? 0, endRef - windowSec);
+            filtered = devTelemetrySamples.filter((s) => s.ts >= startRef && s.ts <= endRef);
+          } else if (afterTs !== null && Number.isFinite(afterTs) && beforeTs === null) {
+            filtered = devTelemetrySamples.filter((s) => s.ts >= afterTs).slice(0, limit);
+          } else {
+            filtered = devTelemetrySamples.filter((s) => {
+              if (beforeTs !== null && Number.isFinite(beforeTs) && s.ts > beforeTs) return false;
+              if (afterTs !== null && Number.isFinite(afterTs) && s.ts < afterTs) return false;
+              return true;
+            });
+            filtered = filtered.slice(-limit);
+          }
+
+          let sampled = filtered;
+          if (filtered.length > limit) {
+            const bucketSize = filtered.length / limit;
+            const out: TelemetryHistoryRow[] = [];
+            for (let i = 0; i < limit; i++) {
+              const sIdx = Math.floor(i * bucketSize);
+              const eIdx = Math.min(filtered.length, Math.max(sIdx + 1, Math.floor((i + 1) * bucketSize)));
+              const chunk = filtered.slice(sIdx, eIdx);
+              if (chunk.length === 1) {
+                out.push(chunk[0]);
+              } else if (chunk.length > 1) {
+                let rep = chunk[0];
+                let repScore = rep.cpu + rep.ram + rep.gpu + rep.net_rx;
+                for (const item of chunk) {
+                  const sc = item.cpu + item.ram + item.gpu + item.net_rx;
+                  if (sc > repScore) {
+                    rep = item;
+                    repScore = sc;
+                  }
+                }
+                out.push(rep);
+              }
+            }
+            if (filtered.length > 0 && out.length > 0 && out[out.length - 1].ts !== filtered[filtered.length - 1].ts) {
+              out[out.length - 1] = filtered[filtered.length - 1];
+            }
+            sampled = out;
+          }
+
+          const fmtDt = (ts: number) => {
+            const d = new Date(ts * 1000);
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `${dd}/${mm} ${d.toLocaleTimeString('es-ES')}`;
+          };
+
+          const series = {
+            timestamps: sampled.map((s) => s.time_str),
+            date_timestamps: sampled.map((s) => fmtDt(s.ts)),
+            epoch_ts: sampled.map((s) => Math.round(s.ts * 1000) / 1000),
+            cpu: sampled.map((s) => s.cpu),
+            gpu: sampled.map((s) => s.gpu),
+            ram: sampled.map((s) => s.ram),
+            ram_total: sampled.map((s) => s.ram_total),
+            net_rx: sampled.map((s) => s.net_rx),
+            net_tx: sampled.map((s) => s.net_tx),
+            disk_r: sampled.map((s) => s.disk_r),
+            disk_w: sampled.map((s) => s.disk_w),
+            disk_pct: sampled.map((s) => s.disk_pct),
+          };
+          const winStart = series.epoch_ts[0] ?? null;
+          const winEnd = series.epoch_ts[series.epoch_ts.length - 1] ?? null;
+
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              ok: true,
+              db_file: 'recursos_history.db',
+              oldest_ts: oldestTs,
+              newest_ts: newestTs,
+              window_start_ts: winStart,
+              window_end_ts: winEnd,
+              total_samples: totalSamples,
+              returned_samples: sampled.length,
+              has_older: Boolean(winStart !== null && oldestTs !== null && winStart > oldestTs + 0.5),
+              has_newer: Boolean(winEnd !== null && newestTs !== null && winEnd < newestTs - 0.5),
+              series,
+            })
+          );
+          return;
+        }
+
+        if (url === '/api/maps/config') {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              success: true,
+              engine: 'leaflet',
+              provider: 'OpenStreetMap',
+              free: true,
+              requires_api_key: false,
+            })
+          );
+          return;
         }
 
         if (url === '/api/net/geoip' && req.method === 'GET') {
@@ -1804,23 +2042,26 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
           const rootDisk = (disks as Array<{ percent?: number }>)[0];
           const rootDiskPct = Number(rootDisk?.percent || 0);
 
+          const nowEpochSec = Math.round((Date.now() / 1000) * 1000) / 1000;
           const timeStr = new Date().toLocaleTimeString('es-ES');
-          historyBuffer.timestamps.push(timeStr);
-          historyBuffer.cpu.push(cpu.overall);
-          historyBuffer.gpu.push(0);
-          historyBuffer.ram.push(ram.percent);
-          historyBuffer.ram_total.push(ram.percent);
-          historyBuffer.net_rx.push(Math.round((net.rx_bytes_sec / (1024 * 1024)) * 100) / 100);
-          historyBuffer.net_tx.push(Math.round((net.tx_bytes_sec / (1024 * 1024)) * 100) / 100);
-          historyBuffer.disk_r.push(Math.round((diskIo.read_bytes_sec / (1024 * 1024)) * 100) / 100);
-          historyBuffer.disk_w.push(Math.round((diskIo.write_bytes_sec / (1024 * 1024)) * 100) / 100);
-          historyBuffer.disk_pct.push(Math.round(rootDiskPct * 10) / 10);
-          for (const k of Object.keys(historyBuffer)) {
-            if (historyBuffer[k].length > 60) historyBuffer[k] = historyBuffer[k].slice(-60);
-          }
+          const devSampleRow: TelemetryHistoryRow = {
+            ts: nowEpochSec,
+            time_str: timeStr,
+            cpu: Math.round(cpu.overall * 100) / 100,
+            gpu: 0,
+            ram: Math.round(ram.percent * 100) / 100,
+            ram_total: Math.round(ram.percent * 100) / 100,
+            net_rx: Math.round((net.rx_bytes_sec / (1024 * 1024)) * 100) / 100,
+            net_tx: Math.round((net.tx_bytes_sec / (1024 * 1024)) * 100) / 100,
+            disk_r: Math.round((diskIo.read_bytes_sec / (1024 * 1024)) * 100) / 100,
+            disk_w: Math.round((diskIo.write_bytes_sec / (1024 * 1024)) * 100) / 100,
+            disk_pct: Math.round(rootDiskPct * 10) / 10,
+          };
+          pushHistoryBucketDev(devSampleRow, true);
+          appendTelemetrySampleDev(devSampleRow);
 
           const payload = {
-            maps_api_key: mapsApiKey || process.env.VITE_GOOGLE_MAPS_API_KEY || '',
+            maps_engine: 'leaflet',
             custom_logos: readCustomLogos(),
             auth_status: {
               is_local: true,
@@ -2005,6 +2246,34 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
                 version_info: getRealVersionPayload(hostHdr),
               })
             );
+          });
+          return;
+        }
+
+        if (url === '/api/system/sync-web' && req.method === 'POST') {
+          let bodyStr = '';
+          req.on('data', (chunk) => {
+            bodyStr += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const body = JSON.parse(bodyStr || '{}');
+              const v = String(body.version || readAppVersion()).trim();
+              res.setHeader('Content-Type', 'application/json');
+              res.end(
+                JSON.stringify({
+                  success: true,
+                  synced: true,
+                  version: v,
+                  message: `Sincronización web en modo desarrollo verificada (v${v}).`,
+                  version_info: getRealVersionPayload(hostHdr),
+                })
+              );
+            } catch {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Payload inválido' }));
+            }
           });
           return;
         }
@@ -2629,11 +2898,9 @@ function emitStandaloneStaticHtmlPlugin(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
-  const mapsApiKey = env.VITE_GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
+export default defineConfig(() => {
   return {
-    plugins: [realOsTelemetryMiddleware(mapsApiKey), react(), tailwindcss(), emitStandaloneStaticHtmlPlugin()],
+    plugins: [realOsTelemetryMiddleware(), react(), tailwindcss(), emitStandaloneStaticHtmlPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

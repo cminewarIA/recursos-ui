@@ -59,6 +59,10 @@ fi
 cp "$PROJECT_ROOT/static/"*.png "$PROJECT_ROOT/static/favicon.ico" "$PKG_DIR/usr/lib/$PKG_NAME/static/" 2>/dev/null || true
 cp "$PROJECT_ROOT/desktop_app/assets/"* "$PKG_DIR/usr/lib/$PKG_NAME/assets/"
 cp "$PROJECT_ROOT/VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/VERSION"
+if [ -f "$PROJECT_ROOT/package.json" ]; then
+    cp "$PROJECT_ROOT/package.json" "$PKG_DIR/usr/lib/$PKG_NAME/package.json"
+    chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/package.json"
+fi
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/*.py
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/VERSION
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/static/"*
@@ -102,6 +106,9 @@ done
 
 cp "$PROJECT_ROOT/desktop_app/assets/recursos-cockpit.svg" "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/recursos-cockpit.svg"
 chmod 644 "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/recursos-cockpit.svg"
+
+# Garantizar que el paquete .deb nunca incluya archivos de base de datos ni caches locales que sobrescriban datos al actualizar
+find "$PKG_DIR" -type f \( -name "*.db" -o -name "*.db-wal" -o -name "*.db-shm" -o -name "telemetry_history_dev.json" -o -name "nic_history_2h.json" \) -delete
 
 # Calcular Installed-Size exacto para compatibilidad con Snap Store / App Center / PackageKit
 INSTALLED_SIZE=$(du -sk "$PKG_DIR" | awk '{print $1}')

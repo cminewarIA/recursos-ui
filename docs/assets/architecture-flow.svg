@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 380" width="1200" height="380">
+  <defs>
+    <filter id="archShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.06" />
+    </filter>
+    <style>
+      .bg { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 1.5; }
+      .layer { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1.5; filter: url(#archShadow); }
+      .sub { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; }
+      .h { fill: #0f172a; font-family: Inter, sans-serif; font-weight: 800; }
+      .m { fill: #334155; font-family: Inter, sans-serif; font-weight: 600; }
+      .s { fill: #64748b; font-family: Inter, sans-serif; font-weight: 500; }
+      .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+      .pipe { stroke: #0284c7; stroke-width: 3; fill: none; stroke-dasharray: 8 6; animation: moveFlow 2s linear infinite; }
+      .pipe2 { stroke: #10b981; stroke-width: 3; fill: none; stroke-dasharray: 8 6; animation: moveFlow 2s linear infinite; }
+      @keyframes moveFlow { to { stroke-dashoffset: -28; } }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #020617; stroke: #1e293b; }
+        .layer { fill: #0f172a; stroke: #1e293b; }
+        .sub { fill: #1e293b; stroke: #334155; }
+        .h { fill: #f8fafc; }
+        .m { fill: #cbd5e1; }
+        .s { fill: #94a3b8; }
+      }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="380" rx="22" class="bg" />
+  <text x="36" y="42" font-size="18" class="h">Arquitectura Desacoplada en 3 Capas · De la Telemetría del Kernel a los Clientes en ~17 ms</text>
+
+  <!-- Capa 1 -->
+  <g transform="translate(36, 66)">
+    <rect x="0" y="0" width="330" height="280" rx="18" class="layer" />
+    <rect x="18" y="16" width="164" height="24" rx="12" fill="#e0f2fe" />
+    <text x="100" y="32" text-anchor="middle" font-size="11" font-weight="800" fill="#0369a1" font-family="Inter, sans-serif">CAPA 1 · KERNEL &amp; RED FÍSICA</text>
+
+    <rect x="18" y="54" width="294" height="58" rx="12" class="sub" />
+    <text x="32" y="76" font-size="13" class="h">Silicio y Almacenamiento</text>
+    <text x="32" y="96" font-size="11" class="s mono">psutil · /sys · /proc/diskstats · NVML/DRM</text>
+
+    <rect x="18" y="124" width="294" height="58" rx="12" class="sub" />
+    <text x="32" y="146" font-size="13" class="h">Red Nativa sin Spam sudo</text>
+    <text x="32" y="166" font-size="11" class="s mono">ss + conntrack (CAP_NET_ADMIN) + ip neigh</text>
+
+    <rect x="18" y="194" width="294" height="66" rx="12" class="sub" />
+    <text x="32" y="216" font-size="13" class="h">Router Mesh &amp; Servicios</text>
+    <text x="32" y="236" font-size="11" class="s mono">ASUS AiMesh SSH · Pi-hole · Fail2ban · Docker</text>
+  </g>
+
+  <!-- Flechas animadas 1 -> 2 -->
+  <path d="M 366 150 L 428 150" class="pipe" />
+  <polygon points="424,144 436,150 424,156" fill="#0284c7" />
+  <path d="M 366 238 L 428 238" class="pipe2" />
+  <polygon points="424,232 436,238 424,244" fill="#10b981" />
+
+  <!-- Capa 2 -->
+  <g transform="translate(436, 66)">
+    <rect x="0" y="0" width="330" height="280" rx="18" class="layer" />
+    <rect x="18" y="16" width="188" height="24" rx="12" fill="#d1fae5" />
+    <text x="112" y="32" text-anchor="middle" font-size="11" font-weight="800" fill="#047857" font-family="Inter, sans-serif">CAPA 2 · MOTOR PYTHON (:8085)</text>
+
+    <rect x="18" y="54" width="294" height="58" rx="12" class="sub" />
+    <text x="32" y="76" font-size="13" class="h">8 Trabajadores Daemon Async</text>
+    <text x="32" y="96" font-size="11" class="s mono">Ciclo 1.5s · TTL Fail2ban/Pi-hole · Poda 60s</text>
+
+    <rect x="18" y="124" width="294" height="58" rx="12" class="sub" />
+    <text x="32" y="146" font-size="13" class="h">Caché Atómica (~17 ms)</text>
+    <text x="32" y="166" font-size="11" class="s mono">METRICS_CACHE_BYTES + Byte-Splicing directo</text>
+
+    <rect x="18" y="194" width="294" height="66" rx="12" class="sub" />
+    <text x="32" y="216" font-size="13" class="h">Bóveda &amp; Historial SQLite WAL</text>
+    <text x="32" y="236" font-size="11" class="s mono">AES-256-GCM · PBKDF2 · HMAC-SHA256 Zero-Trust</text>
+  </g>
+
+  <!-- Flechas animadas 2 -> 3 -->
+  <path d="M 766 150 L 828 150" class="pipe" />
+  <polygon points="824,144 836,150 824,156" fill="#0284c7" />
+  <path d="M 766 238 L 828 238" class="pipe2" />
+  <polygon points="824,232 836,238 824,244" fill="#10b981" />
+
+  <!-- Capa 3 -->
+  <g transform="translate(836, 66)">
+    <rect x="0" y="0" width="330" height="280" rx="18" class="layer" />
+    <rect x="18" y="16" width="194" height="24" rx="12" fill="#ede9fe" />
+    <text x="115" y="32" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9" font-family="Inter, sans-serif">CAPA 3 · CLIENTES UNIFICADOS</text>
+
+    <rect x="18" y="54" width="294" height="58" rx="12" class="sub" />
+    <text x="32" y="76" font-size="13" class="h">Interfaz Web SPA + Manual</text>
+    <text x="32" y="96" font-size="11" class="s mono">React 19 · Tailwind v4 · D3 · /manual (/readme)</text>
+
+    <rect x="18" y="124" width="294" height="58" rx="12" class="sub" />
+    <text x="32" y="146" font-size="13" class="h">App Nativa Ubuntu (.deb)</text>
+    <text x="32" y="166" font-size="11" class="s mono">GTK 3 + WebKit2 · Bridge + DeX USB (/dev/uhid)</text>
+
+    <rect x="18" y="194" width="294" height="66" rx="12" class="sub" />
+    <text x="32" y="216" font-size="13" class="h">App Nativa Android (.apk)</text>
+    <text x="32" y="236" font-size="11" class="s mono">Compose + WebView · KeyStore · Auto LAN ↔ WAN</text>
+  </g>
+</svg>
+

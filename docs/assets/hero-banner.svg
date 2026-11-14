@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320">
+  <defs>
+    <linearGradient id="heroBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="55%" stop-color="#eff6ff" />
+      <stop offset="100%" stop-color="#ecfeff" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="50%" stop-color="#0ea5e9" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <linearGradient id="waveFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.24" />
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.01" />
+    </linearGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.07" />
+    </filter>
+    <style>
+      .bg-base { fill: url(#heroBg); }
+      .border-frame { stroke: #cbd5e1; fill: none; }
+      .card { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1.5; filter: url(#cardShadow); }
+      .pill { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1; }
+      .pill-accent { fill: #e0f2fe; stroke: #7dd3fc; stroke-width: 1; }
+      .pill-green { fill: #d1fae5; stroke: #6ee7b7; stroke-width: 1; }
+      .title { fill: #0f172a; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 800; }
+      .subtitle { fill: #475569; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 500; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-variant-numeric: tabular-nums; }
+      .kpi-label { fill: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; font-family: Inter, sans-serif; }
+      .kpi-val { fill: #0f172a; font-size: 20px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, monospace; }
+      .pill-txt { fill: #0f172a; font-size: 11.5px; font-weight: 700; font-family: Inter, sans-serif; }
+      .grid-line { stroke: #e2e8f0; stroke-width: 1; stroke-dasharray: 4 6; }
+      @keyframes pulseDot {
+        0%, 100% { r: 5; opacity: 1; }
+        50% { r: 7.5; opacity: 0.55; }
+      }
+      @keyframes flowDash {
+        to { stroke-dashoffset: -48; }
+      }
+      .pulse { animation: pulseDot 2.2s ease-in-out infinite; }
+      .wave-stroke { stroke: url(#accentGrad); stroke-width: 3; fill: none; stroke-linecap: round; stroke-dasharray: 12 6; animation: flowDash 2.6s linear infinite; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg-base { fill: #020617; }
+        .border-frame { stroke: #1e293b; }
+        .card { fill: #0f172a; stroke: #1e293b; }
+        .pill { fill: #1e293b; stroke: #334155; }
+        .pill-accent { fill: #082f49; stroke: #0284c7; }
+        .pill-green { fill: #064e3b; stroke: #059669; }
+        .title { fill: #f8fafc; }
+        .subtitle { fill: #94a3b8; }
+        .kpi-label { fill: #94a3b8; }
+        .kpi-val { fill: #f8fafc; }
+        .pill-txt { fill: #f1f5f9; }
+        .grid-line { stroke: #1e293b; }
+      }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="320" rx="20" class="bg-base" />
+  <rect x="1" y="1" width="1198" height="318" rx="19" class="border-frame" stroke-width="2" />
+
+  <!-- Rejilla de telemetría sutil -->
+  <line x1="40" y1="80" x2="1160" y2="80" class="grid-line" />
+  <line x1="40" y1="160" x2="1160" y2="160" class="grid-line" />
+  <line x1="40" y1="240" x2="1160" y2="240" class="grid-line" />
+
+  <!-- Emblema CMineWar vectorial -->
+  <g transform="translate(46, 38)">
+    <rect x="0" y="0" width="68" height="68" rx="18" fill="#0f172a" stroke="#38bdf8" stroke-width="2.5" />
+    <circle cx="34" cy="34" r="21" fill="none" stroke="#1e293b" stroke-width="4.5" />
+    <path d="M 16 44 A 21 21 0 1 1 52 24" fill="none" stroke="url(#accentGrad)" stroke-width="4.5" stroke-linecap="round" />
+    <polyline points="18,36 25,36 30,24 36,46 41,31 50,31" fill="none" stroke="#34d399" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="54" cy="14" r="5" fill="#10b981" class="pulse" />
+  </g>
+
+  <!-- Título y badges principales -->
+  <text x="134" y="66" font-size="30" class="title">Recursos Cockpit · Manual Visual e Interactivo</text>
+  <text x="134" y="94" font-size="14.5" class="subtitle">Telemetría Linux en Tiempo Real · Topología ASUS AiMesh · Ciberdefensa Zero-Trust · Apps Nativas Ubuntu &amp; Android</text>
+
+  <g transform="translate(134, 110)">
+    <rect x="0" y="0" width="136" height="26" rx="13" class="pill-accent" />
+    <text x="68" y="17" text-anchor="middle" class="pill-txt mono">v12.4.0</text>
+
+    <rect x="146" y="0" width="176" height="26" rx="13" class="pill-green" />
+    <text x="234" y="17" text-anchor="middle" class="pill-txt">React 19 + Tailwind v4</text>
+
+    <rect x="332" y="0" width="172" height="26" rx="13" class="pill" />
+    <text x="418" y="17" text-anchor="middle" class="pill-txt">Ubuntu GTK3 + WebKit2</text>
+
+    <rect x="514" y="0" width="182" height="26" rx="13" class="pill" />
+    <text x="605" y="17" text-anchor="middle" class="pill-txt">Android Compose + WebView</text>
+
+    <rect x="706" y="0" width="174" height="26" rx="13" class="pill" />
+    <text x="793" y="17" text-anchor="middle" class="pill-txt">100% Zero-Hardcoding</text>
+  </g>
+
+  <!-- Mini gráfica de onda de telemetría inferior izquierda -->
+  <g transform="translate(46, 162)">
+    <rect x="0" y="0" width="380" height="122" rx="16" class="card" />
+    <text x="18" y="25" class="kpi-label">Caché Atómica METRICS_CACHE_BYTES</text>
+    <circle cx="350" cy="21" r="5" fill="#10b981" class="pulse" />
+    <path d="M 18 96 L 60 82 L 105 88 L 152 60 L 198 68 L 245 48 L 292 56 L 340 36 L 362 44 L 362 104 L 18 104 Z" fill="url(#waveFill)" />
+    <path d="M 18 96 L 60 82 L 105 88 L 152 60 L 198 68 L 245 48 L 292 56 L 340 36 L 362 44" class="wave-stroke" />
+    <text x="18" y="113" font-size="11" class="subtitle mono">Refresco: 1.5s · Empalme directo sin bloqueo HTTP</text>
+  </g>
+
+  <!-- 4 Tarjetas KPI simétricas -->
+  <g transform="translate(446, 162)">
+    <rect x="0" y="0" width="166" height="122" rx="16" class="card" />
+    <text x="16" y="26" class="kpi-label">Latencia API</text>
+    <text x="16" y="64" class="kpi-val" fill="#0284c7">~17 ms</text>
+    <rect x="16" y="82" width="134" height="6" rx="3" fill="#e2e8f0" />
+    <rect x="16" y="82" width="108" height="6" rx="3" fill="#0284c7" />
+    <text x="16" y="108" font-size="11" class="subtitle">Byte-Splicing /api/metrics</text>
+  </g>
+
+  <g transform="translate(626, 162)">
+    <rect x="0" y="0" width="166" height="122" rx="16" class="card" />
+    <text x="16" y="26" class="kpi-label">Memoria &amp; ZRAM</text>
+    <text x="16" y="64" class="kpi-val" fill="#10b981">Dinámica</text>
+    <rect x="16" y="82" width="134" height="6" rx="3" fill="#e2e8f0" />
+    <rect x="16" y="82" width="92" height="6" rx="3" fill="#10b981" />
+    <text x="16" y="108" font-size="11" class="subtitle">Hilos CPU · GPU · NVMe I/O</text>
+  </g>
+
+  <g transform="translate(806, 162)">
+    <rect x="0" y="0" width="166" height="122" rx="16" class="card" />
+    <text x="16" y="26" class="kpi-label">Ciberdefensa</text>
+    <text x="16" y="64" class="kpi-val" fill="#7c3aed">HMAC-256</text>
+    <rect x="16" y="82" width="134" height="6" rx="3" fill="#e2e8f0" />
+    <rect x="16" y="82" width="124" height="6" rx="3" fill="#7c3aed" />
+    <text x="16" y="108" font-size="11" class="subtitle">Bóveda PBKDF2 + Fail2ban</text>
+  </g>
+
+  <g transform="translate(986, 162)">
+    <rect x="0" y="0" width="168" height="122" rx="16" class="card" />
+    <text x="16" y="26" class="kpi-label">Exclusivo Ubuntu</text>
+    <text x="16" y="64" class="kpi-val" fill="#f59e0b">DeX USB</text>
+    <rect x="16" y="82" width="136" height="6" rx="3" fill="#e2e8f0" />
+    <rect x="16" y="82" width="118" height="6" rx="3" fill="#f59e0b" />
+    <text x="16" y="108" font-size="11" class="subtitle">scrcpy + /dev/uhid 60 FPS</text>
+  </g>
+</svg>
+

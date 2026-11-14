@@ -89,7 +89,7 @@ class RecursosAndroidBridge(
 
 private fun formatDisplayVersion(): String {
     val raw = BuildConfig.VERSION_NAME
-    return if (raw.startsWith("12.")) "v2B.${raw.removePrefix("12.")}" else "v$raw"
+    return "v$raw"
 }
 
 @SuppressLint("SetJavaScriptEnabled")

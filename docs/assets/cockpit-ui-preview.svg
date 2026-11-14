@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600">
+  <defs>
+    <linearGradient id="cpuArea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.28" />
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.02" />
+    </linearGradient>
+    <linearGradient id="ioArea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.26" />
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.02" />
+    </linearGradient>
+    <filter id="uiShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.06" />
+    </filter>
+    <style>
+      .shell { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 2; }
+      .topbar { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1.5; }
+      .bento { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1.5; filter: url(#uiShadow); }
+      .subtile { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; }
+      .dock { fill: rgba(255,255,255,0.94); stroke: #cbd5e1; stroke-width: 1.5; filter: url(#uiShadow); }
+      .dock-active { fill: #e0f2fe; stroke: #7dd3fc; stroke-width: 1; }
+      .txt-h { fill: #0f172a; font-family: Inter, sans-serif; font-weight: 800; }
+      .txt-m { fill: #475569; font-family: Inter, sans-serif; font-weight: 600; }
+      .txt-s { fill: #64748b; font-family: Inter, sans-serif; font-weight: 500; }
+      .mono { font-family: ui-monospace, SFMono-Regular, monospace; font-variant-numeric: tabular-nums; }
+      .tooltip { fill: #0f172a; }
+      .tooltip-txt { fill: #f8fafc; font-family: ui-monospace, monospace; font-size: 10.5px; }
+      .btn-wol { fill: #ecfdf5; stroke: #6ee7b7; stroke-width: 1; }
+      .btn-off { fill: #fef2f2; stroke: #fca5a5; stroke-width: 1; }
+      @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+      @keyframes scanMove { 0%,100% { transform: translateX(0px); } 50% { transform: translateX(28px); } }
+      .live-dot { animation: blink 2s ease-in-out infinite; }
+      .hover-group { animation: scanMove 6s ease-in-out infinite; }
+
+      @media (prefers-color-scheme: dark) {
+        .shell { fill: #020617; stroke: #1e293b; }
+        .topbar { fill: #0f172a; stroke: #1e293b; }
+        .bento { fill: #0f172a; stroke: #1e293b; }
+        .subtile { fill: #1e293b; stroke: #334155; }
+        .dock { fill: #0f172a; stroke: #334155; }
+        .dock-active { fill: #082f49; stroke: #0284c7; }
+        .txt-h { fill: #f8fafc; }
+        .txt-m { fill: #cbd5e1; }
+        .txt-s { fill: #94a3b8; }
+        .btn-wol { fill: #064e3b; stroke: #10b981; }
+        .btn-off { fill: #450a0a; stroke: #f87171; }
+      }
+    </style>
+  </defs>
+
+  <!-- Marco principal ventana Cockpit -->
+  <rect x="0" y="0" width="1200" height="600" rx="24" class="shell" />
+
+  <!-- Barra superior -->
+  <rect x="24" y="20" width="1152" height="58" rx="16" class="topbar" />
+  <circle cx="52" cy="49" r="14" fill="#0f172a" stroke="#38bdf8" stroke-width="2" />
+  <polyline points="44,50 49,50 52,42 55,56 58,47 62,47" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" />
+  <text x="78" y="46" font-size="16" class="txt-h">Recursos Cockpit · Nodo Activo (LAN)</text>
+  <text x="78" y="63" font-size="11.5" class="txt-s mono">VERSION 12.4.0 · Polling 1.5s · Modo Claro / Oscuro</text>
+
+  <rect x="850" y="34" width="150" height="30" rx="15" fill="#d1fae5" stroke="#6ee7b7" />
+  <circle cx="868" cy="49" r="5" fill="#059669" class="live-dot" />
+  <text x="882" y="53" font-size="11.5" font-weight="700" fill="#065f46" font-family="Inter, sans-serif">Sistema Saludable</text>
+
+  <rect x="1012" y="34" width="146" height="30" rx="15" class="subtile" />
+  <text x="1085" y="53" text-anchor="middle" font-size="11.5" class="txt-m">Tema: Claro / Oscuro</text>
+
+  <!-- Fila 1: 4 KPI Cards simétricas -->
+  <g transform="translate(24, 94)">
+    <rect x="0" y="0" width="276" height="106" rx="18" class="bento" />
+    <text x="18" y="28" font-size="12" class="txt-s">PROCESADOR (NÚCLEOS DINÁMICOS)</text>
+    <text x="18" y="64" font-size="28" class="txt-h mono">18.4 %</text>
+    <rect x="172" y="22" width="84" height="24" rx="12" fill="#e0f2fe" />
+    <text x="214" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="#0369a1" class="mono">43.2 °C</text>
+    <rect x="18" y="80" width="240" height="8" rx="4" fill="#e2e8f0" />
+    <rect x="18" y="80" width="78" height="8" rx="4" fill="#0284c7" />
+
+    <rect x="292" y="0" width="276" height="106" rx="18" class="bento" />
+    <text x="310" y="28" font-size="12" class="txt-s">MEMORIA RAM + ZRAM ACTIVA</text>
+    <text x="310" y="64" font-size="28" class="txt-h mono">46.2 %</text>
+    <rect x="464" y="22" width="86" height="24" rx="12" fill="#d1fae5" />
+    <text x="507" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="#047857" class="mono">ZRAM OK</text>
+    <rect x="310" y="80" width="240" height="8" rx="4" fill="#e2e8f0" />
+    <rect x="310" y="80" width="124" height="8" rx="4" fill="#10b981" />
+
+    <rect x="584" y="0" width="276" height="106" rx="18" class="bento" />
+    <text x="602" y="28" font-size="12" class="txt-s">ACELERADORA GPU &amp; VRAM</text>
+    <text x="602" y="64" font-size="28" class="txt-h mono">12.0 %</text>
+    <rect x="756" y="22" width="86" height="24" rx="12" fill="#ede9fe" />
+    <text x="799" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="#6d28d9" class="mono">NVML / DRM</text>
+    <rect x="602" y="80" width="240" height="8" rx="4" fill="#e2e8f0" />
+    <rect x="602" y="80" width="54" height="8" rx="4" fill="#7c3aed" />
+
+    <rect x="876" y="0" width="276" height="106" rx="18" class="bento" />
+    <text x="894" y="28" font-size="12" class="txt-s">RED TRÁFICO &amp; CONEXIONES</text>
+    <text x="894" y="64" font-size="24" class="txt-h mono">↓ 4.2 · ↑ 1.8 MB/s</text>
+    <text x="894" y="90" font-size="11.5" class="txt-s mono">conntrack + Pi-hole DNS + Fail2ban</text>
+  </g>
+
+  <!-- Fila 2: Dos gráficas HiDPI con Tooltip Flotante + Tarjeta Control Remoto -->
+  <g transform="translate(24, 216)">
+    <!-- Gráfica izquierda: CPU & Memoria -->
+    <rect x="0" y="0" width="374" height="278" rx="18" class="bento" />
+    <text x="20" y="30" font-size="14" class="txt-h">Curva en Vivo · CPU &amp; RAM (2 min)</text>
+    <text x="20" y="48" font-size="11.5" class="txt-s">Tooltips HiDPI al pasar ratón o dedo</text>
+    <line x1="20" y1="80" x2="354" y2="80" stroke="#e2e8f0" stroke-dasharray="3 4" />
+    <line x1="20" y1="140" x2="354" y2="140" stroke="#e2e8f0" stroke-dasharray="3 4" />
+    <line x1="20" y1="200" x2="354" y2="200" stroke="#e2e8f0" stroke-dasharray="3 4" />
+    <path d="M 20 220 L 65 202 L 110 184 L 155 190 L 200 156 L 245 162 L 290 132 L 354 148 L 354 242 L 20 242 Z" fill="url(#cpuArea)" />
+    <path d="M 20 220 L 65 202 L 110 184 L 155 190 L 200 156 L 245 162 L 290 132 L 354 148" fill="none" stroke="#0284c7" stroke-width="3" stroke-linecap="round" />
+    <!-- Tooltip interactivo flotante -->
+    <g class="hover-group">
+      <line x1="200" y1="74" x2="200" y2="242" stroke="#0284c7" stroke-width="1.2" stroke-dasharray="4 3" />
+      <circle cx="200" cy="156" r="5.5" fill="#0284c7" stroke="#ffffff" stroke-width="2" />
+      <rect x="136" y="88" width="128" height="44" rx="8" class="tooltip" />
+      <text x="200" y="106" text-anchor="middle" class="tooltip-txt">t -12s · CPU: 18.4%</text>
+      <text x="200" y="122" text-anchor="middle" class="tooltip-txt">RAM: 46.2% · 43°C</text>
+    </g>
+
+    <!-- Gráfica centro: Almacenamiento Dual (MB/s + %) -->
+    <rect x="389" y="0" width="374" height="278" rx="18" class="bento" />
+    <text x="409" y="30" font-size="14" class="txt-h">Almacenamiento Dual (MB/s + %)</text>
+    <text x="409" y="48" font-size="11.5" class="txt-s">Lectura / Escritura (/proc/diskstats) + Capacidad</text>
+    <line x1="409" y1="80" x2="743" y2="80" stroke="#e2e8f0" stroke-dasharray="3 4" />
+    <line x1="409" y1="140" x2="743" y2="140" stroke="#e2e8f0" stroke-dasharray="3 4" />
+    <line x1="409" y1="200" x2="743" y2="200" stroke="#e2e8f0" stroke-dasharray="3 4" />
+    <path d="M 409 216 L 455 186 L 502 198 L 548 148 L 594 170 L 640 124 L 686 154 L 743 132 L 743 242 L 409 242 Z" fill="url(#ioArea)" />
+    <path d="M 409 216 L 455 186 L 502 198 L 548 148 L 594 170 L 640 124 L 686 154 L 743 132" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" />
+    <path d="M 409 112 L 743 108" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-dasharray="6 4" />
+    <rect x="409" y="250" width="102" height="18" rx="9" fill="#d1fae5" />
+    <text x="460" y="263" text-anchor="middle" font-size="10.5" font-weight="700" fill="#047857" class="mono">I/O 84 MB/s</text>
+    <rect x="520" y="250" width="96" height="18" rx="9" fill="#fef3c7" />
+    <text x="568" y="263" text-anchor="middle" font-size="10.5" font-weight="700" fill="#b45309" class="mono">Uso: 54.0 %</text>
+
+    <!-- Panel derecho: Equipos LAN con botones simétricos Encender / Apagar -->
+    <rect x="778" y="0" width="374" height="278" rx="18" class="bento" />
+    <text x="798" y="30" font-size="14" class="txt-h">Equipos Detectados en LAN</text>
+    <text x="798" y="48" font-size="11.5" class="txt-s">Controles simétricos WoL y Apagado Remoto</text>
+
+    <!-- Dispositivo 1 -->
+    <rect x="798" y="66" width="334" height="58" rx="12" class="subtile" />
+    <text x="812" y="88" font-size="13" class="txt-h">Estación Principal · Cable LAN</text>
+    <text x="812" y="108" font-size="11" class="txt-s mono">Auto-detectada vía ASUS AiMesh</text>
+    <rect x="974" y="79" width="70" height="30" rx="8" class="btn-wol" />
+    <text x="1009" y="98" text-anchor="middle" font-size="11" font-weight="700" fill="#047857">Encender</text>
+    <rect x="1050" y="79" width="70" height="30" rx="8" class="btn-off" />
+    <text x="1085" y="98" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">Apagar</text>
+
+    <!-- Dispositivo 2 -->
+    <rect x="798" y="134" width="334" height="58" rx="12" class="subtile" />
+    <text x="812" y="156" font-size="13" class="txt-h">Terminal Móvil · Wi-Fi 5 GHz</text>
+    <text x="812" y="176" font-size="11" class="txt-s mono">HMAC Certificado · Modo Auto LAN/WAN</text>
+    <rect x="974" y="147" width="70" height="30" rx="8" class="btn-wol" />
+    <text x="1009" y="166" text-anchor="middle" font-size="11" font-weight="700" fill="#047857">Encender</text>
+    <rect x="1050" y="147" width="70" height="30" rx="8" class="btn-off" />
+    <text x="1085" y="166" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">Apagar</text>
+
+    <!-- Dispositivo 3 -->
+    <rect x="798" y="202" width="334" height="58" rx="12" class="subtile" />
+    <text x="812" y="224" font-size="13" class="txt-h">Dispositivo IoT · Wi-Fi 2.4 GHz</text>
+    <text x="812" y="244" font-size="11" class="txt-s mono">Consultas DNS auditadas por Pi-hole</text>
+    <rect x="1008" y="216" width="112" height="28" rx="8" fill="#e0f2fe" />
+    <text x="1064" y="234" text-anchor="middle" font-size="11" font-weight="700" fill="#0369a1">Ver detalles</text>
+  </g>
+
+  <!-- Barra de navegación inferior fija en 5 bloques -->
+  <g transform="translate(260, 514)">
+    <rect x="0" y="0" width="680" height="64" rx="20" class="dock" />
+    <rect x="12" y="10" width="124" height="44" rx="14" class="dock-active" />
+    <text x="74" y="37" text-anchor="middle" font-size="13.5" font-weight="800" fill="#0284c7" font-family="Inter, sans-serif">Inicio</text>
+
+    <text x="206" y="37" text-anchor="middle" font-size="13.5" class="txt-m">Equipo</text>
+    <text x="340" y="37" text-anchor="middle" font-size="13.5" class="txt-m">Red</text>
+    <text x="474" y="37" text-anchor="middle" font-size="13.5" class="txt-m">Programas</text>
+    <text x="606" y="37" text-anchor="middle" font-size="13.5" class="txt-m">Más</text>
+  </g>
+</svg>
+

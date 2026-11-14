@@ -18,7 +18,9 @@ venv/
 # Datos y sesiones locales sensibles
 trusted_devices.json
 geoip_cache.json
-geoip_history.db
+geoip_history.db*
+recursos_history.db*
+telemetry_history_dev.json
 nic_history_2h.json
 .auth_secret
 .admin_master_key

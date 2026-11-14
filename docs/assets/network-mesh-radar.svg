@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
+  <defs>
+    <filter id="netShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.06" />
+    </filter>
+    <style>
+      .bg { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 1.5; }
+      .panel { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1.5; filter: url(#netShadow); }
+      .chip { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1; }
+      .h { fill: #0f172a; font-family: Inter, sans-serif; font-weight: 800; }
+      .s { fill: #64748b; font-family: Inter, sans-serif; font-weight: 500; }
+      .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+      .ring { stroke: #bae6fd; stroke-width: 1.5; fill: none; }
+      @keyframes radarSpin { to { transform: rotate(360deg); } }
+      @keyframes pingNode { 0%,100% { r: 6; opacity: 1; } 50% { r: 9; opacity: 0.5; } }
+      .radar-sweep { transform-origin: 185px 198px; animation: radarSpin 7s linear infinite; }
+      .ping { animation: pingNode 2.4s ease-in-out infinite; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #020617; stroke: #1e293b; }
+        .panel { fill: #0f172a; stroke: #1e293b; }
+        .chip { fill: #1e293b; stroke: #334155; }
+        .h { fill: #f8fafc; }
+        .s { fill: #94a3b8; }
+        .ring { stroke: #0c4a6e; }
+      }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="360" rx="22" class="bg" />
+  <text x="34" y="42" font-size="18" class="h">Módulo de Red &amp; Ciberdefensa (/red) · Topología Tribanda, Mapa Dinámico y Escudo IPS</text>
+
+  <!-- Izquierda: Radar Mapa GeoIP Dinámico -->
+  <g>
+    <rect x="34" y="64" width="320" height="270" rx="18" class="panel" />
+    <text x="54" y="92" font-size="13.5" class="h">Mapa GeoIP + Clustering Dinámico</text>
+    <circle cx="185" cy="198" r="88" class="ring" />
+    <circle cx="185" cy="198" r="58" class="ring" />
+    <circle cx="185" cy="198" r="28" class="ring" />
+    <line x1="97" y1="198" x2="273" y2="198" class="ring" />
+    <line x1="185" y1="110" x2="185" y2="286" class="ring" />
+    <path d="M 185 198 L 185 110 A 88 88 0 0 1 258 148 Z" fill="#0ea5e9" fill-opacity="0.16" class="radar-sweep" />
+    <circle cx="185" cy="198" r="7" fill="#0284c7" />
+    <circle cx="236" cy="154" r="6" fill="#10b981" class="ping" />
+    <circle cx="132" cy="166" r="6" fill="#8b5cf6" />
+    <circle cx="222" cy="242" r="6" fill="#ef4444" />
+    <text x="54" y="315" font-size="11" class="s mono">OpenStreetMap + Leaflet · Poda SQLite WAL 60s</text>
+  </g>
+
+  <!-- Centro: Clasificador ASUS AiMesh -->
+  <g transform="translate(374, 64)">
+    <rect x="0" y="0" width="404" height="270" rx="18" class="panel" />
+    <text x="20" y="28" font-size="13.5" class="h">Clasificador Tribanda ASUS AiMesh (SSH Cifrado)</text>
+    <text x="20" y="48" font-size="11" class="s">Dos pasadas sobre /tmp/clientlist.json + br0 (sin docker*/veth*)</text>
+
+    <rect x="20" y="68" width="364" height="50" rx="12" class="chip" />
+    <circle cx="42" cy="93" r="7" fill="#0284c7" />
+    <text x="60" y="90" font-size="13" class="h">Cable LAN (brctl showmacs br0)</text>
+    <text x="60" y="108" font-size="11" class="s">Consolidación real sin falsos positivos inalámbricos</text>
+
+    <rect x="20" y="130" width="364" height="50" rx="12" class="chip" />
+    <circle cx="42" cy="155" r="7" fill="#10b981" />
+    <text x="60" y="152" font-size="13" class="h">Wi-Fi 5 GHz / 6 GHz (Nodos Mesh)</text>
+    <text x="60" y="170" font-size="11" class="s">Banda y nodo detectados dinámicamente en vivo</text>
+
+    <rect x="20" y="192" width="364" height="50" rx="12" class="chip" />
+    <circle cx="42" cy="217" r="7" fill="#f59e0b" />
+    <text x="60" y="214" font-size="13" class="h">Wi-Fi 2.4 GHz (Domótica &amp; IoT)</text>
+    <text x="60" y="232" font-size="11" class="s">Bóveda .router_credentials.json en AES-256-GCM</text>
+  </g>
+
+  <!-- Derecha: Ciberdefensa Zero-Trust & IPS -->
+  <g transform="translate(798, 64)">
+    <rect x="0" y="0" width="368" height="270" rx="18" class="panel" />
+    <text x="20" y="28" font-size="13.5" class="h">Ciberdefensa Activa &amp; DNS</text>
+    <text x="20" y="48" font-size="11" class="s">Protección WAN + Respuesta Instantánea</text>
+
+    <rect x="20" y="68" width="328" height="58" rx="12" fill="#fee2e2" stroke="#fca5a5" />
+    <text x="36" y="92" font-size="13" font-weight="800" fill="#991b1b" font-family="Inter, sans-serif">Fail2ban IPS · Baneo en 1 Clic</text>
+    <text x="36" y="112" font-size="11" fill="#b91c1c" font-family="ui-monospace, monospace">Caché st_mtime + Lockout 3 intentos WAN</text>
+
+    <rect x="20" y="138" width="328" height="52" rx="12" fill="#e0f2fe" stroke="#7dd3fc" />
+    <text x="36" y="160" font-size="13" font-weight="800" fill="#075985" font-family="Inter, sans-serif">Pi-hole SQLite (TTL Caché 18s)</text>
+    <text x="36" y="178" font-size="11" fill="#0369a1" font-family="ui-monospace, monospace">Consultas filtradas y dominios bloqueados</text>
+
+    <rect x="20" y="202" width="328" height="50" rx="12" fill="#d1fae5" stroke="#6ee7b7" />
+    <text x="36" y="224" font-size="13" font-weight="800" fill="#065f46" font-family="Inter, sans-serif">DuckDNS + Caddy TLS (HTTPS)</text>
+    <text x="36" y="241" font-size="11" fill="#047857" font-family="ui-monospace, monospace">Sincronización dinámica sin secretos en repo</text>
+  </g>
+</svg>
+

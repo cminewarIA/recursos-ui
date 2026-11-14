@@ -119,16 +119,11 @@ def get_app_version():
 
 
 def get_display_version(raw_ver=None):
-    v = str(raw_ver or get_app_version()).strip()
-    if v.startswith("12."):
-        return "2B." + v[3:]
-    return v
+    return str(raw_ver or get_app_version()).strip()
 
 
 def parse_semver_tuple(ver_str):
     clean = str(ver_str or "").strip().lstrip("vV")
-    if clean.startswith("2B."):
-        clean = "12." + clean[3:]
     clean = clean.split("-")[0].split("+")[0]
     parts = []
     for p in clean.split("."):
@@ -139,6 +134,24 @@ def parse_semver_tuple(ver_str):
     while len(parts) < 3:
         parts.append(0)
     return tuple(parts[:3])
+
+
+def resolve_bundled_root():
+    """Devuelve el directorio raíz que contiene los archivos web empaquetados (VERSION, static/index.html, etc.)."""
+    candidates = [
+        os.path.abspath(os.path.join(SCRIPT_DIR, "..")),
+        os.path.abspath(SCRIPT_DIR),
+        "/usr/lib/recursos-cockpit",
+        "/usr/share/recursos-cockpit",
+        os.path.abspath("."),
+    ]
+    for root in candidates:
+        if os.path.isfile(os.path.join(root, "static", "index.html")):
+            return root
+    for root in candidates:
+        if os.path.isfile(os.path.join(root, "VERSION")):
+            return root
+    return os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 
 
 def resolve_bundled_html_path():
@@ -803,11 +816,306 @@ class ServerConnectionManager:
             "lan_url": f"http://{lan_ip}:{self.node_port}",
         }
 
-    def check_github_app_update(self):
-        """Consulta GitHub Releases / VERSION oficial para comprobar actualizaciones disponibles."""
+    def _resolve_target_server_url(self, explicit_url=None):
+        """Localiza de forma rápida el nodo servidor web activo (conectado, guardado, loopback o WAN)."""
+        port = self.node_port or 8085
+        candidates = []
+        if explicit_url:
+            candidates.append(str(explicit_url).strip().rstrip("/"))
+        if self.active_url:
+            candidates.append(str(self.active_url).strip().rstrip("/"))
+        if self.saved_host:
+            candidates.append(f"http://{self.saved_host}:{port}")
+        candidates.extend([f"http://127.0.0.1:{port}", f"http://localhost:{port}"])
+        wan_dom = (self.wan_domain or "").strip().rstrip("/")
+        if wan_dom:
+            wan_cand = wan_dom if wan_dom.startswith(("http://", "https://")) else f"https://{wan_dom}"
+            candidates.append(wan_cand)
+
+        seen = set()
+        for cand in candidates:
+            if not cand or cand in seen:
+                continue
+            seen.add(cand)
+            timeout_val = 1.2 if cand.startswith("https://") else 0.6
+            ok, is_rev = self._probe(cand, timeout=timeout_val)
+            if ok and not is_rev:
+                if not self.active_url:
+                    self.active_url = cand
+                    self.connection_mode = "WAN" if cand.startswith("https://") else "LAN"
+                return cand
+        return ""
+
+    def probe_server_version_info(self, target_url=None, refresh=False):
+        """Consulta /api/version en el servidor web activo y devuelve (payload_dict, reachable, base_url)."""
+        base_url = self._resolve_target_server_url(target_url)
+        if not base_url:
+            return None, False, ""
+        suffix = "/api/version?refresh=1" if refresh else "/api/version"
+        req = urllib.request.Request(
+            f"{base_url.rstrip('/')}{suffix}",
+            headers=self._build_auth_headers({"Accept": "application/json"}),
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                if resp.status == 200:
+                    payload = json.loads(resp.read().decode("utf-8"))
+                    if isinstance(payload, dict):
+                        return payload, True, base_url
+        except Exception:
+            pass
+        return None, False, base_url
+
+    def collect_local_web_bundle(self, version_override=None):
+        """Empaqueta los archivos estáticos web de esta App Ubuntu junto con sumas SHA-256."""
+        bundle_root = resolve_bundled_root()
+        app_ver = str(version_override or self.get_installed_deb_version() or get_app_version()).strip().lstrip("vV")
+        web_rel_paths = [
+            "VERSION",
+            "package.json",
+            "static/index.html",
+            "static/manual.html",
+            "docs/index.html",
+            "static/favicon.ico",
+            "static/favicon.png",
+            "static/favicon-16x16.png",
+            "static/favicon-32x32.png",
+            "static/favicon-192x192.png",
+            "static/favicon-512x512.png",
+            "static/apple-touch-icon.png",
+        ]
+        files_b64 = {}
+        sha_map = {}
+        for rel_path in web_rel_paths:
+            abs_p = os.path.join(bundle_root, rel_path)
+            if not os.path.isfile(abs_p) and rel_path.startswith("static/"):
+                alt_p = resolve_static_asset_path(os.path.basename(rel_path))
+                if alt_p and os.path.isfile(alt_p):
+                    abs_p = alt_p
+            if os.path.isfile(abs_p):
+                try:
+                    with open(abs_p, "rb") as f:
+                        raw = f.read()
+                    files_b64[rel_path] = base64.b64encode(raw).decode("ascii")
+                    sha_map[rel_path] = hashlib.sha256(raw).hexdigest().lower()
+                except Exception:
+                    pass
+
+        if "static/index.html" not in files_b64:
+            html_path = resolve_bundled_html_path()
+            if html_path and os.path.isfile(html_path):
+                with open(html_path, "rb") as f:
+                    raw = f.read()
+                files_b64["static/index.html"] = base64.b64encode(raw).decode("ascii")
+                sha_map["static/index.html"] = hashlib.sha256(raw).hexdigest().lower()
+
+        if "docs/index.html" not in files_b64 and "static/manual.html" in files_b64:
+            files_b64["docs/index.html"] = files_b64["static/manual.html"]
+            sha_map["docs/index.html"] = sha_map["static/manual.html"]
+
+        ver_bytes = (app_ver + "\n").encode("utf-8")
+        files_b64["VERSION"] = base64.b64encode(ver_bytes).decode("ascii")
+        sha_map["VERSION"] = hashlib.sha256(ver_bytes).hexdigest().lower()
+
+        return {
+            "version": app_ver,
+            "files": files_b64,
+            "sha256": sha_map,
+            "root": bundle_root,
+        }
+
+    def sync_web_bundle_to_server(self, target_url=None, force=False, version_override=None):
+        """Envía el paquete web compilado de la App Ubuntu a POST /api/system/sync-web en el servidor local."""
+        base_url = self._resolve_target_server_url(target_url)
+        if not base_url:
+            return False, "No hay ningún servidor accesible en red local o DDNS para sincronizar la web.", None
+        bundle = self.collect_local_web_bundle(version_override=version_override)
+        if "static/index.html" not in bundle["files"]:
+            return False, "No se encontró static/index.html en la instalación de la App Ubuntu.", None
+
+        payload_bytes = json.dumps(
+            {
+                "version": bundle["version"],
+                "force": bool(force),
+                "files": bundle["files"],
+                "sha256": bundle["sha256"],
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            f"{base_url.rstrip('/')}/api/system/sync-web",
+            data=payload_bytes,
+            headers=self._build_auth_headers(
+                {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                }
+            ),
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=25.0) as resp:
+                res_obj = json.loads(resp.read().decode("utf-8"))
+                ok = bool(res_obj.get("success"))
+                msg = str(res_obj.get("message") or f"Web local sincronizada a v{bundle['version']}.")
+                return ok, msg, res_obj
+        except urllib.error.HTTPError as he:
+            err_body = ""
+            try:
+                err_body = he.read().decode("utf-8", errors="ignore")
+                err_json = json.loads(err_body)
+                err_body = str(err_json.get("error") or err_body)
+            except Exception:
+                pass
+            return False, f"HTTP {he.code} al sincronizar web local: {err_body or he.reason}", None
+        except Exception as e:
+            return False, f"No se pudo sincronizar la web local con el servidor: {e}", None
+
+    def _compute_version_comparison(
+        self,
+        app_ver,
+        gh_ver,
+        server_ver,
+        server_reachable,
+        server_url="",
+        installed_deb="",
+        deb_url="https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb",
+        deb_asset_name="recursos-cockpit.deb",
+        sha_url="",
+        release_url="https://github.com/cminewarIA/recursos-ui/releases/latest",
+        err_msg="",
+    ):
+        app_ver = str(app_ver or get_app_version()).strip().lstrip("vV")
+        gh_ver = str(gh_ver or "").strip().lstrip("vV")
+        server_ver = str(server_ver or "").strip().lstrip("vV")
+        installed_deb = str(installed_deb or "").strip().lstrip("vV")
+
+        app_t = parse_semver_tuple(app_ver)
+        gh_t = parse_semver_tuple(gh_ver) if gh_ver else (0, 0, 0)
+        srv_t = parse_semver_tuple(server_ver) if (server_reachable and server_ver) else (0, 0, 0)
+
+        github_above_app = bool(gh_ver and gh_t > app_t)
+        app_above_github = bool(gh_ver and app_t > gh_t)
+        app_above_server = bool(server_reachable and server_ver and app_t > srv_t)
+        github_above_server = bool(server_reachable and server_ver and gh_ver and gh_t > srv_t)
+        server_needs_update = bool(app_above_server or github_above_server)
+        effective_update_available = bool(github_above_app or server_needs_update)
+
+        best_ver = app_ver
+        best_t = app_t
+        if gh_ver and gh_t > best_t:
+            best_ver = gh_ver
+            best_t = gh_t
+        if server_reachable and server_ver and srv_t > best_t:
+            best_ver = server_ver
+
+        app_disp = get_display_version(app_ver)
+        gh_disp = get_display_version(gh_ver) if gh_ver else ""
+        srv_disp = get_display_version(server_ver) if server_ver else ""
+
+        if github_above_app and server_needs_update:
+            update_mode = "github_deb_and_server"
+            update_action_label = f"Actualizar app y servidor a v{gh_disp}"
+            update_summary = (
+                f"GitHub (v{gh_disp}) supera a App Ubuntu (v{app_disp}) y Servidor web local (v{srv_disp}). "
+                f"Pulsa para actualizar ambos en un clic."
+            )
+        elif github_above_app:
+            update_mode = "github_deb"
+            update_action_label = f"Actualizar app a v{gh_disp}"
+            update_summary = (
+                f"Nueva versión disponible en GitHub: v{gh_disp} (App Ubuntu actual: v{app_disp}). "
+                f"Pulsa para actualizar sin desinstalar."
+            )
+        elif app_above_server and app_above_github:
+            update_mode = "sync_app_to_server_ahead_of_github"
+            update_action_label = f"Actualizar web local a v{app_disp}"
+            update_summary = (
+                f"La App Ubuntu (v{app_disp}) es superior a GitHub (v{gh_disp}) y al Servidor web local (v{srv_disp}). "
+                f"Pulsa para actualizar la web local al instante."
+            )
+        elif app_above_server:
+            update_mode = "sync_app_to_server"
+            update_action_label = f"Actualizar web local a v{app_disp}"
+            update_summary = (
+                f"La App Ubuntu (v{app_disp}) es superior al Servidor web local (v{srv_disp}). "
+                f"Pulsa para actualizar la web local en un clic."
+            )
+        elif github_above_server:
+            update_mode = "github_to_server"
+            update_action_label = f"Actualizar servidor web a v{gh_disp}"
+            update_summary = (
+                f"GitHub (v{gh_disp}) es superior al Servidor web local (v{srv_disp}). "
+                f"Pulsa para actualizar el servidor web local."
+            )
+        elif app_above_github:
+            update_mode = "app_ahead_of_github"
+            update_action_label = f"Sincronizar web local (v{app_disp})" if server_reachable else f"Versión v{app_disp} al día"
+            if server_reachable:
+                update_summary = (
+                    f"App Ubuntu y Servidor web local están en v{app_disp} (por delante de GitHub v{gh_disp})."
+                )
+            else:
+                update_summary = (
+                    f"App Ubuntu v{app_disp} supera a la versión publicada en GitHub (v{gh_disp})."
+                )
+        elif gh_ver:
+            update_mode = "up_to_date"
+            update_action_label = "Actualizar / Reinstalar"
+            if server_reachable:
+                update_summary = (
+                    f"App Ubuntu, Servidor web local y GitHub sincronizados en v{gh_disp}."
+                )
+            else:
+                update_summary = f"App Ubuntu y GitHub al día en v{gh_disp}."
+        else:
+            update_mode = "offline_check"
+            update_action_label = "Sincronizar / Reintentar"
+            update_summary = (
+                "No se pudo consultar GitHub ahora. Puedes sincronizar la web local si hay un servidor activo."
+            )
+
+        return {
+            "local_version": app_ver,
+            "local_display_version": app_disp,
+            "app_version": app_ver,
+            "app_display_version": app_disp,
+            "installed_deb_version": installed_deb,
+            "installed_display_version": get_display_version(installed_deb) if installed_deb else "",
+            "app_installed_deb": bool(installed_deb) or os.path.isfile("/usr/bin/recursos-cockpit"),
+            "server_version": server_ver,
+            "server_display_version": srv_disp,
+            "server_reachable": bool(server_reachable),
+            "server_url": server_url,
+            "github_version": gh_ver,
+            "github_display_version": gh_disp,
+            "update_available": github_above_app,
+            "effective_update_available": effective_update_available,
+            "app_above_server": app_above_server,
+            "app_above_github": app_above_github,
+            "github_above_server": github_above_server,
+            "github_above_app": github_above_app,
+            "server_needs_update": server_needs_update,
+            "target_version": best_ver,
+            "update_mode": update_mode,
+            "update_action_label": update_action_label,
+            "update_summary": update_summary,
+            "deb_download_url": deb_url,
+            "deb_asset_name": deb_asset_name,
+            "sha256_url": sha_url,
+            "release_url": release_url,
+            "error": err_msg,
+        }
+
+    def check_github_app_update(self, target_url=None, probe_server=True, server_payload=None, refresh_server=False):
+        """Consulta App Ubuntu, Servidor web local y GitHub Releases/VERSION comparando las tres versiones."""
         local_ver = get_app_version()
         installed_deb = self.get_installed_deb_version()
-        baseline_ver = installed_deb or local_ver
+        if installed_deb and parse_semver_tuple(installed_deb) >= parse_semver_tuple(local_ver):
+            app_ver = installed_deb
+        else:
+            app_ver = local_ver
+
         gh_ver = ""
         deb_url = "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb"
         deb_asset_name = "recursos-cockpit.deb"
@@ -820,7 +1128,7 @@ class ServerConnectionManager:
                 "https://api.github.com/repos/cminewarIA/recursos-ui/releases/latest",
                 headers={
                     "Accept": "application/vnd.github+json",
-                    "User-Agent": f"RecursosCockpit-Ubuntu/{local_ver}",
+                    "User-Agent": f"RecursosCockpit-Ubuntu/{app_ver}",
                 },
             )
             with urllib.request.urlopen(req, timeout=4.0) as resp:
@@ -844,93 +1152,66 @@ class ServerConnectionManager:
         except Exception as e:
             err_msg = str(e)
 
-        if not gh_ver:
-            try:
-                req_ver = urllib.request.Request(
-                    "https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/VERSION",
-                    headers={"User-Agent": f"RecursosCockpit-Ubuntu/{local_ver}"},
-                )
-                with urllib.request.urlopen(req_ver, timeout=3.5) as resp:
-                    gh_ver = resp.read().decode("utf-8").strip().lstrip("vV")
-                    err_msg = ""
-            except Exception as e2:
-                if not err_msg:
-                    err_msg = str(e2)
+        try:
+            req_ver = urllib.request.Request(
+                "https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/VERSION",
+                headers={"User-Agent": f"RecursosCockpit-Ubuntu/{app_ver}"},
+            )
+            with urllib.request.urlopen(req_ver, timeout=3.5) as resp:
+                raw_gh_ver = resp.read().decode("utf-8").strip().lstrip("vV")
+                if raw_gh_ver and (not gh_ver or parse_semver_tuple(raw_gh_ver) > parse_semver_tuple(gh_ver)):
+                    gh_ver = raw_gh_ver
+                err_msg = ""
+        except Exception as e2:
+            if not gh_ver and not err_msg:
+                err_msg = str(e2)
 
-        update_available = False
-        if gh_ver:
-            update_available = parse_semver_tuple(gh_ver) > parse_semver_tuple(baseline_ver)
+        srv_ver = ""
+        srv_reachable = False
+        srv_url = str(target_url or self.active_url or "").strip().rstrip("/")
+        if isinstance(server_payload, dict) and (server_payload.get("server_version") or server_payload.get("version") or server_payload.get("current_version")):
+            srv_ver = str(
+                server_payload.get("server_version")
+                or server_payload.get("current_version")
+                or server_payload.get("version")
+                or ""
+            ).strip().lstrip("vV")
+            srv_reachable = bool(srv_ver)
+            if not srv_url:
+                srv_url = self._resolve_target_server_url(target_url)
+        elif probe_server:
+            srv_payload, srv_reachable, srv_url = self.probe_server_version_info(
+                target_url=target_url,
+                refresh=refresh_server,
+            )
+            if srv_reachable and isinstance(srv_payload, dict):
+                srv_ver = str(
+                    srv_payload.get("server_version")
+                    or srv_payload.get("current_version")
+                    or srv_payload.get("version")
+                    or ""
+                ).strip().lstrip("vV")
+                if not gh_ver and srv_payload.get("remote_version"):
+                    gh_ver = str(srv_payload.get("remote_version") or "").strip().lstrip("vV")
 
-        info = {
-            "local_version": local_ver,
-            "local_display_version": get_display_version(local_ver),
-            "installed_deb_version": installed_deb,
-            "installed_display_version": get_display_version(installed_deb) if installed_deb else "",
-            "app_installed_deb": bool(installed_deb) or os.path.isfile("/usr/bin/recursos-cockpit"),
-            "github_version": gh_ver,
-            "github_display_version": get_display_version(gh_ver) if gh_ver else "",
-            "update_available": update_available,
-            "deb_download_url": deb_url,
-            "deb_asset_name": deb_asset_name,
-            "sha256_url": sha_url,
-            "release_url": release_url,
-            "error": err_msg,
-        }
+        info = self._compute_version_comparison(
+            app_ver=app_ver,
+            gh_ver=gh_ver,
+            server_ver=srv_ver,
+            server_reachable=srv_reachable,
+            server_url=srv_url,
+            installed_deb=installed_deb,
+            deb_url=deb_url,
+            deb_asset_name=deb_asset_name,
+            sha_url=sha_url,
+            release_url=release_url,
+            err_msg=err_msg,
+        )
         self.github_update_info = info
         return info
 
-    def update_installed_app_from_github(self, gh_info=None):
-        """
-        Actualiza la aplicación y/o el nodo local instalado desde GitHub sin desinstalar previamente:
-        1. Si existe repositorio git local del nodo, actualiza el código con git pull y reinicia el servicio.
-        2. Descarga el paquete .deb firmado oficial desde GitHub Releases, verifica SHA-256 e instala en sitio.
-        """
-        info = gh_info or self.check_github_app_update()
-        st = self.detect_local_node_status()
-        updated_parts = []
-
-        # 1. Actualizar nodo local en repositorio Git si existe
-        repo_dir = st.get("repo_dir")
-        if repo_dir and os.path.isdir(os.path.join(repo_dir, ".git")):
-            try:
-                status_p = subprocess.run(
-                    ["git", "-C", repo_dir, "status", "--porcelain"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                had_dirty = bool(status_p.stdout.strip())
-                if had_dirty:
-                    subprocess.run(
-                        ["git", "-C", repo_dir, "stash", "push", "-u", "-m", "recursos-auto-update"],
-                        capture_output=True,
-                        timeout=10,
-                    )
-                pull_p = subprocess.run(
-                    ["git", "-C", repo_dir, "pull", "--rebase", "origin", "main"],
-                    capture_output=True,
-                    text=True,
-                    timeout=45,
-                )
-                if pull_p.returncode != 0:
-                    subprocess.run(
-                        ["git", "-C", repo_dir, "pull", "origin", "main"],
-                        capture_output=True,
-                        text=True,
-                        timeout=45,
-                    )
-                if os.path.isfile(os.path.join(repo_dir, "package.json")) and subprocess.run(
-                    ["which", "npm"], capture_output=True
-                ).returncode == 0:
-                    subprocess.run(["npm", "run", "build"], cwd=repo_dir, capture_output=True, timeout=90)
-                if st.get("service_exists"):
-                    runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
-                    subprocess.run([runner, "systemctl", "restart", "system-dashboard.service"], capture_output=True, timeout=20)
-                updated_parts.append("nodo local")
-            except Exception:
-                pass
-
-        # 2. Actualizar paquete .deb de la aplicación de Ubuntu desde GitHub Releases sin desinstalar
+    def _install_deb_from_github(self, info, relaunch_on_deb=True):
+        """Descarga, verifica SHA-256 e instala el paquete .deb oficial desde GitHub Releases."""
         deb_url = info.get("deb_download_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb"
         tmp_deb = "/tmp/recursos-cockpit-github-update.deb"
         try:
@@ -941,11 +1222,10 @@ class ServerConnectionManager:
             with urllib.request.urlopen(req, timeout=30.0) as resp:
                 deb_bytes = resp.read()
             if len(deb_bytes) < 10240 or not deb_bytes.startswith(b"!<arch>\n"):
-                return False, "El archivo descargado desde GitHub no es un paquete .deb válido.", info
+                return False, "El archivo descargado desde GitHub no es un paquete .deb válido.", ""
             with open(tmp_deb, "wb") as f:
                 f.write(deb_bytes)
 
-            # Verificar suma SHA-256 si está disponible en la release
             sha_url = info.get("sha256_url")
             if sha_url:
                 try:
@@ -965,17 +1245,16 @@ class ServerConnectionManager:
                     if expected:
                         actual = hashlib.sha256(deb_bytes).hexdigest().lower()
                         if actual != expected:
-                            return False, "Error de verificación SHA-256 en el paquete descargado de GitHub.", info
+                            return False, "Error de verificación SHA-256 en el paquete descargado de GitHub.", ""
                 except Exception:
                     pass
 
             check_p = subprocess.run(["dpkg-deb", "--info", tmp_deb], capture_output=True, text=True, timeout=5)
             if check_p.returncode != 0:
-                return False, "El paquete .deb descargado está corrupto o incompleto.", info
+                return False, "El paquete .deb descargado está corrupto o incompleto.", ""
 
             runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
-            # Instalación limpia en el mismo sitio (sin desinstalar), manteniendo configuración y datos
-            relaunch = "/usr/bin/recursos-cockpit" if os.path.isfile("/usr/bin/recursos-cockpit") else ""
+            relaunch = "/usr/bin/recursos-cockpit" if (relaunch_on_deb and os.path.isfile("/usr/bin/recursos-cockpit")) else ""
             helper_script = "/tmp/recursos-cockpit-apply-update.sh"
             with open(helper_script, "w", encoding="utf-8") as hf:
                 hf.write(
@@ -993,7 +1272,6 @@ class ServerConnectionManager:
                 pass
             if inst.returncode == 0:
                 new_ver = self.get_installed_deb_version() or info.get("github_version") or get_app_version()
-                updated_parts.append(f"app Ubuntu v{get_display_version(new_ver)}")
                 if relaunch and os.environ.get("DISPLAY"):
                     try:
                         subprocess.Popen(
@@ -1004,13 +1282,183 @@ class ServerConnectionManager:
                         )
                     except Exception:
                         pass
-                return True, f"Actualización completada desde GitHub ({', '.join(updated_parts)}).", info
+                return True, f"app Ubuntu v{get_display_version(new_ver)}", new_ver
             err_detail = (inst.stderr or inst.stdout or "").strip()
-            return False, f"No se pudo completar la instalación de actualización: {err_detail[:180]}", info
+            return False, f"No se pudo completar la instalación de actualización: {err_detail[:180]}", ""
         except Exception as e:
-            if updated_parts:
-                return True, f"Se actualizó correctamente ({', '.join(updated_parts)}).", info
-            return False, f"Error descargando actualización desde GitHub: {e}", info
+            return False, f"Error descargando actualización desde GitHub: {e}", ""
+
+    def perform_unified_update(self, gh_info=None, target_url=None, relaunch_on_deb=True):
+        """
+        Actualización unificada en un solo botón:
+        1. Si GitHub supera a la App Ubuntu: descarga e instala el .deb oficial sin desinstalar.
+        2. Si la App Ubuntu y/o GitHub superan al Servidor web local (incluido cuando la App supera a GitHub):
+           sincroniza la web local del servidor directamente mediante POST /api/system/sync-web (con fallback a /api/system/update).
+        3. Nunca realiza downgrades cuando la App Ubuntu supera la versión publicada en GitHub.
+        """
+        info = gh_info or self.check_github_app_update(target_url=target_url, refresh_server=True)
+        st = self.detect_local_node_status()
+        srv_url = info.get("server_url") or self._resolve_target_server_url(target_url)
+
+        logs = []
+        updated_parts = []
+        deb_installed = False
+        web_synced = False
+
+        app_ver = info.get("app_version") or get_app_version()
+        gh_ver = info.get("github_version") or ""
+        srv_ver = info.get("server_version") or ""
+        github_above_app = bool(info.get("github_above_app"))
+        app_above_github = bool(info.get("app_above_github"))
+        app_above_server = bool(info.get("app_above_server"))
+        github_above_server = bool(info.get("github_above_server"))
+        server_reachable = bool(info.get("server_reachable") or srv_url)
+
+        logs.append(
+            f"[i] Estado de versiones -> App Ubuntu: v{app_ver} · Servidor web: "
+            f"{('v' + srv_ver) if srv_ver else 'no detectado'} · GitHub: {('v' + gh_ver) if gh_ver else 'sin acceso'}"
+        )
+
+        # Paso 1: Si GitHub supera a la App Ubuntu, descargar e instalar nuevo .deb oficial
+        if github_above_app:
+            logs.append(f"[+] GitHub (v{gh_ver}) es superior a la App Ubuntu (v{app_ver}). Instalando paquete .deb...")
+            deb_ok, deb_msg, installed_new_ver = self._install_deb_from_github(info, relaunch_on_deb=relaunch_on_deb)
+            if not deb_ok:
+                logs.append(f"[-] {deb_msg}")
+                return False, deb_msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
+            deb_installed = True
+            updated_parts.append(deb_msg)
+            logs.append(f"[✓] {deb_msg} instalada correctamente.")
+            app_ver = installed_new_ver or get_app_version()
+            if server_reachable and srv_ver:
+                app_above_server = parse_semver_tuple(app_ver) > parse_semver_tuple(srv_ver)
+
+        # Paso 2: Si App Ubuntu (incluso por encima de GitHub) o GitHub superan al servidor local, actualizar la web local
+        if server_reachable and (app_above_server or github_above_server):
+            sync_ver_override = app_ver if parse_semver_tuple(app_ver) >= parse_semver_tuple(gh_ver) else None
+            if sync_ver_override or not app_above_github:
+                if app_above_github:
+                    logs.append(
+                        f"[+] App Ubuntu (v{app_ver}) supera a GitHub (v{gh_ver}) y al servidor local (v{srv_ver}). Sincronizando web local..."
+                    )
+                else:
+                    logs.append(
+                        f"[+] Sincronizando web local del servidor ({srv_url}) a v{sync_ver_override or app_ver}..."
+                    )
+                sync_ok, sync_msg, _sync_res = self.sync_web_bundle_to_server(
+                    target_url=srv_url,
+                    version_override=sync_ver_override or app_ver,
+                )
+                if sync_ok:
+                    web_synced = True
+                    updated_parts.append(f"web local v{get_display_version(sync_ver_override or app_ver)}")
+                    logs.append(f"[✓] {sync_msg}")
+                else:
+                    logs.append(f"[!] Aviso en sincronización directa (/api/system/sync-web): {sync_msg}")
+                    # Fallback a actualización remota por git si el servidor la soporta y no estamos por encima de GitHub
+                    if github_above_server and not app_above_github:
+                        try:
+                            req_srv = urllib.request.Request(
+                                f"{srv_url.rstrip('/')}/api/system/update",
+                                data=b"{}",
+                                headers=self._build_auth_headers({"Content-Type": "application/json"}),
+                                method="POST",
+                            )
+                            with urllib.request.urlopen(req_srv, timeout=45.0) as r_srv:
+                                r_obj = json.loads(r_srv.read().decode("utf-8"))
+                                if r_obj.get("success"):
+                                    web_synced = True
+                                    updated_parts.append("servidor local (GitHub)")
+                                    logs.append(f"[✓] Servidor actualizado desde GitHub: {r_obj.get('message', 'OK')}")
+                        except Exception as e_srv:
+                            logs.append(f"[-] Fallback /api/system/update falló: {e_srv}")
+                    if not web_synced and not deb_installed:
+                        return False, sync_msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
+
+        # Paso 3: Si existen fuentes git locales y GitHub va por delante (sin conflicto con versión local superior)
+        repo_dir = st.get("repo_dir")
+        if repo_dir and os.path.isdir(os.path.join(repo_dir, ".git")) and github_above_app and not app_above_github:
+            try:
+                status_p = subprocess.run(
+                    ["git", "-C", repo_dir, "status", "--porcelain"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if bool(status_p.stdout.strip()):
+                    subprocess.run(
+                        ["git", "-C", repo_dir, "stash", "push", "-u", "-m", "recursos-auto-update"],
+                        capture_output=True,
+                        timeout=10,
+                    )
+                pull_p = subprocess.run(
+                    ["git", "-C", repo_dir, "pull", "--rebase", "origin", "main"],
+                    capture_output=True,
+                    text=True,
+                    timeout=45,
+                )
+                if pull_p.returncode != 0:
+                    subprocess.run(
+                        ["git", "-C", repo_dir, "pull", "origin", "main"],
+                        capture_output=True,
+                        text=True,
+                        timeout=45,
+                    )
+                if st.get("service_exists"):
+                    runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
+                    subprocess.run([runner, "systemctl", "restart", "system-dashboard.service"], capture_output=True, timeout=20)
+                logs.append("[✓] Repositorio local sincronizado.")
+            except Exception as ge:
+                logs.append(f"[!] Aviso al actualizar repositorio git local: {ge}")
+
+        # Si todo estaba igualado o la app ya va por encima de GitHub y el servidor ya está igualado
+        if not updated_parts:
+            if app_above_github:
+                msg = (
+                    f"La App Ubuntu y la web local ya están en v{get_display_version(app_ver)} "
+                    f"(por encima de GitHub v{get_display_version(gh_ver)}). Sin cambios pendientes."
+                )
+                logs.append(f"[✓] {msg}")
+                new_info = self.check_github_app_update(target_url=srv_url, refresh_server=True)
+                return True, msg, new_info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
+
+            if gh_ver and parse_semver_tuple(gh_ver) == parse_semver_tuple(app_ver) and server_reachable:
+                # Re-sincronización limpia explícita cuando el usuario pulsa el botón estando al día
+                sync_ok, sync_msg, _ = self.sync_web_bundle_to_server(target_url=srv_url, force=True, version_override=app_ver)
+                if sync_ok:
+                    web_synced = True
+                    updated_parts.append(f"web local v{get_display_version(app_ver)}")
+                    logs.append(f"[✓] {sync_msg}")
+                else:
+                    msg = f"Todo el ecosistema ya está en la última versión (v{get_display_version(app_ver)})."
+                    logs.append(f"[✓] {msg}")
+                    new_info = self.check_github_app_update(target_url=srv_url, refresh_server=True)
+                    return True, msg, new_info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
+            elif gh_ver:
+                deb_ok, deb_msg, _ = self._install_deb_from_github(info, relaunch_on_deb=relaunch_on_deb)
+                if deb_ok:
+                    deb_installed = True
+                    updated_parts.append(deb_msg)
+                    logs.append(f"[✓] {deb_msg} reinstalada correctamente.")
+                else:
+                    return False, deb_msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
+            else:
+                msg = f"App Ubuntu en v{get_display_version(app_ver)} (sin conexión a GitHub ni cambios pendientes en servidor)."
+                logs.append(f"[i] {msg}")
+                return True, msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
+
+        new_info = self.check_github_app_update(target_url=srv_url, refresh_server=True)
+        final_msg = f"Actualización completada ({', '.join(updated_parts)})."
+        return True, final_msg, new_info, {
+            "deb_installed": deb_installed,
+            "web_synced": web_synced,
+            "output": "\n".join(logs),
+        }
+
+    def update_installed_app_from_github(self, gh_info=None):
+        """Envoltorio compatible para el lanzador GTK: ejecuta la actualización unificada de App y Web local."""
+        ok, msg, info, _flags = self.perform_unified_update(gh_info=gh_info, relaunch_on_deb=True)
+        return ok, msg, info
 
     def install_or_enable_local_node(self):
         """Instala y arranca el nodo local como servicio si no existe, o devuelve sus datos LAN si ya está instalado."""
@@ -1483,9 +1931,10 @@ class LocalHtmlBridgeServer:
                     extra_hdrs["Content-Type"] = self.headers.get("Content-Type")
                 headers = parent.conn_mgr._build_auth_headers(extra_hdrs)
 
+                req_timeout = 60.0 if self.path.startswith("/api/system/") else 4.0
                 req = urllib.request.Request(target_url, data=body, headers=headers, method=method)
                 try:
-                    with urllib.request.urlopen(req, timeout=4.0) as resp:
+                    with urllib.request.urlopen(req, timeout=req_timeout) as resp:
                         resp_body = resp.read()
                         ctype = resp.headers.get("Content-Type", "application/json")
                         if "application/json" in ctype and self.path.startswith("/api/metrics"):
@@ -1495,6 +1944,59 @@ class LocalHtmlBridgeServer:
                                 if new_tok and new_tok != parent.conn_mgr.device_token:
                                     parent.conn_mgr.device_token = new_tok
                                     parent.conn_mgr._save_config()
+                                if isinstance(parsed.get("version_info"), dict):
+                                    srv_vinfo = parsed["version_info"]
+                                    srv_ver_live = str(
+                                        srv_vinfo.get("server_version")
+                                        or srv_vinfo.get("current_version")
+                                        or srv_vinfo.get("version")
+                                        or ""
+                                    ).strip().lstrip("vV")
+                                    gh_cached = parent.conn_mgr.github_update_info or {}
+                                    gh_ver_live = str(
+                                        gh_cached.get("github_version")
+                                        or srv_vinfo.get("remote_version")
+                                        or ""
+                                    ).strip().lstrip("vV")
+                                    app_ver_live = str(
+                                        gh_cached.get("app_version")
+                                        or parent.conn_mgr.device_telemetry.get("app_version")
+                                        or get_app_version()
+                                    ).strip().lstrip("vV")
+                                    comp = parent.conn_mgr._compute_version_comparison(
+                                        app_ver=app_ver_live,
+                                        gh_ver=gh_ver_live,
+                                        server_ver=srv_ver_live,
+                                        server_reachable=True,
+                                        server_url=active_base,
+                                        installed_deb=gh_cached.get("installed_deb_version") or "",
+                                    )
+                                    srv_vinfo.update(
+                                        {
+                                            "app_version": comp["app_version"],
+                                            "app_display_version": comp["app_display_version"],
+                                            "server_version": comp["server_version"],
+                                            "server_display_version": comp["server_display_version"],
+                                            "server_reachable": True,
+                                            "remote_version": comp["github_version"] or srv_vinfo.get("remote_version"),
+                                            "remote_display_version": comp["github_display_version"]
+                                            or srv_vinfo.get("remote_display_version"),
+                                            "app_above_server": comp["app_above_server"],
+                                            "app_above_github": comp["app_above_github"],
+                                            "github_above_server": comp["github_above_server"],
+                                            "github_above_app": comp["github_above_app"],
+                                            "server_needs_update": comp["server_needs_update"],
+                                            "effective_update_available": comp["effective_update_available"],
+                                            "update_available": bool(comp["effective_update_available"]),
+                                            "ahead_of_remote": bool(comp["app_above_github"] and not comp["server_needs_update"]),
+                                            "target_version": comp["target_version"],
+                                            "update_mode": comp["update_mode"],
+                                            "update_action_label": comp["update_action_label"],
+                                            "update_summary": comp["update_summary"],
+                                            "ubuntu_native_bridge": True,
+                                        }
+                                    )
+                                    resp_body = json.dumps(parsed).encode("utf-8")
                             except Exception:
                                 pass
                         self.send_response(resp.status)
@@ -1562,6 +2064,74 @@ class LocalHtmlBridgeServer:
                     return
 
                 # 2. Proxy de API hacia el servidor descubierto o fallback local
+                if clean_path == "/api/version":
+                    srv_payload = None
+                    active_base = parent.conn_mgr._resolve_target_server_url()
+                    if active_base:
+                        try:
+                            req_v = urllib.request.Request(
+                                f"{active_base.rstrip('/')}{self.path}",
+                                headers=parent.conn_mgr._build_auth_headers({"Accept": "application/json"}),
+                                method="GET",
+                            )
+                            with urllib.request.urlopen(req_v, timeout=4.0) as rv:
+                                if rv.status == 200:
+                                    srv_payload = json.loads(rv.read().decode("utf-8"))
+                        except Exception:
+                            srv_payload = None
+
+                    ver_comp = parent.conn_mgr.check_github_app_update(
+                        target_url=active_base,
+                        probe_server=(srv_payload is None),
+                        server_payload=srv_payload,
+                    )
+                    out_payload = dict(srv_payload) if isinstance(srv_payload, dict) else {}
+                    srv_reachable = bool(ver_comp.get("server_reachable"))
+                    shown_ver = ver_comp["server_version"] if srv_reachable else ver_comp["app_version"]
+                    shown_disp = ver_comp["server_display_version"] if srv_reachable else ver_comp["app_display_version"]
+                    rem_ver = ver_comp.get("github_version") or out_payload.get("remote_version") or ver_comp["app_version"]
+                    rem_disp = ver_comp.get("github_display_version") or get_display_version(rem_ver)
+
+                    out_payload.update(
+                        {
+                            "current_version": shown_ver,
+                            "version": shown_ver,
+                            "display_version": shown_disp,
+                            "local_version": ver_comp["app_version"],
+                            "app_version": ver_comp["app_version"],
+                            "app_display_version": ver_comp["app_display_version"],
+                            "server_version": ver_comp["server_version"],
+                            "server_display_version": ver_comp["server_display_version"],
+                            "server_reachable": srv_reachable,
+                            "remote_version": rem_ver,
+                            "remote_display_version": rem_disp,
+                            "installed_deb_version": ver_comp.get("installed_deb_version") or ver_comp["app_version"],
+                            "package_installed": bool(ver_comp.get("app_installed_deb")),
+                            "package_needs_install": bool(ver_comp.get("github_above_app")),
+                            "update_available": bool(ver_comp.get("effective_update_available")),
+                            "effective_update_available": bool(ver_comp.get("effective_update_available")),
+                            "ahead_of_remote": bool(ver_comp.get("app_above_github") and not ver_comp.get("server_needs_update")),
+                            "app_above_server": bool(ver_comp.get("app_above_server")),
+                            "app_above_github": bool(ver_comp.get("app_above_github")),
+                            "github_above_server": bool(ver_comp.get("github_above_server")),
+                            "github_above_app": bool(ver_comp.get("github_above_app")),
+                            "server_needs_update": bool(ver_comp.get("server_needs_update")),
+                            "target_version": ver_comp.get("target_version"),
+                            "update_mode": ver_comp.get("update_mode"),
+                            "update_action_label": ver_comp.get("update_action_label"),
+                            "update_summary": ver_comp.get("update_summary"),
+                            "ubuntu_native_bridge": True,
+                            "auto_install_enabled": out_payload.get("auto_install_enabled", parent.conn_mgr.auto_install_enabled),
+                        }
+                    )
+                    if not srv_reachable:
+                        out_payload.setdefault("has_git", False)
+                        out_payload.setdefault("recent_commits", [])
+                        out_payload.setdefault("auto_install_status", "Comprobación directa desde App Ubuntu")
+                        out_payload.setdefault("branch", "main")
+                    self._send_json(out_payload)
+                    return
+
                 if clean_path.startswith("/api/"):
                     if self._proxy_to_remote("GET"):
                         return
@@ -1703,6 +2273,22 @@ class LocalHtmlBridgeServer:
                 if clean_path == "/api/dex/stop":
                     parent.dex.stop_session()
                     self._send_json({"ok": True, "success": True, "session_running": False})
+                    return
+
+                if clean_path in ("/api/system/update", "/api/update"):
+                    ok, msg, updated_info, flags = parent.conn_mgr.perform_unified_update(relaunch_on_deb=False)
+                    self._send_json(
+                        {
+                            "success": ok,
+                            "ok": ok,
+                            "deb_installed": flags.get("deb_installed", False),
+                            "web_synced": flags.get("web_synced", False),
+                            "message": msg,
+                            "output": flags.get("output") or msg,
+                            "version_info": updated_info,
+                        },
+                        status=200,
+                    )
                     return
 
                 if self._proxy_to_remote("POST", body=raw_body):
@@ -2173,36 +2759,47 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             self.btn_opt2.set_label("Instalar nodo local")
 
         if hasattr(self, "lbl_github_info") and hasattr(self, "btn_opt2_update"):
-            self.btn_opt2_update.set_visible(app_installed)
+            has_server_gap = bool(gh and gh.get("server_needs_update"))
+            self.btn_opt2_update.set_visible(app_installed or has_server_gap)
             ctx = self.btn_opt2_update.get_style_context()
             ctx.remove_class("btn-primary")
             ctx.remove_class("btn-nav")
-            if gh and gh.get("github_version"):
-                gh_disp = gh.get("github_display_version") or gh.get("github_version")
-                if gh.get("update_available"):
-                    self.lbl_github_info.set_text(
-                        f"Nueva versión disponible en GitHub: v{gh_disp}. Pulsa para actualizar sin desinstalar."
-                    )
-                    self.btn_opt2_update.set_label(f"Actualizar a v{gh_disp} (GitHub)")
-                    ctx.add_class("btn-primary")
-                else:
-                    self.lbl_github_info.set_text(
-                        f"GitHub al día (v{gh_disp}). Puedes reinstalar o actualizar desde GitHub cuando quieras."
-                    )
-                    self.btn_opt2_update.set_label("Actualizar desde GitHub")
-                    ctx.add_class("btn-nav")
+            if gh and gh.get("effective_update_available"):
+                summary = gh.get("update_summary") or f"Actualización disponible a v{gh.get('target_version')}."
+                btn_lbl = gh.get("update_action_label") or f"Actualizar a v{gh.get('target_version')}"
+                self.lbl_github_info.set_text(summary)
+                self.btn_opt2_update.set_label(btn_lbl)
+                ctx.add_class("btn-primary")
+            elif gh and gh.get("app_above_github"):
+                srv_note = f" · Servidor web: v{gh.get('server_display_version')}" if gh.get("server_reachable") else ""
+                self.lbl_github_info.set_text(
+                    f"App Ubuntu v{gh.get('app_display_version')} (superior a GitHub v{gh.get('github_display_version')}{srv_note})."
+                )
+                self.btn_opt2_update.set_label(
+                    gh.get("update_action_label") or "Sincronizar web local"
+                )
+                ctx.add_class("btn-nav")
+            elif gh and gh.get("github_version"):
+                self.lbl_github_info.set_text(
+                    gh.get("update_summary")
+                    or f"GitHub al día (v{gh.get('github_display_version')}). Puedes reinstalar o sincronizar cuando quieras."
+                )
+                self.btn_opt2_update.set_label(gh.get("update_action_label") or "Actualizar / Reinstalar")
+                ctx.add_class("btn-nav")
             else:
-                self.lbl_github_info.set_text("Actualización directa mediante GitHub disponible para instalaciones existentes.")
-                self.btn_opt2_update.set_label("Actualizar desde GitHub")
+                self.lbl_github_info.set_text("Actualización unificada de App Ubuntu y web local disponible.")
+                self.btn_opt2_update.set_label("Comprobar y actualizar")
                 ctx.add_class("btn-nav")
         return False
 
     def _on_update_from_github_clicked(self, _widget):
         if hasattr(self, "btn_opt2_update"):
             self.btn_opt2_update.set_sensitive(False)
-            self.btn_opt2_update.set_label("Actualizando desde GitHub...")
+            self.btn_opt2_update.set_label("Aplicando actualización...")
         if hasattr(self, "lbl_github_info"):
-            self.lbl_github_info.set_text("Descargando el paquete firmado desde GitHub Releases y aplicando actualización en sitio...")
+            self.lbl_github_info.set_text(
+                "Comparando App Ubuntu, Servidor web local y GitHub para aplicar la actualización en un clic..."
+            )
 
         def worker():
             ok, msg, gh = self.conn_mgr.update_installed_app_from_github()

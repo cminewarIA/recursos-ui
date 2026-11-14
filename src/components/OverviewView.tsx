@@ -35,9 +35,12 @@ export interface ExpandChartSpec {
   subtitle: string;
   series: ChartSeries[];
   timestamps: string[];
+  epochTs?: number[];
   leftUnit?: string;
   maxLeft?: number;
   maxRight?: number;
+  chartKind?: 'cpu' | 'ram' | 'gpu' | 'storage' | 'net';
+  nicName?: string;
 }
 
 interface OverviewViewProps {
@@ -100,6 +103,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const hist = metrics?.history;
   const timestamps = hist?.timestamps ?? [];
+  const epochTs = hist?.epoch_ts ?? [];
   const cpuHist = hist?.cpu ?? [];
   const ramHist = hist?.ram ?? [];
   const gpuHist = hist?.gpu ?? [];
@@ -111,30 +115,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     return len > 0 ? Array.from({ length: len }, () => storageSummary.percent) : [];
   }, [hist?.disk_pct, diskReadHist.length, timestamps.length, storageSummary.percent]);
 
-  const diskThroughputMax = useMemo(() => {
-    const peak = Math.max(1, ...diskReadHist, ...diskWriteHist);
-    if (peak <= 5) return 5;
-    if (peak <= 25) return Math.ceil(peak * 1.25);
-    return Math.ceil(peak * 1.2);
-  }, [diskReadHist, diskWriteHist]);
-
   const cpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'cpu', label: 'Procesador', data: cpuHist, color: '#2563eb', unit: '%' }],
+    () => [{ id: 'cpu', metricKey: 'cpu', label: 'Procesador', data: cpuHist, color: '#2563eb', unit: '%' }],
     [cpuHist]
   );
   const ramSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'ram', label: 'Memoria RAM', data: ramHist, color: '#0ea5e9', unit: '%' }],
+    () => [{ id: 'ram', metricKey: 'ram', label: 'Memoria RAM', data: ramHist, color: '#0ea5e9', unit: '%' }],
     [ramHist]
   );
   const gpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'gpu', label: 'Tarjeta gráfica', data: gpuHist, color: '#16a34a', unit: '%' }],
+    () => [{ id: 'gpu', metricKey: 'gpu', label: 'Tarjeta gráfica', data: gpuHist, color: '#16a34a', unit: '%' }],
     [gpuHist]
   );
   const storageSeries: ChartSeries[] = useMemo(
     () => [
-      { id: 'disk_r', label: 'Lectura', data: diskReadHist, color: '#d97706', unit: 'MB/s', decimals: 1, fillAlpha: 0.16, axis: 'left' },
-      { id: 'disk_w', label: 'Escritura', data: diskWriteHist, color: '#ea580c', unit: 'MB/s', decimals: 1, fillAlpha: 0.08, axis: 'left' },
-      { id: 'disk_pct', label: 'Espacio usado', data: diskPctHist, color: '#64748b', unit: '%', decimals: 1, fillAlpha: 0, dashed: true, axis: 'right' },
+      { id: 'disk_r', metricKey: 'disk_r', label: 'Lectura', data: diskReadHist, color: '#d97706', unit: 'MB/s', decimals: 2, fillAlpha: 0.16, axis: 'left' },
+      { id: 'disk_w', metricKey: 'disk_w', label: 'Escritura', data: diskWriteHist, color: '#ea580c', unit: 'MB/s', decimals: 2, fillAlpha: 0.08, axis: 'left' },
+      { id: 'disk_pct', metricKey: 'disk_pct', label: 'Espacio usado', data: diskPctHist, color: '#64748b', unit: '%', decimals: 1, fillAlpha: 0, dashed: true, axis: 'right' },
     ],
     [diskReadHist, diskWriteHist, diskPctHist]
   );
@@ -254,6 +251,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   subtitle: metrics?.cpu?.model || 'Procesador principal',
                   series: cpuSeries,
                   timestamps,
+                  epochTs,
                   leftUnit: '%',
                   maxLeft: 100,
                 })
@@ -268,7 +266,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <TelemetryChart
               series={cpuSeries}
               timestamps={timestamps}
-              height={148}
+              epochTs={epochTs}
+              height={160}
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -278,6 +277,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   subtitle: metrics?.cpu?.model || 'Procesador principal',
                   series: cpuSeries,
                   timestamps,
+                  epochTs,
                   leftUnit: '%',
                   maxLeft: 100,
                 })
@@ -317,6 +317,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   subtitle: `${formatBytes(ramUsed)} usados de ${formatBytes(ramTotal)}`,
                   series: ramSeries,
                   timestamps,
+                  epochTs,
                   leftUnit: '%',
                   maxLeft: 100,
                 })
@@ -331,7 +332,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <TelemetryChart
               series={ramSeries}
               timestamps={timestamps}
-              height={148}
+              epochTs={epochTs}
+              height={160}
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -341,6 +343,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   subtitle: `${formatBytes(ramUsed)} usados de ${formatBytes(ramTotal)}`,
                   series: ramSeries,
                   timestamps,
+                  epochTs,
                   leftUnit: '%',
                   maxLeft: 100,
                 })
@@ -384,6 +387,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   subtitle: metrics?.gpu?.name || 'Gráfica del sistema',
                   series: gpuSeries,
                   timestamps,
+                  epochTs,
                   leftUnit: '%',
                   maxLeft: 100,
                 })
@@ -398,7 +402,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <TelemetryChart
               series={gpuSeries}
               timestamps={timestamps}
-              height={148}
+              epochTs={epochTs}
+              height={160}
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -408,6 +413,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   subtitle: metrics?.gpu?.name || 'Gráfica del sistema',
                   series: gpuSeries,
                   timestamps,
+                  epochTs,
                   leftUnit: '%',
                   maxLeft: 100,
                 })
@@ -461,8 +467,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   subtitle: `${formatBytes(storageSummary.freeBytes)} disponibles`,
                   series: storageSeries,
                   timestamps,
+                  epochTs,
                   leftUnit: 'MB/s',
-                  maxLeft: diskThroughputMax,
                   maxRight: 100,
                 })
               }
@@ -476,8 +482,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <TelemetryChart
               series={storageSeries}
               timestamps={timestamps}
-              height={148}
-              maxLeft={diskThroughputMax}
+              epochTs={epochTs}
+              height={160}
               maxRight={100}
               leftUnit="MB/s"
               theme={theme}
@@ -487,8 +493,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   subtitle: `${formatBytes(storageSummary.freeBytes)} disponibles`,
                   series: storageSeries,
                   timestamps,
+                  epochTs,
                   leftUnit: 'MB/s',
-                  maxLeft: diskThroughputMax,
                   maxRight: 100,
                 })
               }

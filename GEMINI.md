@@ -1,17 +1,13 @@
 # Reglas y Pautas del Proyecto (Dashboard / Recursos)
 
-## 1. Sincronización Previa Obligatoria (`git pull`)
-- **Regla obligatoria**: Antes de comenzar a modificar cualquier archivo en el proyecto o responder a una solicitud de cambio, siempre se debe ejecutar primero `git pull origin main` en el directorio de trabajo del repositorio (`./`).
-- **Objetivo**: Asegurar que cualquier cambio o commit realizado desde Google AI Studio en el móvil o GitHub se descargue e integre en el entorno local antes de tocar código, evitando conflictos o sobrescrituras.
-
-## 2. Compatibilidad Universal de Rutas y Cero Hardcoding (Zero-Hardcoding)
+## 1. Compatibilidad Universal de Rutas y Cero Hardcoding (Zero-Hardcoding)
 - **Regla obligatoria**:
   1. **Rutas Relativas al Repositorio**: Todas las referencias a archivos del proyecto (`VERSION`, `planes/`, `static/`, scripts de DuckDNS o Caddy) deben resolverse mediante rutas relativas (`./` y `BASE_DIR`), evitando codificar o asumir rutas fijas del servidor físico (`/home/servidor/...`) que provoquen errores en contenedores de Google AI Studio o entornos cloud. Cuando sea necesario acceder a rutas locales del servidor físico, se debe verificar previamente su existencia con `os.path.exists()`.
   2. **Cero Nombres Fijos (Zero-Hardcoding)**: Queda terminantemente prohibido codificar valores estáticos, marcas, nombres de ciudades, ubicaciones o proveedores ("Mountain View", "Madrid", "Google", "AWS"). Toda etiqueta, ubicación o agrupación se calcula de forma 100% dinámica a partir de la telemetría en tiempo real (`remote_ip`, `city`, `country`, `isp`, `asn`).
   3. **Hardware Dinámico**: Sensores térmicos, núcleos CPU, discos, interfaces de red (NICs), particiones y GPUs deben detectarse e instanciarse dinámicamente mediante las APIs del sistema (`psutil`, `/sys`, `ip-api`), nunca con listas o arrays estáticos.
   4. **Agrupamientos Dinámicos**: Los grupos y clusters del mapa o tablas se computan dinámicamente según coordenadas o distancias en tiempo de ejecución.
 
-## 3. Control de Versión Unificado y Criterio Estricto de Incremento (`VERSION`)
+## 2. Control de Versión Unificado y Criterio Estricto de Incremento (`VERSION`)
 - **Regla obligatoria**:
   1. **Punto Único de Verdad**: La versión canónica de la aplicación reside exclusivamente en `./VERSION`. Queda estrictamente prohibido codificar versiones hardcodeadas en HTML, scripts o endpoints.
   2. **Sincronización Obligatoria de Archivos**: Al modificar `./VERSION`, se deben sincronizar inmediatamente con el mismo número:
@@ -25,14 +21,14 @@
      - **`0.X.0` (Actualización Intermedia / Añadir, Quitar o Rediseñar una Función o Aspecto Concreto)**: Se incrementa `MINOR` **cuando se añade una nueva función, se retira una existente o se rediseña/ajusta un aspecto o función concreta de la interfaz** (ej: rediseño de un componente, formato cuadrícula/cápsulas, desplegables modulares). El tercer número se restablece a 0 (ej: `8.0.0` -> `8.1.0`).
      - **`0.0.X` (Actualización o Ajuste de Pequeños Detalles)**: Se incrementa `PATCH` **cuando se actualiza algo existente, se corrigen errores (bugfixes) o se ajustan pequeños detalles** (modificación de textos, reglas, ajustes de rendimiento o documentación sin alterar funciones completas ni el diseño general) (ej: `8.3.7` -> `8.3.8`).
 
-## 4. Almacenamiento Obligatorio de Planes de Implementación y Walkthroughs (`planes/`)
+## 3. Almacenamiento Obligatorio de Planes de Implementación y Walkthroughs (`planes/`)
 - **Regla obligatoria**: Todos los planes de implementación (`implementation_plan.md`, `implementation_plan_v*.md`), archivos de recorrido y verificación (`walkthrough.md`, `walkthrough_v*.md`), bitácoras de trabajo y pruebas deben guardarse SIEMPRE en la carpeta `./planes/`. Jamás deben limitarse a directorios temporales de las IAs (`.gemini/antigravity/brain`).
 - **Objetivo**: Garantizar que Google AI Studio, clientes móviles y Antigravity compartan permanentemente el contexto técnico exacto tras sincronizar con Git.
 
-## 5. Actualización Obligatoria del README (`README.md`)
-- **Regla obligatoria**: Cada vez que se realice cualquier modificación, corrección, nueva funcionalidad, cambio de diseño, ajuste de reglas o incremento de versión, se debe actualizar de inmediato `./README.md` (badges de versión, banner y tabla de historial de cambios).
+## 4. Actualización Obligatoria del README (`README.md`)
+- **Regla obligatoria**: Cada vez que se realice cualquier modificación, corrección, nueva funcionalidad, cambio de diseño, ajuste de reglas o incremento de versión, se debe sincronizar inmediatamente `./README.md` con la versión activa (badges de versión, banner, enlaces de descarga y ejemplos), evitando nombrar o listar versiones anteriores salvo para comunicar diferencias relevantes de arquitectura o funcionamiento.
 
-## 6. Compilación e Instalación Local Obligatoria de la App Nativa Linux (.deb)
+## 5. Compilación e Instalación Local Obligatoria de la App Nativa Linux (.deb)
 - **Regla obligatoria**: Tras incrementar el número de versión en `./VERSION` y completar cualquier cambio:
   1. **Compilación Inmediata**: Compilar el paquete Debian canónico ejecutando:
      ```bash
@@ -49,7 +45,7 @@
      ```
      Verificando con `dpkg -l | grep recursos-cockpit` que la versión instalada coincida exactamente con `./VERSION`.
 
-## 7. Arquitectura Contractual de Aplicaciones Nativas (Linux & Android)
+## 6. Arquitectura Contractual de Aplicaciones Nativas (Linux & Android)
 - **Regla obligatoria**: El diseño y desarrollo de cualquier aplicación cliente nativa (Linux/Ubuntu y Android) debe ajustarse de forma estricta y permanente a los siguientes principios:
   1. **Motor de Interfaz HTML5 Unificado con Contenedores Nativos (Ubuntu WebKit2 & Android WebView)**:
      - Las aplicaciones nativas de Ubuntu Linux (`.deb`) y Android (`.apk`) renderizan directamente la interfaz canónica completa en HTML5, CSS3, D3.js v7 y OpenStreetMap/Leaflet mediante contenedores nativos acelerados por hardware (`WebKit2` integrado en GTK 3 en Linux, y `android.webkit.WebView` integrado en Kotlin/Jetpack Compose en Android).
@@ -72,17 +68,8 @@
        - *App Nativa de Ubuntu*: Al disponer de acceso directo a `/dev/uhid`, `scrcpy` y el subsistema USB a través de su puente nativo local, desbloquea dinámicamente el submenú de control DeX / Modo Escritorio Android (`/dex`) con todos sus controles de resolución, tasa de refresco (60 FPS), auto-conexión y modo pantalla completa.
        - *Versión Web y Clientes Externos (incluido Android)*: Todo submenú de DeX permanece estrictamente bloqueado y oculto en la navegación, mostrando únicamente el mensaje pasivo si se consulta: *"Esperando dispositivo para conectarse en su versión nativa"*.
 
-## 8. Principio de Simetría Total, Homogeneidad y Cohesión en Interfaces y Submenús (Web, Linux/Ubuntu y Android)
+## 7. Principio de Simetría Total, Homogeneidad y Cohesión en Interfaces y Submenús (Web, Linux/Ubuntu y Android)
 - **Regla obligatoria**:
   1. **Simetría y Homogeneidad Estricta en Todas las Interfaces**: Todos los componentes, vistas, tarjetas Bento, barras de herramientas, HUDs, paneles flotantes, modales y submenús (incluida la interfaz del mapa geoespacial, el catálogo de servicios, los selectores de subredes, gráficos y tablas) deben mantener una simetría visual y estructural rigurosa, limpia y equilibrada en cualquier resolución o factor de forma.
   2. **Ecosistema Homogéneo Universal**: La experiencia visual entre la aplicación web y las aplicaciones nativas de Ubuntu (GTK 3 + WebKit2 HTML5) y Android (Jetpack Compose + WebView HTML5) es 100% homogénea y coherente, compartiendo el mismo código HTML5/CSS3/D3.js/Leaflet, principios de espaciado simétrico, radios de curvatura, tratamiento de cristal (*Apple Liquid Glass*), contraste, tipografía monoespaciada tabular y ergonomía táctil (*Tesla Touch Cockpit*).
   3. **Simetría Contractual en Nuevas Funcionalidades**: Cualquier elemento, control, submenú o vista que se incorpore a futuro debe ceñirse sin excepción a esta simetría y homogeneidad, evitando componentes desalineados, estilos visuales dispares o menús secundarios asimétricos.
-
-## 9. Publicación Automática en GitHub (`git push`)
-- **Regla obligatoria**: Al finalizar cualquier modificación, tras compilar e instalar el paquete local y actualizar `README.md` y `planes/`, se deben confirmar los cambios con un commit semántico claro y ejecutar:
-  ```bash
-  git push origin main --tags
-  ```
-  - Repositorio remoto: `https://github.com/cminewarIA/recursos-ui`
-  - Rama: `main`
-- **Objetivo**: Mantener permanentemente sincronizado el proyecto para que los cambios se reflejen de inmediato en Google AI Studio y el móvil al pulsar *Pull Changes*.

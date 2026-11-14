@@ -334,9 +334,15 @@ def record_auth_success(ip):
         if ip in AUTH_LOCKOUTS:
             del AUTH_LOCKOUTS[ip]
 
-# Real-time Metrics History
+# Real-time Metrics History (Rolling 20-minute window in peak-preserving 5s buckets)
+HISTORY_WINDOW_SECONDS = 1200  # 20 minutos
+HISTORY_BUCKET_SECONDS = 5     # cubetas de 5s -> hasta 240 puntos en 20 minutos
+MAX_HISTORY = HISTORY_WINDOW_SECONDS // HISTORY_BUCKET_SECONDS
+_HISTORY_BUCKETS_20M = []
+
 HISTORY = {
     "timestamps": [],
+    "epoch_ts": [],
     "cpu": [],
     "gpu": [],
     "ram": [],
@@ -347,13 +353,77 @@ HISTORY = {
     "disk_w": [],
     "disk_pct": []
 }
-MAX_HISTORY = 60
 
-# Rolling 2-Hour per-NIC Bandwidth History Buffer (100% OS-driven from /proc/net/dev)
+def _sync_history_dict_from_buckets():
+    HISTORY["timestamps"] = [b["time_str"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["epoch_ts"] = [b["ts"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["cpu"] = [b["cpu"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["gpu"] = [b["gpu"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["ram"] = [b["ram"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["ram_total"] = [b["ram_total"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["net_rx"] = [b["net_rx"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["net_tx"] = [b["net_tx"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["disk_r"] = [b["disk_r"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["disk_w"] = [b["disk_w"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["disk_pct"] = [b["disk_pct"] for b in _HISTORY_BUCKETS_20M]
+
+def _push_history_bucket(sample_ts, time_str, cpu_val, gpu_val, ram_val, ram_tot_val, net_rx_val, net_tx_val, disk_r_val, disk_w_val, disk_pct_val, sync=True):
+    ts_num = float(sample_ts)
+    b_ts = (int(ts_num) // HISTORY_BUCKET_SECONDS) * HISTORY_BUCKET_SECONDS
+    cutoff_b_ts = b_ts - HISTORY_WINDOW_SECONDS
+
+    c_v = round(float(cpu_val or 0.0), 2)
+    g_v = round(float(gpu_val or 0.0), 2)
+    r_v = round(float(ram_val or 0.0), 2)
+    rt_v = round(float(ram_tot_val or 0.0), 2)
+    nrx_v = round(float(net_rx_val or 0.0), 2)
+    ntx_v = round(float(net_tx_val or 0.0), 2)
+    dr_v = round(float(disk_r_val or 0.0), 2)
+    dw_v = round(float(disk_w_val or 0.0), 2)
+    dp_v = round(float(disk_pct_val or 0.0), 1)
+    t_str = str(time_str or "")
+
+    if not _HISTORY_BUCKETS_20M or _HISTORY_BUCKETS_20M[-1]["b_ts"] < b_ts:
+        _HISTORY_BUCKETS_20M.append({
+            "b_ts": b_ts,
+            "ts": round(ts_num, 2),
+            "time_str": t_str,
+            "cpu": c_v,
+            "gpu": g_v,
+            "ram": r_v,
+            "ram_total": rt_v,
+            "net_rx": nrx_v,
+            "net_tx": ntx_v,
+            "disk_r": dr_v,
+            "disk_w": dw_v,
+            "disk_pct": dp_v,
+        })
+    elif _HISTORY_BUCKETS_20M[-1]["b_ts"] == b_ts:
+        last_b = _HISTORY_BUCKETS_20M[-1]
+        last_b["ts"] = round(ts_num, 2)
+        if t_str:
+            last_b["time_str"] = t_str
+        last_b["cpu"] = max(last_b["cpu"], c_v)
+        last_b["gpu"] = max(last_b["gpu"], g_v)
+        last_b["ram"] = max(last_b["ram"], r_v)
+        last_b["ram_total"] = max(last_b["ram_total"], rt_v)
+        last_b["net_rx"] = max(last_b["net_rx"], nrx_v)
+        last_b["net_tx"] = max(last_b["net_tx"], ntx_v)
+        last_b["disk_r"] = max(last_b["disk_r"], dr_v)
+        last_b["disk_w"] = max(last_b["disk_w"], dw_v)
+        last_b["disk_pct"] = max(last_b["disk_pct"], dp_v)
+
+    while _HISTORY_BUCKETS_20M and _HISTORY_BUCKETS_20M[0]["b_ts"] < cutoff_b_ts:
+        _HISTORY_BUCKETS_20M.pop(0)
+
+    if sync:
+        _sync_history_dict_from_buckets()
+
+# Rolling 20-Minute per-NIC Bandwidth History Buffer (100% OS-driven from /proc/net/dev)
 NIC_BANDWIDTH_HISTORY_2H = {}  # { nic_name: [ {"t": ms_epoch, "rx": float_bytes_sec, "tx": float_bytes_sec}, ... ] }
 NIC_BANDWIDTH_LOCK = threading.Lock()
-MAX_NIC_HISTORY_SECONDS = 7200  # 2 hours (120 minutes)
-NIC_BUCKET_INTERVAL_MS = 15000  # 15-second quantized buckets (480 buckets across 2 hours)
+MAX_NIC_HISTORY_SECONDS = 1200  # 20 minutos
+NIC_BUCKET_INTERVAL_MS = 5000   # cubetas de 5 segundos (240 cubetas en 20 minutos)
 NIC_HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nic_history_2h.json")
 _LAST_NIC_HISTORY_SAVE_TS = 0.0
 
@@ -1799,14 +1869,67 @@ def _is_private_ip(ip_str):
         return True
     return False
 
-GEOIP_HISTORY_DB_FILE = os.path.join(BASE_DIR, "geoip_history.db")
+def _resolve_recursos_history_db_path():
+    """Resuelve la ruta persistente de recursos_history.db sin sobrescribir ni depender de rutas fijas."""
+    env_path = os.environ.get("RECURSOS_HISTORY_DB_PATH", "").strip()
+    if env_path:
+        return env_path
+    base_db = os.path.join(BASE_DIR, "recursos_history.db")
+    legacy_db = os.path.join(BASE_DIR, "geoip_history.db")
+    if os.path.exists(base_db) or os.path.exists(legacy_db) or os.access(BASE_DIR, os.W_OK):
+        return base_db
+    var_lib_dir = "/var/lib/recursos-cockpit"
+    try:
+        os.makedirs(var_lib_dir, exist_ok=True)
+    except Exception:
+        pass
+    return os.path.join(var_lib_dir, "recursos_history.db")
+
+RECURSOS_HISTORY_DB_FILE = _resolve_recursos_history_db_path()
+_LEGACY_GEOIP_HISTORY_DB_FILE = os.path.join(os.path.dirname(RECURSOS_HISTORY_DB_FILE), "geoip_history.db")
+GEOIP_HISTORY_DB_FILE = RECURSOS_HISTORY_DB_FILE
 GEOIP_HISTORY_DB_LOCK = threading.Lock()
+_TELEMETRY_SQLITE_BUFFER = []
+_LAST_TELEMETRY_FLUSH_TS = 0.0
+_LAST_TELEMETRY_PRUNE_TS = 0.0
+_TELEMETRY_HISTORY_INITIALIZED = False
+
+def _migrate_legacy_geoip_db_if_needed():
+    """Migra de forma segura geoip_history.db → recursos_history.db sin perder el historial DNS/GeoIP previo."""
+    if os.path.exists(RECURSOS_HISTORY_DB_FILE) or not os.path.exists(_LEGACY_GEOIP_HISTORY_DB_FILE):
+        return
+    try:
+        for suffix in ("", "-wal", "-shm"):
+            src = _LEGACY_GEOIP_HISTORY_DB_FILE + suffix
+            dst = RECURSOS_HISTORY_DB_FILE + suffix
+            if os.path.exists(src) and not os.path.exists(dst):
+                os.replace(src, dst)
+        print("[+] Base de datos migrada de geoip_history.db a recursos_history.db")
+    except Exception as e:
+        try:
+            src_conn = sqlite3.connect(_LEGACY_GEOIP_HISTORY_DB_FILE, timeout=10.0)
+            dst_conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+            src_conn.backup(dst_conn)
+            dst_conn.close()
+            src_conn.close()
+            print(f"[+] Copia de seguridad migrada de geoip_history.db a recursos_history.db ({e})")
+        except Exception as e2:
+            print(f"[-] Aviso migrando geoip_history.db -> recursos_history.db: {e2}")
 
 def init_geoip_history_db():
-    """Inicializa la base de datos SQLite para persistir ubicaciones GeoIP de alta precisión y el historial de conexiones catalogado por servicios."""
+    """Inicializa de forma incremental la base de datos SQLite unificada (recursos_history.db) sin sobrescribir datos existentes."""
+    global _TELEMETRY_HISTORY_INITIALIZED
+    if _TELEMETRY_HISTORY_INITIALIZED and os.path.isfile(RECURSOS_HISTORY_DB_FILE):
+        return
     with GEOIP_HISTORY_DB_LOCK:
+        if _TELEMETRY_HISTORY_INITIALIZED and os.path.isfile(RECURSOS_HISTORY_DB_FILE):
+            return
         try:
-            conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
+            parent_dir = os.path.dirname(RECURSOS_HISTORY_DB_FILE)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
+            _migrate_legacy_geoip_db_if_needed()
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
             conn.execute("""
@@ -1859,10 +1982,333 @@ def init_geoip_history_db():
             conn.execute("CREATE INDEX IF NOT EXISTS idx_conn_hist_local_ip ON connection_history(local_ip);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_conn_hist_direction ON connection_history(direction);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_conn_hist_last_seen ON connection_history(last_seen DESC);")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS telemetry_history (
+                    ts REAL PRIMARY KEY,
+                    time_str TEXT NOT NULL,
+                    cpu REAL DEFAULT 0,
+                    gpu REAL DEFAULT 0,
+                    ram REAL DEFAULT 0,
+                    ram_total REAL DEFAULT 0,
+                    net_rx REAL DEFAULT 0,
+                    net_tx REAL DEFAULT 0,
+                    disk_r REAL DEFAULT 0,
+                    disk_w REAL DEFAULT 0,
+                    disk_pct REAL DEFAULT 0
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_history_ts ON telemetry_history(ts DESC);")
+            conn.commit()
+            conn.close()
+            _TELEMETRY_HISTORY_INITIALIZED = True
+        except Exception as e:
+            print(f"[-] Error inicializando SQLite recursos_history.db: {e}")
+
+def preload_telemetry_history_from_sqlite():
+    """Precarga las últimas muestras de consumo (últimos 20 minutos) desde recursos_history.db."""
+    init_geoip_history_db()
+    with GEOIP_HISTORY_DB_LOCK:
+        try:
+            cutoff_ts = time.time() - HISTORY_WINDOW_SECONDS
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                FROM telemetry_history
+                WHERE ts >= ?
+                ORDER BY ts ASC
+            """, (cutoff_ts,)).fetchall()
+            conn.close()
+            if not rows:
+                return
+            _HISTORY_BUCKETS_20M.clear()
+            for r in rows:
+                _push_history_bucket(
+                    r["ts"] or 0.0,
+                    r["time_str"] or "",
+                    r["cpu"] or 0.0,
+                    r["gpu"] or 0.0,
+                    r["ram"] or 0.0,
+                    r["ram_total"] or 0.0,
+                    r["net_rx"] or 0.0,
+                    r["net_tx"] or 0.0,
+                    r["disk_r"] or 0.0,
+                    r["disk_w"] or 0.0,
+                    r["disk_pct"] or 0.0,
+                    sync=False,
+                )
+            _sync_history_dict_from_buckets()
+        except Exception as e:
+            print(f"[-] Error precargando telemetry_history desde SQLite: {e}")
+
+def record_telemetry_sample_to_sqlite(now_ts, time_str, cpu_val, gpu_val, ram_val, ram_tot_val, net_rx_val, net_tx_val, disk_r_val, disk_w_val, disk_pct_val, force_flush=False):
+    """Encola y persiste periódicamente en recursos_history.db cada muestra de consumo del sistema."""
+    global _LAST_TELEMETRY_FLUSH_TS, _LAST_TELEMETRY_PRUNE_TS
+    if not _TELEMETRY_HISTORY_INITIALIZED:
+        init_geoip_history_db()
+    sample = (
+        round(float(now_ts), 3),
+        str(time_str or ""),
+        round(float(cpu_val or 0.0), 2),
+        round(float(gpu_val or 0.0), 2),
+        round(float(ram_val or 0.0), 2),
+        round(float(ram_tot_val or 0.0), 2),
+        round(float(net_rx_val or 0.0), 2),
+        round(float(net_tx_val or 0.0), 2),
+        round(float(disk_r_val or 0.0), 2),
+        round(float(disk_w_val or 0.0), 2),
+        round(float(disk_pct_val or 0.0), 1),
+    )
+    _TELEMETRY_SQLITE_BUFFER.append(sample)
+    if not force_flush and len(_TELEMETRY_SQLITE_BUFFER) < 2 and (now_ts - _LAST_TELEMETRY_FLUSH_TS) < 3.0:
+        return
+    batch = list(_TELEMETRY_SQLITE_BUFFER)
+    _TELEMETRY_SQLITE_BUFFER.clear()
+    _LAST_TELEMETRY_FLUSH_TS = now_ts
+    with GEOIP_HISTORY_DB_LOCK:
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+            conn.executemany("""
+                INSERT INTO telemetry_history (
+                    ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(ts) DO UPDATE SET
+                    time_str=excluded.time_str,
+                    cpu=excluded.cpu,
+                    gpu=excluded.gpu,
+                    ram=excluded.ram,
+                    ram_total=excluded.ram_total,
+                    net_rx=excluded.net_rx,
+                    net_tx=excluded.net_tx,
+                    disk_r=excluded.disk_r,
+                    disk_w=excluded.disk_w,
+                    disk_pct=excluded.disk_pct
+            """, batch)
+            if now_ts - _LAST_TELEMETRY_PRUNE_TS >= 60.0:
+                cutoff_7d = now_ts - (7 * 86400.0)
+                conn.execute("DELETE FROM telemetry_history WHERE ts < ?", (cutoff_7d,))
+                conn.execute("""
+                    DELETE FROM telemetry_history
+                    WHERE ts NOT IN (
+                        SELECT ts FROM telemetry_history ORDER BY ts DESC LIMIT 250000
+                    )
+                """)
+                _LAST_TELEMETRY_PRUNE_TS = now_ts
             conn.commit()
             conn.close()
         except Exception as e:
-            print(f"[-] Error inicializando SQLite geoip_history.db: {e}")
+            print(f"[-] Error guardando telemetry_history en SQLite: {e}")
+
+def _format_telemetry_rows_payload(rows):
+    timestamps = []
+    date_timestamps = []
+    epoch_ts = []
+    cpu = []
+    gpu = []
+    ram = []
+    ram_total = []
+    net_rx = []
+    net_tx = []
+    disk_r = []
+    disk_w = []
+    disk_pct = []
+    for r in rows:
+        ts_val = float(r["ts"] or 0.0)
+        t_str = str(r["time_str"] or "")
+        if not t_str and ts_val > 0:
+            t_str = datetime.fromtimestamp(ts_val).strftime("%H:%M:%S")
+        dt_str = datetime.fromtimestamp(ts_val).strftime("%d/%m %H:%M:%S") if ts_val > 0 else t_str
+        timestamps.append(t_str)
+        date_timestamps.append(dt_str)
+        epoch_ts.append(round(ts_val, 3))
+        cpu.append(round(float(r["cpu"] or 0.0), 2))
+        gpu.append(round(float(r["gpu"] or 0.0), 2))
+        ram.append(round(float(r["ram"] or 0.0), 2))
+        ram_total.append(round(float(r["ram_total"] or 0.0), 2))
+        net_rx.append(round(float(r["net_rx"] or 0.0), 2))
+        net_tx.append(round(float(r["net_tx"] or 0.0), 2))
+        disk_r.append(round(float(r["disk_r"] or 0.0), 2))
+        disk_w.append(round(float(r["disk_w"] or 0.0), 2))
+        disk_pct.append(round(float(r["disk_pct"] or 0.0), 1))
+    return {
+        "timestamps": timestamps,
+        "date_timestamps": date_timestamps,
+        "epoch_ts": epoch_ts,
+        "cpu": cpu,
+        "gpu": gpu,
+        "ram": ram,
+        "ram_total": ram_total,
+        "net_rx": net_rx,
+        "net_tx": net_tx,
+        "disk_r": disk_r,
+        "disk_w": disk_w,
+        "disk_pct": disk_pct,
+    }
+
+def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_sec=None, limit=180):
+    """Consulta el historial persistente de consumo desde recursos_history.db con soporte de retroceso y submuestreo."""
+    if not _TELEMETRY_HISTORY_INITIALIZED:
+        init_geoip_history_db()
+    try:
+        limit_val = max(20, min(int(limit or 180), 600))
+    except Exception:
+        limit_val = 180
+
+    b_ts = None
+    a_ts = None
+    w_sec = None
+    try:
+        if before_ts not in (None, "", "null", "undefined"):
+            b_ts = float(before_ts)
+    except Exception:
+        b_ts = None
+    try:
+        if after_ts not in (None, "", "null", "undefined"):
+            a_ts = float(after_ts)
+    except Exception:
+        a_ts = None
+    if window_sec not in (None, "", "live", "all", "null", "undefined"):
+        try:
+            w_val = float(window_sec)
+            if w_val > 0:
+                w_sec = w_val
+        except Exception:
+            w_sec = None
+    is_all_window = str(window_sec or "").strip().lower() == "all"
+
+    empty_series = _format_telemetry_rows_payload([])
+    with GEOIP_HISTORY_DB_LOCK:
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+
+            meta_row = cur.execute("""
+                SELECT COUNT(*) AS cnt, MIN(ts) AS min_ts, MAX(ts) AS max_ts
+                FROM telemetry_history
+            """).fetchone()
+            total_samples = int(meta_row["cnt"] or 0) if meta_row else 0
+            oldest_ts = float(meta_row["min_ts"]) if meta_row and meta_row["min_ts"] is not None else None
+            newest_ts = float(meta_row["max_ts"]) if meta_row and meta_row["max_ts"] is not None else None
+
+            if total_samples == 0:
+                conn.close()
+                return {
+                    "ok": True,
+                    "db_file": "recursos_history.db",
+                    "oldest_ts": None,
+                    "newest_ts": None,
+                    "window_start_ts": None,
+                    "window_end_ts": None,
+                    "total_samples": 0,
+                    "returned_samples": 0,
+                    "has_older": False,
+                    "has_newer": False,
+                    "series": empty_series,
+                }
+
+            where_clauses = []
+            params = []
+
+            if is_all_window:
+                raw_rows = cur.execute("""
+                    SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                    FROM telemetry_history
+                    ORDER BY ts ASC
+                """).fetchall()
+            elif w_sec is not None:
+                end_ref = b_ts if b_ts is not None else newest_ts
+                start_ref = max(oldest_ts or 0.0, float(end_ref) - w_sec)
+                raw_rows = cur.execute("""
+                    SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                    FROM telemetry_history
+                    WHERE ts >= ? AND ts <= ?
+                    ORDER BY ts ASC
+                """, (start_ref, end_ref)).fetchall()
+            elif a_ts is not None and b_ts is None:
+                raw_rows = cur.execute("""
+                    SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                    FROM telemetry_history
+                    WHERE ts >= ?
+                    ORDER BY ts ASC
+                    LIMIT ?
+                """, (a_ts, limit_val)).fetchall()
+            else:
+                if b_ts is not None:
+                    where_clauses.append("ts <= ?")
+                    params.append(b_ts)
+                if a_ts is not None:
+                    where_clauses.append("ts >= ?")
+                    params.append(a_ts)
+                where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+                desc_rows = cur.execute(f"""
+                    SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                    FROM telemetry_history
+                    {where_sql}
+                    ORDER BY ts DESC
+                    LIMIT ?
+                """, (*params, limit_val)).fetchall()
+                desc_rows.reverse()
+                raw_rows = desc_rows
+
+            # Si hay más muestras que el límite visual, submuestrear preservando extremos temporales y picos
+            if len(raw_rows) > limit_val:
+                bucket_size = len(raw_rows) / float(limit_val)
+                sampled = []
+                for idx in range(limit_val):
+                    start_i = int(idx * bucket_size)
+                    end_i = min(len(raw_rows), max(start_i + 1, int((idx + 1) * bucket_size)))
+                    chunk = raw_rows[start_i:end_i]
+                    if not chunk:
+                        continue
+                    if len(chunk) == 1:
+                        sampled.append(chunk[0])
+                    else:
+                        # Elegir el punto representativo con mayor carga combinada (o central si empata)
+                        rep = max(chunk, key=lambda r: float(r["cpu"] or 0.0) + float(r["ram"] or 0.0) + float(r["gpu"] or 0.0) + float(r["net_rx"] or 0.0))
+                        sampled.append(rep)
+                # Garantizar última muestra exacta en orden
+                if raw_rows and sampled and sampled[-1]["ts"] != raw_rows[-1]["ts"]:
+                    sampled[-1] = raw_rows[-1]
+                rows = sampled
+            else:
+                rows = raw_rows
+
+            conn.close()
+            series_obj = _format_telemetry_rows_payload(rows)
+            win_start = series_obj["epoch_ts"][0] if series_obj["epoch_ts"] else None
+            win_end = series_obj["epoch_ts"][-1] if series_obj["epoch_ts"] else None
+            has_older = bool(win_start is not None and oldest_ts is not None and win_start > (oldest_ts + 0.5))
+            has_newer = bool(win_end is not None and newest_ts is not None and win_end < (newest_ts - 0.5))
+            return {
+                "ok": True,
+                "db_file": "recursos_history.db",
+                "oldest_ts": oldest_ts,
+                "newest_ts": newest_ts,
+                "window_start_ts": win_start,
+                "window_end_ts": win_end,
+                "total_samples": total_samples,
+                "returned_samples": len(rows),
+                "has_older": has_older,
+                "has_newer": has_newer,
+                "series": series_obj,
+            }
+        except Exception as e:
+            print(f"[-] Error consultando telemetry_history en SQLite: {e}")
+            return {
+                "ok": False,
+                "error": str(e),
+                "db_file": "recursos_history.db",
+                "oldest_ts": None,
+                "newest_ts": None,
+                "window_start_ts": None,
+                "window_end_ts": None,
+                "total_samples": 0,
+                "returned_samples": 0,
+                "has_older": False,
+                "has_newer": False,
+                "series": empty_series,
+            }
 
 def save_geoip_locations_to_sqlite(entries_dict):
     """Persiste un lote de ubicaciones GeoIP resueltas en la tabla SQLite geoip_locations."""
@@ -3719,9 +4165,18 @@ def get_display_version(pkg_ver=None):
     env_disp = os.environ.get("RECURSOS_DISPLAY_VERSION", "").strip()
     if env_disp:
         return env_disp
-    if ver.startswith("12."):
-        return "2B." + ver[3:]
     return ver
+
+def _parse_semver_tuple(ver_str):
+    try:
+        clean = str(ver_str or "0").strip().lstrip("vV")
+        clean = clean.split("-")[0].split("+")[0]
+        parts = [int(p) for p in clean.split(".") if p.isdigit()]
+        while len(parts) < 3:
+            parts.append(0)
+        return tuple(parts[:3])
+    except Exception:
+        return (0, 0, 0)
 
 AUTO_INSTALL_CONFIG_FILE = os.path.join(BASE_DIR, "auto_install_config.json")
 AUTO_INSTALL_LOCK = threading.Lock()
@@ -3799,8 +4254,8 @@ def ensure_local_deb_built_and_installed(target_version=None):
             logs.append(f"[-] Error compilando paquete .deb: {e}")
 
     installed_ver = get_installed_deb_version()
-    if installed_ver == ver and os.path.isfile("/usr/bin/recursos-cockpit"):
-        logs.append(f"[✓] Aplicación de escritorio v{get_display_version(ver)} ya instalada y al día.")
+    if installed_ver and _parse_semver_tuple(installed_ver) >= _parse_semver_tuple(ver) and os.path.isfile("/usr/bin/recursos-cockpit"):
+        logs.append(f"[✓] Aplicación de escritorio v{get_display_version(installed_ver)} ya instalada y al día.")
         return True, "\n".join(logs)
 
     if os.path.isfile(deb_abs):
@@ -3886,6 +4341,7 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
                         cwd=BASE_DIR, capture_output=True, text=True, timeout=25
                     )
                     if p_pull.returncode != 0:
+                        # Guardar solo archivos rastreados; las bases de datos (.db) y caches en tiempo real nunca se tocan al actualizar
                         p_st = subprocess.run(["git", "stash", "push", "-m", "auto-updater-backup"], cwd=BASE_DIR, capture_output=True, text=True, timeout=10)
                         did_stash = (p_st.returncode == 0 and "No local changes" not in (p_st.stdout or ""))
                         p_pull = subprocess.run(
@@ -3973,8 +4429,13 @@ def auto_install_watcher_worker():
                 ver_target = get_app_version()
                 inst_ver = get_installed_deb_version()
                 deb_path = os.path.join(BASE_DIR, "dist", f"recursos-cockpit_{ver_target}_amd64.deb")
+                build_script = os.path.join(BASE_DIR, "packaging", "build_deb.sh")
                 in_perm_cooldown = (now_ts < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
-                if not in_perm_cooldown and (inst_ver != ver_target or not os.path.isfile(deb_path)):
+                if not in_perm_cooldown and os.path.isfile(build_script) and os.path.isfile("/usr/bin/recursos-cockpit") and (
+                    not inst_ver
+                    or _parse_semver_tuple(inst_ver) < _parse_semver_tuple(ver_target)
+                    or (_parse_semver_tuple(inst_ver) == _parse_semver_tuple(ver_target) and not os.path.isfile(deb_path))
+                ):
                     perform_auto_update_and_install(trigger_source="local_package_detected", do_git_pull=False)
 
                 info = get_version_info(force_refresh=True, allow_auto_trigger=False)
@@ -4046,6 +4507,7 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
     remote_msg = local_msg
     remote_date = local_date
     remote_author = "cminewarIA"
+    remote_version = pkg_version
     recent_commits = []
     github_reachable = False
 
@@ -4097,6 +4559,19 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
         except Exception:
             pass
 
+    # Obtener también versión SemVer canónica publicada en GitHub (VERSION en rama o latest release)
+    try:
+        raw_ver_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/VERSION"
+        req_rv = urllib.request.Request(raw_ver_url, headers={"User-Agent": "Recursos-Server-Monitor/12.0"})
+        with urllib.request.urlopen(req_rv, timeout=3.0) as rv_resp:
+            if rv_resp.status == 200:
+                rv_txt = rv_resp.read().decode("utf-8", errors="ignore").strip().lstrip("vV")
+                if rv_txt:
+                    remote_version = rv_txt
+                    github_reachable = True
+    except Exception:
+        pass
+
     if not recent_commits and local_recent_commits:
         recent_commits = local_recent_commits
 
@@ -4104,7 +4579,16 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
     update_available = False
     behind_count = 0
 
-    if has_git and github_reachable and remote_full_sha and local_full_sha and remote_full_sha != local_full_sha:
+    local_tuple = _parse_semver_tuple(pkg_version)
+    remote_tuple = _parse_semver_tuple(remote_version) if remote_version else local_tuple
+
+    if github_reachable and remote_version and remote_tuple > local_tuple:
+        update_available = True
+        ahead_of_remote = False
+    elif github_reachable and remote_version and local_tuple > remote_tuple:
+        ahead_of_remote = True
+        update_available = False
+    elif has_git and github_reachable and remote_full_sha and local_full_sha and remote_full_sha != local_full_sha:
         # Verificar si el commit remoto ya es ancestro de HEAD (es decir, el equipo local está por delante)
         try:
             p_anc = subprocess.run(
@@ -4140,7 +4624,7 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
 
     installed_deb_ver = get_installed_deb_version()
     package_installed = bool(installed_deb_ver)
-    package_needs_install = bool(installed_deb_ver != pkg_version)
+    package_needs_install = bool(not installed_deb_ver or _parse_semver_tuple(installed_deb_ver) < local_tuple)
     in_perm_cooldown = (now < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
 
     if (
@@ -4156,11 +4640,16 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
             daemon=True,
         ).start()
 
+    remote_disp = get_display_version(remote_version) if remote_version else disp_version
     pub_dom = detect_system_dns_domain()
     result = {
         "version": pkg_version,
         "current_version": pkg_version,
         "display_version": disp_version,
+        "server_version": pkg_version,
+        "server_display_version": disp_version,
+        "remote_version": remote_version,
+        "remote_display_version": remote_disp,
         "installed_deb_version": installed_deb_ver or pkg_version,
         "package_installed": package_installed,
         "package_needs_install": package_needs_install,
@@ -7665,7 +8154,7 @@ def background_collector():
             tx_bytes_sec = max(0, (curr_tx - last_tx) / dt)
             last_rx, last_tx = curr_rx, curr_tx
 
-            # Accumulate rolling 2-hour bandwidth history per NIC (15s fixed buckets, 480 buckets across 7200s)
+            # Accumulate rolling 20-minute bandwidth history per NIC (5s fixed buckets, 240 buckets across 1200s)
             with NIC_BANDWIDTH_LOCK:
                 now_ms = int(now * 1000)
                 bucket_ms = (now_ms // NIC_BUCKET_INTERVAL_MS) * NIC_BUCKET_INTERVAL_MS
@@ -7761,16 +8250,6 @@ def background_collector():
                 "write_total_bytes": curr_w
             }
             
-            HISTORY["timestamps"].append(sys_info.get("time_str", ""))
-            HISTORY["cpu"].append(cpu_info.get("usage_percent", 0))
-            HISTORY["gpu"].append(gpu_info.get("gpu_util_percent", 0) if gpu_info.get("available") else 0)
-            HISTORY["ram"].append(ram_info.get("percent", 0))
-            HISTORY["ram_total"].append(ram_info.get("total_used_percent", 0))
-            HISTORY["net_rx"].append(round(rx_bytes_sec / (1024 * 1024), 2))
-            HISTORY["net_tx"].append(round(tx_bytes_sec / (1024 * 1024), 2))
-            HISTORY["disk_r"].append(round(read_bytes_sec / (1024 * 1024), 2))
-            HISTORY["disk_w"].append(round(write_bytes_sec / (1024 * 1024), 2))
-
             tot_d_bytes = sum(float(d.get("total_bytes") or 0) for d in disks_info)
             used_d_bytes = sum(float(d.get("used_bytes") or 0) for d in disks_info)
             if tot_d_bytes > 0:
@@ -7782,11 +8261,45 @@ def background_collector():
                     disk_pct_val = round(float(psutil.disk_usage('/').percent), 1)
                 except Exception:
                     disk_pct_val = 0.0
-            HISTORY["disk_pct"].append(disk_pct_val)
-            
-            for k in HISTORY:
-                if len(HISTORY[k]) > MAX_HISTORY:
-                    HISTORY[k] = HISTORY[k][-MAX_HISTORY:]
+
+            t_str_sample = sys_info.get("time_str", "")
+            cpu_sample = round(float(cpu_info.get("usage_percent", 0) or 0.0), 2)
+            gpu_sample = round(float(gpu_info.get("gpu_util_percent", 0) if gpu_info.get("available") else 0), 2)
+            ram_sample = round(float(ram_info.get("percent", 0) or 0.0), 2)
+            ram_tot_sample = round(float(ram_info.get("total_used_percent", 0) or 0.0), 2)
+            net_rx_sample = round(rx_bytes_sec / (1024 * 1024), 2)
+            net_tx_sample = round(tx_bytes_sec / (1024 * 1024), 2)
+            disk_r_sample = round(read_bytes_sec / (1024 * 1024), 2)
+            disk_w_sample = round(write_bytes_sec / (1024 * 1024), 2)
+
+            _push_history_bucket(
+                now,
+                t_str_sample,
+                cpu_sample,
+                gpu_sample,
+                ram_sample,
+                ram_tot_sample,
+                net_rx_sample,
+                net_tx_sample,
+                disk_r_sample,
+                disk_w_sample,
+                disk_pct_val,
+                sync=True,
+            )
+
+            record_telemetry_sample_to_sqlite(
+                now,
+                t_str_sample,
+                cpu_sample,
+                gpu_sample,
+                ram_sample,
+                ram_tot_sample,
+                net_rx_sample,
+                net_tx_sample,
+                disk_r_sample,
+                disk_w_sample,
+                disk_pct_val,
+            )
             
             with DOCKER_LOCK:
                 systemd_acts = list(SYSTEMD_CACHE)
@@ -8108,11 +8621,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
         self.send_header(
             'Content-Security-Policy',
-            f"default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://maps.googleapis.com https://*.googleapis.com data: blob:; "
-            f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://maps.googleapis.com https://*.googleapis.com; "
+            f"default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org data: blob:; "
+            f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; "
             f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
             f"img-src 'self' data: blob: https: http:; "
-            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://maps.googleapis.com https://*.googleapis.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
+            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
             f"frame-src 'self' https://*.duckdns.org https://{dom} https://*.{dom}; "
             f"frame-ancestors {csp_ancestors};"
         )
@@ -8270,6 +8783,37 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(data)
             return
 
+        # 1a-bis. HISTORIAL PERSISTENTE DE CONSUMO DESDE SQLITE (recursos_history.db)
+        elif clean_path == "/api/metrics/history":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            query_str = self.path.split('?', 1)[1] if '?' in self.path else ''
+            params = urllib.parse.parse_qs(query_str)
+            before_ts = params.get('before_ts', [None])[0]
+            after_ts = params.get('after_ts', [None])[0]
+            window_sec = params.get('window_sec', params.get('window', [None]))[0]
+            limit_param = params.get('limit', [180])[0]
+            hist_payload = query_telemetry_history_from_sqlite(
+                before_ts=before_ts,
+                after_ts=after_ts,
+                window_sec=window_sec,
+                limit=limit_param,
+            )
+            resp = json.dumps(hist_payload).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # 1b. API VERSION & GITHUB SYNC STATUS
         elif clean_path == "/api/version":
             if not auth["is_trusted"]:
@@ -8375,9 +8919,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         # 1.1 CONFIGURACIÓN Y ESTADO DE MOTOR DE MAPAS (OpenStreetMap / CartoDB)
         elif clean_path == "/api/maps/config":
             resp = json.dumps({
+                "success": True,
                 "engine": "leaflet",
                 "provider": "OpenStreetMap",
-                "free": True
+                "free": True,
+                "requires_api_key": False
             }).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -9951,6 +10497,145 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # 6a-bis. Sincronización directa de web local desde la App Nativa de Ubuntu
+        elif clean_path == "/api/system/sync-web":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            body, err_code = self._read_json_body(max_bytes=16 * 1024 * 1024)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            ALLOWED_WEB_SYNC_FILES = {
+                "VERSION",
+                "package.json",
+                "static/index.html",
+                "static/manual.html",
+                "docs/index.html",
+                "static/favicon.ico",
+                "static/favicon.png",
+                "static/favicon-16x16.png",
+                "static/favicon-32x32.png",
+                "static/favicon-192x192.png",
+                "static/favicon-512x512.png",
+                "static/apple-touch-icon.png",
+            }
+            incoming_ver = str((body or {}).get("version") or "").strip().lstrip("vV")
+            force_sync = bool((body or {}).get("force", False))
+            files_map = (body or {}).get("files") or {}
+            sha_map = (body or {}).get("sha256") or {}
+
+            if not incoming_ver or not isinstance(files_map, dict) or not files_map:
+                resp = json.dumps({"success": False, "error": "Paquete web inválido o vacío."}).encode('utf-8')
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.send_security_headers()
+                self.send_header('Content-Length', str(len(resp)))
+                self.end_headers()
+                self.wfile.write(resp)
+                return
+
+            current_srv_ver = get_app_version()
+            if not force_sync and _parse_semver_tuple(incoming_ver) < _parse_semver_tuple(current_srv_ver):
+                resp = json.dumps({
+                    "success": False,
+                    "error": f"La versión recibida ({incoming_ver}) es inferior a la actual del servidor ({current_srv_ver}).",
+                    "server_version": current_srv_ver,
+                }).encode('utf-8')
+                self.send_response(409)
+                self.send_header('Content-Type', 'application/json')
+                self.send_security_headers()
+                self.send_header('Content-Length', str(len(resp)))
+                self.end_headers()
+                self.wfile.write(resp)
+                return
+
+            decoded_entries = []
+            try:
+                for rel_path, b64_val in files_map.items():
+                    clean_rel = str(rel_path or "").strip().lstrip("/")
+                    if clean_rel not in ALLOWED_WEB_SYNC_FILES:
+                        raise ValueError(f"Ruta no permitida en sincronización web: {clean_rel}")
+                    raw_bytes = base64.b64decode(str(b64_val), validate=True)
+                    expected_sha = str(sha_map.get(rel_path) or sha_map.get(clean_rel) or "").strip().lower()
+                    if expected_sha:
+                        actual_sha = hashlib.sha256(raw_bytes).hexdigest().lower()
+                        if actual_sha != expected_sha:
+                            raise ValueError(f"Suma SHA-256 inválida para {clean_rel}")
+                    decoded_entries.append((clean_rel, raw_bytes))
+            except Exception as val_err:
+                resp = json.dumps({"success": False, "error": str(val_err)}).encode('utf-8')
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.send_security_headers()
+                self.send_header('Content-Length', str(len(resp)))
+                self.end_headers()
+                self.wfile.write(resp)
+                return
+
+            written_files = []
+            try:
+                for clean_rel, raw_bytes in decoded_entries:
+                    abs_target = os.path.abspath(os.path.join(BASE_DIR, clean_rel))
+                    if not abs_target.startswith(os.path.abspath(BASE_DIR) + os.sep):
+                        raise ValueError(f"Ruta fuera del directorio base: {clean_rel}")
+                    os.makedirs(os.path.dirname(abs_target), exist_ok=True)
+                    tmp_target = abs_target + ".sync_tmp"
+                    with open(tmp_target, "wb") as tf:
+                        tf.write(raw_bytes)
+                    os.replace(tmp_target, abs_target)
+                    written_files.append(clean_rel)
+            except Exception as io_err:
+                resp = json.dumps({"success": False, "error": f"Error escribiendo archivos web: {io_err}"}).encode('utf-8')
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.send_security_headers()
+                self.send_header('Content-Length', str(len(resp)))
+                self.end_headers()
+                self.wfile.write(resp)
+                return
+
+            with VERSION_LOCK:
+                VERSION_CACHE["data"] = None
+                VERSION_CACHE["timestamp"] = 0
+            new_ver_info = get_version_info(force_refresh=True, allow_auto_trigger=False)
+
+            global METRICS_CACHE_BYTES
+            with METRICS_LOCK:
+                if isinstance(METRICS_CACHE, dict):
+                    METRICS_CACHE["version_info"] = new_ver_info
+                METRICS_CACHE_BYTES = b"{}"
+
+            now_str = datetime.now().strftime("%H:%M:%S")
+            disp_new = get_display_version(incoming_ver)
+            with AUTO_INSTALL_LOCK:
+                AUTO_INSTALL_STATE["last_installed_at"] = now_str
+                AUTO_INSTALL_STATE["last_status"] = f"Web local sincronizada · v{disp_new} ({now_str})"
+
+            resp = json.dumps({
+                "success": True,
+                "synced": True,
+                "previous_version": current_srv_ver,
+                "version": incoming_ver,
+                "updated_files": written_files,
+                "message": f"Web local actualizada en caliente a v{disp_new} ({len(written_files)} archivos).",
+                "version_info": new_ver_info,
+            }).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # 6b. Configurar preferencia de instalación automática al detectar
         elif clean_path == "/api/system/auto-update":
             auth = check_trust_status(self)
@@ -10132,7 +10817,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.send_security_headers()
                 self.end_headers()
                 return
-            resp = json.dumps({"success": True, "engine": "leaflet", "provider": "OpenStreetMap"}).encode('utf-8')
+            resp = json.dumps({
+                "success": True,
+                "engine": "leaflet",
+                "provider": "OpenStreetMap",
+                "free": True,
+                "requires_api_key": False
+            }).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
@@ -10197,6 +10888,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         return
 
 def run_server(port=8085):
+    preload_telemetry_history_from_sqlite()
     threading.Thread(target=fetch_gpu_worker, daemon=True).start()
     threading.Thread(target=fetch_disks_worker, daemon=True).start()
     threading.Thread(target=fetch_docker_worker, daemon=True).start()
