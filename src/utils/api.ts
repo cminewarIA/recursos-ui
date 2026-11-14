@@ -19,10 +19,11 @@ export function setStoredToken(token: string): void {
 export function detectNativeEnvironment(): {
   isUbuntuNative: boolean;
   isAndroidNative: boolean;
+  isAndroidTv: boolean;
   isNativeApp: boolean;
 } {
   if (typeof window === 'undefined') {
-    return { isUbuntuNative: false, isAndroidNative: false, isNativeApp: false };
+    return { isUbuntuNative: false, isAndroidNative: false, isAndroidTv: false, isNativeApp: false };
   }
   const ua = (navigator.userAgent || '').toLowerCase();
   const isUbuntuNative =
@@ -32,10 +33,20 @@ export function detectNativeEnvironment(): {
   const isAndroidNative =
     Boolean(window.__RECURSOS_ANDROID_NATIVE__) ||
     ua.includes('recursoscockpit-android') ||
-    Boolean(window.AndroidBridge);
+    Boolean(window.AndroidBridge) ||
+    Boolean(window.RecursosAndroidBridge);
+  const telemetryChassis = String(window.__RECURSOS_DEVICE_TELEMETRY__?.chassis_type || '').toLowerCase();
+  const bridgeTv = Boolean(window.RecursosAndroidBridge?.isTelevision?.());
+  const isAndroidTv =
+    Boolean(window.__RECURSOS_ANDROID_TV__) ||
+    bridgeTv ||
+    ua.includes('androidtv') ||
+    ua.includes('smarttv') ||
+    telemetryChassis.includes('tv');
   return {
     isUbuntuNative,
     isAndroidNative,
+    isAndroidTv,
     isNativeApp: isUbuntuNative || isAndroidNative,
   };
 }

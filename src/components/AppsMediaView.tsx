@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { LayoutGroup, motion } from 'motion/react';
 import {
   Box,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   ServerCog,
   Square,
 } from 'lucide-react';
+import { AccordionBody, COCKPIT_EASE, MorphPill, ViewStage } from './MotionPrimitives';
 import { DockerActivity, MetricsPayload, SystemdService } from '../types/telemetry';
 import { formatBytes, formatSpeed } from '../utils/formatters';
 
@@ -79,35 +81,40 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
   const torrentStats = metrics?.torrent_stats;
   const emby = metrics?.emby;
 
+  const subTabs: Array<{ id: AppsSubTab; label: string; icon: React.ReactNode }> = [
+    { id: 'services', label: 'Aplicaciones y servicios', icon: <Box className="h-4 w-4" /> },
+    { id: 'media', label: 'Descargas y multimedia', icon: <Film className="h-4 w-4" /> },
+  ];
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-slate-800 dark:bg-slate-900">
-          <button
-            type="button"
-            onClick={() => setSubTab('services')}
-            className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
-              subTab === 'services'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Box className="h-4 w-4" />
-            <span>Aplicaciones y servicios</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubTab('media')}
-            className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
-              subTab === 'media'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Film className="h-4 w-4" />
-            <span>Descargas y multimedia</span>
-          </button>
-        </div>
+        <LayoutGroup id="apps-subtabs">
+          <div className="cockpit-segmented flex items-center gap-1.5 p-1.5">
+            {subTabs.map((t) => {
+              const active = subTab === t.id;
+              return (
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  key={t.id}
+                  type="button"
+                  onClick={() => setSubTab(t.id)}
+                  className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+                    active
+                      ? 'text-sky-700 dark:text-sky-300'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                  }`}
+                >
+                  {active && <MorphPill layoutId="apps-subtab-pill" className="rounded-xl" />}
+                  <span className="relative z-10 inline-flex items-center gap-2">
+                    {t.icon}
+                    <span>{t.label}</span>
+                  </span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </LayoutGroup>
 
         {subTab === 'services' && (
           <div className="relative">
@@ -117,16 +124,18 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Filtrar aplicación o servicio..."
-              className="min-h-[44px] rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              className="cockpit-subtile min-h-[44px] pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
             />
           </div>
         )}
       </div>
 
+      <ViewStage tabKey={subTab}>
+
       {subTab === 'services' && (
         <div className="space-y-5">
           {/* Docker Containers */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <section className="cockpit-bento p-5">
             <div className="mb-4 flex items-center justify-between gap-2">
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
@@ -174,7 +183,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                               type="button"
                               disabled={busy}
                               onClick={() => onServiceAction('docker', c.name, 'start')}
-                              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+                              className="cockpit-btn-wol inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
                             >
                               <Play className="h-3.5 w-3.5" />
                               <span>Iniciar</span>
@@ -185,7 +194,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => onServiceAction('docker', c.name, 'restart')}
-                                className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                                className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                               >
                                 <RotateCw className="h-3.5 w-3.5" />
                                 <span>Reiniciar</span>
@@ -194,7 +203,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => onServiceAction('docker', c.name, 'stop')}
-                                className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+                                className="cockpit-btn-off inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
                               >
                                 <Square className="h-3.5 w-3.5" />
                                 <span>Detener</span>
@@ -215,7 +224,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                       </div>
 
                       {techOpen && (
-                        <div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs font-mono text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
+                        <div className="cockpit-subtile mt-2 p-3 text-xs font-mono text-slate-600 dark:text-slate-300">
                           <div>Imagen: {c.image || '--'}</div>
                           <div>Red: {c.net_io || '--'} · Disco: {c.block_io || '--'}</div>
                           <div>Estado exacto: {c.status || c.state || '--'}</div>
@@ -229,7 +238,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
           </section>
 
           {/* Systemd Services */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <section className="cockpit-bento p-5">
             <div className="mb-4 flex items-center gap-2">
               <ServerCog className="h-4 w-4 text-slate-500" />
               <div>
@@ -283,7 +292,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                           type="button"
                           disabled={busy}
                           onClick={() => onServiceAction('systemd', unitTarget, 'restart')}
-                          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                          className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
                           <RotateCw className="h-3.5 w-3.5" />
                           <span>Reiniciar</span>
@@ -301,8 +310,8 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
       {subTab === 'media' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* Emby / Multimedia */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <section className="cockpit-bento p-5">
+            <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                   Cine y multimedia en casa
@@ -317,23 +326,23 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
 
             {(emby?.movies_count || emby?.series_count || emby?.episodes_count) ? (
               <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="rounded-xl bg-slate-50 px-2 py-2 dark:bg-slate-800/60">
-                  <p className="font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                <div className="cockpit-pill-cyan rounded-xl px-2 py-2.5">
+                  <p className="font-mono text-sm font-bold tabular-nums">
                     {emby?.movies_count ?? emby?.library_counts?.['Películas'] ?? 0}
                   </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Películas</p>
+                  <p className="text-[11px] opacity-85">Películas</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-2 py-2 dark:bg-slate-800/60">
-                  <p className="font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                <div className="cockpit-pill-emerald rounded-xl px-2 py-2.5">
+                  <p className="font-mono text-sm font-bold tabular-nums">
                     {emby?.series_count ?? emby?.library_counts?.['Series'] ?? 0}
                   </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Series</p>
+                  <p className="text-[11px] opacity-85">Series</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-2 py-2 dark:bg-slate-800/60">
-                  <p className="font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                <div className="cockpit-pill-violet rounded-xl px-2 py-2.5">
+                  <p className="font-mono text-sm font-bold tabular-nums">
                     {emby?.episodes_count ?? emby?.library_counts?.['Episodios'] ?? 0}
                   </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Episodios</p>
+                  <p className="text-[11px] opacity-85">Episodios</p>
                 </div>
               </div>
             ) : null}
@@ -380,8 +389,8 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
           </section>
 
           {/* Torrents / Descargas */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <section className="cockpit-bento p-5">
+            <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                   Gestor de descargas
@@ -390,7 +399,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                   Bajada: {formatSpeed(torrentStats?.dl_info_speed)} · Subida: {formatSpeed(torrentStats?.up_info_speed)}
                 </p>
               </div>
-              <Download className="h-4 w-4 text-slate-400" />
+              <Download className="h-4 w-4 text-sky-600 dark:text-sky-400" />
             </div>
 
             {torrents.length === 0 ? (
@@ -398,19 +407,24 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                 No hay descargas activas en la cola.
               </p>
             ) : (
-              <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="mt-3 space-y-2.5">
                 {torrents.slice(0, 15).map((t) => {
                   const pct = Math.min(100, Math.max(0, Math.round(toNum(t.progress))));
                   return (
-                    <div key={t.hash} className="py-3">
+                    <div key={t.hash} className="cockpit-subtile p-3">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{t.name}</p>
-                        <span className="font-mono text-xs font-semibold tabular-nums text-slate-700 dark:text-slate-300">
+                        <span className="font-mono text-xs font-semibold tabular-nums text-sky-700 dark:text-sky-300">
                           {pct} %
                         </span>
                       </div>
-                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div className="h-full rounded-full bg-blue-600" style={{ width: `${pct}%` }} />
+                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.5, ease: COCKPIT_EASE }}
+                          className="cockpit-progress-fill h-full rounded-full bg-[#0284c7] dark:bg-[#38bdf8]"
+                        />
                       </div>
                       <p className="mt-1.5 text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
                         {formatBytes(t.size)} · ↓ {formatSpeed(t.dlspeed)} · ↑ {formatSpeed(t.upspeed)}
@@ -423,6 +437,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
           </section>
         </div>
       )}
+      </ViewStage>
     </div>
   );
 };

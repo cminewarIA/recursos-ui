@@ -1,7 +1,12 @@
 package com.cminewar.recursoscockpit.ui
 
 import android.annotation.SuppressLint
+import android.app.UiModeManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -12,10 +17,26 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,8 +47,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +76,8 @@ class RecursosAndroidBridge(
     private val currentModeProvider: () -> ConnectionMode,
     private val activeUrlProvider: () -> String,
     private val deviceTelemetryProvider: () -> String,
-    private val onTriggerRescan: () -> Unit
+    private val onTriggerRescan: () -> Unit,
+    private val isTvProvider: () -> Boolean = { false }
 ) {
     @JavascriptInterface
     fun getDeviceToken(): String {
@@ -82,9 +108,24 @@ class RecursosAndroidBridge(
     }
 
     @JavascriptInterface
+    fun isTelevision(): Boolean {
+        return isTvProvider()
+    }
+
+    @JavascriptInterface
     fun triggerNodeRescan() {
         onTriggerRescan()
     }
+}
+
+private fun detectTelevisionMode(context: Context): Boolean {
+    val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+    val isTvMode = uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+    val pm = context.packageManager
+    val hasLeanback = pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    @Suppress("DEPRECATION")
+    val hasTelevisionFeature = pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+    return isTvMode || hasLeanback || hasTelevisionFeature
 }
 
 private fun formatDisplayVersion(): String {
@@ -102,10 +143,40 @@ fun CockpitDashboard(
     deviceTelemetryProvider: () -> String,
     onRefresh: () -> Unit
 ) {
+    val context = LocalContext.current
+    val isTvDevice = remember(context) { detectTelevisionMode(context) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
     var isPageLoading by remember { mutableStateOf(true) }
     var lastLoadedBaseUrl by remember { mutableStateOf("") }
+    var refreshFocused by remember { mutableStateOf(false) }
+    var revokedBtnFocused by remember { mutableStateOf(false) }
+    val isDark = isSystemInDarkTheme()
+    val paletteBg = MaterialTheme.colorScheme.background
+    val paletteCard = MaterialTheme.colorScheme.surface
+    val paletteBorder = MaterialTheme.colorScheme.outline
+    val paletteTextPrimary = MaterialTheme.colorScheme.onSurface
+    val paletteTextSecondary = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val infiniteTransition = rememberInfiniteTransition(label = "cockpitPulse")
+    val sonarScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 2.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "sonarScale"
+    )
+    val sonarAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "sonarAlpha"
+    )
 
     BackHandler(enabled = canGoBack) {
         webViewRef?.goBack()
@@ -115,12 +186,21 @@ fun CockpitDashboard(
         val wv = webView ?: return
         val tokenEscaped = securePreferences.deviceToken.replace("'", "\\'")
         val telemetryJson = deviceTelemetryProvider().ifBlank { "{}" }
+        val tvFlag = if (isTvDevice) "true" else "false"
 
         val jsPayload = """
             (function() {
                 window.__RECURSOS_ANDROID_NATIVE__ = true;
+                window.__RECURSOS_ANDROID_TV__ = $tvFlag;
                 window.__RECURSOS_NATIVE__ = true;
                 window.__RECURSOS_NATIVE_PLATFORM__ = 'android';
+                if (document && document.documentElement) {
+                    if ($tvFlag) {
+                        document.documentElement.setAttribute('data-tv', 'true');
+                    } else {
+                        document.documentElement.removeAttribute('data-tv');
+                    }
+                }
                 try {
                     window.__RECURSOS_NATIVE_DEVICE_INFO__ = $telemetryJson;
                     window.__RECURSOS_DEVICE_TELEMETRY__ = window.__RECURSOS_NATIVE_DEVICE_INFO__;
@@ -154,21 +234,25 @@ fun CockpitDashboard(
     }
 
     Scaffold(
-        containerColor = CockpitBg,
+        containerColor = paletteBg,
         topBar = {
             Surface(
-                color = CockpitCard,
+                color = paletteCard,
                 tonalElevation = 0.dp,
-                shadowElevation = 0.dp,
+                shadowElevation = 2.dp,
+                shape = RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(width = 1.dp, color = CockpitBorder)
+                    .border(width = 1.dp, color = paletteBorder, shape = RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp))
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(
+                            horizontal = if (isTvDevice) 28.dp else 14.dp,
+                            vertical = if (isTvDevice) 12.dp else 9.dp
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -185,11 +269,24 @@ fun CockpitDashboard(
                             else -> NeonOrange
                         }
                         Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(statusColor)
-                        )
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(16.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .scale(sonarScale)
+                                    .alpha(sonarAlpha)
+                                    .clip(CircleShape)
+                                    .background(statusColor)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(statusColor)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = when (connectionMode) {
@@ -213,7 +310,7 @@ fun CockpitDashboard(
                             } else {
                                 scanningMessage
                             },
-                            color = TextSecondary,
+                            color = paletteTextSecondary,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             maxLines = 1,
@@ -223,27 +320,48 @@ fun CockpitDashboard(
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = formatDisplayVersion(),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextSecondary,
-                            fontFamily = FontFamily.Monospace
-                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isDark) Color(0xFF082F49) else Color(0xFFE0F2FE))
+                                .border(1.dp, if (isDark) Color(0xFF0284C7) else Color(0xFF7DD3FC), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = formatDisplayVersion(),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) Color(0xFF38BDF8) else NeonBlue,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
 
                         IconButton(
                             onClick = {
                                 onRefresh()
                                 webViewRef?.reload()
                             },
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier
+                                .size(if (isTvDevice) 38.dp else 34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    width = if (refreshFocused) 2.dp else 0.dp,
+                                    color = if (refreshFocused) (if (isDark) NeonSky else NeonBlue) else Color.Transparent,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .background(
+                                    if (refreshFocused) (if (isDark) NeonSky.copy(alpha = 0.16f) else NeonBlue.copy(alpha = 0.12f))
+                                    else Color.Transparent
+                                )
+                                .onFocusChanged { refreshFocused = it.isFocused }
+                                .focusable()
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "Volver a conectar",
-                                tint = NeonBlue,
+                                tint = if (isDark) NeonSky else NeonBlue,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -256,17 +374,19 @@ fun CockpitDashboard(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(CockpitBg)
+                .background(paletteBg)
         ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
-                factory = { context ->
-                    WebView(context).apply {
+                factory = { wvContext ->
+                    WebView(wvContext).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                        setBackgroundColor(android.graphics.Color.parseColor("#F6F7F9"))
+                        isFocusable = true
+                        isFocusableInTouchMode = true
+                        setBackgroundColor(android.graphics.Color.parseColor(if (isDark) "#020617" else "#F1F5F9"))
                         setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
                         settings.apply {
@@ -281,7 +401,11 @@ fun CockpitDashboard(
                             setSupportZoom(false)
                             builtInZoomControls = false
                             displayZoomControls = false
-                            userAgentString = "$userAgentString RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (NativeHTML; FullAccess)"
+                            if (isTvDevice) {
+                                textZoom = 110
+                            }
+                            val tvSuffix = if (isTvDevice) "; AndroidTV" else ""
+                            userAgentString = "$userAgentString RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (NativeHTML; FullAccess$tvSuffix)"
                         }
 
                         addJavascriptInterface(
@@ -290,10 +414,22 @@ fun CockpitDashboard(
                                 currentModeProvider = { connectionMode },
                                 activeUrlProvider = { activeUrl },
                                 deviceTelemetryProvider = deviceTelemetryProvider,
-                                onTriggerRescan = onRefresh
+                                onTriggerRescan = onRefresh,
+                                isTvProvider = { isTvDevice }
                             ),
                             "RecursosAndroidBridge"
                         )
+
+                        setOnKeyListener { view, keyCode, event ->
+                            if (event.action == KeyEvent.ACTION_DOWN) {
+                                if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
+                                    onRefresh()
+                                    (view as? WebView)?.reload()
+                                    return@setOnKeyListener true
+                                }
+                            }
+                            false
+                        }
 
                         webChromeClient = WebChromeClient()
                         webViewClient = object : WebViewClient() {
@@ -308,6 +444,9 @@ fun CockpitDashboard(
                                 isPageLoading = false
                                 canGoBack = view?.canGoBack() ?: false
                                 injectNativeContext(view)
+                                if (isTvDevice) {
+                                    view?.requestFocus()
+                                }
                             }
 
                             override fun onReceivedError(
@@ -334,52 +473,65 @@ fun CockpitDashboard(
                 }
             )
 
-            if (connectionMode == ConnectionMode.SCANNING_LAN || (isPageLoading && activeUrl.isEmpty())) {
+            AnimatedVisibility(
+                visible = connectionMode == ConnectionMode.SCANNING_LAN || (isPageLoading && activeUrl.isEmpty()),
+                enter = fadeIn(tween(240)) + scaleIn(initialScale = 0.96f, animationSpec = tween(260)),
+                exit = fadeOut(tween(220)) + scaleOut(targetScale = 0.97f, animationSpec = tween(220))
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(CockpitBg),
+                        .background(paletteBg),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(28.dp)
+                        modifier = Modifier
+                            .padding(28.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(paletteCard)
+                            .border(1.dp, paletteBorder, RoundedCornerShape(18.dp))
+                            .padding(horizontal = 32.dp, vertical = 28.dp)
                     ) {
                         Image(
                             painter = painterResource(id = R.mipmap.ic_launcher),
                             contentDescription = "CMineWar",
                             modifier = Modifier
                                 .size(64.dp)
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(16.dp))
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        CircularProgressIndicator(color = NeonBlue, strokeWidth = 3.dp)
+                        CircularProgressIndicator(color = if (isDark) NeonSky else NeonBlue, strokeWidth = 3.dp)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "Panel del Servidor",
-                            color = TextPrimary,
+                            color = paletteTextPrimary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = scanningMessage,
-                            color = TextSecondary,
+                            color = paletteTextSecondary,
                             fontSize = 13.sp
                         )
                     }
                 }
             }
 
-            if (connectionMode == ConnectionMode.REVOKED) {
+            AnimatedVisibility(
+                visible = connectionMode == ConnectionMode.REVOKED,
+                enter = fadeIn(tween(240)) + slideInVertically(initialOffsetY = { -40 }),
+                exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { -40 })
+            ) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .padding(16.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFFEF2F2))
-                        .border(1.dp, NeonRed.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(if (isDark) Color(0xFF450A0A) else Color(0xFFFEF2F2))
+                        .border(1.dp, NeonRed.copy(alpha = 0.45f), RoundedCornerShape(18.dp))
                         .padding(16.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -399,15 +551,22 @@ fun CockpitDashboard(
                             )
                             Text(
                                 text = "Este dispositivo fue desconectado desde el servidor. Conéctate a tu red Wi-Fi de casa y pulsa Reconectar.",
-                                color = TextPrimary,
+                                color = paletteTextPrimary,
                                 fontSize = 12.sp
                             )
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(NeonRed)
+                                .border(
+                                    width = if (revokedBtnFocused) 2.dp else 0.dp,
+                                    color = if (revokedBtnFocused) Color.White else Color.Transparent,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .onFocusChanged { revokedBtnFocused = it.isFocused }
+                                .focusable()
                                 .clickable { onRefresh() }
                                 .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {

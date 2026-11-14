@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LayoutGroup, motion } from 'motion/react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,6 +11,7 @@ import {
   Rewind,
   X,
 } from 'lucide-react';
+import { COCKPIT_SPRING, MorphPill } from './MotionPrimitives';
 import { ChartSeries, TelemetryChart } from './TelemetryChart';
 import { ExpandChartSpec } from './OverviewView';
 import { HistorySeries, MetricsPayload, TelemetryHistoryResponse, ThemeMode } from '../types/telemetry';
@@ -364,16 +366,24 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   const totalSpanSec = oldestTs && newestTs ? Math.max(1, newestTs - oldestTs) : 0;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-5 backdrop-blur-sm"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-5 backdrop-blur-sm"
       onClick={onClose}
     >
-      <div
-        className="w-full max-w-4xl max-h-[94vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={COCKPIT_SPRING}
+        className="cockpit-bento w-full max-w-4xl max-h-[94vh] overflow-y-auto p-4 sm:p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera */}
-        <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-200/70 dark:border-slate-800">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
@@ -381,14 +391,12 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
               </h2>
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                  isLiveNow
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
-                    : 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                  isLiveNow ? 'cockpit-pill-emerald' : 'cockpit-pill-cyan'
                 }`}
               >
                 {isLiveNow ? (
                   <>
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 cockpit-live-dot" />
                     Tiempo real
                   </>
                 ) : (
@@ -410,7 +418,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
             type="button"
             aria-label="Cerrar gráfica ampliada"
             onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="cockpit-subtile flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -419,59 +427,64 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         {/* Barra simétrica de ventanas temporales y modo táctil */}
         {hasMetricKeys && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Ventana temporal">
-              {WINDOW_PRESETS.map((p) => {
-                const active = preset === p.key;
-                return (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => selectPreset(p.key)}
-                    className={`min-h-[36px] rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      active
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                        : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
+            <LayoutGroup id="expanded-presets">
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Ventana temporal">
+                {WINDOW_PRESETS.map((p) => {
+                  const active = preset === p.key;
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => selectPreset(p.key)}
+                      className={`relative min-h-[36px] rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        active
+                          ? 'text-sky-700 dark:text-sky-300'
+                          : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {active && <MorphPill layoutId="expanded-preset-pill" className="rounded-xl" />}
+                      <span className="relative z-10">{p.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </LayoutGroup>
 
             <div className="flex items-center gap-1.5" role="group" aria-label="Modo de interacción táctil">
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 type="button"
                 onClick={() => setInteractionMode('inspect')}
-                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
+                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
                   interactionMode === 'inspect'
-                    ? 'bg-blue-600 text-white'
-                    : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300'
+                    ? 'cockpit-btn-accent'
+                    : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                 }`}
               >
                 <Crosshair className="h-3.5 w-3.5" />
                 <span>Inspeccionar</span>
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 type="button"
                 onClick={() => setInteractionMode('pan')}
-                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
+                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
                   interactionMode === 'pan'
-                    ? 'bg-blue-600 text-white'
-                    : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300'
+                    ? 'cockpit-btn-accent'
+                    : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                 }`}
               >
                 <MoveHorizontal className="h-3.5 w-3.5" />
                 <span>Deslizar tiempo</span>
-              </button>
+              </motion.button>
             </div>
           </div>
         )}
 
         {/* Lienzo principal de inspección táctil */}
-        <div className="relative mt-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+        <div className="cockpit-subtile relative mt-3 p-3">
           {loadingHistory && (
-            <div className="pointer-events-none absolute right-3 top-2 z-10 rounded-full bg-slate-900/80 px-2.5 py-0.5 text-[11px] font-medium text-white dark:bg-slate-800">
+            <div className="cockpit-pill-cyan pointer-events-none absolute right-3 top-2 z-10 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
               Cargando historial...
             </div>
           )}
@@ -509,13 +522,13 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
 
         {/* Controles táctiles de retroceso, avance y deslizador de línea de tiempo */}
         {hasMetricKeys && (
-          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40 space-y-3">
+          <div className="cockpit-subtile mt-3 p-3 space-y-3">
             {/* Deslizador cronológico completo */}
             {oldestTs !== null && newestTs !== null && totalSpanSec > 5 && (
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
                   <span className="inline-flex items-center gap-1 font-medium">
-                    <Database className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                    <Database className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
                     Línea temporal registrada ({formatEpochDateTime(oldestTs)} → {formatEpochDateTime(newestTs)})
                   </span>
                   <span className="font-mono font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
@@ -540,7 +553,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                       jumpToTimestampEnd(nextVal, preset === 'live' || preset === 'all' ? 1200 : activeWindowSec);
                     }, 90);
                   }}
-                  className="h-2 w-full cursor-pointer accent-blue-600 rounded-lg"
+                  className="h-2 w-full cursor-pointer accent-sky-600 dark:accent-sky-400 rounded-lg"
                 />
               </div>
             )}
@@ -577,10 +590,10 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
               <button
                 type="button"
                 onClick={() => selectPreset('live')}
-                className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
+                className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
                   isLiveNow
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200'
+                    ? 'cockpit-pill-emerald'
+                    : 'cockpit-btn-accent'
                 }`}
               >
                 <Radio className="h-4 w-4" />
@@ -604,7 +617,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
             {windowStats.map((st) => (
               <div
                 key={st.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-800/50"
+                className="cockpit-subtile flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs"
               >
                 <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: st.color }} />
@@ -621,8 +634,8 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

@@ -77,6 +77,72 @@ function formatEpochTick(epochSec: number, spanSec: number): string {
   return `${hh}:${mm}`;
 }
 
+function traceMonotoneSpline(
+  ctx: CanvasRenderingContext2D,
+  pts: Array<{ x: number; y: number }>,
+  startWithMoveTo = true
+): void {
+  const n = pts.length;
+  if (n === 0) return;
+  if (startWithMoveTo) ctx.moveTo(pts[0].x, pts[0].y);
+  else ctx.lineTo(pts[0].x, pts[0].y);
+
+  if (n === 1) return;
+  if (n === 2) {
+    ctx.lineTo(pts[1].x, pts[1].y);
+    return;
+  }
+
+  // Fritsch-Carlson monotone cubic Hermite interpolation:
+  // pasa EXACTAMENTE por cada punto pts[i] sin flotar encima ni debajo de los picos.
+  const dx: number[] = new Array(n - 1);
+  const dy: number[] = new Array(n - 1);
+  const slope: number[] = new Array(n - 1);
+
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = Math.max(0.0001, pts[i + 1].x - pts[i].x);
+    dy[i] = pts[i + 1].y - pts[i].y;
+    slope[i] = dy[i] / dx[i];
+  }
+
+  const m: number[] = new Array(n);
+  m[0] = slope[0];
+  m[n - 1] = slope[n - 2];
+
+  for (let i = 1; i < n - 1; i++) {
+    if (slope[i - 1] * slope[i] <= 0) {
+      m[i] = 0;
+    } else {
+      m[i] = (slope[i - 1] + slope[i]) * 0.5;
+    }
+  }
+
+  for (let i = 0; i < n - 1; i++) {
+    if (Math.abs(slope[i]) < 1e-6) {
+      m[i] = 0;
+      m[i + 1] = 0;
+    } else {
+      const a = m[i] / slope[i];
+      const b = m[i + 1] / slope[i];
+      const h = Math.hypot(a, b);
+      if (h > 3) {
+        const t = 3 / h;
+        m[i] = t * a * slope[i];
+        m[i + 1] = t * b * slope[i];
+      }
+    }
+  }
+
+  for (let i = 0; i < n - 1; i++) {
+    const segDx = dx[i] / 3;
+    const cp1x = pts[i].x + segDx;
+    const cp1y = pts[i].y + m[i] * segDx;
+    const cp2x = pts[i + 1].x - segDx;
+    const cp2y = pts[i + 1].y - m[i + 1] * segDx;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pts[i + 1].x, pts[i + 1].y);
+  }
+}
+
 export const TelemetryChart: React.FC<TelemetryChartProps> = ({
   series,
   timestamps = [],
@@ -110,6 +176,10 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 320, height });
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
+  const animPhaseRef = useRef<number>(0);
+  const mountStartMsRef = useRef<number>(0);
+  const mountRevealedRef = useRef<boolean>(false);
+  const drawChartRef = useRef<() => void>(() => {});
 
   const sampleCount = useMemo(() => {
     let maxLen = 0;
@@ -198,23 +268,26 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
     const plotW = Math.max(20, w - padL - padR);
     const plotH = Math.max(20, h - padT - padB);
 
-    const gridColor = theme === 'dark' ? 'rgba(148, 163, 184, 0.13)' : 'rgba(15, 23, 42, 0.07)';
-    const topLineColor = theme === 'dark' ? 'rgba(148, 163, 184, 0.22)' : 'rgba(15, 23, 42, 0.13)';
-    const axisLabelColor = theme === 'dark' ? 'rgba(148, 163, 184, 0.86)' : 'rgba(71, 85, 105, 0.9)';
-    const peakLabelColor = theme === 'dark' ? 'rgba(241, 245, 249, 0.96)' : 'rgba(15, 23, 42, 0.95)';
-    const crosshairColor = theme === 'dark' ? 'rgba(226, 232, 240, 0.35)' : 'rgba(15, 23, 42, 0.25)';
+    const gridColor = theme === 'dark' ? 'rgba(51, 65, 85, 0.55)' : 'rgba(203, 213, 225, 0.85)';
+    const topLineColor = theme === 'dark' ? 'rgba(71, 85, 105, 0.7)' : 'rgba(203, 213, 225, 0.95)';
+    const axisLabelColor = theme === 'dark' ? 'rgba(148, 163, 184, 0.9)' : 'rgba(100, 116, 139, 0.95)';
+    const peakLabelColor = theme === 'dark' ? 'rgba(125, 211, 252, 0.98)' : 'rgba(2, 132, 199, 0.98)';
+    const crosshairColor = theme === 'dark' ? 'rgba(56, 189, 248, 0.5)' : 'rgba(2, 132, 199, 0.42)';
 
-    // Horizontal grid lines + Left (and optional Right) Y-axis scale labels
+    // Horizontal grid lines (dashed 4-6 style matching SVG assets) + Left/Right Y-axis scale labels
     ctx.font = fontAxis;
     ctx.textBaseline = 'middle';
     gridFracs.forEach((frac, i) => {
       const gy = Math.round(padT + plotH * frac) + 0.5;
+      ctx.save();
       ctx.strokeStyle = frac === 0 || frac === 1 ? topLineColor : gridColor;
       ctx.lineWidth = 1;
+      if (frac > 0 && frac < 1) ctx.setLineDash([4, 6]);
       ctx.beginPath();
       ctx.moveTo(padL, gy);
       ctx.lineTo(padL + plotW, gy);
       ctx.stroke();
+      ctx.restore();
 
       ctx.textAlign = 'right';
       ctx.fillStyle = frac === 0 && leftUnit !== '%' ? peakLabelColor : axisLabelColor;
@@ -243,7 +316,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       return padL + (sampleCount > 1 ? (globalIdx / (sampleCount - 1)) * plotW : plotW);
     };
 
-    // Vertical grid lines + X-axis Time scale ticks
+    // Vertical grid lines (dashed 4-6) + X-axis Time scale ticks
     const tickCount = plotW < 230 ? 3 : plotW < 400 ? 4 : 5;
     ctx.font = fontAxis;
     ctx.textBaseline = 'top';
@@ -251,12 +324,15 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       const frac = tickCount > 1 ? ti / (tickCount - 1) : 0;
       const gx = Math.round(padL + frac * plotW) + 0.5;
       if (ti > 0 && ti < tickCount - 1) {
+        ctx.save();
         ctx.strokeStyle = gridColor;
         ctx.lineWidth = 1;
+        ctx.setLineDash([4, 6]);
         ctx.beginPath();
         ctx.moveTo(gx, padT);
         ctx.lineTo(gx, padT + plotH);
         ctx.stroke();
+        ctx.restore();
       }
 
       let xLabel = '';
@@ -294,52 +370,126 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       return { x, y };
     };
 
-    // Draw each series smoothly
-    for (const s of series) {
-      if (!s.data || s.data.length < 2) continue;
-      const pts = s.data.map((_, i) => getPointXY(s, i));
+    const computedSeries = series
+      .filter((s) => s.data && s.data.length >= 2)
+      .map((s) => ({
+        s,
+        pts: s.data.map((_, i) => getPointXY(s, i)),
+      }));
 
-      // Area fill if fillAlpha > 0
-      const fillAlpha = s.fillAlpha ?? (s.dashed ? 0 : 0.14);
+    // Smooth horizontal clip reveal on initial mount
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    let revealFrac = 1;
+    if (!prefersReduced && !mountRevealedRef.current) {
+      if (mountStartMsRef.current === 0) mountStartMsRef.current = performance.now();
+      const rawT = Math.min(1, (performance.now() - mountStartMsRef.current) / 560);
+      revealFrac = 1 - Math.pow(1 - rawT, 3);
+      if (rawT >= 1) mountRevealedRef.current = true;
+    }
+
+    ctx.save();
+    if (revealFrac < 1) {
+      ctx.beginPath();
+      ctx.rect(padL - 4, 0, (plotW + padR + 8) * revealFrac, h);
+      ctx.clip();
+    }
+
+    // 1. Draw gradient area fills under every curve first
+    for (const { s, pts } of computedSeries) {
+      const fillAlpha = s.fillAlpha ?? (s.dashed ? 0 : 0.16);
       if (fillAlpha > 0) {
         const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
         grad.addColorStop(0, `${s.color}${Math.round(fillAlpha * 255).toString(16).padStart(2, '0')}`);
         grad.addColorStop(1, `${s.color}00`);
         ctx.beginPath();
         ctx.moveTo(pts[0].x, padT + plotH);
-        ctx.lineTo(pts[0].x, pts[0].y);
-        for (let i = 0; i < pts.length - 1; i++) {
-          const xc = (pts[i].x + pts[i + 1].x) / 2;
-          const yc = (pts[i].y + pts[i + 1].y) / 2;
-          ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
-        }
-        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        traceMonotoneSpline(ctx, pts, false);
         ctx.lineTo(pts[pts.length - 1].x, padT + plotH);
         ctx.closePath();
         ctx.fillStyle = grad;
         ctx.fill();
       }
+    }
 
-      // Stroke line
+    // 2. Stroke smooth monotone spline lines (exact knot alignment, zero overshoot)
+    for (const { s, pts } of computedSeries) {
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const xc = (pts[i].x + pts[i + 1].x) / 2;
-        const yc = (pts[i].y + pts[i + 1].y) / 2;
-        ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
-      }
-      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+      traceMonotoneSpline(ctx, pts, true);
       ctx.strokeStyle = s.color;
-      ctx.lineWidth = s.dashed ? 1.6 : 2.1;
+      ctx.lineWidth = s.dashed ? 1.6 : 2.2;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       if (s.dashed) ctx.setLineDash([5, 4]);
       ctx.stroke();
+
+      // Luminous traveling wave overlay clipped onto the EXACT full spline (0.00px deviation)
+      if (!s.dashed && pts.length >= 6 && revealFrac >= 1) {
+        const sweepFrac = animPhaseRef.current % 1;
+        const winStartX = padL + Math.max(0, sweepFrac - 0.14) * plotW;
+        const winEndX = padL + Math.min(1, sweepFrac + 0.04) * plotW;
+        if (winEndX > winStartX) {
+          const glowGrad = ctx.createLinearGradient(winStartX, 0, winEndX, 0);
+          const highlightColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.36)' : 'rgba(255, 255, 255, 0.58)';
+          glowGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+          glowGrad.addColorStop(0.55, highlightColor);
+          glowGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          ctx.beginPath();
+          traceMonotoneSpline(ctx, pts, true);
+          ctx.strokeStyle = glowGrad;
+          ctx.lineWidth = 2.2;
+          ctx.stroke();
+        }
+      }
       ctx.restore();
     }
 
-    // Hover / touch crosshair & highlighted sample points
+    const dotBgFill = theme === 'dark' ? '#0f172a' : '#ffffff';
+
+    // 3. Draw sample vertices & pulsing live beacon STRICTLY ON TOP OF all lines and right ON the curve knots
+    const pulseWave = 0.5 + 0.5 * Math.sin(animPhaseRef.current * Math.PI * 2);
+    for (const { s, pts } of computedSeries) {
+      if (s.dashed) continue;
+      const minSpacingPx = 11;
+      let lastDrawnX = -Infinity;
+
+      // Key sample vertices centered directly over the spline (decimated cleanly when dense)
+      for (let i = 0; i < pts.length - 1; i++) {
+        const pt = pts[i];
+        if (pt.x - lastDrawnX < minSpacingPx) continue;
+        lastDrawnX = pt.x;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 2.35, 0, Math.PI * 2);
+        ctx.fillStyle = s.color;
+        ctx.fill();
+        ctx.lineWidth = 1.25;
+        ctx.strokeStyle = dotBgFill;
+        ctx.stroke();
+      }
+
+      // Live tip point + animated sonar halo right ON the final knot of the line
+      const tip = pts[pts.length - 1];
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, 4.2 + pulseWave * 4.8, 0, Math.PI * 2);
+      ctx.fillStyle = `${s.color}${Math.round((0.32 - pulseWave * 0.24) * 255).toString(16).padStart(2, '0')}`;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, 3.6, 0, Math.PI * 2);
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = dotBgFill;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.restore();
+
+    // 4. Hover / touch crosshair & highlighted active sample points (top-most layer, exact knot coordinates)
     if (hoverIdx !== null && hoverIdx >= 0 && hoverIdx < sampleCount) {
       const xPos = getXForGlobalIndex(hoverIdx);
       ctx.save();
@@ -352,29 +502,50 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       ctx.stroke();
       ctx.restore();
 
-      for (const s of series) {
+      for (const { s, pts } of computedSeries) {
         const localIdx = hoverIdx - (sampleCount - s.data.length);
-        if (localIdx < 0 || localIdx >= s.data.length) continue;
-        const pt = getPointXY(s, localIdx);
+        if (localIdx < 0 || localIdx >= pts.length) continue;
+        const pt = pts[localIdx];
         ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 5.5, 0, Math.PI * 2);
-        ctx.fillStyle = theme === 'dark' ? '#111827' : '#ffffff';
+        ctx.arc(pt.x, pt.y, 5.8, 0, Math.PI * 2);
+        ctx.fillStyle = dotBgFill;
         ctx.fill();
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.2;
         ctx.strokeStyle = s.color;
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI * 2);
+        ctx.arc(pt.x, pt.y, 2.8, 0, Math.PI * 2);
         ctx.fillStyle = s.color;
         ctx.fill();
       }
     }
   }, [size, series, sampleCount, computedMaxLeft, maxRight, leftUnit, hasRightAxis, validEpochRange, timestamps, dateTimestamps, intervalSec, theme, hoverIdx]);
 
+  drawChartRef.current = drawChart;
+
   useEffect(() => {
     drawChart();
   }, [drawChart]);
+
+  // Continuous lightweight 30fps live animation loop (sonar tip beacon + subtle wave sweep)
+  useEffect(() => {
+    if (sampleCount < 2 || typeof window === 'undefined') return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let rafId = 0;
+    let lastTick = 0;
+    const step = (ts: number) => {
+      rafId = window.requestAnimationFrame(step);
+      if (document.hidden) return;
+      if (ts - lastTick < 34) return;
+      lastTick = ts;
+      animPhaseRef.current = (ts / 2400) % 1;
+      drawChartRef.current();
+    };
+    rafId = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(rafId);
+  }, [sampleCount]);
 
   const updatePointer = useCallback(
     (clientX: number, clientY: number) => {

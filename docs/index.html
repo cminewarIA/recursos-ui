@@ -7,9 +7,9 @@
   <link rel="icon" type="image/png" href="/favicon-32x32.png" />
   <style>
     :root {
-      --bg: #f8fafc;
+      --bg: #f1f5f9;
       --bg-elevated: #ffffff;
-      --bg-subtle: #f1f5f9;
+      --bg-subtle: #f8fafc;
       --border: #e2e8f0;
       --border-strong: #cbd5e1;
       --text: #0f172a;
@@ -17,20 +17,20 @@
       --text-soft: #64748b;
       --accent: #0284c7;
       --accent-soft: rgba(2, 132, 199, 0.12);
-      --emerald: #059669;
-      --emerald-soft: rgba(5, 150, 105, 0.12);
-      --amber: #d97706;
-      --amber-soft: rgba(217, 119, 6, 0.12);
-      --rose: #dc2626;
-      --rose-soft: rgba(220, 38, 38, 0.12);
+      --emerald: #10b981;
+      --emerald-soft: rgba(16, 185, 129, 0.14);
+      --amber: #f59e0b;
+      --amber-soft: rgba(245, 158, 11, 0.14);
+      --rose: #ef4444;
+      --rose-soft: rgba(239, 68, 68, 0.13);
       --violet: #7c3aed;
-      --violet-soft: rgba(124, 58, 237, 0.12);
+      --violet-soft: rgba(124, 58, 237, 0.13);
       --code-bg: #0f172a;
       --code-text: #e2e8f0;
-      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-      --shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.08);
-      --radius: 16px;
-      --radius-sm: 10px;
+      --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 12px 28px -8px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+      --radius-sm: 12px;
       --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
@@ -678,7 +678,7 @@
         <div>
           <div class="brand-title">Manual Interactivo · Panel de Recursos</div>
           <div class="brand-sub">
-            <span class="pill accent mono" id="manualVersionBadge">v12.4.0</span>
+            <span class="pill accent mono" id="manualVersionBadge">v12.6.0</span>
             <span class="pill emerald" id="liveServerBadge">Modo autónomo</span>
           </div>
         </div>
@@ -1040,12 +1040,12 @@
           <div class="panel-box">
             <div style="font-size:14px; font-weight:700; margin-bottom:10px;">Descarga directa y actualización limpia</div>
             <div style="display:grid; gap:8px; margin-bottom:12px;">
-              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.4.0</a>
-              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android (.apk) · 12.4.0</a>
+              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.6.0</a>
+              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android &amp; Android TV (.apk) · 12.6.0</a>
             </div>
             <div class="code-wrap">
               <button type="button" class="copy-btn" data-copy-target="cmdInstallBlock">Copiar</button>
-              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.4.0_amd64.deb</pre>
+              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.6.0_amd64.deb</pre>
             </div>
           </div>
         </div>
@@ -1162,7 +1162,7 @@
 
       function setVersionText(ver, extra) {
         const badge = document.getElementById('manualVersionBadge');
-        if (badge) badge.textContent = 'v' + (ver || '12.4.0') + (extra ? ' · ' + extra : '');
+        if (badge) badge.textContent = 'v' + (ver || '12.6.0') + (extra ? ' · ' + extra : '');
       }
 
       if (window.__INITIAL_APP_VERSION__) {
@@ -1186,7 +1186,7 @@
           if (r.ok) {
             const d = await r.json();
             serverOnline = true;
-            setVersionText(d.current_version || '12.4.0', d.local_commit || '');
+            setVersionText(d.current_version || '12.6.0', d.local_commit || '');
             const b = document.getElementById('liveServerBadge');
             b.textContent = 'Conectado al nodo en vivo';
             b.className = 'pill emerald';
@@ -1414,41 +1414,82 @@
         const gridColor = isDark ? 'rgba(148,163,184,0.14)' : 'rgba(15,23,42,0.08)';
         const textColor = isDark ? '#94a3b8' : '#64748b';
         const ioColor = isDark ? '#38bdf8' : '#0284c7';
-        const pctColor = isDark ? '#fbbf24' : '#d97706';
+        const pctColor = isDark ? '#fbbf24' : '#f59e0b';
+        const dotRing = isDark ? '#0f172a' : '#ffffff';
 
-        // Rejilla
-        ctx.strokeStyle = gridColor;
+        const n = simSeries.length;
+        const maxIo = Math.max(50, ...simSeries.map(function (p) { return p.io; }));
+
+        // Rejilla sincronizada exactamente con maxIo real
         ctx.fillStyle = textColor;
-        ctx.font = '10px monospace';
+        ctx.font = '600 10px ui-monospace, monospace';
         for (let i = 0; i <= 4; i++) {
           const y = padT + (ch * i) / 4;
+          ctx.save();
+          ctx.strokeStyle = gridColor;
+          if (i > 0 && i < 4) ctx.setLineDash([4, 6]);
           ctx.beginPath();
           ctx.moveTo(padL, y);
           ctx.lineTo(w - padR, y);
           ctx.stroke();
-          const ioLbl = Math.round(500 * (1 - i / 4)) + 'M';
+          ctx.restore();
+          const ioLbl = Math.round(maxIo * (1 - i / 4)) + 'M';
           const pctLbl = Math.round(100 * (1 - i / 4)) + '%';
           ctx.fillText(ioLbl, 4, y + 3);
           ctx.fillText(pctLbl, w - padR + 6, y + 3);
         }
 
-        const n = simSeries.length;
-        const maxIo = Math.max(100, ...simSeries.map(function (p) { return p.io; })) * 1.15;
-
-        // Área MB/s
-        ctx.beginPath();
-        simSeries.forEach(function (pt, idx) {
-          const x = padL + (idx / (n - 1)) * cw;
-          const y = padT + ch - Math.min(1, pt.io / maxIo) * ch;
-          if (idx === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+        const ioPts = simSeries.map(function (pt, idx) {
+          return {
+            x: padL + (idx / Math.max(1, n - 1)) * cw,
+            y: padT + ch - Math.min(1, Math.max(0, pt.io / maxIo)) * ch
+          };
         });
-        ctx.strokeStyle = ioColor;
-        ctx.lineWidth = 2.2;
-        ctx.stroke();
+        const pctPts = simSeries.map(function (pt, idx) {
+          return {
+            x: padL + (idx / Math.max(1, n - 1)) * cw,
+            y: padT + ch - Math.min(1, Math.max(0, pt.pct / 100)) * ch
+          };
+        });
 
-        ctx.lineTo(padL + cw, padT + ch);
-        ctx.lineTo(padL, padT + ch);
+        function traceMonotone(pts, startMove) {
+          if (!pts.length) return;
+          if (startMove) ctx.moveTo(pts[0].x, pts[0].y);
+          else ctx.lineTo(pts[0].x, pts[0].y);
+          if (pts.length === 2) {
+            ctx.lineTo(pts[1].x, pts[1].y);
+            return;
+          }
+          const k = pts.length;
+          const dx = [], slope = [], tang = new Array(k);
+          for (let i = 0; i < k - 1; i++) {
+            dx.push(Math.max(1e-4, pts[i + 1].x - pts[i].x));
+            slope.push((pts[i + 1].y - pts[i].y) / dx[i]);
+          }
+          tang[0] = slope[0];
+          tang[k - 1] = slope[k - 2];
+          for (let i = 1; i < k - 1; i++) {
+            tang[i] = (slope[i - 1] * slope[i] <= 0) ? 0 : (slope[i - 1] + slope[i]) * 0.5;
+          }
+          for (let i = 0; i < k - 1; i++) {
+            if (slope[i] === 0) { tang[i] = 0; tang[i + 1] = 0; }
+            else {
+              const a = tang[i] / slope[i], b = tang[i + 1] / slope[i], h = Math.hypot(a, b);
+              if (h > 3) { const t = 3 / h; tang[i] = t * a * slope[i]; tang[i + 1] = t * b * slope[i]; }
+            }
+            const c1x = pts[i].x + dx[i] / 3;
+            const c1y = pts[i].y + (tang[i] * dx[i]) / 3;
+            const c2x = pts[i + 1].x - dx[i] / 3;
+            const c2y = pts[i + 1].y - (tang[i + 1] * dx[i]) / 3;
+            ctx.bezierCurveTo(c1x, c1y, c2x, c2y, pts[i + 1].x, pts[i + 1].y);
+          }
+        }
+
+        // 1. Degradado debajo de MB/s
+        ctx.beginPath();
+        ctx.moveTo(ioPts[0].x, padT + ch);
+        traceMonotone(ioPts, false);
+        ctx.lineTo(ioPts[ioPts.length - 1].x, padT + ch);
         ctx.closePath();
         const grad = ctx.createLinearGradient(0, padT, 0, padT + ch);
         grad.addColorStop(0, isDark ? 'rgba(56,189,248,0.28)' : 'rgba(2,132,199,0.20)');
@@ -1456,27 +1497,61 @@
         ctx.fillStyle = grad;
         ctx.fill();
 
-        // Línea discontinua % Espacio Usado
+        // 2. Línea spline monótona MB/s (pasa 100% por cada vértice)
+        ctx.beginPath();
+        traceMonotone(ioPts, true);
+        ctx.strokeStyle = ioColor;
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+
+        // 3. Línea discontinua % Espacio Usado
         ctx.save();
         ctx.setLineDash([5, 4]);
         ctx.beginPath();
-        simSeries.forEach(function (pt, idx) {
-          const x = padL + (idx / (n - 1)) * cw;
-          const y = padT + ch - Math.min(1, pt.pct / 100) * ch;
-          if (idx === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
+        traceMonotone(pctPts, true);
         ctx.strokeStyle = pctColor;
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
 
-        if (hoverIdx !== null && simSeries[hoverIdx]) {
-          const pt = simSeries[hoverIdx];
-          const hx = padL + (hoverIdx / (n - 1)) * cw;
-          const hy = padT + ch - Math.min(1, pt.io / maxIo) * ch;
+        // 4. Puntos de muestra siempre ENCIMA de la línea y centrados en los vértices exactos
+        let lastX = -999;
+        for (let i = 0; i < ioPts.length - 1; i++) {
+          if (ioPts[i].x - lastX < 14) continue;
+          lastX = ioPts[i].x;
           ctx.beginPath();
-          ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+          ctx.arc(ioPts[i].x, ioPts[i].y, 2.4, 0, Math.PI * 2);
+          ctx.fillStyle = ioColor;
+          ctx.fill();
+          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = dotRing;
+          ctx.stroke();
+        }
+        const tip = ioPts[ioPts.length - 1];
+        const phase = 0.5 + 0.5 * Math.sin(Date.now() / 380);
+        ctx.beginPath();
+        ctx.arc(tip.x, tip.y, 4.5 + phase * 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = isDark ? 'rgba(56, 189, 248, 0.25)' : 'rgba(2, 132, 199, 0.22)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(tip.x, tip.y, 3.6, 0, Math.PI * 2);
+        ctx.fillStyle = ioColor;
+        ctx.fill();
+        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = dotRing;
+        ctx.stroke();
+
+        if (hoverIdx !== null && ioPts[hoverIdx]) {
+          const pt = ioPts[hoverIdx];
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 5.5, 0, Math.PI * 2);
+          ctx.fillStyle = dotRing;
+          ctx.fill();
+          ctx.lineWidth = 2.2;
+          ctx.strokeStyle = ioColor;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 2.8, 0, Math.PI * 2);
           ctx.fillStyle = ioColor;
           ctx.fill();
         }
@@ -1678,18 +1753,18 @@
             'Desbloquea en exclusiva "Pantalla móvil USB (DeX)" mediante adb, scrcpy y /dev/uhid.',
             'Paquete firmado con GPG (_gpgorigin) compatible con apt y Ubuntu App Center.'
           ],
-          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.4.0_amd64.deb'
+          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.6.0_amd64.deb'
         },
         android: {
-          title: 'App Nativa Android (.apk)',
-          level: 'FULL_NATIVE_ACCESS · Zero-Config Auto LAN/WAN',
+          title: 'App Nativa Android & Android TV (.apk)',
+          level: 'FULL_NATIVE_ACCESS · Zero-Config Auto LAN/WAN + Leanback TV',
           bullets: [
-            'Jetpack Compose + WebView acelerado por hardware con barra superior táctica.',
-            'Almacenamiento de tokens HMAC en EncryptedSharedPreferences (AES256-GCM).',
-            'Conmutación transparente entre red Wi-Fi local y dominio DuckDNS al salir de casa.',
-            'Firmada con keystore oficial v1/v2/v3 para actualizar encima sin desinstalar.'
+            'Jetpack Compose + WebView acelerado por hardware con barra superior táctica adaptada a overscan TV.',
+            'Launcher oficial Android TV (LEANBACK_LAUNCHER + banner 640×360) y navegación completa con mando D-Pad.',
+            'Almacenamiento de tokens HMAC en EncryptedSharedPreferences (AES256-GCM) y detección automática LAN (Wi-Fi/Ethernet) / WAN.',
+            'Firmada con keystore oficial v1/v2/v3 y desplegable automáticamente en Smart TVs de la LAN con packaging/install_all.sh.'
           ],
-          cmd: 'adb install -r dist/recursos-cockpit_12.4.0.apk'
+          cmd: 'bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.6.0.apk'
         },
         web: {
           title: 'Navegador Web Moderno (SPA React 19)',
@@ -1740,9 +1815,9 @@
 
       // 8. Consola API REST en Vivo
       const API_ENDPOINTS = [
-        { method: 'GET', path: '/api/version', desc: 'Versión canónica (App, Servidor y GitHub), commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.4.0', display_version: '12.4.0', server_version: '12.4.0', remote_version: '12.4.0', branch: 'main', update_available: false } },
-        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { current_version: '12.4.0', display_version: '12.4.0' } } },
-        { method: 'POST', path: '/api/system/sync-web', desc: 'Sincronización en caliente de archivos web desde la App Nativa de Ubuntu verificada con SHA-256 sin tocar recursos_history.db', sample: { success: true, synced: true, version: '12.4.0', updated_files: ['VERSION', 'package.json', 'static/index.html', 'static/manual.html'] } },
+        { method: 'GET', path: '/api/version', desc: 'Versión canónica (App, Servidor y GitHub), commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.6.0', display_version: '12.6.0', server_version: '12.6.0', remote_version: '12.6.0', branch: 'main', update_available: false } },
+        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { current_version: '12.6.0', display_version: '12.6.0' } } },
+        { method: 'POST', path: '/api/system/sync-web', desc: 'Sincronización en caliente de archivos web desde la App Nativa de Ubuntu verificada con SHA-256 sin tocar recursos_history.db', sample: { success: true, synced: true, version: '12.6.0', updated_files: ['VERSION', 'package.json', 'static/index.html', 'static/manual.html'] } },
         { method: 'GET', path: '/api/metrics/history?window_sec=3600&limit=180', desc: 'Historial persistente de consumo en recursos_history.db para retroceso temporal en la Inspección Táctil', sample: { ok: true, db_file: 'recursos_history.db', total_samples: 18420, returned_samples: 180, has_older: true } },
         { method: 'GET', path: '/api/maps/config', desc: 'Motor cartográfico libre OpenStreetMap / Leaflet sin necesidad de API Key', sample: { success: true, engine: 'leaflet', provider: 'OpenStreetMap', free: true, requires_api_key: false } },
         { method: 'GET', path: '/api/system/logs?limit=10', desc: 'Agregador unificado de fallos de Systemd, Docker y Kernel', sample: { ok: true, total_errors: 0, counts_by_category: { systemd: 0, docker: 0, kernel: 0 } } },
@@ -1796,6 +1871,9 @@
 
       // 9. Changelog interactivo filtrado por tipo SemVer
       const CHANGELOG = [
+        { ver: 'v12.6.0', type: 'MINOR', desc: 'Compatibilidad nativa integral con Android TV (LEANBACK_LAUNCHER, banner 640×360, detección dinámica UiModeManager, overscan y navegación con mando D-Pad + anillo de foco en Compose y React 19) y despliegue simultáneo automatizado en ordenador (.deb) y Smart TVs de la LAN vía ADB mediante packaging/install_all.sh y packaging/install_tv_apk.sh (100 % Zero-Hardcoding).' },
+        { ver: 'v12.5.1', type: 'PATCH', desc: 'Eliminación definitiva de basemaps.cartocdn.com (CARTO servía imágenes PNG HTTP 200 con la marca de agua "API KEY REQUIRED" sin disparar tileerror), sustituido por el proxy local cacheado /api/maps/tile/{light|dark|osm}/{z}/{x}/{y}.png sobre OpenStreetMap y ArcGIS Gray Canvas nativo oscuro con respaldo automático tile.openstreetmap.de.' },
+        { ver: 'v12.5.0', type: 'MINOR', desc: 'Unificación estética total basada en los SVG oficiales en las 4 interfaces (Web React 19, Ubuntu GTK 3, Android Jetpack Compose y Manual), animaciones a 60 FPS con Motion v12 (MorphPill, ViewStage, bento springs y radar GeoIP), marcadores de muestreo trazados exactamente sobre curvas monótonas Fritsch–Carlson en capa superior, banner principal de Red e Internet en telemetría y desglose separado de unidades físicas/extraíbles (lsblk) con deduplicación inteligente por pool_key para montajes compartidos NAS.' },
         { ver: 'v12.4.0', type: 'MINOR', desc: 'Detección triple simultánea en la App Nativa de Ubuntu (App Ubuntu vs. Servidor web local vs. GitHub) y botón único de actualización unificada capaz de instalar .deb desde GitHub o sincronizar la web local en caliente mediante POST /api/system/sync-web con SHA-256 incluso cuando la app supera a la versión publicada en GitHub.' },
         { ver: 'v12.3.0', type: 'MINOR', desc: 'Todas las gráficas unificadas a una ventana móvil exacta de los últimos 20 minutos (cubetas de 5 s pico-preservantes), ejes visibles de escala temporal (X) y de magnitud/velocidad (Y), y autoajuste dinámico en métricas de velocidad (discos y red) bloqueando el tope de la escala exactamente al punto más alto registrado en esos 20 minutos.' },
         { ver: 'v12.2.1', type: 'PATCH', desc: 'Blindaje completo de recursos_history.db en instalación y actualizaciones: creación inicial idempotente en postinst, exclusión explícita de archivos .db/.json en el paquete .deb y actualización incremental SQLite (ON CONFLICT DO UPDATE) sin sobrescribir jamás datos previos.' },

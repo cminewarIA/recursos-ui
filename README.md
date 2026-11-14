@@ -4,13 +4,13 @@
   <img src="./docs/assets/hero-banner.svg" alt="Recursos Cockpit - Manual Visual e Interactivo" width="100%" />
 </a>
 
-# Panel de Recursos · Manual Interactivo (`v12.4.0`)
+# Panel de Recursos · Manual Interactivo (`v12.6.0`)
 
-[![Versión](https://img.shields.io/badge/Versi%C3%B3n-v12.4.0-0284C7?style=for-the-badge)](./VERSION)
+[![Versión](https://img.shields.io/badge/Versi%C3%B3n-v12.6.0-0284C7?style=for-the-badge)](./VERSION)
 [![Manual HTML5 en Vivo](https://img.shields.io/badge/Manual_HTML5-Simuladores_%2B_API_en_Vivo-059669?style=for-the-badge&logo=readthedocs&logoColor=white)](./docs/index.html)
 [![Frontend](https://img.shields.io/badge/Interfaz-React_19_%2B_Tailwind_v4-0EA5E9?style=for-the-badge&logo=react&logoColor=white)](#-cap%C3%ADtulo-1--tour-visual-e-interactivo-por-las-5-pantallas)
 [![Linux](https://img.shields.io/badge/Ubuntu-.deb_WebKit2_%2B_DeX_USB-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)](#-cap%C3%ADtulo-4--manual-de-aplicaciones-nativas-deb--apk-y-dex-usb)
-[![Android](https://img.shields.io/badge/Android-.apk_Compose_%2B_WebView-3DDC84?style=for-the-badge&logo=android&logoColor=black)](#-cap%C3%ADtulo-4--manual-de-aplicaciones-nativas-deb--apk-y-dex-usb)
+[![Android](https://img.shields.io/badge/Android_%26_TV-.apk_Compose_%2B_Leanback-3DDC84?style=for-the-badge&logo=android&logoColor=black)](#-cap%C3%ADtulo-4--manual-de-aplicaciones-nativas-deb--apk-y-dex-usb)
 [![Seguridad](https://img.shields.io/badge/Seguridad-HMAC--256_%2B_AES--256--GCM-DC2626?style=for-the-badge&logo=shield&logoColor=white)](#-cap%C3%ADtulo-3--topolog%C3%ADa-aimesh-mapa-geoip-y-zero-trust)
 
 <p align="center">
@@ -54,7 +54,7 @@
     </td>
     <td width="33%" valign="top">
       <b>📦 6. Descargas y Despliegue</b><br/>
-      Descarga los instaladores oficiales <code>12.4.0</code>, configura <code>systemd</code> con capacidades POSIX y consulta las diferencias clave de arquitectura.<br/><br/>
+      Descarga los instaladores oficiales <code>12.6.0</code>, configura <code>systemd</code> con capacidades POSIX y consulta las diferencias clave de arquitectura.<br/><br/>
       <a href="#-cap%C3%ADtulo-6--descargas-oficiales-e-instalaci%C3%B3n-guiada">Ir al Capítulo 6 →</a>
     </td>
   </tr>
@@ -76,9 +76,9 @@ Toda la plataforma se organiza en **5 vistas simétricas** conectadas por una ba
 <details open>
 <summary><b>🟢 Vista 1 · <code>/inicio</code> — Tablero Principal, Almacenamiento Dual y Control de Equipos</b> <i>(Desplegado por defecto · Pulsa otras vistas para explorar)</i></summary>
 
-1. **Barra de Estado y Tema**: Muestra el modo de conexión (`LAN` directa o `WAN` cifrada TLS), la salud agregada del sistema y el botón para alternar entre diseño **Claro Minimalista** y **Modo Oscuro** (`recursos_theme`).
-2. **Tarjetas KPI Instantáneas (`1.5s`)**: Lecturas numéricas tabulares (`tabular-nums`) de procesador, memoria RAM + ZRAM, GPU/VRAM y tráfico de red saliente/entrante.
-3. **Gráficas HiDPI de 20 Minutos con Escalas X/Y y Pico Máximo Automático**: Todas las gráficas en vivo muestran exactamente los últimos **20 minutos** en cubetas de `5s` que preservan picos reales, incorporan **escala horaria visible (eje X)** y **escala de datos/velocidad (eje Y)**, y en velocidades de disco y red autoajustan el techo de la escala exactamente al **punto más alto registrado en esos 20 minutos** refrescándose al instante. Al pulsar sobre cualquier gráfica se abre la **Pantalla de Inspección Táctil** para retroceder por todo el historial guardado en `recursos_history.db`.
+1. **Barra de Estado y Tema**: Muestra el modo de conexión (`LAN` directa o `WAN` cifrada TLS), transiciones animadas a `60 FPS` (`MorphPill`, `ViewStage`, valores tabulares animados) con diseño unificado procedente de los SVG oficiales en las 4 interfaces (Web, Ubuntu GTK 3, Android Compose y Manual) y el botón para alternar entre diseño **Claro Minimalista** y **Modo Oscuro** (`recursos_theme`).
+2. **Tarjetas KPI y Gráfica Principal en Vivo (`2x2 + Almacenamiento`)**: Cuadrícula principal con gráficas HiDPI simultáneas para **Procesador (CPU)**, **Memoria RAM + ZRAM**, **GPU / Gráficos** y **Red e Internet** (bajada/subida con techo dinámico al pico máximo de 20 min), seguida de la tarjeta **Almacenamiento y discos disponibles** con total combinado real deduplicado y cada unidad física (NVMe/SATA), memoria extraíble USB/SD (`lsblk` aunque esté desmontada) y recurso NAS listado por separado sin inflar la capacidad cuando múltiples carpetas comparten el mismo RAID (`pool_key`).
+3. **Gráficas HiDPI de 20 Minutos con Curvas Monótonas, Puntos Exactos y Escalas X/Y**: Todas las gráficas muestran los últimos **20 minutos** en cubetas de `5s` que preservan picos reales mediante interpolación monótona Fritsch–Carlson; los **marcadores de muestreo se dibujan en la capa superior directamente sobre la curva** sin flotar, e incorporan ejes X/Y visibles más la **Pantalla de Inspección Táctil** para retroceder por todo `recursos_history.db`.
 4. **Encendido y Apagado Simétrico de Equipos**: Junto a cada equipo detectado dinámicamente en la LAN dispones de dos botones simétricos:
    - **`Encender`**: envía paquetes mágicos **Wake-on-LAN (WoL)** a todas las subredes activas.
    - **`Apagar`**: abre confirmación segura y lanza señal remota **Sleep-on-LAN / SSH `BatchMode` / RPC / Webhook**, protegiendo automáticamente al propio servidor anfitrión frente a auto-apagados accidentales.
@@ -218,13 +218,14 @@ sequenceDiagram
 
 Las aplicaciones nativas siguen el **Principio Contractual de Paridad y Simetría Total**: todas ejecutan exactamente el mismo motor HTML5 (`static/index.html` y `static/manual.html`) dentro de un contenedor acelerado por hardware propio de cada sistema operativo.
 
-| Característica | Interfaz Web SPA | App Nativa Ubuntu (`.deb`) | App Nativa Android (`.apk`) |
+| Característica | Interfaz Web SPA | App Nativa Ubuntu (`.deb`) | App Nativa Android &amp; Android TV (`.apk`) |
 | :--- | :--- | :--- | :--- |
-| **Contenedor Nativo** | Navegador Web Moderno | `GTK 3` + `WebKit2` + `LocalHtmlBridgeServer` | `Jetpack Compose` + `android.webkit.WebView` |
-| **Detección del Nodo** | Manual por URL / IP | Escaneo LAN / `mDNS` + Lanzador 3 tarjetas | Escaneo automático en segundo plano (Zero-Config) |
+| **Contenedor Nativo** | Navegador Web Moderno | `GTK 3` + `WebKit2` + `LocalHtmlBridgeServer` | `Jetpack Compose` + `android.webkit.WebView` + `Leanback` |
+| **Detección del Nodo** | Manual por URL / IP | Escaneo LAN / `mDNS` + Lanzador 3 tarjetas | Escaneo automático en segundo plano (Wi-Fi / Ethernet / TV) |
 | **Almacén de Credenciales** | `Cookie HttpOnly` + `localStorage` | Configuración protegida / Keyring local | `Android KeyStore` + `EncryptedSharedPreferences` |
-| **Conmutación `LAN ↔ WAN`** | Según ruta accedida | IP LAN mínima latencia ↔ DDNS WAN cifrado | Automática al cambiar entre Wi-Fi local y 4G/5G |
-| **Actualización OTA en Sitio** | Refresco del servidor o botón unificado | Botón único inteligente (`check_github_app_update()` + `perform_unified_update()`) que compara App Ubuntu, Servidor web local y GitHub, y actualiza la web local en caliente si la app supera a GitHub o al servidor | Keystore oficial permanente (`v1/v2/v3`, sin desinstalar) |
+| **Conmutación `LAN ↔ WAN`** | Según ruta accedida | IP LAN mínima latencia ↔ DDNS WAN cifrado | Automática al cambiar entre red local (LAN/Wi-Fi) y WAN exterior |
+| **Control y Ergonomía** | Ratón / Táctil | Ratón / Táctil / Atajos nativos | Táctil móvil/tablet + **D-Pad / Mando Android TV** (anillo cian + overscan) |
+| **Actualización OTA en Sitio** | Refresco del servidor o botón unificado | Botón único inteligente (`check_github_app_update()` + `perform_unified_update()`) que compara App Ubuntu, Servidor web local y GitHub, y actualiza la web local en caliente si la app supera a GitHub o al servidor | Keystore oficial permanente (`v1/v2/v3`, sin desinstalar) + despliegue ADB en TV con `install_all.sh` |
 | **Pantalla Móvil USB (`DeX`)** | Oculto por arquitectura | **Desbloqueado en exclusiva** (`adb`, `scrcpy`, `/dev/uhid`) | Oculto por arquitectura |
 
 <details>
@@ -265,8 +266,8 @@ curl -fsS -H "X-Device-Token: $TOKEN" http://127.0.0.1:8085/api/metrics | jq '{v
 ```json
 {
   "version_info": {
-    "current_version": "12.4.0",
-    "display_version": "12.4.0",
+    "current_version": "12.6.0",
+    "display_version": "12.6.0",
     "local_commit": "HEAD",
     "update_available": false
   },
@@ -303,8 +304,8 @@ curl -fsS http://127.0.0.1:8085/api/version | jq .
 ```
 ```json
 {
-  "current_version": "12.4.0",
-  "display_version": "12.4.0",
+  "current_version": "12.6.0",
+  "display_version": "12.6.0",
   "branch": "main",
   "local_commit": "HEAD",
   "update_available": false
@@ -319,7 +320,7 @@ curl -fsS http://127.0.0.1:8085/api/version | jq .
 ```bash
 curl -I http://127.0.0.1:8085/manual
 ```
-Sirve [`static/manual.html`](./static/manual.html) (con respaldo [`docs/index.html`](./docs/index.html)) inyectando `window.__INITIAL_APP_VERSION__ = "12.4.0"`, tanto desde `server.py` como desde el servidor puente nativo `LocalHtmlBridgeServer` de Ubuntu.
+Sirve [`static/manual.html`](./static/manual.html) (con respaldo [`docs/index.html`](./docs/index.html)) inyectando `window.__INITIAL_APP_VERSION__ = "12.6.0"`, tanto desde `server.py` como desde el servidor puente nativo `LocalHtmlBridgeServer` de Ubuntu.
 
 </details>
 
@@ -376,23 +377,26 @@ curl -fsS -X POST -H "Content-Type: application/json" -H "X-Device-Token: $TOKEN
 
 ## 📦 Capítulo 6 · Descargas Oficiales e Instalación Guiada
 
-| Paquete Oficial | Plataforma | Descarga Directa (`v12.4.0`) | Integridad y Firma |
+| Paquete Oficial | Plataforma | Descarga Directa (`v12.6.0`) | Integridad y Firma |
 | :--- | :--- | :--- | :--- |
-| **🐧 Recursos Cockpit (`.deb`)** | Ubuntu / Debian `amd64` | [**`recursos-cockpit_12.4.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.4.0/recursos-cockpit_12.4.0_amd64.deb) | Firma GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.4.0/SHA256SUMS.txt) |
-| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ | [**`recursos-cockpit_12.4.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.4.0/recursos-cockpit_12.4.0.apk) | Keystore Permanente (`v1/v2/v3`) |
+| **🐧 Recursos Cockpit (`.deb`)** | Ubuntu / Debian `amd64` | [**`recursos-cockpit_12.6.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.6.0/recursos-cockpit_12.6.0_amd64.deb) | Firma GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.6.0/SHA256SUMS.txt) |
+| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ &amp; Android TV (Leanback) | [**`recursos-cockpit_12.6.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.6.0/recursos-cockpit_12.6.0.apk) | Keystore Permanente (`v1/v2/v3`) |
 | **⚡ Enlaces `latest`** | Última Release | [`.deb Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) · [`.apk Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Actualización directa sobre versión previa |
 
 <details>
 <summary><b>🛠️ Asistente Paso a Paso · Instalar Apps Nativas o Desplegar el Servidor desde Cero (Zero-Hardcoding)</b></summary>
 
-#### Opción A · Instalar o actualizar la App Nativa en Ubuntu / Debian y Android
+#### Opción A · Instalar o actualizar simultáneamente en Ordenador (`.deb`) y Android TV (`.apk`)
 ```bash
-# Ubuntu / Debian (actualiza encima conservando autodescubrimiento y tokens)
-sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.4.0_amd64.deb
-/usr/bin/recursos-cockpit --test-mode
+# Instalación unificada recomendada: compila e instala en el ordenador (.deb),
+# genera la APK firmada y la instala automáticamente en cualquier Android TV de la LAN vía ADB
+bash packaging/install_all.sh
 
-# Android vía ADB (conserva enlace en Android KeyStore)
-adb install -r dist/recursos-cockpit_12.4.0.apk
+# O paso a paso manualmente:
+sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.6.0_amd64.deb
+/usr/bin/recursos-cockpit --test-mode
+bash packaging/build_apk.sh
+bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.6.0.apk
 ```
 
 #### Opción B · Desplegar tu propio Servidor en cualquier máquina Linux
@@ -403,9 +407,8 @@ cd /opt/recursos-cockpit
 pip3 install -r requirements.txt || pip3 install psutil
 npm install && npm run build
 
-# Generar el paquete .deb local desde ./VERSION e instalarlo
-bash packaging/build_deb.sh
-sudo apt-get install --reinstall -y ./dist/recursos-cockpit_$(cat VERSION)_amd64.deb
+# Generar el paquete .deb local desde ./VERSION e instalarlo (+ Android TV si hay ADB en LAN)
+bash packaging/install_all.sh
 ```
 
 #### Opción C · Unidad `systemd` sin spam `sudo` y Proxy TLS con `Caddy`
@@ -450,17 +453,18 @@ Todo el proyecto se rige por [`./GEMINI.md`](./GEMINI.md) manteniendo [`./VERSIO
 * **`0.0.X` (`PATCH`)**: Optimización interna, corrección de errores, reglas o mejoras documentales.
 
 <details open>
-<summary><b>🔄 Diferencias Clave de la Versión Actual (<code>v12.4.0</code>) frente a Arquitecturas Anteriores</b></summary>
+<summary><b>🔄 Diferencias Clave de la Versión Actual (<code>v12.6.0</code>) frente a Arquitecturas Anteriores</b></summary>
 
-| Ámbito | Arquitectura Anterior | Versión Actual (`v12.4.0`) |
+| Ámbito | Arquitectura Anterior | Versión Actual (`v12.6.0`) |
 | :--- | :--- | :--- |
-| **Actualización Triple y Sincronización Web Ubuntu** | La app de Ubuntu comprobaba únicamente GitHub frente al paquete `.deb` instalado y requería `git pull` en el servidor para actualizar la interfaz web. | **Detección Triple (`App Ubuntu · Servidor web local · GitHub`) en un solo botón**: detecta automáticamente si la App Ubuntu y/o GitHub superan al servidor local (incluido cuando la App supera a GitHub) y sincroniza la web local en caliente mediante `POST /api/system/sync-web` verificado con SHA-256 sin tocar `recursos_history.db` ni exigir `.git`. |
-| **Interfaz, Gráficas y Escalas** | Gráficas limitadas a 60 muestras recientes sin ejes ni marcas de escala, con topes redondeados estáticos y sin retroceso en el visor ampliado. | **Ventana unificada de 20 minutos + Escalas X/Y + Autoescala de Pico + Inspección Táctil**: todas las gráficas muestran los últimos 20 minutos (cubetas de 5s pico-preservantes), eje temporal X (`HH:MM`), eje de magnitud/velocidad Y y techo dinámico igual al pico máximo exacto de esos 20 minutos; además, el visor ampliado permite retroceder por todo el historial guardado en `recursos_history.db`. |
+| **Android TV (Leanback / D-Pad) y Despliegue Simultáneo** | La APK Android estaba limitada al launcher táctil móvil, carecía de banner TV y requería instalación manual separada tras actualizar el PC. | **Compatibilidad universal móvil + Android TV (`LEANBACK_LAUNCHER`, banner oficial `640×360`, detección dinámica `UiModeManager`, overscan y navegación con mando D-Pad + anillo de foco en Compose y React 19)** junto con **`packaging/install_all.sh`**, que compila e instala `.deb` en el PC y descubre dinámicamente televisores Android vía ADB en la LAN para actualizarlos automáticamente al mismo tiempo. |
+| **Estética SVG Unificada y Animaciones 60 FPS** | Estilos visuales heterogéneos entre Web, Ubuntu GTK 3 y Android Compose, transiciones CSS estáticas y sin motor coreografiado de layout compartido. | **Lenguaje visual 100 % unificado a los SVG oficiales** en las 4 interfaces (Web React 19, Ubuntu GTK 3, Android Jetpack Compose y Manual) con animaciones fluidas a **60 FPS** (`Motion v12` con `MorphPill`, `ViewStage`, tarjetas Bento con física de resorte, pulso radar GeoIP y barrido horizontal luminoso en gráficas). |
+| **Banner de Red + Almacenamiento Separado y Deduplicación NAS** | El tráfico de red aparecía como tarjeta KPI compacta fuera de la cuadrícula principal; los almacenamientos extraíbles desmontados no se listaban y múltiples carpetas compartidas de un mismo NAS sumaban su capacidad varias veces (p. ej. 4× RAID). | **Gráfica principal dedicada de Red e Internet** (`20m` Rx/Tx) integrada en la cuadrícula `2x2` + detección física real mediante **`lsblk -J -b` y `/sys/class/hwmon`**: separa discos internos (NVMe/SATA), memorias extraíbles USB/SD (montadas o desmontadas) y **deduplica automáticamente por `pool_key` los montajes que comparten el mismo servidor/RAID NAS** evitando multiplicar el total de terabytes. |
+| **Gráficas HiDPI, Puntos Exactos y Escalas** | Gráficas limitadas sin escalas claras o con puntos de muestreo capaces de quedar desplazados respecto al trazo de la curva interpolada. | **Curva monótona `Fritsch–Carlson` + puntos estrictamente sobre la línea en capa superior** + ventana exacta de **20 minutos**, ejes X/Y visibles, techo dinámico al pico máximo en red/disco e **Inspección Táctil** sobre `recursos_history.db`. |
+| **Actualización Triple y Sincronización Web Ubuntu** | La app de Ubuntu comprobaba únicamente GitHub frente al paquete `.deb` instalado y requería `git pull` en el servidor para actualizar la interfaz web. | **Detección Triple (`App Ubuntu · Servidor web local · GitHub`) en un solo botón**: detecta si la App Ubuntu y/o GitHub superan al servidor local y sincroniza la web local en caliente mediante `POST /api/system/sync-web` con SHA-256 sin tocar `recursos_history.db`. |
 | **Persistencia Unificada (`SQLite`)** | Base de datos dedicada únicamente a DNS/GeoIP (`geoip_history.db`) sin series temporales de hardware. | Base de datos unificada **`recursos_history.db` (SQLite WAL)** creada al instalar e intacta tras cada actualización (nunca se sobrescribe; solo añade/actualiza registros en `geoip_locations`, `connection_history` y `telemetry_history`), consultable vía `GET /api/metrics/history`. |
-| **Mapa Geoespacial GeoIP** | Dependencia dual con selector y variables de clave de API (`Google Maps Platform`). | Motor único **100 % libre sobre OpenStreetMap / CartoDB (`Leaflet`)** sin API Key, cambio dinámico de tema claro/oscuro y respaldo automático a `tile.openstreetmap.org`. |
-| **Telemetría y Permisos Linux** | Invocaciones periódicas de `sudo` (ruido PAM en logs), lectura de disco sin historial y serialización completa por petición. | Capacidades POSIX `CAP_NET_ADMIN`, poda SQLite acotada cada `60s`, caché atómica `METRICS_CACHE_BYTES` (~17 ms), serie `disk_pct` real y filtrado tribanda ASUS AiMesh + Docker. |
-| **Seguridad de Credenciales** | Credenciales de router en texto plano y paso directo por línea de comandos. | Bóveda cifrada **AES-256-GCM (`PBKDF2-HMAC-SHA256`)**, paso seguro vía entorno `SSHPASS` y tokens `HMAC-SHA256` por dispositivo físico (`LAN ↔ WAN`). |
-| **Documentación y Manual** | `README.md` de texto plano extenso con listados acumulados de versiones pasadas. | **Manual Visual e Interactivo** en `README.md` (5 SVGs Claro/Oscuro) y app web autocontenida (`/manual`, `/readme`, `docs/index.html`) enfocada únicamente en la versión vigente y sus diferencias arquitectónicas. |
+| **Mapa Geoespacial GeoIP y Seguridad** | Dependencia de API Key o proveedores con marca de agua (`basemaps.cartocdn.com`), invocaciones periódicas de `sudo` y credenciales planas. | **Leaflet sobre OpenStreetMap + ArcGIS Canvas vía proxy cacheado `/api/maps/tile/`** (100 % libre, sin CartoDB, sin marcas `"API KEY REQUIRED"` y sin API Key) + radar animado, capacidades POSIX `CAP_NET_ADMIN`, caché `METRICS_CACHE_BYTES`, bóveda **AES-256-GCM** y tokens **HMAC-SHA256**. |
+| **Documentación y Manual** | `README.md` extenso con listados acumulados de versiones pasadas. | **Manual Visual e Interactivo** en `README.md` y app web autocontenida (`/manual`, `/readme`, `docs/index.html`) enfocada únicamente en la versión vigente y sus diferencias arquitectónicas. |
 
 </details>
 

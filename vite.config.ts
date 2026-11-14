@@ -1292,6 +1292,102 @@ function buildLiveConnectionsMap(localIp: string) {
   };
 }
 
+interface DevBlkMeta {
+  name: string;
+  kname: string;
+  path: string;
+  type: string;
+  sizeBytes: number;
+  tran: string;
+  model: string;
+  isRemovable: boolean;
+  fstype: string;
+  uuid: string;
+  label: string;
+  mountpoint: string | null;
+  hasChildren: boolean;
+}
+
+function readDevLsblkMetadata() {
+  const byPath = new Map<string, DevBlkMeta>();
+  const byMount = new Map<string, DevBlkMeta>();
+  const candidates: DevBlkMeta[] = [];
+  try {
+    const out = execSync(
+      'lsblk -J -b -o NAME,KNAME,PATH,TYPE,SIZE,RM,HOTPLUG,TRAN,FSTYPE,UUID,LABEL,MODEL,MOUNTPOINT 2>/dev/null',
+      { timeout: 2000 }
+    ).toString();
+    const parsed = JSON.parse(out || '{}') as { blockdevices?: unknown[] };
+    const walk = (nodes: unknown[], parent?: DevBlkMeta) => {
+      for (const rawNode of nodes) {
+        if (!rawNode || typeof rawNode !== 'object') continue;
+        const n = rawNode as Record<string, unknown>;
+        const name = String(n.name || '');
+        const kname = String(n.kname || name);
+        const devPath = String(n.path || (kname ? `/dev/${kname}` : ''));
+        const btype = String(n.type || '').toLowerCase();
+        const tranOwn = String(n.tran || '').trim().toLowerCase();
+        const modelOwn = String(n.model || '').trim();
+        const rmOwn = String(n.rm || '').toLowerCase() === 'true' || String(n.rm || '') === '1';
+        const hpOwn = String(n.hotplug || '').toLowerCase() === 'true' || String(n.hotplug || '') === '1';
+        const tran = tranOwn || parent?.tran || '';
+        const model = modelOwn || parent?.model || '';
+        const isRemovable = rmOwn || hpOwn || Boolean(parent?.isRemovable) || tran === 'usb' || tran === 'mmc';
+        const sizeBytes = Number(n.size || 0) || 0;
+        const fstype = String(n.fstype || '').trim().toLowerCase();
+        const uuid = String(n.uuid || '').trim();
+        const label = String(n.label || '').trim();
+        const mountpoint = typeof n.mountpoint === 'string' && n.mountpoint !== '[SWAP]' ? n.mountpoint : null;
+        const children = Array.isArray(n.children) ? n.children : [];
+
+        const meta: DevBlkMeta = {
+          name,
+          kname,
+          path: devPath,
+          type: btype,
+          sizeBytes,
+          tran,
+          model,
+          isRemovable,
+          fstype,
+          uuid,
+          label,
+          mountpoint,
+          hasChildren: children.length > 0,
+        };
+        if (devPath) {
+          byPath.set(devPath, meta);
+          try {
+            byPath.set(fs.realpathSync(devPath), meta);
+          } catch {
+            // ignore
+          }
+        }
+        if (mountpoint) byMount.set(mountpoint, meta);
+
+        const isVirtual =
+          btype === 'loop' ||
+          btype === 'rom' ||
+          btype === 'zram' ||
+          name.startsWith('loop') ||
+          name.startsWith('zram') ||
+          name.startsWith('ram') ||
+          name.startsWith('sr') ||
+          fstype === 'swap' ||
+          fstype === 'squashfs';
+        if (!isVirtual && sizeBytes > 0 && (['part', 'lvm', 'crypt', 'md', 'dm'].includes(btype) || (btype === 'disk' && children.length === 0))) {
+          candidates.push(meta);
+        }
+        if (children.length > 0) walk(children, meta);
+      }
+    };
+    if (Array.isArray(parsed.blockdevices)) walk(parsed.blockdevices);
+  } catch {
+    // Ignore lsblk errors on restricted environments
+  }
+  return { byPath, byMount, candidates };
+}
+
 function sampleRealDisks() {
   const now = Date.now();
   if (cachedDisks.data.length > 0 && now - cachedDisks.ts < 6000) {
@@ -1299,26 +1395,132 @@ function sampleRealDisks() {
   }
   const disks: unknown[] = [];
   try {
-    const out = execSync('df -B1 -T -x tmpfs -x devtmpfs -x squashfs 2>/dev/null || df -k', { timeout: 1500 }).toString();
+    const { byPath, byMount, candidates } = readDevLsblkMetadata();
+    const netFs = new Set(['cifs', 'smb', 'smb3', 'nfs', 'nfs4', 'sshfs', 'fuse.sshfs', 'davfs', 'glusterfs']);
+    const poolPrimaryMount = new Map<string, string>();
+    const seenMounts = new Set<string>();
+    const seenDevs = new Set<string>();
+
+    const out = execSync(
+      'df -B1 -P -T -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs 2>/dev/null || df -k -P',
+      { timeout: 1500 }
+    ).toString();
     for (const line of out.split('\n').slice(1)) {
       const parts = line.trim().split(/\s+/);
       if (parts.length < 7) continue;
-      const [device, fstype, totalStr, usedStr, availStr, pctStr, mountpoint] = parts;
+      const [device, fstypeRaw, totalStr, usedStr, availStr, pctStr, ...mpParts] = parts;
+      const mountpoint = mpParts.join(' ');
+      if (!mountpoint || seenMounts.has(mountpoint)) continue;
+      if (mountpoint.startsWith('/proc') || mountpoint.startsWith('/sys') || mountpoint.startsWith('/dev') || mountpoint.startsWith('/run') || mountpoint.startsWith('/snap')) {
+        continue;
+      }
+      const fstype = fstypeRaw.toLowerCase();
+      let realDev = device;
+      try {
+        if (device.startsWith('/dev/')) realDev = fs.realpathSync(device);
+      } catch {
+        // ignore
+      }
+      const blk = byMount.get(mountpoint) || byPath.get(realDev) || byPath.get(device);
+      const isNet = netFs.has(fstype) || device.startsWith('//') || (device.includes(':/') && !device.startsWith('/'));
+      const isRemovable = isNet ? false : Boolean(blk?.isRemovable);
+      if (fstype === 'vfat' && mountpoint.startsWith('/boot') && !isRemovable) continue;
+
       const total = parseInt(totalStr, 10) || 0;
       const used = parseInt(usedStr, 10) || 0;
       const free = parseInt(availStr, 10) || 0;
       const percent = parseFloat(pctStr.replace('%', '')) || (total > 0 ? Math.round((used / total) * 1000) / 10 : 0);
       if (total <= 0) continue;
+
+      seenMounts.add(mountpoint);
+      seenDevs.add(realDev);
+      seenDevs.add(device);
+
+      const kind: 'local' | 'removable' | 'network' = isNet ? 'network' : isRemovable ? 'removable' : 'local';
+      const tran = blk?.tran || '';
+      const model = blk?.model || null;
+      const transport = isNet
+        ? fstype.includes('nfs')
+          ? 'NAS · NFS'
+          : 'NAS · SMB'
+        : tran === 'usb'
+          ? 'USB Extraíble'
+          : tran === 'mmc'
+            ? 'Tarjeta SD/MMC'
+            : tran === 'nvme' || device.includes('nvme')
+              ? 'SSD NVMe'
+              : tran === 'sata' || tran === 'ata'
+                ? 'Disco SATA'
+                : 'Disco local';
+
+      let poolKey = `${kind}:${blk?.uuid || realDev || mountpoint}:${total}`;
+      if (isNet) {
+        const host = device.startsWith('//')
+          ? device.replace(/^\/+/, '').split('/')[0].toLowerCase()
+          : device.split(':')[0].toLowerCase();
+        poolKey = `net:${host}:${total}`;
+      }
+      const isPrimary = !poolPrimaryMount.has(poolKey);
+      const sharedWith = isPrimary ? null : poolPrimaryMount.get(poolKey) || null;
+      if (isPrimary) poolPrimaryMount.set(poolKey, mountpoint);
+
+      const leaf = path.basename(mountpoint.replace(/\/+$/, '')) || device;
+      const label =
+        mountpoint === '/'
+          ? `Sistema Raíz · ${model || device}`
+          : isNet
+            ? `${leaf} · NAS ${device.replace(/^\/+/, '').split('/')[0]}`
+            : model
+              ? `${model} · ${blk?.label || leaf}`
+              : `Volumen ${blk?.label || leaf}`;
+
       disks.push({
         mountpoint,
-        label: mountpoint === '/' ? 'Unidad Raíz del Sistema (/)' : `Volumen (${mountpoint})`,
+        label,
         device,
-        fstype,
+        fstype: fstypeRaw,
+        kind,
+        transport,
+        model,
+        mounted: true,
+        is_removable: isRemovable,
+        pool_key: poolKey,
+        pool_primary: isPrimary,
+        pool_shared_with: sharedWith,
         temp_c: null,
         total_bytes: total,
         used_bytes: used,
         free_bytes: free,
         percent,
+      });
+    }
+
+    for (const blk of candidates) {
+      if ((blk.mountpoint && seenMounts.has(blk.mountpoint)) || seenDevs.has(blk.path)) continue;
+      if (['linux_raid_member', 'lvm2_member', 'crypto_luks', 'swap', 'squashfs'].includes(blk.fstype)) continue;
+      if (!blk.isRemovable && (blk.sizeBytes < 256 * 1024 * 1024 || (blk.fstype === 'vfat' && blk.sizeBytes <= 2500 * 1024 * 1024) || blk.label.toLowerCase().includes('efi'))) {
+        continue;
+      }
+      if (!blk.isRemovable && !blk.fstype) continue;
+      const kind: 'local' | 'removable' = blk.isRemovable ? 'removable' : 'local';
+      disks.push({
+        mountpoint: blk.path,
+        label: blk.model ? `${blk.model} · ${blk.label || blk.name}` : `Memoria extraíble · ${blk.label || blk.name}`,
+        device: blk.path,
+        fstype: blk.fstype || 'sin formato',
+        kind,
+        transport: blk.tran === 'usb' ? 'USB Extraíble' : blk.tran === 'mmc' ? 'Tarjeta SD/MMC' : 'Disco local',
+        model: blk.model || null,
+        mounted: false,
+        is_removable: blk.isRemovable,
+        pool_key: `${kind}:${blk.uuid || blk.path}:${blk.sizeBytes}`,
+        pool_primary: false,
+        pool_shared_with: null,
+        temp_c: null,
+        total_bytes: blk.sizeBytes,
+        used_bytes: 0,
+        free_bytes: blk.sizeBytes,
+        percent: 0,
       });
     }
     cachedDisks = { data: disks, ts: now };
@@ -1860,8 +2062,53 @@ function realOsTelemetryMiddleware(): Plugin {
               provider: 'OpenStreetMap',
               free: true,
               requires_api_key: false,
+              tile_proxy: true,
             })
           );
+          return;
+        }
+
+        const tileMatch = url.match(/^\/api\/maps\/tile\/(light|dark|osm)\/(\d+)\/(\d+)\/(\d+)(?:\.(?:png|jpg|jpeg))?$/);
+        if (tileMatch && req.method === 'GET') {
+          const [, style, zStr, xStr, yStr] = tileMatch;
+          const candidates =
+            style === 'dark'
+              ? [
+                  `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${zStr}/${yStr}/${xStr}`,
+                  `https://tile.openstreetmap.de/${zStr}/${xStr}/${yStr}.png`,
+                ]
+              : [
+                  `https://tile.openstreetmap.org/${zStr}/${xStr}/${yStr}.png`,
+                  `https://tile.openstreetmap.de/${zStr}/${xStr}/${yStr}.png`,
+                  `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/${zStr}/${yStr}/${xStr}`,
+                ];
+          void (async () => {
+            for (const candidateUrl of candidates) {
+              try {
+                const resp = await fetch(candidateUrl, {
+                  headers: {
+                    'User-Agent': `RecursosCockpit/${readAppVersion()} (+https://github.com/cminewarIA/recursos-ui)`,
+                    Accept: 'image/webp,image/png,image/jpeg,*/*;q=0.8',
+                  },
+                });
+                const ctype = (resp.headers.get('content-type') || '').toLowerCase();
+                if (resp.ok && ctype.startsWith('image/')) {
+                  const arrBuf = await resp.arrayBuffer();
+                  if (arrBuf.byteLength > 100) {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', ctype.split(';')[0]);
+                    res.setHeader('Cache-Control', 'public, max-age=86400');
+                    res.end(Buffer.from(arrBuf));
+                    return;
+                  }
+                }
+              } catch {
+                // ignore and try next tile source
+              }
+            }
+            res.statusCode = 502;
+            res.end();
+          })();
           return;
         }
 

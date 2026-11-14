@@ -2,7 +2,10 @@ package com.cminewar.recursoscockpit.data
 
 import android.annotation.SuppressLint
 import android.app.ActivityManager
+import android.app.UiModeManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
@@ -49,6 +52,19 @@ class ApiService(
         .connectTimeout(350, TimeUnit.MILLISECONDS)
         .readTimeout(500, TimeUnit.MILLISECONDS)
         .build()
+
+    fun isTelevisionDevice(): Boolean {
+        return try {
+            val uiModeMgr = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+            val isTvUiMode = uiModeMgr?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+            val pm = context.packageManager
+            val hasLeanback = pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+                pm.hasSystemFeature("android.hardware.type.television")
+            isTvUiMode || hasLeanback
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     @SuppressLint("HardwareIds")
     fun collectDeviceTelemetry(): NativeDeviceTelemetry {
@@ -204,9 +220,10 @@ class ApiService(
         }
         val cleanHost = "${brand}-${model}".replace(Regex("[^a-zA-Z0-9_-]"), "-")
 
+        val isTvDevice = isTelevisionDevice()
         return NativeDeviceTelemetry(
             clientType = "android_native",
-            clientLabel = "App Nativa Android (.apk)",
+            clientLabel = if (isTvDevice) "App Nativa Android TV (.apk)" else "App Nativa Android (.apk)",
             accessLevel = "FULL_NATIVE_ACCESS",
             fullAccess = true,
             dexCapable = false,
@@ -223,7 +240,7 @@ class ApiService(
             hardwareSoc = hardwareSoc,
             bootloader = bootloader,
             buildDisplay = buildDisplay,
-            chassisType = "Android Mobile / Tablet",
+            chassisType = if (isTvDevice) "Android TV / Smart TV" else "Android Mobile / Tablet",
             osDistro = osDistro,
             securityPatch = securityPatch,
             kernel = kernel,
@@ -264,7 +281,8 @@ class ApiService(
     }
 
     private fun applyAuthAndTelemetryHeaders(reqBuilder: Request.Builder) {
-        reqBuilder.header("User-Agent", "RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE}; ${Build.MANUFACTURER} ${Build.MODEL}; NativeHTML; FullAccess)")
+        val tvFlag = if (isTelevisionDevice()) "; AndroidTV" else ""
+        reqBuilder.header("User-Agent", "RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE}; ${Build.MANUFACTURER} ${Build.MODEL}$tvFlag; NativeHTML; FullAccess)")
         reqBuilder.header("X-Recursos-Client", "android_native")
         val telemetryB64 = getEncodedTelemetryHeader()
         if (telemetryB64.isNotEmpty()) {

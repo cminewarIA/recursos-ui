@@ -3831,6 +3831,71 @@ def fetch_connections_geo_worker():
         GEOIP_WAKE_EVENT.wait(timeout=2.5)
         GEOIP_WAKE_EVENT.clear()
 
+
+MAP_TILE_CACHE = collections.OrderedDict()
+MAP_TILE_CACHE_LOCK = threading.Lock()
+MAP_TILE_CACHE_MAX = 1500
+MAP_TILE_TTL_SEC = 7 * 86400
+
+
+def fetch_cached_map_tile(style, z, x, y):
+    """Obtiene y cachea en memoria teselas 100 % gratuitas (OpenStreetMap / ArcGIS Canvas) sin API Key."""
+    style = str(style or "light").strip().lower()
+    if style not in ("light", "dark", "osm"):
+        return None
+    try:
+        zi, xi, yi = int(z), int(x), int(y)
+    except Exception:
+        return None
+    if zi < 0 or zi > 19:
+        return None
+    max_coord = 1 << zi
+    if xi < 0 or yi < 0 or xi >= max_coord or yi >= max_coord:
+        return None
+
+    cache_key = f"{style}:{zi}:{xi}:{yi}"
+    now = time.time()
+    with MAP_TILE_CACHE_LOCK:
+        cached = MAP_TILE_CACHE.get(cache_key)
+        if cached and (now - cached[2]) < MAP_TILE_TTL_SEC:
+            MAP_TILE_CACHE.move_to_end(cache_key)
+            return cached[0], cached[1], cached[3]
+
+    if style == "dark":
+        candidates = [
+            ("arcgis-dark", f"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{zi}/{yi}/{xi}"),
+            ("osm-de", f"https://tile.openstreetmap.de/{zi}/{xi}/{yi}.png"),
+            ("osm", f"https://tile.openstreetmap.org/{zi}/{xi}/{yi}.png"),
+        ]
+    else:
+        candidates = [
+            ("osm", f"https://tile.openstreetmap.org/{zi}/{xi}/{yi}.png"),
+            ("osm-de", f"https://tile.openstreetmap.de/{zi}/{xi}/{yi}.png"),
+            ("arcgis-light", f"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{zi}/{yi}/{xi}"),
+        ]
+
+    ver_ua = get_app_version() if callable(globals().get("get_app_version")) else "12.6.0"
+    headers = {
+        "User-Agent": f"RecursosCockpit/{ver_ua} (+https://github.com/cminewarIA/recursos-ui)",
+        "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
+    }
+
+    for prov_name, tile_url in candidates:
+        try:
+            r = requests.get(tile_url, headers=headers, timeout=6)
+            ctype = (r.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+            if r.status_code == 200 and ctype.startswith("image/") and len(r.content) > 100:
+                data = bytes(r.content)
+                with MAP_TILE_CACHE_LOCK:
+                    MAP_TILE_CACHE[cache_key] = (data, ctype, now, prov_name)
+                    MAP_TILE_CACHE.move_to_end(cache_key)
+                    while len(MAP_TILE_CACHE) > MAP_TILE_CACHE_MAX:
+                        MAP_TILE_CACHE.popitem(last=False)
+                return data, ctype, prov_name
+        except Exception:
+            continue
+    return None
+
 # Dynamic Hardware & OS Information (Queried directly from OS kernel at startup)
 def _detect_cpu_static_specs():
     model = ""
@@ -6161,34 +6226,196 @@ def get_ram_info():
     except Exception as e:
         return {"error": str(e), "percent": 0.0, "total_used_percent": 0.0}
 
+def _read_hwmon_disk_temps():
+    """Detecta temperaturas reales de unidades NVMe/SATA desde /sys/class/hwmon."""
+    dev_temps = {}
+    nvme_fallback = None
+    try:
+        for hw in os.listdir("/sys/class/hwmon"):
+            hw_dir = os.path.join("/sys/class/hwmon", hw)
+            name_f = os.path.join(hw_dir, "name")
+            if not os.path.exists(name_f):
+                continue
+            with open(name_f, "r", encoding="utf-8", errors="ignore") as nf:
+                hw_name = nf.read().strip().lower()
+            if hw_name not in ("nvme", "drivetemp"):
+                continue
+            t1 = os.path.join(hw_dir, "temp1_input")
+            if not os.path.exists(t1):
+                continue
+            try:
+                with open(t1, "r", encoding="utf-8", errors="ignore") as tf:
+                    temp_c = round(int(tf.read().strip()) / 1000.0, 1)
+            except Exception:
+                continue
+            if hw_name == "nvme" and nvme_fallback is None:
+                nvme_fallback = temp_c
+            block_dir = os.path.join(hw_dir, "device", "block")
+            if os.path.isdir(block_dir):
+                for bdev in os.listdir(block_dir):
+                    dev_temps[bdev] = temp_c
+            # En NVMe algunos kernels exponen hwmon dentro de /sys/block/nvme0n1/device/hwmon*
+            dev_link = os.path.realpath(os.path.join(hw_dir, "device"))
+            nvme_node = os.path.basename(dev_link)
+            if nvme_node.startswith("nvme"):
+                dev_temps[nvme_node] = temp_c
+    except Exception:
+        pass
+    return dev_temps, nvme_fallback
+
+
+def _read_lsblk_metadata():
+    """Lee discos físicos, particiones, modelos, buses y memorias extraíbles USB/MMC mediante lsblk."""
+    by_path = {}
+    by_mount = {}
+    candidates = []
+    try:
+        raw = subprocess.check_output(
+            [
+                "lsblk", "-J", "-b", "-o",
+                "NAME,KNAME,PATH,TYPE,SIZE,RM,HOTPLUG,TRAN,FSTYPE,UUID,LABEL,MODEL,MOUNTPOINT"
+            ],
+            timeout=2.5,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        parsed = json.loads(raw) if raw else {}
+    except Exception:
+        parsed = {}
+
+    def walk(nodes, parent_meta=None):
+        for node in nodes or []:
+            if not isinstance(node, dict):
+                continue
+            name = str(node.get("name") or "")
+            kname = str(node.get("kname") or name)
+            path = str(node.get("path") or (f"/dev/{kname}" if kname else ""))
+            btype = str(node.get("type") or "").lower()
+            tran_own = str(node.get("tran") or "").strip().lower()
+            model_own = str(node.get("model") or "").strip()
+            rm_own = str(node.get("rm") or "").strip().lower() in ("1", "true", "yes")
+            hp_own = str(node.get("hotplug") or "").strip().lower() in ("1", "true", "yes")
+
+            tran = tran_own or (parent_meta.get("tran") if parent_meta else "") or ""
+            model = model_own or (parent_meta.get("model") if parent_meta else "") or ""
+            is_rm = rm_own or hp_own or (parent_meta.get("is_removable") if parent_meta else False) or (tran in ("usb", "mmc"))
+            root_disk = kname if btype == "disk" else ((parent_meta.get("root_disk") if parent_meta else "") or kname)
+
+            try:
+                size_bytes = int(node.get("size") or 0)
+            except Exception:
+                size_bytes = 0
+
+            fstype = str(node.get("fstype") or "").strip().lower()
+            uuid = str(node.get("uuid") or "").strip()
+            fs_label = str(node.get("label") or "").strip()
+            mp = node.get("mountpoint")
+            children = node.get("children") or []
+
+            meta = {
+                "name": name,
+                "kname": kname,
+                "path": path,
+                "type": btype,
+                "size_bytes": size_bytes,
+                "tran": tran,
+                "model": model,
+                "is_removable": is_rm,
+                "root_disk": root_disk,
+                "fstype": fstype,
+                "uuid": uuid,
+                "fs_label": fs_label,
+                "mountpoint": mp,
+                "has_children": len(children) > 0,
+            }
+            if path:
+                by_path[path] = meta
+                try:
+                    by_path[os.path.realpath(path)] = meta
+                except Exception:
+                    pass
+            if mp and isinstance(mp, str) and mp != "[SWAP]":
+                by_mount[mp] = meta
+
+            is_virtual = (
+                btype in ("loop", "rom", "zram")
+                or name.startswith(("loop", "zram", "ram", "sr"))
+                or fstype in ("swap", "squashfs")
+                or mp == "[SWAP]"
+            )
+            if not is_virtual and size_bytes > 0:
+                if btype in ("part", "lvm", "crypt", "md", "dm") or (btype == "disk" and not children):
+                    candidates.append(meta)
+
+            if children:
+                walk(children, meta)
+
+    walk(parsed.get("blockdevices"))
+    return by_path, by_mount, candidates
+
+
+def _format_transport_badge(kind, fstype, tran, dev_name):
+    t = (tran or "").strip().lower()
+    fs = (fstype or "").strip().lower()
+    dn = (dev_name or "").strip().lower()
+    if kind == "network":
+        if fs in ("cifs", "smb", "smb3"):
+            return "NAS · SMB"
+        if fs.startswith("nfs"):
+            return "NAS · NFS"
+        return f"Red · {fs.upper() or 'Remoto'}"
+    if t == "usb":
+        return "USB Extraíble"
+    if t == "mmc" or "mmcblk" in dn:
+        return "Tarjeta SD/MMC"
+    if t == "nvme" or "nvme" in dn:
+        return "SSD NVMe"
+    if t in ("sata", "ata"):
+        return "Disco SATA"
+    if kind == "removable":
+        return "Extraíble"
+    return "Disco local"
+
+
+def _compute_pool_key(kind, dev_name, mpoint, total_bytes, blk_meta=None):
+    if kind == "network":
+        dn = (dev_name or "").strip()
+        if dn.startswith("//"):
+            remote_host = dn.lstrip("/").split("/", 1)[0].lower()
+        elif ":/" in dn:
+            remote_host = dn.split(":", 1)[0].lower()
+        else:
+            remote_host = dn.lower() or mpoint
+        return f"net:{remote_host}:{int(total_bytes)}"
+    uuid = (blk_meta or {}).get("uuid") if blk_meta else ""
+    base_dev = uuid or (blk_meta or {}).get("path") or dev_name or mpoint
+    try:
+        if not uuid and dev_name.startswith("/dev/"):
+            base_dev = os.path.realpath(dev_name)
+    except Exception:
+        pass
+    return f"{kind}:{base_dev}:{int(total_bytes)}"
+
+
 def fetch_disks_worker():
     global DISKS_CACHE
     ignored_fstypes = {
         "proc", "sysfs", "tmpfs", "devtmpfs", "devpts", "cgroup", "cgroup2",
         "pstore", "securityfs", "debugfs", "tracefs", "configfs", "fusectl",
         "hugetlbfs", "mqueue", "binfmt_misc", "autofs", "squashfs", "overlay",
-        "nsfs", "efivarfs", "fuse.lxcfs", "fuse.portal", "ramfs", "rpc_pipefs"
+        "nsfs", "efivarfs", "fuse.lxcfs", "fuse.portal", "ramfs", "rpc_pipefs",
+        "swap"
     }
+    net_fstypes = {"cifs", "smb", "smb3", "nfs", "nfs4", "sshfs", "fuse.sshfs", "davfs", "glusterfs"}
     while True:
         try:
-            nvme_temp = None
-            try:
-                for hw in os.listdir("/sys/class/hwmon"):
-                    hw_dir = os.path.join("/sys/class/hwmon", hw)
-                    name_f = os.path.join(hw_dir, "name")
-                    if os.path.exists(name_f):
-                        with open(name_f, "r") as nf:
-                            if "nvme" in nf.read():
-                                t1 = os.path.join(hw_dir, "temp1_input")
-                                if os.path.exists(t1):
-                                    with open(t1, "r") as tf:
-                                        nvme_temp = round(int(tf.read().strip()) / 1000.0, 1)
-                                break
-            except Exception:
-                pass
+            dev_temps, nvme_fallback = _read_hwmon_disk_temps()
+            blk_by_path, blk_by_mount, blk_candidates = _read_lsblk_metadata()
 
             disks = []
             seen_mounts = set()
+            seen_mounted_devs = set()
+            pool_primary_mount = {}
             partitions = []
             try:
                 partitions = psutil.disk_partitions(all=True)
@@ -6203,52 +6430,163 @@ def fetch_disks_worker():
                     continue
                 if fstype in ignored_fstypes or mpoint.startswith(("/proc", "/sys", "/dev", "/run", "/snap")):
                     continue
-                if fstype == "vfat" and mpoint.startswith("/boot"):
+
+                real_dev = dev_name
+                try:
+                    if dev_name.startswith("/dev/"):
+                        real_dev = os.path.realpath(dev_name)
+                except Exception:
+                    pass
+
+                blk = blk_by_mount.get(mpoint) or blk_by_path.get(real_dev) or blk_by_path.get(dev_name)
+                is_net = fstype in net_fstypes or dev_name.startswith("//") or (":/" in dev_name and not dev_name.startswith("/"))
+                is_removable = False if is_net else bool(blk and blk.get("is_removable"))
+
+                # Excluir partición EFI del sistema (/boot/efi) salvo que sea un medio extraíble USB/SD
+                if fstype == "vfat" and mpoint.startswith("/boot") and not is_removable:
                     continue
+
                 seen_mounts.add(mpoint)
                 try:
                     st = os.statvfs(mpoint)
                     total = st.f_blocks * st.f_frsize
                     free = st.f_bavail * st.f_frsize
-                    used = total - (st.f_bfree * st.f_frsize)
+                    used = max(0, total - (st.f_bfree * st.f_frsize))
                     if total == 0:
                         continue
                     percent = round((used / total) * 100, 1)
+                    kind = "network" if is_net else ("removable" if is_removable else "local")
+                    tran = (blk or {}).get("tran") or ""
+                    model = (blk or {}).get("model") or ""
+                    fs_label = (blk or {}).get("fs_label") or ""
+                    transport = _format_transport_badge(kind, fstype, tran, dev_name)
+                    pool_key = _compute_pool_key(kind, dev_name, mpoint, total, blk)
+
+                    is_primary = pool_key not in pool_primary_mount
+                    shared_with = None if is_primary else pool_primary_mount[pool_key]
+                    if is_primary:
+                        pool_primary_mount[pool_key] = mpoint
+
                     if mpoint == "/":
-                        label = f"Sistema Raíz ({dev_name or '/'})"
-                    elif fstype in ("cifs", "smb", "smb3", "nfs", "nfs4", "sshfs"):
+                        label = f"Sistema Raíz · {model or dev_name}" if (model or dev_name) else "Sistema Raíz (/)"
+                    elif kind == "network":
                         share_leaf = os.path.basename(mpoint.rstrip("/")) or dev_name
-                        label = f"Recurso Red ({fstype.upper()}) · {share_leaf}"
+                        remote_host = dev_name.lstrip("/").split("/", 1)[0] if dev_name.startswith("//") else dev_name.split(":", 1)[0]
+                        label = f"{share_leaf} · NAS {remote_host}" if remote_host else f"Recurso Red · {share_leaf}"
+                    elif kind == "removable":
+                        leaf = fs_label or os.path.basename(mpoint.rstrip("/")) or (blk or {}).get("name") or dev_name
+                        label = f"{model} · {leaf}" if model and model.lower() not in leaf.lower() else f"Memoria extraíble · {leaf}"
                     else:
-                        leaf = os.path.basename(mpoint.rstrip("/")) or mpoint
-                        label = f"Volumen {leaf} ({dev_name or fstype})"
+                        leaf = fs_label or os.path.basename(mpoint.rstrip("/")) or mpoint
+                        label = f"{model} · {leaf}" if model else f"Volumen {leaf}"
+
+                    root_disk = (blk or {}).get("root_disk") or ""
+                    kname = (blk or {}).get("kname") or ""
+                    disk_temp = dev_temps.get(root_disk) or dev_temps.get(kname)
+                    if disk_temp is None and ("nvme" in kname or "nvme" in dev_name or mpoint == "/"):
+                        disk_temp = nvme_fallback
+
+                    if real_dev:
+                        seen_mounted_devs.add(real_dev)
+                    if dev_name:
+                        seen_mounted_devs.add(dev_name)
+
                     disks.append({
                         "mountpoint": mpoint,
                         "label": label,
                         "device": dev_name,
                         "fstype": part.fstype or fstype,
-                        "temp_c": nvme_temp if mpoint == "/" else None,
+                        "kind": kind,
+                        "transport": transport,
+                        "model": model or None,
+                        "mounted": True,
+                        "is_removable": is_removable,
+                        "pool_key": pool_key,
+                        "pool_primary": is_primary,
+                        "pool_shared_with": shared_with,
+                        "temp_c": disk_temp,
                         "total_bytes": total,
                         "used_bytes": used,
                         "free_bytes": free,
-                        "percent": percent
+                        "percent": percent,
                     })
                 except Exception:
                     continue
+
+            # Incluir también memorias extraíbles USB/SD o discos de datos conectados en el sistema aunque no estén montados aún
+            for blk in blk_candidates:
+                bpath = blk.get("path") or ""
+                bmp = blk.get("mountpoint")
+                bfstype = blk.get("fstype") or ""
+                bsize = int(blk.get("size_bytes") or 0)
+                if bmp and bmp in seen_mounts:
+                    continue
+                if bpath and bpath in seen_mounted_devs:
+                    continue
+                if bfstype in ("linux_raid_member", "lvm2_member", "crypto_luks", "swap", "squashfs"):
+                    continue
+                is_rem = bool(blk.get("is_removable"))
+                blabel = (blk.get("fs_label") or "").lower()
+                # Ignorar pequeñas particiones EFI/reserva ocultas no extraíbles
+                if not is_rem and (bsize < 256 * 1024 * 1024 or (bfstype == "vfat" and bsize <= 2500 * 1024 * 1024) or "efi" in blabel):
+                    continue
+                # Mostrar memorias extraíbles siempre, y particiones locales no montadas con formato válido
+                if not is_rem and not bfstype:
+                    continue
+                kind = "removable" if is_rem else "local"
+                transport = _format_transport_badge(kind, bfstype, blk.get("tran"), bpath)
+                model = blk.get("model") or ""
+                leaf = blk.get("fs_label") or blk.get("name") or bpath
+                label = (
+                    f"{model} · {leaf}"
+                    if model and model.lower() not in leaf.lower()
+                    else (f"Memoria extraíble · {leaf}" if is_rem else f"Disco {leaf}")
+                )
+                pool_key = _compute_pool_key(kind, bpath, bpath, bsize, blk)
+                root_disk = blk.get("root_disk") or ""
+                kname = blk.get("kname") or ""
+                disk_temp = dev_temps.get(root_disk) or dev_temps.get(kname)
+                disks.append({
+                    "mountpoint": bpath,
+                    "label": label,
+                    "device": bpath,
+                    "fstype": bfstype or "sin formato",
+                    "kind": kind,
+                    "transport": transport,
+                    "model": model or None,
+                    "mounted": False,
+                    "is_removable": is_rem,
+                    "pool_key": pool_key,
+                    "pool_primary": False,
+                    "pool_shared_with": None,
+                    "temp_c": disk_temp,
+                    "total_bytes": bsize,
+                    "used_bytes": 0,
+                    "free_bytes": bsize,
+                    "percent": 0.0,
+                })
 
             if not disks and os.path.exists("/"):
                 try:
                     st = os.statvfs("/")
                     total = st.f_blocks * st.f_frsize
                     free = st.f_bavail * st.f_frsize
-                    used = total - (st.f_bfree * st.f_frsize)
+                    used = max(0, total - (st.f_bfree * st.f_frsize))
                     if total > 0:
                         disks.append({
                             "mountpoint": "/",
                             "label": "Sistema Raíz (/)",
                             "device": "rootfs",
                             "fstype": "ext4",
-                            "temp_c": nvme_temp,
+                            "kind": "local",
+                            "transport": "Disco local",
+                            "model": None,
+                            "mounted": True,
+                            "is_removable": False,
+                            "pool_key": f"local:rootfs:{total}",
+                            "pool_primary": True,
+                            "pool_shared_with": None,
+                            "temp_c": nvme_fallback,
                             "total_bytes": total,
                             "used_bytes": used,
                             "free_bytes": free,
@@ -8250,8 +8588,17 @@ def background_collector():
                 "write_total_bytes": curr_w
             }
             
-            tot_d_bytes = sum(float(d.get("total_bytes") or 0) for d in disks_info)
-            used_d_bytes = sum(float(d.get("used_bytes") or 0) for d in disks_info)
+            unique_mounted_disks = [
+                d for d in disks_info
+                if d.get("mounted", True) and d.get("pool_primary", True)
+            ]
+            local_mounted_disks = [
+                d for d in unique_mounted_disks
+                if d.get("kind") in ("local", None)
+            ]
+            pct_source = local_mounted_disks or unique_mounted_disks or disks_info
+            tot_d_bytes = sum(float(d.get("total_bytes") or 0) for d in pct_source)
+            used_d_bytes = sum(float(d.get("used_bytes") or 0) for d in pct_source)
             if tot_d_bytes > 0:
                 disk_pct_val = round((used_d_bytes / tot_d_bytes) * 100.0, 1)
             elif disks_info:
@@ -8621,11 +8968,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
         self.send_header(
             'Content-Security-Policy',
-            f"default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org data: blob:; "
+            f"default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com data: blob:; "
             f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; "
             f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
             f"img-src 'self' data: blob: https: http:; "
-            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
+            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
             f"frame-src 'self' https://*.duckdns.org https://{dom} https://*.{dom}; "
             f"frame-ancestors {csp_ancestors};"
         )
@@ -8916,14 +9263,15 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 1.1 CONFIGURACIÓN Y ESTADO DE MOTOR DE MAPAS (OpenStreetMap / CartoDB)
+        # 1.1 CONFIGURACIÓN Y ESTADO DE MOTOR DE MAPAS (OpenStreetMap / ArcGIS Libre sin API Key)
         elif clean_path == "/api/maps/config":
             resp = json.dumps({
                 "success": True,
                 "engine": "leaflet",
                 "provider": "OpenStreetMap",
                 "free": True,
-                "requires_api_key": False
+                "requires_api_key": False,
+                "tile_proxy": True
             }).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -8932,6 +9280,31 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(resp)))
             self.end_headers()
             self.wfile.write(resp)
+            return
+
+        # 1.2 PROXY CACHEADO DE TESELAS DE MAPA SIN API KEY NI MARCAS DE AGUA
+        elif clean_path.startswith("/api/maps/tile/"):
+            m_tile = re.match(r"^/api/maps/tile/(light|dark|osm)/(\d+)/(\d+)/(\d+)(?:\.(?:png|jpg|jpeg))?$", clean_path)
+            if not m_tile:
+                self.send_response(400)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            tile_res = fetch_cached_map_tile(m_tile.group(1), m_tile.group(2), m_tile.group(3), m_tile.group(4))
+            if not tile_res:
+                self.send_response(502)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            tile_bytes, tile_ctype, tile_prov = tile_res
+            self.send_response(200)
+            self.send_header('Content-Type', tile_ctype)
+            self.send_header('X-Tile-Provider', tile_prov)
+            self.send_header('Cache-Control', 'public, max-age=86400')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(tile_bytes)))
+            self.end_headers()
+            self.wfile.write(tile_bytes)
             return
 
         # 2. LISTADO DE DISPOSITIVOS EMPAREJADOS CON IDENTIFICACIÓN COMPLETA DE HARDWARE

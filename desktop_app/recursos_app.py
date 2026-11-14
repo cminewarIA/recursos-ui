@@ -468,7 +468,7 @@ def encode_telemetry_header(telemetry_dict):
 
 NATIVE_CSS = b"""
 window {
-    background-color: #f6f7f9;
+    background-color: #f1f5f9;
     color: #0f172a;
 }
 headerbar {
@@ -476,8 +476,8 @@ headerbar {
     background-color: #ffffff;
     color: #0f172a;
     border-bottom: 1px solid #e2e8f0;
-    min-height: 46px;
-    padding: 0 8px;
+    min-height: 48px;
+    padding: 0 10px;
 }
 headerbar .title {
     color: #0f172a;
@@ -489,6 +489,7 @@ headerbar .subtitle {
 }
 headerbar button {
     color: #0f172a;
+    transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 headerbar:backdrop {
     background-color: #ffffff;
@@ -505,7 +506,7 @@ headerbar .titlebutton,
 headerbar:backdrop button.titlebutton,
 headerbar:backdrop .titlebutton {
     background-image: none;
-    background-color: #f1f5f9;
+    background-color: #f8fafc;
     color: #0f172a;
     border: 1px solid #cbd5e1;
     border-radius: 9999px;
@@ -518,9 +519,9 @@ headerbar:backdrop .titlebutton {
 }
 headerbar button.titlebutton:hover,
 headerbar .titlebutton:hover {
-    background-color: #e2e8f0;
-    border-color: #94a3b8;
-    color: #0f172a;
+    background-color: #e0f2fe;
+    border-color: #7dd3fc;
+    color: #0369a1;
 }
 headerbar button.titlebutton.close,
 headerbar .titlebutton.close,
@@ -559,15 +560,28 @@ headerbar .titlebutton.close:hover image {
     color: #0f172a;
     -gtk-icon-style: symbolic;
 }
+.launcher-hero {
+    background-image: linear-gradient(135deg, #f8fafc, #eff6ff 55%, #ecfeff);
+    border: 1px solid #cbd5e1;
+    border-radius: 20px;
+    padding: 20px 24px;
+    box-shadow: 0 10px 26px -10px rgba(15, 23, 42, 0.10);
+}
 .launcher-card {
     background-color: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 16px;
+    border-radius: 18px;
     padding: 20px;
+    box-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.08);
+    transition: all 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.launcher-card:hover {
+    border-color: #7dd3fc;
+    box-shadow: 0 12px 26px -8px rgba(2, 132, 199, 0.14);
 }
 .launcher-title {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 800;
     color: #0f172a;
 }
 .launcher-subtitle {
@@ -575,85 +589,99 @@ headerbar .titlebutton.close:hover image {
     color: #475569;
 }
 .badge-ready {
-    background-color: #ecfdf5;
-    color: #15803d;
-    border-radius: 8px;
-    padding: 4px 10px;
+    background-color: #d1fae5;
+    border: 1px solid #6ee7b7;
+    color: #065f46;
+    border-radius: 9999px;
+    padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-lan {
-    background-color: #ecfdf5;
-    color: #15803d;
-    border-radius: 8px;
-    padding: 4px 10px;
+    background-color: #d1fae5;
+    border: 1px solid #6ee7b7;
+    color: #065f46;
+    border-radius: 9999px;
+    padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-wan {
-    background-color: #eff6ff;
-    color: #1d4ed8;
-    border-radius: 8px;
-    padding: 4px 10px;
+    background-color: #e0f2fe;
+    border: 1px solid #7dd3fc;
+    color: #0369a1;
+    border-radius: 9999px;
+    padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-revoked {
-    background-color: #fef2f2;
+    background-color: #fee2e2;
+    border: 1px solid #fca5a5;
     color: #b91c1c;
-    border-radius: 8px;
-    padding: 4px 10px;
+    border-radius: 9999px;
+    padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-scanning {
-    background-color: #fffbeb;
+    background-color: #fef3c7;
+    border: 1px solid #fcd34d;
     color: #b45309;
-    border-radius: 8px;
-    padding: 4px 10px;
+    border-radius: 9999px;
+    padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-local {
     background-color: #f1f5f9;
+    border: 1px solid #cbd5e1;
     color: #475569;
-    border-radius: 8px;
-    padding: 4px 10px;
+    border-radius: 9999px;
+    padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .btn-primary {
-    background-image: none;
-    background-color: #0f172a;
+    background-image: linear-gradient(135deg, #0284c7, #0ea5e9);
     color: #ffffff;
     font-weight: 700;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 10px 18px;
     border: none;
+    box-shadow: 0 6px 14px -4px rgba(2, 132, 199, 0.35);
+    transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .btn-primary:hover {
-    background-color: #1e293b;
+    background-image: linear-gradient(135deg, #0369a1, #0284c7);
 }
 .btn-nav {
     background-image: none;
-    background-color: #ffffff;
+    background-color: #f8fafc;
     color: #0f172a;
     font-weight: 600;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 6px 12px;
     border: 1px solid #cbd5e1;
+    transition: all 180ms ease;
 }
 .btn-nav:hover {
-    background-color: #f8fafc;
+    background-color: #e0f2fe;
+    border-color: #7dd3fc;
+    color: #0369a1;
 }
 .btn-dex {
     background-image: none;
-    background-color: #eff6ff;
-    color: #1d4ed8;
+    background-color: #e0f2fe;
+    color: #0369a1;
     font-weight: 700;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 6px 12px;
-    border: 1px solid #bfdbfe;
+    border: 1px solid #7dd3fc;
+    transition: all 180ms ease;
+}
+.btn-dex:hover {
+    background-color: #bae6fd;
 }
 """
 
@@ -2135,6 +2163,50 @@ class LocalHtmlBridgeServer:
                 if clean_path.startswith("/api/"):
                     if self._proxy_to_remote("GET"):
                         return
+                    if clean_path.startswith("/api/maps/tile/"):
+                        m_tile = re.match(r"^/api/maps/tile/(light|dark|osm)/(\d+)/(\d+)/(\d+)(?:\.(?:png|jpg|jpeg))?$", clean_path)
+                        if not m_tile:
+                            self.send_response(400)
+                            self.end_headers()
+                            return
+                        t_style, zi, xi, yi = m_tile.group(1), int(m_tile.group(2)), int(m_tile.group(3)), int(m_tile.group(4))
+                        t_urls = (
+                            [
+                                f"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{zi}/{yi}/{xi}",
+                                f"https://tile.openstreetmap.de/{zi}/{xi}/{yi}.png",
+                            ]
+                            if t_style == "dark"
+                            else [
+                                f"https://tile.openstreetmap.org/{zi}/{xi}/{yi}.png",
+                                f"https://tile.openstreetmap.de/{zi}/{xi}/{yi}.png",
+                                f"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{zi}/{yi}/{xi}",
+                            ]
+                        )
+                        for tu in t_urls:
+                            try:
+                                req_t = urllib.request.Request(
+                                    tu,
+                                    headers={
+                                        "User-Agent": f"RecursosCockpit/{get_app_version()} (+https://github.com/cminewarIA/recursos-ui)",
+                                        "Accept": "image/webp,image/png,image/jpeg,*/*;q=0.8",
+                                    },
+                                )
+                                with urllib.request.urlopen(req_t, timeout=6) as tr:
+                                    t_bytes = tr.read()
+                                    t_ct = tr.headers.get_content_type() or "image/png"
+                                    if tr.status == 200 and t_ct.startswith("image/") and len(t_bytes) > 100:
+                                        self.send_response(200)
+                                        self.send_header("Content-Type", t_ct)
+                                        self.send_header("Cache-Control", "public, max-age=86400")
+                                        self.send_header("Content-Length", str(len(t_bytes)))
+                                        self.end_headers()
+                                        self.wfile.write(t_bytes)
+                                        return
+                            except Exception:
+                                continue
+                        self.send_response(502)
+                        self.end_headers()
+                        return
                     if clean_path == "/api/metrics":
                         self._send_json(parent.conn_mgr.build_local_fallback_metrics())
                         return
@@ -2559,6 +2631,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
     def _build_main_layout(self):
         self.main_stack = Gtk.Stack()
         self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.main_stack.set_transition_duration(260)
 
         # Page 1: Native 3-Option Home Launcher
         home_scroll = Gtk.ScrolledWindow()
@@ -2572,9 +2645,10 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         center_box.set_margin_end(28)
         center_box.set_size_request(680, -1)
 
-        # Header with CMineWar Logo
+        # Header with CMineWar Logo inside Asset Hero Card
         brand_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        brand_box.set_halign(Gtk.Align.CENTER)
+        brand_box.set_halign(Gtk.Align.FILL)
+        brand_box.get_style_context().add_class("launcher-hero")
         logo_path = resolve_static_asset_path("recursos-cockpit.png")
         if logo_path:
             try:

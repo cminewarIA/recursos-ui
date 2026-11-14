@@ -28,22 +28,26 @@
 ## 4. Actualización Obligatoria del README (`README.md`)
 - **Regla obligatoria**: Cada vez que se realice cualquier modificación, corrección, nueva funcionalidad, cambio de diseño, ajuste de reglas o incremento de versión, se debe sincronizar inmediatamente `./README.md` con la versión activa (badges de versión, banner, enlaces de descarga y ejemplos), evitando nombrar o listar versiones anteriores salvo para comunicar diferencias relevantes de arquitectura o funcionamiento.
 
-## 5. Compilación e Instalación Local Obligatoria de la App Nativa Linux (.deb)
+## 5. Compilación e Instalación Local Obligatoria de la App Nativa Linux (.deb) y Android TV (.apk)
 - **Regla obligatoria**: Tras incrementar el número de versión en `./VERSION` y completar cualquier cambio:
-  1. **Compilación Inmediata**: Compilar el paquete Debian canónico ejecutando:
+  1. **Compilación e Instalación Simultánea Canónica (Ordenador + Android TV)**: Ejecutar preferentemente el orquestador unificado que actualiza primero el ordenador (`.deb`) y de forma automática compila y despliega la nueva versión en cualquier dispositivo Android TV / Leanback accesible vía ADB en la red local (Zero-Hardcoding):
      ```bash
-     bash packaging/build_deb.sh
+     bash packaging/install_all.sh
      ```
-     Generando `dist/recursos-cockpit_${VERSION}_amd64.deb` y `dist/SHA256SUMS.txt`.
-  2. **Instalación Local en el Servidor**: Instalar de inmediato en el sistema operativo local:
-     ```bash
-     sudo apt-get install -y ./dist/recursos-cockpit_${VERSION}_amd64.deb
-     ```
-  3. **Verificación de la Instalación**: Comprobar que `/usr/bin/recursos-cockpit` esté instalado y operativo ejecutando:
-     ```bash
-     /usr/bin/recursos-cockpit --test-mode
-     ```
-     Verificando con `dpkg -l | grep recursos-cockpit` que la versión instalada coincida exactamente con `./VERSION`.
+  2. **Compilación Individual (si se ejecuta paso a paso)**:
+     - Paquete Debian (`.deb` + `SHA256SUMS.txt` firmado):
+       ```bash
+       bash packaging/build_deb.sh
+       sudo apt-get install --reinstall -y ./dist/recursos-cockpit_${VERSION}_amd64.deb
+       /usr/bin/recursos-cockpit --test-mode
+       dpkg -l | grep recursos-cockpit
+       ```
+     - Paquete Android / Android TV (`.apk` firmado con keystore permanente + despliegue dinámico vía ADB):
+       ```bash
+       bash packaging/build_apk.sh
+       bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_${VERSION}.apk
+       ```
+  3. **Verificación de la Instalación**: Comprobar que `/usr/bin/recursos-cockpit` esté instalado y operativo (`dpkg -l | grep recursos-cockpit` coincidente con `./VERSION`), y que todo televisor Android TV detectado por ADB en la LAN tenga instalada la APK con la misma versión (`versionName == ./VERSION`).
 
 ## 6. Arquitectura Contractual de Aplicaciones Nativas (Linux & Android)
 - **Regla obligatoria**: El diseño y desarrollo de cualquier aplicación cliente nativa (Linux/Ubuntu y Android) debe ajustarse de forma estricta y permanente a los siguientes principios:

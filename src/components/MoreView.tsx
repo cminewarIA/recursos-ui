@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { LayoutGroup, motion } from 'motion/react';
 import {
   BookOpen,
   Check,
@@ -17,6 +18,7 @@ import {
   Trash2,
   Usb,
 } from 'lucide-react';
+import { MorphPill, ViewStage } from './MotionPrimitives';
 import {
   DexStatusPayload,
   MetricsPayload,
@@ -245,64 +247,46 @@ export const MoreView: React.FC<MoreViewProps> = ({
   return (
     <div className="space-y-5">
       {/* Sub-navigation */}
-      <div className="flex items-center gap-1.5 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 no-scrollbar dark:border-slate-800 dark:bg-slate-900">
-        <button
-          type="button"
-          onClick={() => setSubTab('updates')}
-          className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
-            subTab === 'updates'
-              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-          }`}
-        >
-          <GitCommit className="h-4 w-4" />
-          <span>Actualizaciones y aspecto</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setSubTab('devices')}
-          className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
-            subTab === 'devices'
-              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-          }`}
-        >
-          <ShieldCheck className="h-4 w-4" />
-          <span>Dispositivos conectados</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setSubTab('manual')}
-          className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
-            subTab === 'manual'
-              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-          }`}
-        >
-          <BookOpen className="h-4 w-4" />
-          <span>Manual interactivo</span>
-        </button>
-        {isUbuntuNative && (
-          <button
-            type="button"
-            onClick={() => setSubTab('dex')}
-            className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
-              subTab === 'dex'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Usb className="h-4 w-4" />
-            <span>Pantalla móvil USB</span>
-          </button>
-        )}
-      </div>
+      <LayoutGroup id="more-subtabs">
+        <div className="cockpit-segmented flex items-center gap-1.5 overflow-x-auto p-1.5 no-scrollbar">
+          {[
+            { id: 'updates' as const, label: 'Actualizaciones y aspecto', icon: <GitCommit className="h-4 w-4" /> },
+            { id: 'devices' as const, label: 'Dispositivos conectados', icon: <ShieldCheck className="h-4 w-4" /> },
+            { id: 'manual' as const, label: 'Manual interactivo', icon: <BookOpen className="h-4 w-4" /> },
+            ...(isUbuntuNative
+              ? [{ id: 'dex' as const, label: 'Pantalla móvil USB', icon: <Usb className="h-4 w-4" /> }]
+              : []),
+          ].map((t) => {
+            const active = subTab === t.id;
+            return (
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                key={t.id}
+                type="button"
+                onClick={() => setSubTab(t.id)}
+                className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                  active
+                    ? 'text-sky-700 dark:text-sky-300'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                }`}
+              >
+                {active && <MorphPill layoutId="more-subtab-pill" className="rounded-xl" />}
+                <span className="relative z-10 inline-flex items-center gap-2">
+                  {t.icon}
+                  <span>{t.label}</span>
+                </span>
+              </motion.button>
+            );
+          })}
+        </div>
+      </LayoutGroup>
 
+      <ViewStage tabKey={subTab}>
       {/* 1. Actualizaciones y aspecto (Selector de Tema Claro/Oscuro integrado aquí) */}
       {subTab === 'updates' && (
         <div className="space-y-4">
           {/* Theme Switcher inside GitHub Updater Panel */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <section className="cockpit-bento p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
@@ -312,44 +296,43 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   Cambia al instante entre el diseño claro minimalista y el modo oscuro en web y apps
                 </p>
               </div>
-              <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onChangeTheme('light')}
-                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-lg px-4 text-xs font-semibold transition-colors ${
-                    theme === 'light'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-                  }`}
-                >
-                  <Sun className="h-4 w-4" />
-                  <span>Claro</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChangeTheme('dark')}
-                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-lg px-4 text-xs font-semibold transition-colors ${
-                    theme === 'dark'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-                  }`}
-                >
-                  <Moon className="h-4 w-4" />
-                  <span>Oscuro</span>
-                </button>
-              </div>
+              <LayoutGroup id="theme-switcher">
+                <div className="cockpit-subtile inline-flex items-center gap-1 p-1 shrink-0">
+                  {(['light', 'dark'] as const).map((mode) => {
+                    const active = theme === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => onChangeTheme(mode)}
+                        className={`relative inline-flex min-h-[40px] items-center gap-2 rounded-lg px-4 text-xs font-semibold transition-colors ${
+                          active
+                            ? 'text-sky-700 dark:text-sky-300'
+                            : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                        }`}
+                      >
+                        {active && <MorphPill layoutId="theme-switcher-pill" className="rounded-lg" />}
+                        <span className="relative z-10 inline-flex items-center gap-2">
+                          {mode === 'light' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                          <span>{mode === 'light' ? 'Claro' : 'Oscuro'}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </LayoutGroup>
             </div>
           </section>
 
           {/* Unified App / Server / GitHub Updater */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <section className="cockpit-bento p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
                     {isUbuntuNative ? 'Actualización unificada' : 'Actualizaciones desde GitHub'}
                   </h2>
-                  <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
+                  <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold">
                     v{displayVer}
                   </span>
                 </div>
@@ -368,7 +351,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
 
                 {(activeVer?.ubuntu_native_bridge || activeVer?.app_version || activeVer?.server_version) && (
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                    <div className="cockpit-subtile px-3 py-2.5">
                       <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
                         App Ubuntu
                       </p>
@@ -382,16 +365,16 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       </p>
                     </div>
                     <div
-                      className={`rounded-xl border px-3 py-2 ${
+                      className={`rounded-xl px-3 py-2.5 ${
                         activeVer.server_needs_update
-                          ? 'border-blue-200 bg-blue-50/80 dark:border-blue-900/60 dark:bg-blue-950/40'
-                          : 'border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/60'
+                          ? 'cockpit-pill-cyan'
+                          : 'cockpit-subtile'
                       }`}
                     >
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                      <p className="text-[10px] font-medium uppercase tracking-wider opacity-75">
                         Servidor web local
                       </p>
-                      <p className="mt-0.5 font-mono text-xs font-semibold text-slate-900 dark:text-white">
+                      <p className="mt-0.5 font-mono text-xs font-semibold">
                         {activeVer.server_reachable === false
                           ? 'Sin conexión'
                           : `v${getDisplayVersionString(
@@ -399,23 +382,23 @@ export const MoreView: React.FC<MoreViewProps> = ({
                               activeVer.server_display_version
                             )}`}
                         {activeVer.server_needs_update && (
-                          <span className="ml-1.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                          <span className="ml-1.5 text-[10px] font-medium text-sky-600 dark:text-sky-300">
                             · actualizable
                           </span>
                         )}
                       </p>
                     </div>
                     <div
-                      className={`rounded-xl border px-3 py-2 ${
+                      className={`rounded-xl px-3 py-2.5 ${
                         activeVer.github_above_app || activeVer.github_above_server
-                          ? 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/60 dark:bg-emerald-950/40'
-                          : 'border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/60'
+                          ? 'cockpit-pill-emerald'
+                          : 'cockpit-subtile'
                       }`}
                     >
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                      <p className="text-[10px] font-medium uppercase tracking-wider opacity-75">
                         GitHub oficial
                       </p>
-                      <p className="mt-0.5 font-mono text-xs font-semibold text-slate-900 dark:text-white">
+                      <p className="mt-0.5 font-mono text-xs font-semibold">
                         {remoteDisplayVer && remoteDisplayVer !== '0.0.0' ? `v${remoteDisplayVer}` : 'Sin acceso'}
                       </p>
                     </div>
@@ -427,10 +410,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 <button
                   type="button"
                   onClick={handleToggleAutoUpdate}
-                  className={`min-h-[44px] rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors ${
+                  className={`min-h-[44px] rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors ${
                     activeVer?.auto_install_enabled
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                      ? 'cockpit-pill-emerald'
+                      : 'cockpit-subtile text-slate-700 dark:text-slate-300'
                   }`}
                 >
                   {activeVer?.auto_install_enabled ? 'Autoactualización activada' : 'Autoactualización pausada'}
@@ -439,7 +422,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   type="button"
                   disabled={checkingUpdate}
                   onClick={() => loadVersion(true)}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="cockpit-subtile inline-flex min-h-[44px] items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
                   <span>Comprobar</span>
@@ -448,10 +431,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   type="button"
                   disabled={installingUpdate}
                   onClick={handleApplyUpdate}
-                  className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-50 ${
+                  className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-all disabled:opacity-50 ${
                     activeVer?.effective_update_available || activeVer?.update_available
-                      ? 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400'
-                      : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900'
+                      ? 'cockpit-btn-accent'
+                      : 'cockpit-subtile text-slate-800 hover:bg-slate-100 dark:text-white dark:hover:bg-slate-800'
                   }`}
                 >
                   <Download className="h-3.5 w-3.5" />
@@ -497,7 +480,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             {showTechUpdate && (
               <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                 <div>
-                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.4.0'} · Commit local:{' '}
+                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.6.0'} · Commit local:{' '}
                   {activeVer?.local_commit || activeVer?.local_hash || 'local'} · Remoto:{' '}
                   {activeVer?.remote_commit || activeVer?.remote_hash || '--'}
                 </div>
@@ -522,7 +505,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
 
           {/* Native apps download (shown in Web browser only) */}
           {!isNativeApp && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <section className="cockpit-bento p-5">
               <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                 Aplicaciones nativas para tus dispositivos
               </h2>
@@ -532,29 +515,33 @@ export const MoreView: React.FC<MoreViewProps> = ({
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <a
                   href="/download/recursos-cockpit.deb"
-                  className="flex min-h-[56px] items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+                  className="cockpit-subtile flex min-h-[60px] items-center justify-between px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:border-sky-400 dark:text-slate-100"
                 >
                   <span className="flex items-center gap-3">
-                    <Laptop className="h-5 w-5 text-blue-600" />
+                    <span className="cockpit-pill-cyan inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+                      <Laptop className="h-5 w-5" />
+                    </span>
                     <span>
                       <span className="block">App para ordenador Ubuntu (.deb)</span>
                       <span className="font-normal text-slate-500 dark:text-slate-400">Conecta, instala nodo o configura</span>
                     </span>
                   </span>
-                  <Download className="h-4 w-4 text-slate-400" />
+                  <Download className="h-4 w-4 text-sky-600 dark:text-sky-400" />
                 </a>
                 <a
                   href="/download/recursos-cockpit.apk"
-                  className="flex min-h-[56px] items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+                  className="cockpit-subtile flex min-h-[60px] items-center justify-between px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:border-emerald-400 dark:text-slate-100"
                 >
                   <span className="flex items-center gap-3">
-                    <Smartphone className="h-5 w-5 text-emerald-600" />
+                    <span className="cockpit-pill-emerald inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+                      <Smartphone className="h-5 w-5" />
+                    </span>
                     <span>
                       <span className="block">App para móvil Android (.apk)</span>
                       <span className="font-normal text-slate-500 dark:text-slate-400">Conexión directa automática</span>
                     </span>
                   </span>
-                  <Download className="h-4 w-4 text-slate-400" />
+                  <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 </a>
               </div>
             </section>
@@ -564,8 +551,8 @@ export const MoreView: React.FC<MoreViewProps> = ({
 
       {/* 2. Dispositivos conectados (Zero-Trust pairing) */}
       {subTab === 'devices' && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+        <section className="cockpit-bento p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200/70 dark:border-slate-800">
             <div>
               <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                 Dispositivos con permiso de acceso
@@ -578,7 +565,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
               <button
                 type="button"
                 onClick={handleRevokeAllOthers}
-                className="min-h-[40px] rounded-xl border border-rose-200 bg-rose-50 px-3.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+                className="cockpit-btn-off min-h-[40px] rounded-xl px-3.5 text-xs font-semibold transition-colors"
               >
                 Desconectar los demás
               </button>
@@ -590,12 +577,12 @@ export const MoreView: React.FC<MoreViewProps> = ({
               No hay sesiones guardadas en este momento.
             </p>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="mt-4 space-y-2.5">
               {devices.map((dev) => {
                 const isOpen = expandedDevId === dev.id;
                 const accessText = dev.full_access ? 'Aplicación nativa verificada' : 'Navegador web verificado';
                 return (
-                  <div key={dev.id} className="py-4">
+                  <div key={dev.id} className="cockpit-subtile p-3.5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
                         {editingId === dev.id ? (
@@ -604,12 +591,12 @@ export const MoreView: React.FC<MoreViewProps> = ({
                               type="text"
                               value={aliasDraft}
                               onChange={(e) => setAliasDraft(e.target.value)}
-                              className="min-h-[38px] rounded-xl border border-slate-300 px-3 text-xs dark:border-slate-700 dark:bg-slate-800"
+                              className="cockpit-subtile min-h-[38px] px-3 text-xs"
                             />
                             <button
                               type="button"
                               onClick={() => handleSaveAlias(dev.id)}
-                              className="inline-flex min-h-[38px] items-center gap-1 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white dark:bg-white dark:text-slate-900"
+                              className="cockpit-btn-accent inline-flex min-h-[38px] items-center gap-1 rounded-xl px-3 text-xs font-semibold"
                             >
                               <Check className="h-3.5 w-3.5" />
                               <span>Guardar</span>
@@ -620,8 +607,13 @@ export const MoreView: React.FC<MoreViewProps> = ({
                             <p className="text-sm font-semibold text-slate-900 dark:text-white">
                               {dev.name} {dev.is_current ? '(Este dispositivo)' : ''}
                             </p>
-                            <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">·</span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">{accessText}</span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                dev.full_access ? 'cockpit-pill-violet' : 'cockpit-pill-cyan'
+                              }`}
+                            >
+                              {accessText}
+                            </span>
                           </div>
                         )}
                         <p className="mt-0.5 text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
@@ -637,7 +629,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                             setEditingId(dev.id);
                             setAliasDraft(dev.custom_alias || dev.name);
                           }}
-                          className="min-h-[38px] rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"
+                          className="min-h-[38px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
                           Renombrar
                         </button>
@@ -645,7 +637,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                           <button
                             type="button"
                             onClick={() => handleRevokeDevice(dev.id)}
-                            className="inline-flex min-h-[38px] items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
+                            className="cockpit-btn-off inline-flex min-h-[38px] items-center gap-1 rounded-xl px-3 text-xs font-semibold transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             <span>Desconectar</span>
@@ -663,7 +655,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     </div>
 
                     {isOpen && (
-                      <pre className="mt-3 overflow-x-auto rounded-xl bg-slate-50 p-3 font-mono text-[11px] text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
+                      <pre className="mt-3 overflow-x-auto rounded-xl border border-slate-200/70 bg-white p-3 font-mono text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
                         {JSON.stringify(
                           {
                             id: dev.id,
@@ -685,7 +677,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
 
       {/* 3. Manual Interactivo */}
       {subTab === 'manual' && (
-        <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900">
+        <section className="cockpit-bento space-y-3 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
@@ -699,13 +691,13 @@ export const MoreView: React.FC<MoreViewProps> = ({
               href="/manual"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+              className="cockpit-btn-accent inline-flex min-h-[40px] items-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all"
             >
               <span>Abrir en pantalla completa</span>
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+          <div className="overflow-hidden rounded-[14px] border border-slate-200 dark:border-slate-800">
             <iframe
               ref={manualIframeRef}
               src="/manual"
@@ -717,7 +709,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   // ignore
                 }
               }}
-              className="h-[74vh] w-full bg-white dark:bg-slate-950"
+              className="h-[74vh] w-full bg-white dark:bg-[#020617]"
             />
           </div>
         </section>
@@ -725,7 +717,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
 
       {/* 4. Pantalla móvil USB (Solo en Ubuntu nativa; en web/Android mensaje pasivo) */}
       {subTab === 'dex' && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <section className="cockpit-bento p-5">
           {!isUbuntuNative ? (
             <div className="flex flex-col items-center py-10 text-center">
               <Lock className="h-8 w-8 text-slate-400" />
@@ -735,11 +727,16 @@ export const MoreView: React.FC<MoreViewProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
                 <div>
-                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                    Pantalla del móvil por USB (Modo Escritorio)
-                  </h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                      Pantalla del móvil por USB (Modo Escritorio)
+                    </h2>
+                    <span className="cockpit-pill-emerald rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
+                      Puente nativo USB
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     Proyecta y controla tu móvil Android conectado al ordenador por cable USB
                   </p>
@@ -747,7 +744,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 <button
                   type="button"
                   onClick={loadDex}
-                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                  className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   <span>Buscar cable USB</span>
@@ -760,7 +757,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   <select
                     value={dexResolution}
                     onChange={(e) => setDexResolution(e.target.value)}
-                    className="mt-1 min-h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-800"
+                    className="cockpit-subtile mt-1 min-h-[42px] w-full px-3"
                   >
                     <option value="1920x1080">Full HD (1920×1080)</option>
                     <option value="2560x1440">2K QHD (2560×1440)</option>
@@ -772,7 +769,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   <select
                     value={dexFps}
                     onChange={(e) => setDexFps(Number(e.target.value))}
-                    className="mt-1 min-h-[42px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-800"
+                    className="cockpit-subtile mt-1 min-h-[42px] w-full px-3"
                   >
                     <option value={60}>60 imágenes/seg</option>
                     <option value={30}>30 imágenes/seg</option>
@@ -783,7 +780,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     type="checkbox"
                     checked={dexFullscreen}
                     onChange={(e) => setDexFullscreen(e.target.checked)}
-                    className="h-4 w-4 rounded"
+                    className="h-4 w-4 rounded accent-sky-600"
                   />
                   <span className="text-slate-700 dark:text-slate-300">Abrir a pantalla completa</span>
                 </label>
@@ -802,7 +799,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   <button
                     type="button"
                     onClick={() => handleDexAction(true, dexStatus?.devices?.[0]?.serial)}
-                    className="min-h-[44px] rounded-xl bg-slate-900 px-5 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+                    className="cockpit-btn-accent min-h-[44px] rounded-xl px-5 text-xs font-semibold transition-all"
                   >
                     Iniciar proyección USB
                   </button>
@@ -812,6 +809,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
           )}
         </section>
       )}
+      </ViewStage>
     </div>
   );
 };

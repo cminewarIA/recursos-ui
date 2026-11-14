@@ -92,6 +92,14 @@ export interface DiskInfo {
   label?: string;
   device?: string;
   fstype?: string;
+  kind?: 'local' | 'removable' | 'network';
+  transport?: string;
+  model?: string | null;
+  mounted?: boolean;
+  is_removable?: boolean;
+  pool_key?: string;
+  pool_primary?: boolean;
+  pool_shared_with?: string | null;
   temp_c?: number | null;
   total_bytes?: number;
   used_bytes?: number;
@@ -584,10 +592,20 @@ declare global {
     __INITIAL_APP_HASH__?: string;
     __RECURSOS_UBUNTU_NATIVE__?: boolean;
     __RECURSOS_ANDROID_NATIVE__?: boolean;
+    __RECURSOS_ANDROID_TV__?: boolean;
     __RECURSOS_DEVICE_TELEMETRY__?: Record<string, unknown>;
     AndroidBridge?: {
       getAppVersion?: () => string;
       reconnect?: () => void;
+    };
+    RecursosAndroidBridge?: {
+      getDeviceToken?: () => string;
+      onTokenUpdated?: (token: string) => void;
+      getConnectionMode?: () => string;
+      getActiveNodeUrl?: () => string;
+      getDeviceTelemetryJson?: () => string;
+      isTelevision?: () => boolean;
+      triggerNodeRescan?: () => void;
     };
     webkit?: {
       messageHandlers?: {
