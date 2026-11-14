@@ -246,14 +246,62 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     return list.filter((i) => i.is_up && i.name !== 'lo');
   }, [metrics?.net?.interfaces, metrics?.net?.interfaces_list]);
 
+  const OVERVIEW_WINDOW_SECONDS = 300; // Ventana en vivo de 5 minutos en Inicio
+
   const hist = metrics?.history;
-  const timestamps = hist?.timestamps ?? [];
-  const epochTs = hist?.epoch_ts ?? [];
-  const cpuHist = hist?.cpu ?? [];
-  const ramHist = hist?.ram ?? [];
-  const gpuHist = hist?.gpu ?? [];
-  const netRxHist = hist?.net_rx ?? [];
-  const netTxHist = hist?.net_tx ?? [];
+  const { timestamps, epochTs, cpuHist, ramHist, gpuHist, netRxHist, netTxHist } = useMemo(() => {
+    const rawTs = hist?.timestamps ?? [];
+    const rawEpoch = hist?.epoch_ts ?? [];
+    const rawCpu = hist?.cpu ?? [];
+    const rawRam = hist?.ram ?? [];
+    const rawGpu = hist?.gpu ?? [];
+    const rawNetRx = hist?.net_rx ?? [];
+    const rawNetTx = hist?.net_tx ?? [];
+
+    const totalLen = Math.max(
+      rawTs.length,
+      rawEpoch.length,
+      rawCpu.length,
+      rawRam.length,
+      rawGpu.length,
+      rawNetRx.length,
+      rawNetTx.length
+    );
+
+    if (totalLen === 0) {
+      return {
+        timestamps: rawTs,
+        epochTs: rawEpoch,
+        cpuHist: rawCpu,
+        ramHist: rawRam,
+        gpuHist: rawGpu,
+        netRxHist: rawNetRx,
+        netTxHist: rawNetTx,
+      };
+    }
+
+    let startIdx = Math.max(0, totalLen - 60);
+    if (rawEpoch.length >= 2) {
+      const latestEpoch = Number(rawEpoch[rawEpoch.length - 1]);
+      if (Number.isFinite(latestEpoch) && latestEpoch > 0) {
+        const cutoff = latestEpoch - OVERVIEW_WINDOW_SECONDS;
+        const foundIdx = rawEpoch.findIndex((t) => Number(t) >= cutoff);
+        if (foundIdx >= 0) {
+          startIdx = Math.min(foundIdx, Math.max(0, rawEpoch.length - 2));
+        }
+      }
+    }
+
+    return {
+      timestamps: rawTs.slice(startIdx),
+      epochTs: rawEpoch.slice(startIdx),
+      cpuHist: rawCpu.slice(startIdx),
+      ramHist: rawRam.slice(startIdx),
+      gpuHist: rawGpu.slice(startIdx),
+      netRxHist: rawNetRx.slice(startIdx),
+      netTxHist: rawNetTx.slice(startIdx),
+    };
+  }, [hist]);
 
   const cpuSeries: ChartSeries[] = useMemo(
     () => [{ id: 'cpu', metricKey: 'cpu', label: 'Procesador', data: cpuHist, color: '#0284c7', unit: '%' }],
@@ -813,7 +861,21 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 ? 'text-sky-600 dark:text-sky-400'
                 : tone.textClass;
 
-            const ioHist = d.io_history || [];
+            const rawIoHist = d.io_history || [];
+            const ioHist =
+              rawIoHist.length >= 2
+                ? (() => {
+                    const latestMs = Number(rawIoHist[rawIoHist.length - 1]?.t ?? 0);
+                    if (!Number.isFinite(latestMs) || latestMs <= 0) {
+                      return rawIoHist.slice(-60);
+                    }
+                    const cutoffMs = latestMs - OVERVIEW_WINDOW_SECONDS * 1000;
+                    const idx = rawIoHist.findIndex((b) => Number(b.t) >= cutoffMs);
+                    if (idx < 0) return rawIoHist.slice(-2);
+                    const sliced = rawIoHist.slice(Math.min(idx, Math.max(0, rawIoHist.length - 2)));
+                    return sliced.length >= 2 ? sliced : rawIoHist.slice(-2);
+                  })()
+                : rawIoHist;
             const diskReadPoints =
               ioHist.length >= 2
                 ? ioHist.map((b) => Math.round(((b.r || 0) / (1024 * 1024)) * 100) / 100)

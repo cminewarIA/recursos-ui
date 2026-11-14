@@ -678,7 +678,7 @@
         <div>
           <div class="brand-title">Manual Interactivo · Panel de Recursos</div>
           <div class="brand-sub">
-            <span class="pill accent mono" id="manualVersionBadge">v12.7.0</span>
+            <span class="pill accent mono" id="manualVersionBadge">v12.7.1</span>
             <span class="pill emerald" id="liveServerBadge">Modo autónomo</span>
           </div>
         </div>
@@ -1040,12 +1040,12 @@
           <div class="panel-box">
             <div style="font-size:14px; font-weight:700; margin-bottom:10px;">Descarga directa y actualización limpia</div>
             <div style="display:grid; gap:8px; margin-bottom:12px;">
-              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.7.0</a>
-              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android &amp; Android TV (.apk) · 12.7.0</a>
+              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.7.1</a>
+              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android &amp; Android TV (.apk) · 12.7.1</a>
             </div>
             <div class="code-wrap">
               <button type="button" class="copy-btn" data-copy-target="cmdInstallBlock">Copiar</button>
-              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.7.0_amd64.deb</pre>
+              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.7.1_amd64.deb</pre>
             </div>
           </div>
         </div>
@@ -1162,7 +1162,7 @@
 
       function setVersionText(ver, extra) {
         const badge = document.getElementById('manualVersionBadge');
-        if (badge) badge.textContent = 'v' + (ver || '12.7.0') + (extra ? ' · ' + extra : '');
+        if (badge) badge.textContent = 'v' + (ver || '12.7.1') + (extra ? ' · ' + extra : '');
       }
 
       if (window.__INITIAL_APP_VERSION__) {
@@ -1186,7 +1186,7 @@
           if (r.ok) {
             const d = await r.json();
             serverOnline = true;
-            setVersionText(d.current_version || '12.7.0', d.local_commit || '');
+            setVersionText(d.current_version || '12.7.1', d.local_commit || '');
             const b = document.getElementById('liveServerBadge');
             b.textContent = 'Conectado al nodo en vivo';
             b.className = 'pill emerald';
@@ -1753,7 +1753,7 @@
             'Desbloquea en exclusiva "Pantalla móvil USB (DeX)" mediante adb, scrcpy y /dev/uhid.',
             'Paquete firmado con GPG (_gpgorigin) compatible con apt y Ubuntu App Center.'
           ],
-          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.7.0_amd64.deb'
+          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.7.1_amd64.deb'
         },
         android: {
           title: 'App Nativa Android & Android TV (.apk)',
@@ -1764,7 +1764,7 @@
             'Almacenamiento de tokens HMAC en EncryptedSharedPreferences (AES256-GCM) y detección automática LAN (Wi-Fi/Ethernet) / WAN.',
             'Firmada con keystore oficial v1/v2/v3 y desplegable automáticamente en Smart TVs de la LAN con packaging/install_all.sh.'
           ],
-          cmd: 'bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.7.0.apk'
+          cmd: 'bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.7.1.apk'
         },
         web: {
           title: 'Navegador Web Moderno (SPA React 19)',
@@ -1815,9 +1815,9 @@
 
       // 8. Consola API REST en Vivo
       const API_ENDPOINTS = [
-        { method: 'GET', path: '/api/version', desc: 'Versión canónica (App, Servidor y GitHub), commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.7.0', display_version: '12.7.0', server_version: '12.7.0', remote_version: '12.7.0', branch: 'main', update_available: false } },
-        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { current_version: '12.7.0', display_version: '12.7.0' } } },
-        { method: 'POST', path: '/api/system/sync-web', desc: 'Sincronización en caliente de archivos web desde la App Nativa de Ubuntu verificada con SHA-256 sin tocar recursos_history.db', sample: { success: true, synced: true, version: '12.7.0', updated_files: ['VERSION', 'package.json', 'static/index.html', 'static/manual.html'] } },
+        { method: 'GET', path: '/api/version', desc: 'Versión canónica (App, Servidor y GitHub), commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.7.1', display_version: '12.7.1', server_version: '12.7.1', remote_version: '12.7.1', branch: 'main', update_available: false } },
+        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { current_version: '12.7.1', display_version: '12.7.1' } } },
+        { method: 'POST', path: '/api/system/sync-web', desc: 'Sincronización en caliente de archivos web desde la App Nativa de Ubuntu verificada con SHA-256 sin tocar recursos_history.db', sample: { success: true, synced: true, version: '12.7.1', updated_files: ['VERSION', 'package.json', 'static/index.html', 'static/manual.html'] } },
         { method: 'GET', path: '/api/metrics/history?window_sec=3600&limit=180', desc: 'Historial persistente de consumo en recursos_history.db para retroceso temporal en la Inspección Táctil', sample: { ok: true, db_file: 'recursos_history.db', total_samples: 18420, returned_samples: 180, has_older: true } },
         { method: 'GET', path: '/api/maps/config', desc: 'Motor cartográfico libre OpenStreetMap / Leaflet sin necesidad de API Key', sample: { success: true, engine: 'leaflet', provider: 'OpenStreetMap', free: true, requires_api_key: false } },
         { method: 'GET', path: '/api/system/logs?limit=10', desc: 'Agregador unificado de fallos de Systemd, Docker y Kernel', sample: { ok: true, total_errors: 0, counts_by_category: { systemd: 0, docker: 0, kernel: 0 } } },
@@ -1871,6 +1871,7 @@
 
       // 9. Changelog interactivo filtrado por tipo SemVer
       const CHANGELOG = [
+        { ver: 'v12.7.1', type: 'PATCH', desc: 'Ventana en vivo de 5 minutos (300 s) en Inicio y modo En vivo, historial de disco por buckets pico de 5 s (hasta 20 min en Inspección Táctil), ejes X dinámicos con segundos en ventanas cortas y trazado limpio sin saturación de puntos intermedios manteniendo el marcador activo e inspección estrictamente sobre la curva.' },
         { ver: 'v12.7.0', type: 'MINOR', desc: 'Widgets independientes 1×1 plug-and-play para cada unidad física y pool NAS (sustituyendo el bloque ancho único) con animación dinámica de entrada/salida, tasas reales L/E por dispositivo vía /proc/diskstats y /proc/fs/cifs/Stats, transmisión Wake-on-LAN / Sleep-on-LAN multivía verificada con retención LAN Pi-hole (24 h) y optimización integral de WebKit2 (~0 % CPU en reposo) y puente HTTP Ubuntu.' },
         { ver: 'v12.6.0', type: 'MINOR', desc: 'Compatibilidad nativa integral con Android TV (LEANBACK_LAUNCHER, banner 640×360, detección dinámica UiModeManager, overscan y navegación con mando D-Pad + anillo de foco en Compose y React 19) y despliegue simultáneo automatizado en ordenador (.deb) y Smart TVs de la LAN vía ADB mediante packaging/install_all.sh y packaging/install_tv_apk.sh (100 % Zero-Hardcoding).' },
         { ver: 'v12.5.1', type: 'PATCH', desc: 'Eliminación definitiva de basemaps.cartocdn.com (CARTO servía imágenes PNG HTTP 200 con la marca de agua "API KEY REQUIRED" sin disparar tileerror), sustituido por el proxy local cacheado /api/maps/tile/{light|dark|osm}/{z}/{x}/{y}.png sobre OpenStreetMap y ArcGIS Gray Canvas nativo oscuro con respaldo automático tile.openstreetmap.de.' },

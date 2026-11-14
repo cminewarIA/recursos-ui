@@ -26,8 +26,10 @@ interface ExpandedChartModalProps {
   onClose: () => void;
 }
 
+const LIVE_WINDOW_SECONDS = 300; // Ventana en directo de 5 minutos
+
 const WINDOW_PRESETS: Array<{ key: HistoryPresetKey; label: string; sec?: number }> = [
-  { key: 'live', label: 'En vivo · 20 min' },
+  { key: 'live', label: 'En vivo · 5 min' },
   { key: '1200', label: '20 min', sec: 1200 },
   { key: '3600', label: '1 h', sec: 3600 },
   { key: '21600', label: '6 h', sec: 21600 },
@@ -254,40 +256,75 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     return matched?.io_history ?? null;
   }, [spec.chartKind, spec.diskMountpoint, liveMetrics?.disks]);
 
+  const liveSliceWindow = useMemo(() => {
+    const filterByEpoch = (rawEpoch: number[], spanSec: number): number => {
+      if (rawEpoch.length < 2) return 0;
+      const newest = Number(rawEpoch[rawEpoch.length - 1]);
+      if (!Number.isFinite(newest) || newest <= 0) return Math.max(0, rawEpoch.length - 60);
+      const cutoff = newest - spanSec;
+      const idx = rawEpoch.findIndex((t) => Number(t) >= cutoff);
+      return idx >= 0 ? Math.min(idx, Math.max(0, rawEpoch.length - 2)) : Math.max(0, rawEpoch.length - 2);
+    };
+    return { filterByEpoch };
+  }, []);
+
   const resolvedSeries: ChartSeries[] = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
       if (spec.chartKind === 'net' && liveNicHist) {
+        const startIdx = liveSliceWindow.filterByEpoch(
+          liveNicHist.map((b) => Math.round(b.t / 1000)),
+          LIVE_WINDOW_SECONDS
+        );
+        const sliced = liveNicHist.slice(startIdx);
         return spec.series.map((s) => {
           if (s.metricKey === 'net_rx') {
-            return { ...s, data: liveNicHist.map((b) => Math.round((b.rx / (1024 * 1024)) * 100) / 100) };
+            return { ...s, data: sliced.map((b) => Math.round((b.rx / (1024 * 1024)) * 100) / 100) };
           }
           if (s.metricKey === 'net_tx') {
-            return { ...s, data: liveNicHist.map((b) => Math.round((b.tx / (1024 * 1024)) * 100) / 100) };
+            return { ...s, data: sliced.map((b) => Math.round((b.tx / (1024 * 1024)) * 100) / 100) };
           }
           return s;
         });
       }
       if (spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 0) {
+        const startIdx = liveSliceWindow.filterByEpoch(
+          liveDiskHist.map((b) => Math.round(b.t / 1000)),
+          LIVE_WINDOW_SECONDS
+        );
+        const sliced = liveDiskHist.slice(startIdx);
         return spec.series.map((s) => {
           if (s.id === 'disk_r' || s.metricKey === 'disk_r') {
-            return { ...s, data: liveDiskHist.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
+            return { ...s, data: sliced.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
           }
           if (s.id === 'disk_w' || s.metricKey === 'disk_w') {
-            return { ...s, data: liveDiskHist.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
+            return { ...s, data: sliced.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
           }
           return s;
         });
       }
       const liveHist = liveMetrics?.history;
-      if (liveHist && spec.chartKind !== 'net') {
+      if (liveHist && (spec.chartKind !== 'net' || !spec.nicName)) {
+        const startIdx = liveSliceWindow.filterByEpoch(liveHist.epoch_ts ?? [], LIVE_WINDOW_SECONDS);
         return spec.series.map((s) => {
           if (s.metricKey && Array.isArray(liveHist[s.metricKey])) {
-            return { ...s, data: liveHist[s.metricKey] ?? s.data };
+            return { ...s, data: (liveHist[s.metricKey] ?? s.data).slice(startIdx) };
           }
           return s;
         });
       }
       return spec.series;
+    }
+
+    if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) {
+      return spec.series.map((s) => {
+        if (s.id === 'disk_r' || s.metricKey === 'disk_r') {
+          return { ...s, data: liveDiskHist.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
+        }
+        if (s.id === 'disk_w' || s.metricKey === 'disk_w') {
+          return { ...s, data: liveDiskHist.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
+        }
+        return s;
+      });
     }
 
     const sqlHist: HistorySeries | undefined = historyData?.series;
@@ -298,44 +335,57 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       return s;
     });
-  }, [preset, cursorEndTs, liveMetrics?.history, liveNicHist, liveDiskHist, spec.chartKind, spec.series, historyData]);
+  }, [preset, cursorEndTs, liveMetrics?.history, liveNicHist, liveDiskHist, spec.chartKind, spec.nicName, spec.series, historyData, liveSliceWindow]);
 
   const resolvedTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
       if (spec.chartKind === 'net' && liveNicHist?.length) {
-        return liveNicHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
+        const startIdx = liveSliceWindow.filterByEpoch(liveNicHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
+        return liveNicHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
       }
       if (spec.chartKind === 'storage' && liveDiskHist?.length) {
-        return liveDiskHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
+        const startIdx = liveSliceWindow.filterByEpoch(liveDiskHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
+        return liveDiskHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
       }
-      if (spec.chartKind !== 'net' && liveMetrics?.history?.timestamps?.length) {
-        return liveMetrics.history.timestamps;
+      if ((spec.chartKind !== 'net' || !spec.nicName) && liveMetrics?.history?.timestamps?.length) {
+        const startIdx = liveSliceWindow.filterByEpoch(liveMetrics?.history?.epoch_ts ?? [], LIVE_WINDOW_SECONDS);
+        return liveMetrics.history.timestamps.slice(startIdx);
       }
       return spec.timestamps;
     }
+    if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) {
+      return liveDiskHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
+    }
     return historyData?.series?.timestamps ?? [];
-  }, [preset, cursorEndTs, spec.chartKind, spec.timestamps, liveNicHist, liveDiskHist, liveMetrics?.history?.timestamps, historyData]);
+  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.timestamps, liveNicHist, liveDiskHist, liveMetrics?.history?.timestamps, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
 
   const resolvedDateTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) return undefined;
+    if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) return undefined;
     return historyData?.series?.date_timestamps;
-  }, [preset, cursorEndTs, historyData]);
+  }, [preset, cursorEndTs, spec.chartKind, liveDiskHist, historyData]);
 
   const resolvedEpochTs = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
       if (spec.chartKind === 'net' && liveNicHist?.length) {
-        return liveNicHist.map((b) => Math.round(b.t / 1000));
+        const epochs = liveNicHist.map((b) => Math.round(b.t / 1000));
+        return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
       }
       if (spec.chartKind === 'storage' && liveDiskHist?.length) {
-        return liveDiskHist.map((b) => Math.round(b.t / 1000));
+        const epochs = liveDiskHist.map((b) => Math.round(b.t / 1000));
+        return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
       }
-      if (spec.chartKind !== 'net' && liveMetrics?.history?.epoch_ts?.length) {
-        return liveMetrics.history.epoch_ts;
+      if ((spec.chartKind !== 'net' || !spec.nicName) && liveMetrics?.history?.epoch_ts?.length) {
+        const epochs = liveMetrics.history.epoch_ts;
+        return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
       }
       return spec.epochTs;
     }
+    if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) {
+      return liveDiskHist.map((b) => Math.round(b.t / 1000));
+    }
     return historyData?.series?.epoch_ts;
-  }, [preset, cursorEndTs, spec.chartKind, spec.epochTs, liveNicHist, liveDiskHist, liveMetrics?.history?.epoch_ts, historyData]);
+  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.epochTs, liveNicHist, liveDiskHist, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
 
   // Para velocidades/flujos delegamos en TelemetryChart el autoajuste exacto al pico visible en la ventana
   const dynamicMaxLeft = useMemo(() => {

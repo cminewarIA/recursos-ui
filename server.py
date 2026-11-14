@@ -427,11 +427,12 @@ NIC_BUCKET_INTERVAL_MS = 5000   # cubetas de 5 segundos (240 cubetas en 20 minut
 NIC_HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nic_history_2h.json")
 _LAST_NIC_HISTORY_SAVE_TS = 0.0
 
-# Rolling per-Disk / Pool I/O History Buffer (100% OS-driven from psutil / /proc/fs/cifs/Stats)
+# Rolling 20-Minute per-Disk / Pool I/O History Buffer in 5s peak-preserving buckets (matching 5m Overview + 20m Modal)
 DISK_BANDWIDTH_HISTORY = {}   # { io_key: [ {"t": ms_epoch, "r": float_bytes_sec, "w": float_bytes_sec}, ... ] }
 DISK_PREV_COUNTERS = {}       # { io_key: (ts_float, read_bytes, write_bytes) }
 DISK_BANDWIDTH_LOCK = threading.Lock()
-MAX_DISK_HISTORY_SAMPLES = 90
+MAX_DISK_HISTORY_SECONDS = 1200  # 20 minutos en cubetas de 5 s (240 puntos máx.; Inicio recorta últimos 5 min)
+DISK_BUCKET_INTERVAL_MS = 5000
 
 
 def _read_cifs_stats_by_host():
@@ -547,15 +548,25 @@ def _update_disk_io_history(disks_list, now_ts=None):
                             w_sec = dw / dt
                     DISK_PREV_COUNTERS[io_key] = (ts, r_total, w_total)
                 hist = DISK_BANDWIDTH_HISTORY.setdefault(io_key, [])
-                if not hist or (ts_ms - hist[-1]["t"]) >= 1200:
+                bucket_ms = (ts_ms // DISK_BUCKET_INTERVAL_MS) * DISK_BUCKET_INTERVAL_MS
+                cutoff_ms = ts_ms - (MAX_DISK_HISTORY_SECONDS * 1000)
+                r_round = round(r_sec, 1)
+                w_round = round(w_sec, 1)
+                if not hist or (hist[-1]["t"] // DISK_BUCKET_INTERVAL_MS) * DISK_BUCKET_INTERVAL_MS < bucket_ms:
                     hist.append({
                         "t": ts_ms,
-                        "r": round(r_sec, 1),
-                        "w": round(w_sec, 1),
+                        "r": r_round,
+                        "w": w_round,
                     })
-                    if len(hist) > MAX_DISK_HISTORY_SAMPLES:
-                        del hist[:-MAX_DISK_HISTORY_SAMPLES]
-                computed_tick[io_key] = (round(r_sec, 1), round(w_sec, 1), list(hist))
+                else:
+                    hist[-1]["t"] = ts_ms
+                    if r_round > hist[-1]["r"]:
+                        hist[-1]["r"] = r_round
+                    if w_round > hist[-1]["w"]:
+                        hist[-1]["w"] = w_round
+                while hist and hist[0]["t"] < cutoff_ms:
+                    hist.pop(0)
+                computed_tick[io_key] = (r_round, w_round, list(hist))
 
             r_val, w_val, hist_copy = computed_tick[io_key]
             d["io_device"] = io_key
@@ -4018,7 +4029,7 @@ def fetch_cached_map_tile(style, z, x, y):
             ("arcgis-light", f"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{zi}/{yi}/{xi}"),
         ]
 
-    ver_ua = get_app_version() if callable(globals().get("get_app_version")) else "12.7.0"
+    ver_ua = get_app_version() if callable(globals().get("get_app_version")) else "12.7.1"
     headers = {
         "User-Agent": f"RecursosCockpit/{ver_ua} (+https://github.com/cminewarIA/recursos-ui)",
         "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",

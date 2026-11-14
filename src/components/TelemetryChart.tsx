@@ -224,7 +224,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       }
     }
     if (leftUnit === '%') return Math.max(100, Math.ceil(peak));
-    // Para velocidades / flujos: el punto más alto registrado en los últimos 20 min es exactamente el techo de la escala
+    // Para velocidades / flujos: el punto más alto registrado en la ventana visible es exactamente el techo de la escala
     return peak > 0.0001 ? peak : 0.1;
   }, [series, maxLeft, leftUnit]);
 
@@ -316,8 +316,22 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       return padL + (sampleCount > 1 ? (globalIdx / (sampleCount - 1)) * plotW : plotW);
     };
 
-    // Vertical grid lines (dashed 4-6) + X-axis Time scale ticks
+    // Vertical grid lines (dashed 4-6) + X-axis Time scale ticks (evitar HH:MM repetidos en ventanas cortas de 5m)
     const tickCount = plotW < 230 ? 3 : plotW < 400 ? 4 : 5;
+    let forceSecondsTick = false;
+    if (validEpochRange) {
+      const seenMm = new Set<string>();
+      for (let ti = 0; ti < tickCount; ti++) {
+        const frac = tickCount > 1 ? ti / (tickCount - 1) : 0;
+        const tickTs = validEpochRange.tStart + frac * validEpochRange.spanSec;
+        const lbl = formatEpochTick(tickTs, validEpochRange.spanSec);
+        if (seenMm.has(lbl)) {
+          forceSecondsTick = true;
+          break;
+        }
+        seenMm.add(lbl);
+      }
+    }
     ctx.font = fontAxis;
     ctx.textBaseline = 'top';
     for (let ti = 0; ti < tickCount; ti++) {
@@ -338,7 +352,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       let xLabel = '';
       if (validEpochRange) {
         const tickTs = validEpochRange.tStart + frac * validEpochRange.spanSec;
-        xLabel = formatEpochTick(tickTs, validEpochRange.spanSec);
+        xLabel = formatEpochTick(tickTs, forceSecondsTick ? 120 : validEpochRange.spanSec);
       } else {
         const approxIdx = Math.round(frac * (sampleCount - 1));
         const rawDate = dateTimestamps[approxIdx];
@@ -448,26 +462,10 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
 
     const dotBgFill = theme === 'dark' ? '#0f172a' : '#ffffff';
 
-    // 3. Draw sample vertices & pulsing live beacon STRICTLY ON TOP OF all lines and right ON the curve knots
+    // 3. Draw pulsing live tip beacon STRICTLY ON TOP OF all lines and right ON the final knot (sin saturar la línea con puntos intermedios)
     const pulseWave = 0.5 + 0.5 * Math.sin(animPhaseRef.current * Math.PI * 2);
     for (const { s, pts } of computedSeries) {
-      if (s.dashed) continue;
-      const minSpacingPx = 11;
-      let lastDrawnX = -Infinity;
-
-      // Key sample vertices centered directly over the spline (decimated cleanly when dense)
-      for (let i = 0; i < pts.length - 1; i++) {
-        const pt = pts[i];
-        if (pt.x - lastDrawnX < minSpacingPx) continue;
-        lastDrawnX = pt.x;
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 2.35, 0, Math.PI * 2);
-        ctx.fillStyle = s.color;
-        ctx.fill();
-        ctx.lineWidth = 1.25;
-        ctx.strokeStyle = dotBgFill;
-        ctx.stroke();
-      }
+      if (s.dashed || pts.length === 0) continue;
 
       // Live tip point + animated sonar halo right ON the final knot of the line
       const tip = pts[pts.length - 1];
