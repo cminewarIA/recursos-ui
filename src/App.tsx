@@ -16,7 +16,7 @@ import { MoreView } from './components/MoreView';
 import { TelemetryChart } from './components/TelemetryChart';
 import { MainTabId, MetricsPayload, ThemeMode, WifiClient } from './types/telemetry';
 import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/api';
-import { getDisplayVersionString, normalizeExternalRoute } from './utils/formatters';
+import { extractInitialSubTabFromRoute, getDisplayVersionString, normalizeExternalRoute } from './utils/formatters';
 
 interface ToastState {
   id: number;
@@ -39,7 +39,13 @@ export function App() {
     }
     return 'inicio';
   });
-  const [subTabHint, setSubTabHint] = useState<string | undefined>(undefined);
+  const [subTabHint, setSubTabHint] = useState<string | undefined>(() => {
+    if (typeof window !== 'undefined') {
+      return extractInitialSubTabFromRoute(window.location.pathname);
+    }
+    return undefined;
+  });
+  const [navTick, setNavTick] = useState(0);
 
   const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,14 +116,21 @@ export function App() {
       const normalized = normalizeExternalRoute(viewName);
       setActiveTab(normalized);
       const raw = (viewName || '').toLowerCase();
-      if (raw.includes('dex')) setSubTabHint('dex');
-      else if (raw.includes('version') || raw.includes('sistema')) setSubTabHint('updates');
-      else if (raw.includes('cpu') || raw.includes('procesador')) setSubTabHint('cpu');
-      else if (raw.includes('ram') || raw.includes('memoria')) setSubTabHint('ram');
-      else if (raw.includes('gpu') || raw.includes('grafica')) setSubTabHint('gpu');
-      else if (raw.includes('almacenamiento')) setSubTabHint('storage');
-      else if (raw.includes('procesos')) setSubTabHint('processes');
-      else setSubTabHint(undefined);
+      let sub = extractInitialSubTabFromRoute(viewName);
+      if (!sub) {
+        if (raw.includes('dex')) sub = 'dex';
+        else if (raw.includes('version') || raw.includes('sistema')) sub = 'updates';
+        else if (raw.includes('cpu') || raw.includes('procesador')) sub = 'cpu';
+        else if (raw.includes('ram') || raw.includes('memoria')) sub = 'ram';
+        else if (raw.includes('gpu') || raw.includes('grafica')) sub = 'gpu';
+        else if (raw.includes('almacenamiento')) sub = 'storage';
+        else if (raw.includes('procesos')) sub = 'processes';
+        else if (raw.includes('seguridad')) sub = 'security';
+        else if (raw.includes('dns') || raw.includes('duckdns')) sub = 'dns';
+        else if (raw.includes('multimedia') || raw.includes('descargas')) sub = 'media';
+      }
+      setSubTabHint(sub);
+      setNavTick((t) => t + 1);
     };
 
     window.injectNativeSession = (token: string, telemetry?: Record<string, unknown>) => {
@@ -145,7 +158,7 @@ export function App() {
           ? 'android_native'
           : 'web_browser',
       full_access: env.isNativeApp,
-      app_version: window.__INITIAL_APP_VERSION__ || '12.0.0',
+      app_version: window.__INITIAL_APP_VERSION__ || '12.0.6',
       screen_width: window.screen?.width,
       screen_height: window.screen?.height,
     };
@@ -159,6 +172,7 @@ export function App() {
   const navigateTo = useCallback((tab: MainTabId, sub?: string) => {
     setActiveTab(tab);
     setSubTabHint(sub);
+    setNavTick((t) => t + 1);
     if (typeof window !== 'undefined' && window.history?.replaceState) {
       const targetPath = tab === 'inicio' ? '/' : `/${tab}`;
       if (window.location.pathname !== targetPath) {
@@ -328,12 +342,14 @@ export function App() {
               />
             )}
             {activeTab === 'equipo' && (
-              <EquipmentView metrics={metrics} theme={theme} initialSubTab={subTabHint} />
+              <EquipmentView metrics={metrics} theme={theme} initialSubTab={subTabHint} navTick={navTick} />
             )}
             {activeTab === 'red' && (
               <NetworkSecurityView
                 metrics={metrics}
                 theme={theme}
+                initialSubTab={subTabHint}
+                navTick={navTick}
                 onPowerAction={handlePowerClick}
                 actionPendingMac={pendingMac}
                 onRefreshMetrics={() => void fetchMetrics()}
@@ -343,6 +359,8 @@ export function App() {
             {activeTab === 'programas' && (
               <AppsMediaView
                 metrics={metrics}
+                initialSubTab={subTabHint}
+                navTick={navTick}
                 onServiceAction={handleServiceAction}
                 actionPendingTarget={pendingServiceTarget}
               />
@@ -353,6 +371,7 @@ export function App() {
                 theme={theme}
                 onChangeTheme={applyTheme}
                 initialSubTab={subTabHint}
+                navTick={navTick}
                 onRefreshMetrics={() => void fetchMetrics()}
                 onNotify={notify}
               />

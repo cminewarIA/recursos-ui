@@ -28,11 +28,21 @@ import { getDisplayVersionString } from '../utils/formatters';
 
 type MoreSubTab = 'updates' | 'devices' | 'dex';
 
+function resolveMoreSubTab(hint?: string): MoreSubTab | undefined {
+  if (!hint) return undefined;
+  const h = hint.toLowerCase();
+  if (h === 'updates' || h === 'logs' || h === 'sistema' || h === 'version') return 'updates';
+  if (h === 'devices' || h === 'dispositivos' || h === 'nodos') return 'devices';
+  if (h === 'dex') return 'dex';
+  return undefined;
+}
+
 interface MoreViewProps {
   metrics: MetricsPayload | null;
   theme: ThemeMode;
   onChangeTheme: (next: ThemeMode) => void;
   initialSubTab?: string;
+  navTick?: number;
   onRefreshMetrics: () => void;
   onNotify: (msg: string, isError?: boolean) => void;
 }
@@ -42,24 +52,30 @@ export const MoreView: React.FC<MoreViewProps> = ({
   theme,
   onChangeTheme,
   initialSubTab,
+  navTick,
   onRefreshMetrics,
   onNotify,
 }) => {
   const { isUbuntuNative, isNativeApp } = detectNativeEnvironment();
-  const [subTab, setSubTab] = useState<MoreSubTab>(() => {
-    if (initialSubTab === 'devices' || initialSubTab === 'dex' || initialSubTab === 'updates') {
-      return initialSubTab;
-    }
-    return 'updates';
-  });
+  const [subTab, setSubTab] = useState<MoreSubTab>(() => resolveMoreSubTab(initialSubTab) || 'updates');
 
   // Updates state
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(metrics?.version_info ?? null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [updateOutput, setUpdateOutput] = useState('');
-  const [showTechUpdate, setShowTechUpdate] = useState(false);
+  const [showTechUpdate, setShowTechUpdate] = useState(() => initialSubTab?.toLowerCase() === 'logs');
   const [sysLogs, setSysLogs] = useState<SystemErrorLogEntry[]>([]);
+
+  useEffect(() => {
+    const mapped = resolveMoreSubTab(initialSubTab);
+    if (mapped) {
+      setSubTab(mapped);
+      if (initialSubTab?.toLowerCase() === 'logs') {
+        setShowTechUpdate(true);
+      }
+    }
+  }, [initialSubTab, navTick]);
 
   // Devices state
   const [devices, setDevices] = useState<TrustedDevice[]>([]);
@@ -384,7 +400,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             {showTechUpdate && (
               <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                 <div>
-                  Versión interna: {activeVer?.current_version || activeVer?.version || '12.0.0'} · Commit local:{' '}
+                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.0.6'} · Commit local:{' '}
                   {activeVer?.local_commit || activeVer?.local_hash || 'local'} · Remoto:{' '}
                   {activeVer?.remote_commit || activeVer?.remote_hash || '--'}
                 </div>

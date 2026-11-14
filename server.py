@@ -277,6 +277,7 @@ def load_custom_logos():
         return dict(CUSTOM_LOGOS_CACHE.get("data") or {})
 
 def save_custom_logos(logos_dict):
+    global METRICS_CACHE_BYTES
     try:
         clean = logos_dict if isinstance(logos_dict, dict) else {}
         with open(CUSTOM_LOGOS_FILE, "w", encoding="utf-8") as f:
@@ -286,6 +287,7 @@ def save_custom_logos(logos_dict):
         except Exception:
             CUSTOM_LOGOS_CACHE["mtime"] = time.time()
         CUSTOM_LOGOS_CACHE["data"] = dict(clean)
+        METRICS_CACHE_BYTES = b"{}"
         return True
     except Exception:
         return False
@@ -342,7 +344,8 @@ HISTORY = {
     "net_rx": [],
     "net_tx": [],
     "disk_r": [],
-    "disk_w": []
+    "disk_w": [],
+    "disk_pct": []
 }
 MAX_HISTORY = 60
 
@@ -717,10 +720,12 @@ def save_tg_config(cfg_dict):
 
 def record_tg_activity(direction, msg_type, target, user_name, title, content, status="ok", details=None):
     """Registra un evento de mensaje entrante o saliente del bot de Telegram."""
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     entry = {
         "id": f"tg-{int(time.time()*1000)}-{os.urandom(3).hex()}",
         "ts": time.time(),
-        "time_str": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "time_str": now_str,
+        "timestamp": now_str,
         "direction": direction,  # "out" (lo que manda el bot) | "in" (lo que recibe de usuarios)
         "type": msg_type,        # "torrent_completed", "command_reply", "command_received", "magnet_received", "torrent_file_received", "custom_broadcast", "ping_test", "auth_denied"
         "target": str(target) if target else "Todos (Broadcast)",
@@ -735,7 +740,8 @@ def record_tg_activity(direction, msg_type, target, user_name, title, content, s
 
 TELEGRAM_BOT_CACHE = {
     "enabled": True,
-    "running": True,
+    "running": False,
+    "online": False,
     "polling_active": False,
     "allowed_users_count": 0,
     "allowed_users": [],
@@ -1044,19 +1050,25 @@ def telegram_bot_polling_worker():
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_API_URL:
         with TELEGRAM_BOT_LOCK:
             TELEGRAM_BOT_CACHE["enabled"] = False
+            TELEGRAM_BOT_CACHE["running"] = False
+            TELEGRAM_BOT_CACHE["online"] = False
             TELEGRAM_BOT_CACHE["polling_active"] = False
             TELEGRAM_BOT_CACHE["last_action"] = "En espera (TELEGRAM_BOT_TOKEN no configurado)"
         return
     print("[TG BOT] Long-polling de Telegram integrado iniciado.")
     offset = 0
     with TELEGRAM_BOT_LOCK:
+        TELEGRAM_BOT_CACHE["running"] = True
         TELEGRAM_BOT_CACHE["polling_active"] = True
+        TELEGRAM_BOT_CACHE["online"] = True
         TELEGRAM_BOT_CACHE["last_action"] = "Sondeando api.telegram.org..."
 
     while True:
         try:
             with TELEGRAM_BOT_LOCK:
+                TELEGRAM_BOT_CACHE["running"] = True
                 TELEGRAM_BOT_CACHE["polling_active"] = True
+                TELEGRAM_BOT_CACHE["online"] = True
                 TELEGRAM_BOT_CACHE["last_poll_ts"] = time.time()
                 TELEGRAM_BOT_CACHE["last_poll_str"] = datetime.now().strftime("%H:%M:%S")
 
@@ -1709,6 +1721,9 @@ PORT_SERVICE_LABELS = {
 
 LISTENING_PORTS_MAP = {}
 LAST_LISTENING_SCAN = 0.0
+_SS_NEEDS_SUDO = False
+_CONNTRACK_NEEDS_SUDO = False
+_LAST_SQLITE_PRUNE_TS = 0.0
 
 RE_SS_PORT = re.compile(r':(\d+)\s+')
 RE_SS_PROC = re.compile(r'users:\(\(\"([^\"]+)\",pid=(\d+)')
@@ -1717,24 +1732,48 @@ RE_PIHOLE_LOG_REPLY = re.compile(
 )
 RE_CONNTRACK_FLOW = re.compile(r"src=([^\s]+)\s+dst=([^\s]+)\s+sport=(\d+)\s+dport=(\d+)")
 
+def _parse_ss_listening_output(stdout_text):
+    parsed = {}
+    has_proc_info = False
+    for line in stdout_text.splitlines():
+        m_port = RE_SS_PORT.search(line)
+        m_proc = RE_SS_PROC.search(line)
+        if m_port and m_proc:
+            has_proc_info = True
+            port = int(m_port.group(1))
+            proc = m_proc.group(1)
+            pid = int(m_proc.group(2))
+            parsed[port] = {"proc": proc, "pid": pid}
+    return parsed, has_proc_info
+
 def update_listening_ports_map(force=False):
-    global LISTENING_PORTS_MAP, LAST_LISTENING_SCAN
+    global LISTENING_PORTS_MAP, LAST_LISTENING_SCAN, _SS_NEEDS_SUDO
     now = time.time()
     if not force and (now - LAST_LISTENING_SCAN < 20.0) and LISTENING_PORTS_MAP:
         return LISTENING_PORTS_MAP
     LAST_LISTENING_SCAN = now
     new_map = {}
     try:
-        p = subprocess.run(['sudo', 'ss', '-tulpn', '-H'], capture_output=True, text=True, timeout=2.0)
-        if p.returncode == 0:
-            for line in p.stdout.splitlines():
-                m_port = RE_SS_PORT.search(line)
-                m_proc = RE_SS_PROC.search(line)
-                if m_port and m_proc:
-                    port = int(m_port.group(1))
-                    proc = m_proc.group(1)
-                    pid = int(m_proc.group(2))
-                    new_map[port] = {"proc": proc, "pid": pid}
+        if not _SS_NEEDS_SUDO:
+            p = subprocess.run(['ss', '-tulpn', '-H'], capture_output=True, text=True, timeout=2.0)
+            if p.returncode == 0:
+                new_map, has_proc = _parse_ss_listening_output(p.stdout)
+                if p.stdout.strip() and not has_proc:
+                    p_sudo = subprocess.run(['sudo', '-n', 'ss', '-tulpn', '-H'], capture_output=True, text=True, timeout=2.0)
+                    if p_sudo.returncode == 0:
+                        sudo_map, sudo_has_proc = _parse_ss_listening_output(p_sudo.stdout)
+                        if sudo_has_proc:
+                            _SS_NEEDS_SUDO = True
+                            new_map = sudo_map
+            else:
+                p_sudo = subprocess.run(['sudo', '-n', 'ss', '-tulpn', '-H'], capture_output=True, text=True, timeout=2.0)
+                if p_sudo.returncode == 0:
+                    _SS_NEEDS_SUDO = True
+                    new_map, _ = _parse_ss_listening_output(p_sudo.stdout)
+        else:
+            p_sudo = subprocess.run(['sudo', '-n', 'ss', '-tulpn', '-H'], capture_output=True, text=True, timeout=2.0)
+            if p_sudo.returncode == 0:
+                new_map, _ = _parse_ss_listening_output(p_sudo.stdout)
     except Exception:
         pass
     if new_map:
@@ -1958,13 +1997,16 @@ def record_connections_to_sqlite(connections_list):
                     local_hostname=CASE WHEN excluded.local_hostname != '' THEN excluded.local_hostname ELSE connection_history.local_hostname END,
                     process=CASE WHEN excluded.process != '' THEN excluded.process ELSE connection_history.process END
             """, rows)
-            # Mantener base de datos acotada a los 5000 flujos más recientes
-            conn.execute("""
-                DELETE FROM connection_history
-                WHERE id NOT IN (
-                    SELECT id FROM connection_history ORDER BY last_seen DESC LIMIT 5000
-                )
-            """)
+            # Mantener base de datos acotada a los 5000 flujos más recientes (poda cada 60s para evitar I/O cada 2.5s)
+            global _LAST_SQLITE_PRUNE_TS
+            if now - _LAST_SQLITE_PRUNE_TS >= 60.0:
+                conn.execute("""
+                    DELETE FROM connection_history
+                    WHERE id NOT IN (
+                        SELECT id FROM connection_history ORDER BY last_seen DESC LIMIT 5000
+                    )
+                """)
+                _LAST_SQLITE_PRUNE_TS = now
             conn.commit()
             conn.close()
         except Exception as e:
@@ -2749,13 +2791,13 @@ class PiholeDnsTranslator:
         return flows
 
 def fetch_connections_geo_worker():
-    global CONNECTIONS_MAP_CACHE, SERVER_SELF_GEO
+    global CONNECTIONS_MAP_CACHE, SERVER_SELF_GEO, _CONNTRACK_NEEDS_SUDO
     load_geoip_disk_cache()
     pihole_translator = PiholeDnsTranslator()
     resolved_outbound_hosts = {}
+    last_dns_retry_ts = 0.0
     outbound_targets = [
         ("api.github.com", 443, "TCP", "GitHub OTA Sync (api.github.com)"),
-        ("maps.googleapis.com", 443, "TCP", "Google Maps Platform API"),
         ("cdn.simpleicons.org", 443, "TCP", "SimpleIcons Hardware CDN"),
         ("one.one.one.one", 53, "UDP", "Cloudflare DNS Upstream (1.1.1.1)"),
         ("dns.google", 53, "UDP", "Google Public DNS Upstream (8.8.8.8)")
@@ -2807,27 +2849,29 @@ def fetch_connections_geo_worker():
                         f"Error de red al resolver IP pública del nodo: {str(self_ex)}"
                     )
 
-            # 2. Resolve active DNS outbound targets
-            for host_name, port_num, proto_str, svc_label in outbound_targets:
-                if host_name not in resolved_outbound_hosts:
-                    try:
-                        resolved_ip = socket.gethostbyname(host_name)
-                        if resolved_ip:
-                            resolved_outbound_hosts[host_name] = {
-                                "host": host_name,
-                                "ip": resolved_ip,
-                                "port": port_num,
-                                "protocol": proto_str,
-                                "service": svc_label
-                            }
-                    except Exception as dns_ex:
-                        record_geoip_worker_error(
-                            "NET_REQUEST",
-                            "DNS Lookup",
-                            host_name,
-                            "DNS_ERR",
-                            f"No se pudo resolver el host saliente {host_name}: {str(dns_ex)}"
-                        )
+            # 2. Resolve active DNS outbound targets (throttled retry on temporary DNS failure)
+            if len(resolved_outbound_hosts) < len(outbound_targets) and (now - last_dns_retry_ts >= 30.0):
+                last_dns_retry_ts = now
+                for host_name, port_num, proto_str, svc_label in outbound_targets:
+                    if host_name not in resolved_outbound_hosts:
+                        try:
+                            resolved_ip = socket.gethostbyname(host_name)
+                            if resolved_ip:
+                                resolved_outbound_hosts[host_name] = {
+                                    "host": host_name,
+                                    "ip": resolved_ip,
+                                    "port": port_num,
+                                    "protocol": proto_str,
+                                    "service": svc_label
+                                }
+                        except Exception as dns_ex:
+                            record_geoip_worker_error(
+                                "NET_REQUEST",
+                                "DNS Lookup",
+                                host_name,
+                                "DNS_ERR",
+                                f"No se pudo resolver el host saliente {host_name}: {str(dns_ex)}"
+                            )
 
             # 3. Inspect active kernel sockets via psutil.net_connections
             listening_map = update_listening_ports_map()
@@ -2957,9 +3001,17 @@ def fetch_connections_geo_worker():
             except Exception:
                 pass
 
-            # 3b. Inspect kernel conntrack flows (public traffic involving home devices & host)
+            # 3b. Inspect kernel conntrack flows (direct with CAP_NET_ADMIN first, sudo -n fallback)
             try:
-                ct_proc = subprocess.run(["sudo", "-n", "conntrack", "-L"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.5)
+                if not _CONNTRACK_NEEDS_SUDO:
+                    ct_proc = subprocess.run(["conntrack", "-L"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.5)
+                    if ct_proc.returncode != 0:
+                        ct_sudo = subprocess.run(["sudo", "-n", "conntrack", "-L"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.5)
+                        if ct_sudo.returncode == 0:
+                            _CONNTRACK_NEEDS_SUDO = True
+                            ct_proc = ct_sudo
+                else:
+                    ct_proc = subprocess.run(["sudo", "-n", "conntrack", "-L"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.5)
                 if ct_proc.returncode == 0 and ct_proc.stdout:
                     for line in ct_proc.stdout.splitlines():
                         m = RE_CONNTRACK_FLOW.search(line)
@@ -3381,7 +3433,77 @@ GITHUB_REPO = "cminewarIA/recursos-ui"
 GITHUB_BRANCH = "main"
 VERSION_CACHE = {"data": None, "timestamp": 0}
 VERSION_LOCK = threading.Lock()
+_VERSION_REFRESH_IN_FLIGHT = False
+_LOCAL_GIT_SHA_CACHE = None
 DETECTED_DOMAIN_CACHE = None
+
+def get_local_git_sha_cached():
+    """Devuelve el SHA corto local cacheado evitando ejecutar git rev-parse en cada petición HTTP."""
+    global _LOCAL_GIT_SHA_CACHE
+    with VERSION_LOCK:
+        cached = VERSION_CACHE.get("data")
+        if isinstance(cached, dict) and cached.get("local_hash") and cached["local_hash"] not in ("local", "HEAD"):
+            _LOCAL_GIT_SHA_CACHE = cached["local_hash"]
+            return _LOCAL_GIT_SHA_CACHE
+    if _LOCAL_GIT_SHA_CACHE:
+        return _LOCAL_GIT_SHA_CACHE
+    sha = "HEAD"
+    try:
+        if os.path.isdir(os.path.join(BASE_DIR, ".git")):
+            p_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=1.5)
+            if p_sha.returncode == 0 and p_sha.stdout.strip():
+                sha = p_sha.stdout.strip()[:7]
+    except Exception:
+        pass
+    _LOCAL_GIT_SHA_CACHE = sha
+    return sha
+
+def get_version_info_cached_async():
+    """Devuelve versión cacheada sin bloquear el colector de métricas; refresca en segundo plano si expiró."""
+    global _VERSION_REFRESH_IN_FLIGHT
+    now = time.time()
+    cached_copy = None
+    needs_refresh = False
+    with VERSION_LOCK:
+        if VERSION_CACHE["data"]:
+            cached_copy = dict(VERSION_CACHE["data"])
+            cached_copy["auto_install_enabled"] = AUTO_INSTALL_STATE.get("enabled", True)
+            cached_copy["auto_install_in_progress"] = AUTO_INSTALL_STATE.get("in_progress", False)
+            cached_copy["auto_install_status"] = AUTO_INSTALL_STATE.get("last_status", "")
+            cached_copy["last_auto_install"] = AUTO_INSTALL_STATE.get("last_installed_at", "")
+            if now - VERSION_CACHE["timestamp"] >= 60:
+                needs_refresh = True
+        else:
+            needs_refresh = True
+
+    if needs_refresh and not _VERSION_REFRESH_IN_FLIGHT:
+        def _bg_ver_refresh():
+            global _VERSION_REFRESH_IN_FLIGHT
+            _VERSION_REFRESH_IN_FLIGHT = True
+            try:
+                get_version_info(force_refresh=False, allow_auto_trigger=True)
+            finally:
+                _VERSION_REFRESH_IN_FLIGHT = False
+        threading.Thread(target=_bg_ver_refresh, daemon=True).start()
+
+    if cached_copy is not None:
+        return cached_copy
+
+    pkg_ver = get_app_version()
+    disp_ver = get_display_version(pkg_ver)
+    return {
+        "version": pkg_ver,
+        "current_version": pkg_ver,
+        "display_version": disp_ver,
+        "local_hash": get_local_git_sha_cached(),
+        "local_commit": get_local_git_sha_cached(),
+        "public_domain": detect_system_dns_domain(),
+        "local_ip": SERVER_LOCAL_IP,
+        "auto_install_enabled": AUTO_INSTALL_STATE.get("enabled", True),
+        "auto_install_in_progress": AUTO_INSTALL_STATE.get("in_progress", False),
+        "auto_install_status": AUTO_INSTALL_STATE.get("last_status", ""),
+        "last_auto_install": AUTO_INSTALL_STATE.get("last_installed_at", ""),
+    }
 
 def detect_local_server_ip():
     """Detecta automáticamente la IP privada LAN del servidor instalado sin valores fijos."""
@@ -6152,8 +6274,10 @@ def get_duckdns_status():
         pass
 
     full_domain = f"{domain}.duckdns.org" if (domain and "." not in domain) else (domain or detect_system_dns_domain())
+    script_installed = os.path.isfile(script_p)
     return {
-        "installed": os.path.isfile(script_p),
+        "available": script_installed,
+        "installed": script_installed,
         "domain": domain,
         "full_domain": full_domain,
         "token_set": bool(token),
@@ -6184,8 +6308,10 @@ def update_duckdns_now():
     try:
         res = subprocess.run(["bash", script_p], capture_output=True, text=True, timeout=25)
         st = get_duckdns_status()
+        ok = (res.returncode == 0)
         return {
-            "success": res.returncode == 0,
+            "success": ok,
+            "message": "Sincronización DuckDNS completada correctamente" if ok else (res.stderr.strip() or "Error al sincronizar DuckDNS"),
             "returncode": res.returncode,
             "stdout": res.stdout.strip(),
             "stderr": res.stderr.strip(),
@@ -7126,62 +7252,74 @@ def fetch_security_worker():
     global SECURITY_CACHE
     cached_gravity = 0
     last_gravity_check = 0
+    last_pihole_query_ts = 0.0
+    cached_pihole_data = None
+    last_f2b_mtime = -1.0
+    last_f2b_size = -1
+    cached_f2b_log_events = []  # lista de (ip_val, j_val, dt_str, ts)
+    re_f2b_ban = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?\[([^\]]+)\]\s+Ban\s+(\S+)")
 
     while True:
         try:
             now = time.time()
-            # 1. Pi-hole Metrics (lectura nativa directa sin subprocesos ni bloqueos)
-            pihole_data = {
-                "available": False,
-                "online": False,
-                "status": "offline",
-                "domains_being_blocked": 0,
-                "domains_blocked": 0,
-                "dns_queries_today": 0,
-                "total_queries": 0,
-                "ads_blocked_today": 0,
-                "blocked_today": 0,
-                "ads_percentage_today": 0.0,
-                "percent_blocked": 0.0,
-                "top_blocked": []
-            }
-            try:
-                if now - last_gravity_check > 300 or cached_gravity == 0:
-                    conn_g = sqlite3.connect("file:/etc/pihole/gravity.db?mode=ro", uri=True, timeout=2.0)
-                    row_g = conn_g.execute("SELECT count(*) FROM gravity;").fetchone()
-                    conn_g.close()
-                    if row_g and row_g[0]:
-                        cached_gravity = int(row_g[0])
-                        last_gravity_check = now
-
-                conn_f = sqlite3.connect("file:/etc/pihole/pihole-FTL.db?mode=ro", uri=True, timeout=2.0)
-                cur_f = conn_f.cursor()
-                sql_today = "SELECT count(*), sum(CASE WHEN status IN (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16) THEN 1 ELSE 0 END) FROM query_storage WHERE timestamp >= strftime('%s', 'now', 'start of day');"
-                row_t = cur_f.execute(sql_today).fetchone()
-                total_q = int(row_t[0] or 0) if row_t else 0
-                blocked_q = int(row_t[1] or 0) if row_t else 0
-
-                sql_top = "SELECT domain, count(*) as c FROM queries WHERE status IN (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16) AND timestamp >= strftime('%s', 'now', 'start of day') GROUP BY domain ORDER BY c DESC LIMIT 5;"
-                top_blocked = [{"domain": r[0], "count": int(r[1])} for r in cur_f.execute(sql_top).fetchall() if r[0]]
-                conn_f.close()
-
-                pct = round((blocked_q / total_q * 100), 1) if total_q > 0 else 0.0
+            # 1. Pi-hole Metrics (lectura nativa directa con caché de 18s para evitar agregaciones SQLite continuas)
+            if cached_pihole_data is not None and (now - last_pihole_query_ts < 18.0):
+                pihole_data = dict(cached_pihole_data)
+            else:
                 pihole_data = {
-                    "available": True,
-                    "online": True,
-                    "domains_being_blocked": cached_gravity,
-                    "domains_blocked": cached_gravity,
-                    "dns_queries_today": total_q,
-                    "total_queries": total_q,
-                    "ads_blocked_today": blocked_q,
-                    "blocked_today": blocked_q,
-                    "ads_percentage_today": pct,
-                    "percent_blocked": pct,
-                    "top_blocked": top_blocked,
-                    "status": "online"
+                    "available": False,
+                    "online": False,
+                    "status": "offline",
+                    "domains_being_blocked": 0,
+                    "domains_blocked": 0,
+                    "dns_queries_today": 0,
+                    "total_queries": 0,
+                    "ads_blocked_today": 0,
+                    "blocked_today": 0,
+                    "ads_percentage_today": 0.0,
+                    "percent_blocked": 0.0,
+                    "top_blocked": []
                 }
-            except Exception as pe:
-                pihole_data["error"] = str(pe)
+                try:
+                    if now - last_gravity_check > 300 or cached_gravity == 0:
+                        conn_g = sqlite3.connect("file:/etc/pihole/gravity.db?mode=ro", uri=True, timeout=2.0)
+                        row_g = conn_g.execute("SELECT count(*) FROM gravity;").fetchone()
+                        conn_g.close()
+                        if row_g and row_g[0]:
+                            cached_gravity = int(row_g[0])
+                            last_gravity_check = now
+
+                    conn_f = sqlite3.connect("file:/etc/pihole/pihole-FTL.db?mode=ro", uri=True, timeout=2.0)
+                    cur_f = conn_f.cursor()
+                    sql_today = "SELECT count(*), sum(CASE WHEN status IN (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16) THEN 1 ELSE 0 END) FROM query_storage WHERE timestamp >= strftime('%s', 'now', 'start of day');"
+                    row_t = cur_f.execute(sql_today).fetchone()
+                    total_q = int(row_t[0] or 0) if row_t else 0
+                    blocked_q = int(row_t[1] or 0) if row_t else 0
+
+                    sql_top = "SELECT domain, count(*) as c FROM queries WHERE status IN (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16) AND timestamp >= strftime('%s', 'now', 'start of day') GROUP BY domain ORDER BY c DESC LIMIT 5;"
+                    top_blocked = [{"domain": r[0], "count": int(r[1])} for r in cur_f.execute(sql_top).fetchall() if r[0]]
+                    conn_f.close()
+
+                    pct = round((blocked_q / total_q * 100), 1) if total_q > 0 else 0.0
+                    pihole_data = {
+                        "available": True,
+                        "online": True,
+                        "domains_being_blocked": cached_gravity,
+                        "domains_blocked": cached_gravity,
+                        "dns_queries_today": total_q,
+                        "total_queries": total_q,
+                        "ads_blocked_today": blocked_q,
+                        "blocked_today": blocked_q,
+                        "ads_percentage_today": pct,
+                        "percent_blocked": pct,
+                        "top_blocked": top_blocked,
+                        "status": "online"
+                    }
+                    cached_pihole_data = dict(pihole_data)
+                    last_pihole_query_ts = now
+                except Exception as pe:
+                    pihole_data["error"] = str(pe)
+                    last_pihole_query_ts = now
 
             # 2. Fail2ban Metrics & All-Time History
             f2b_data = {
@@ -7263,30 +7401,40 @@ def fetch_security_worker():
                     except Exception:
                         pass
 
-                # Incorporar IPs registradas en el log vivo si no estaban en bips
+                # Incorporar IPs registradas en el log vivo si no estaban en bips (cacheado por st_mtime/st_size)
                 log_path = "/var/log/fail2ban.log"
                 if os.path.exists(log_path):
                     try:
-                        with open(log_path, "r", errors="ignore") as lf:
-                            for line in lf:
-                                m = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?\[([^\]]+)\]\s+Ban\s+(\S+)", line)
-                                if m:
-                                    dt_str, j_val, ip_val = m.group(1), m.group(2).strip(), m.group(3).strip()
-                                    if ip_val not in known_ips:
-                                        known_ips.add(ip_val)
+                        st_log = os.stat(log_path)
+                        if st_log.st_mtime != last_f2b_mtime or st_log.st_size != last_f2b_size:
+                            parsed_events = []
+                            seen_log_ips = {}
+                            with open(log_path, "r", errors="ignore") as lf:
+                                for line in lf:
+                                    m = re_f2b_ban.search(line)
+                                    if m:
+                                        dt_str, j_val, ip_val = m.group(1), m.group(2).strip(), m.group(3).strip()
                                         try:
                                             ts = int(datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").timestamp())
                                         except Exception:
                                             ts = 0
-                                        all_time_list.append({
-                                            "ip": ip_val,
-                                            "jail": j_val,
-                                            "date": dt_str,
-                                            "timestamp": ts,
-                                            "bantime": 0,
-                                            "bancount": 1,
-                                            "is_active": (ip_val in currently_banned_set)
-                                        })
+                                        seen_log_ips[ip_val] = (ip_val, j_val, dt_str, ts)
+                            parsed_events = list(seen_log_ips.values())
+                            cached_f2b_log_events = parsed_events
+                            last_f2b_mtime = st_log.st_mtime
+                            last_f2b_size = st_log.st_size
+                        for ip_val, j_val, dt_str, ts in cached_f2b_log_events:
+                            if ip_val not in known_ips:
+                                known_ips.add(ip_val)
+                                all_time_list.append({
+                                    "ip": ip_val,
+                                    "jail": j_val,
+                                    "date": dt_str,
+                                    "timestamp": ts,
+                                    "bantime": 0,
+                                    "bancount": 1,
+                                    "is_active": (ip_val in currently_banned_set)
+                                })
                     except Exception:
                         pass
 
@@ -7622,6 +7770,19 @@ def background_collector():
             HISTORY["net_tx"].append(round(tx_bytes_sec / (1024 * 1024), 2))
             HISTORY["disk_r"].append(round(read_bytes_sec / (1024 * 1024), 2))
             HISTORY["disk_w"].append(round(write_bytes_sec / (1024 * 1024), 2))
+
+            tot_d_bytes = sum(float(d.get("total_bytes") or 0) for d in disks_info)
+            used_d_bytes = sum(float(d.get("used_bytes") or 0) for d in disks_info)
+            if tot_d_bytes > 0:
+                disk_pct_val = round((used_d_bytes / tot_d_bytes) * 100.0, 1)
+            elif disks_info:
+                disk_pct_val = round(float(disks_info[0].get("percent") or 0.0), 1)
+            else:
+                try:
+                    disk_pct_val = round(float(psutil.disk_usage('/').percent), 1)
+                except Exception:
+                    disk_pct_val = 0.0
+            HISTORY["disk_pct"].append(disk_pct_val)
             
             for k in HISTORY:
                 if len(HISTORY[k]) > MAX_HISTORY:
@@ -7636,8 +7797,15 @@ def background_collector():
 
             with TELEGRAM_BOT_LOCK:
                 telegram_bot_act = dict(TELEGRAM_BOT_CACHE)
+            telegram_bot_act["online"] = bool(
+                telegram_bot_act.get("polling_active")
+                or (telegram_bot_act.get("enabled") and telegram_bot_act.get("running"))
+            )
 
             sys_errors_summary = get_system_errors_summary()
+            ver_info_act = get_version_info_cached_async()
+            with CUSTOM_LOGOS_LOCK:
+                custom_logos_act = load_custom_logos()
 
             payload = {
                 "system": sys_info,
@@ -7659,7 +7827,10 @@ def background_collector():
                 "security": security_data,
                 "history": HISTORY,
                 "telegram_bot": telegram_bot_act,
-                "system_errors_summary": sys_errors_summary
+                "system_errors_summary": sys_errors_summary,
+                "maps_engine": "leaflet",
+                "version_info": ver_info_act,
+                "custom_logos": custom_logos_act,
             }
             
             serialized = json.dumps(payload).encode('utf-8')
@@ -7996,16 +8167,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(err_resp)
                 return
 
-            with METRICS_LOCK:
-                base_payload = dict(METRICS_CACHE)
-
-            if "system" in base_payload and isinstance(base_payload["system"], dict):
-                base_payload["system"] = dict(base_payload["system"])
-                base_payload["system"]["public_domain"] = req_domain
-                base_payload["system"]["local_ip"] = SERVER_LOCAL_IP
-
-            # Inyectar estado de seguridad contextual y versión para la UI
-            base_payload["auth_status"] = {
+            auth_status_obj = {
                 "is_local": auth["is_local"],
                 "is_trusted": auth["is_trusted"],
                 "client_ip": auth["client_ip"],
@@ -8014,14 +8176,38 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 "token": auth.get("token") or auth.get("new_token") or "",
                 "device_name": auth["device_info"]["name"] if auth.get("device_info") else "Dispositivo Local"
             }
-            base_payload["maps_engine"] = "leaflet"
-            base_payload["version_info"] = get_version_info(force_refresh=False)
-            base_payload["version_info"]["public_domain"] = req_domain
-            if "system_errors_summary" not in base_payload:
-                base_payload["system_errors_summary"] = get_system_errors_summary()
-            with CUSTOM_LOGOS_LOCK:
-                base_payload["custom_logos"] = load_custom_logos()
-            data = json.dumps(base_payload).encode('utf-8')
+
+            with METRICS_LOCK:
+                cached_bytes = METRICS_CACHE_BYTES
+                cached_payload = METRICS_CACHE
+                cached_domain = (cached_payload.get("system") or {}).get("public_domain", "") if isinstance(cached_payload, dict) else ""
+
+            if (
+                cached_bytes
+                and len(cached_bytes) > 2
+                and cached_bytes.endswith(b"}")
+                and cached_domain == req_domain
+                and "version_info" in cached_payload
+            ):
+                data = cached_bytes[:-1] + b', "auth_status": ' + json.dumps(auth_status_obj).encode('utf-8') + b'}'
+            else:
+                with METRICS_LOCK:
+                    base_payload = dict(METRICS_CACHE)
+
+                if "system" in base_payload and isinstance(base_payload["system"], dict):
+                    base_payload["system"] = dict(base_payload["system"])
+                    base_payload["system"]["public_domain"] = req_domain
+                    base_payload["system"]["local_ip"] = SERVER_LOCAL_IP
+
+                base_payload["auth_status"] = auth_status_obj
+                base_payload["maps_engine"] = "leaflet"
+                base_payload["version_info"] = get_version_info_cached_async()
+                base_payload["version_info"]["public_domain"] = req_domain
+                if "system_errors_summary" not in base_payload:
+                    base_payload["system_errors_summary"] = get_system_errors_summary()
+                with CUSTOM_LOGOS_LOCK:
+                    base_payload["custom_logos"] = load_custom_logos()
+                data = json.dumps(base_payload).encode('utf-8')
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -8103,8 +8289,19 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 return
             with TELEGRAM_BOT_LOCK:
                 bot_data = dict(TELEGRAM_BOT_CACHE)
+            bot_data["online"] = bool(
+                bot_data.get("polling_active")
+                or (bot_data.get("enabled") and bot_data.get("running"))
+            )
             with TELEGRAM_ACTIVITY_LOCK:
-                activity_list = list(TELEGRAM_ACTIVITY_LOG)
+                raw_activity = list(TELEGRAM_ACTIVITY_LOG)
+            activity_list = []
+            for item in raw_activity:
+                if isinstance(item, dict):
+                    item_copy = dict(item)
+                    if not item_copy.get("timestamp"):
+                        item_copy["timestamp"] = item_copy.get("time_str", "")
+                    activity_list.append(item_copy)
             wl = list(load_tg_whitelist())
             cfg = load_tg_config()
             resp = json.dumps({
@@ -8506,14 +8703,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     content_str = f.read()
                 current_ver = get_app_version()
                 disp_ver = get_display_version(current_ver)
-                local_sha = "HEAD"
-                try:
-                    if os.path.isdir(os.path.join(BASE_DIR, ".git")):
-                        p_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=1.5)
-                        if p_sha.returncode == 0 and p_sha.stdout.strip():
-                            local_sha = p_sha.stdout.strip()[:7]
-                except Exception:
-                    pass
+                local_sha = get_local_git_sha_cached()
                 content_str = content_str.replace('id="sidebarVersionTag">Sincronizando...<', f'id="sidebarVersionTag">v{disp_ver}<')
                 build_injection = (
                     f'<meta name="recursos-app-version" content="{current_ver}" data-display="{disp_ver}" data-commit="{local_sha}">'

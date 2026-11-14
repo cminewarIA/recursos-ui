@@ -80,9 +80,28 @@ export function getDisplayVersionString(rawVersion?: string, displayVer?: string
 export function normalizeExternalRoute(pathStr: string): 'inicio' | 'equipo' | 'red' | 'programas' | 'mas' {
   const clean = (pathStr || '/').toLowerCase().replace(/^\/+/, '').split('/')[0];
   if (['inicio', 'resumen', ''].includes(clean)) return 'inicio';
-  if (['equipo', 'procesador', 'memoria', 'grafica', 'almacenamiento', 'procesos'].includes(clean)) return 'equipo';
-  if (['red', 'seguridad', 'dns', 'duckdns'].includes(clean)) return 'red';
-  if (['programas', 'aplicaciones', 'multimedia', 'descargas'].includes(clean)) return 'programas';
-  if (['mas', 'sistema', 'version', 'dex'].includes(clean)) return 'mas';
+  if (['equipo', 'procesador', 'cpu', 'memoria', 'ram', 'grafica', 'gpu', 'almacenamiento', 'storage', 'procesos', 'processes'].includes(clean)) return 'equipo';
+  if (['red', 'seguridad', 'security', 'dns', 'duckdns', 'mapa', 'map'].includes(clean)) return 'red';
+  if (['programas', 'aplicaciones', 'servicios', 'services', 'multimedia', 'media', 'descargas', 'downloads'].includes(clean)) return 'programas';
+  if (['mas', 'sistema', 'version', 'updates', 'dispositivos', 'devices', 'dex', 'logs'].includes(clean)) return 'mas';
   return 'inicio';
+}
+
+export function extractInitialSubTabFromRoute(pathStr: string): string | undefined {
+  const clean = (pathStr || '/').toLowerCase().replace(/^\/+/, '').split('/')[0];
+  if (['procesador', 'cpu'].includes(clean)) return 'cpu';
+  if (['memoria', 'ram'].includes(clean)) return 'ram';
+  if (['grafica', 'gpu'].includes(clean)) return 'gpu';
+  if (['almacenamiento', 'storage'].includes(clean)) return 'storage';
+  if (['procesos', 'processes'].includes(clean)) return 'processes';
+  if (['seguridad', 'security'].includes(clean)) return 'security';
+  if (['dns', 'duckdns'].includes(clean)) return 'dns';
+  if (['mapa', 'map'].includes(clean)) return 'map';
+  if (['multimedia', 'media', 'descargas', 'downloads'].includes(clean)) return 'media';
+  if (['aplicaciones', 'servicios', 'services'].includes(clean)) return 'services';
+  if (['sistema', 'version', 'updates'].includes(clean)) return 'updates';
+  if (['dispositivos', 'devices'].includes(clean)) return 'devices';
+  if (['logs'].includes(clean)) return 'logs';
+  if (['dex'].includes(clean)) return 'dex';
+  return undefined;
 }

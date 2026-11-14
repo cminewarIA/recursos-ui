@@ -3,7 +3,7 @@
 # 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
 ### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v2B.0.5_(12.0.5)-0284C7?style=for-the-badge)](./VERSION)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v2B.0.6_(12.0.6)-0284C7?style=for-the-badge)](./VERSION)
 [![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Claro_Minimalista_%2B_Oscuro-059669?style=for-the-badge)](#-filosof%C3%ADa-de-dise%C3%B1o)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-7C3AED?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
 [![App Nativa Linux](https://img.shields.io/badge/App_Linux-WebKit2_.deb-0284C7?style=for-the-badge&logo=debian&logoColor=white)](#-8-apps-nativas-linux-deb--android-apk-con-motor-html5-unificado--dex-por-hardware)
@@ -23,7 +23,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ REACT 19 + CANVAS │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │v2B.0.5 ║
+║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ REACT 19 + CANVAS │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │v2B.0.6 ║
 ╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                                              ║
 ║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
@@ -48,12 +48,12 @@
 
 Descarga directamente los binarios compilados y firmados oficialmente para cada plataforma, sin intermediarios:
 
-### 🚀 Última Versión Canónica (`v2B.0.5` · `12.0.5`)
+### 🚀 Última Versión Canónica (`v2B.0.6` · `12.0.6`)
 
 | Paquete Oficial | Plataforma / Arquitectura | Enlace de Descarga Directa | Firma & Verificación |
 | :--- | :--- | :--- | :--- |
-| **🐧 Recursos Cockpit (`.deb`)** | Linux Ubuntu / Debian 64-bit (`amd64`) | [**`recursos-cockpit_12.0.5_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.5/recursos-cockpit_12.0.5_amd64.deb) | Firmado GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.5/SHA256SUMS.txt) |
-| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ (ARM64 / x86_64 / Tablets & Móviles) | [**`recursos-cockpit_12.0.5.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.5/recursos-cockpit_12.0.5.apk) | Firmado v1/v2/v3 con Keystore Oficial Permanente |
+| **🐧 Recursos Cockpit (`.deb`)** | Linux Ubuntu / Debian 64-bit (`amd64`) | [**`recursos-cockpit_12.0.6_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.6/recursos-cockpit_12.0.6_amd64.deb) | Firmado GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.6/SHA256SUMS.txt) |
+| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ (ARM64 / x86_64 / Tablets & Móviles) | [**`recursos-cockpit_12.0.6.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.6/recursos-cockpit_12.0.6.apk) | Firmado v1/v2/v3 con Keystore Oficial Permanente |
 | **⚡ Symlink Última Release (`latest`)** | Paquete Debian canónico | [**`recursos-cockpit.deb` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) | Canonical Release Asset |
 | **⚡ Symlink Última Release (`latest`)** | Paquete Android canónico | [**`recursos-cockpit.apk` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Canonical Release Asset |
 
@@ -66,7 +66,7 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 * **Actualización en un Clic**: Al compartir el mismo certificado criptográfico en todas las versiones, Android permite instalar nuevas versiones directamente sobre la existente **sin desinstalar primero**, preservando intactas las configuraciones, credenciales de emparejamiento y tokens guardados sin advertencias de conflicto de firma (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`).
 * **Instalación vía terminal o ADB**:
   ```bash
-  adb install -r dist/recursos-cockpit_10.3.0.apk
+  adb install -r dist/recursos-cockpit_12.0.6.apk
   ```
   O descarga el archivo directamente desde el navegador de tu tablet o móvil y pulsa **Actualizar**.
 
@@ -75,11 +75,11 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 * **Directivas de Reemplazo Limpio**: El metadato `DEBIAN/control` declara `Replaces: recursos-cockpit` y `Provides: recursos-cockpit`, garantizando que `dpkg` y `apt` gestionen la actualización sin conflictos de dependencia ni advertencias residuales.
 * **Comando recomendado de actualización limpia**:
   ```bash
-  sudo apt-get install --reinstall -y ./dist/recursos-cockpit_10.3.0_amd64.deb
+  sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.0.6_amd64.deb
   ```
   O con `dpkg`:
   ```bash
-  sudo dpkg -i --force-overwrite ./dist/recursos-cockpit_10.2.1_amd64.deb
+  sudo dpkg -i --force-overwrite ./dist/recursos-cockpit_12.0.6_amd64.deb
   ```
 
 ---
@@ -88,6 +88,7 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 
 | Versión | Paquete Linux (`.deb`) | Paquete Android (`.apk`) | Sumas Criptográficas |
 | :---: | :--- | :--- | :--- |
+| **`v12.0.5`** | [recursos-cockpit_12.0.5_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.5/recursos-cockpit_12.0.5_amd64.deb) | [recursos-cockpit_12.0.5.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.5/recursos-cockpit_12.0.5.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.5/SHA256SUMS.txt) |
 | **`v12.0.4`** | [recursos-cockpit_12.0.4_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.4/recursos-cockpit_12.0.4_amd64.deb) | [recursos-cockpit_12.0.4.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.4/recursos-cockpit_12.0.4.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.4/SHA256SUMS.txt) |
 | **`v12.0.3`** | [recursos-cockpit_12.0.3_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.3/recursos-cockpit_12.0.3_amd64.deb) | [recursos-cockpit_12.0.3.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.3/recursos-cockpit_12.0.3.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.3/SHA256SUMS.txt) |
 | **`v12.0.2`** | [recursos-cockpit_12.0.2_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.2/recursos-cockpit_12.0.2_amd64.deb) | [recursos-cockpit_12.0.2.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.2/recursos-cockpit_12.0.2.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.2/SHA256SUMS.txt) |
@@ -393,6 +394,7 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v12.0.6` (`v2B.0.6`)** | `PATCH` | **Auditoría Integral, Optimización de CPU/SQLite, Erradicación de Spam `sudo` PAM en `journalctl`, Serie Real `disk_pct` y Reactividad de Subpestañas (`v2B.0.6`)**: (1) **Erradicación del Spam `sudo` PAM y Optimización del Backend (`server.py`)**: Ejecución directa sin `sudo` de `conntrack -L` y `ss -tulpn -H` aprovechando `CAP_NET_ADMIN`/`CAP_DAC_READ_SEARCH`/`CAP_SYS_PTRACE` del servicio con fallback automático a `sudo -n` solo si hace falta; poda periódica acotada cada `60s` en `record_connections_to_sqlite()` (en lugar de cada `2.5s`), eliminación de `maps.googleapis.com` obsoleto de `outbound_targets` y reintentos DNS cada `30s`; caché de `/var/log/fail2ban.log` por `(st_mtime, st_size)` y TTL de `18s` en consultas SQLite de Pi-hole dentro de `fetch_security_worker()`; (2) **Serie Histórica Real `disk_pct`, Caché Asíncrona de Versión y Respuesta Rápida `/api/metrics` (`server.py`)**: Incorporación de `HISTORY["disk_pct"]` al colector cada `1.5s`, cálculo no bloqueante `get_version_info_cached_async()` y `get_local_git_sha_cached()` (evitando `git rev-parse` en cada petición HTML), inclusión de `version_info`, `custom_logos` y `maps_engine` en `background_collector()` y empalme directo de `METRICS_CACHE_BYTES` en `/api/metrics`; normalización de `telegram_bot.online` / `timestamp` y `duckdns.available` / `message`; (3) **Reactividad de Subpestañas y Enlaces Profundos en React 19 (`src/`)**: Sincronización reactiva de `initialSubTab` con contador `navTick` en `App.tsx`, `EquipmentView.tsx`, `MoreView.tsx`, `AppsMediaView.tsx` y `NetworkSecurityView.tsx`, extracción de subpestaña inicial desde URL (`extractInitialSubTabFromRoute()`), apertura directa de logs desde `"Abrir registro completo"` en `OverviewView.tsx`, compatibilidad `timestamp \|\| time_str` en Telegram y estado visual de servicio DuckDNS; (4) **Sincronización Canónica, Documentación y Paquete Debian (Reglas 3, 4, 5 y 6)**: Actualización de enlaces de instalación en `README.md`, actualización a `12.0.6` (`v2B.0.6`) en `VERSION`, `package.json`, `packaging/debian/control`, `planes/*_v12.0.6.md` y compilación/instalación verificada de `dist/recursos-cockpit_12.0.6_amd64.deb`. |
 | **`v12.0.5` (`v2B.0.5`)** | `PATCH` | **Cifrado `AES-256-GCM` en Reposo para Credenciales del Router ASUS AiMesh, Sondeo SSH sin Exposición en `cmdline` y Filtrado de Puentes Docker (`v2B.0.5`)**: (1) **Bóveda Cifrada `AES-256-GCM` + `PBKDF2-HMAC-SHA256` (`server.py`, `.router_credentials.json`)**: Protección de las credenciales del router mediante sobre cifrado `AES-256-GCM` con clave derivada mediante `PBKDF2-HMAC-SHA256` (`200000` iteraciones) vinculada a `.admin_master_key` y `/etc/machine-id`, incluyendo migración automática transparente y permisos `0600`; (2) **Endurecimiento SSH y Filtrado `ip neigh` (`server.py`)**: Sustitución de `sshpass -p` por `sshpass -e` con entorno privado (`SSHPASS`) evitando exposición de contraseñas en `/proc/<pid>/cmdline`, exclusión de interfaces virtuales/Docker (`docker*`, `br-*`, `veth*`, `virbr*`, `tailscale*`, `tun*`, `wg*`) en `ip neigh` y publicación de `router_encrypted` y `router_auth_mode` en `wifi_summary`; (3) **Interfaz React 19 (`telemetry.ts`, `NetworkSecurityView.tsx`)**: Indicador del estado cifrado junto a la puerta de enlace dentro de los detalles técnicos de Red; (4) **Sincronización Canónica y Paquete Debian (Reglas 3, 4, 5 y 6)**: Actualización a `12.0.5` (`v2B.0.5`) en `VERSION`, `package.json`, `packaging/debian/control`, `README.md`, `planes/*_v12.0.5.md` y compilación/instalación verificada de `dist/recursos-cockpit_12.0.5_amd64.deb`. |
 | **`v12.0.4` (`v2B.0.4`)** | `PATCH` | **Telemetría Real de Banda/Cable desde Router ASUS AiMesh y Corrección del Crash de `Programas` + Paridad de Esquemas (`v2B.0.4`)**: (1) **Erradicación de `"LAN / 5 GHz"` mediante Sondeo ASUS AiMesh (`server.py` y `.router_credentials.json`)**: Extracción real vía SSH de `/tmp/clientlist.json` y `brctl showmacs br0` con carga *Zero-Hardcoding* de credenciales desde `.router_credentials.json` (git-ignored `0600`) o variables `RECURSOS_ROUTER_*`; algoritmo en dos pasadas que clasifica primero todas las conexiones inalámbricas (`2.4 GHz`, `5 GHz`, `6 GHz`) de todos los nodos AiMesh antes de consolidar enlaces `"Cable LAN"` reales en `br0`/`wired_mac`, sustituyendo `"LAN / 5 GHz"` por `"Cable LAN"`, `"2.4 GHz"` o `"Wi-Fi 5 GHz"` y añadiendo banderas y contadores (`online`, `is_online`, `is_server`, `is_gateway`, `vendor`, `wired_clients`, `band_24g`, `band_5g`, `online_clients`, `router_ip`, `router_online`); (2) **Corrección del Crash de la Pestaña `Programas` (`AppsMediaView.tsx`, `server.py`, `telemetry.ts`)**: Emisión numérica de `cpu_percent`/`mem_percent` e `image` en `fetch_docker_worker()`, parseo numérico seguro `toNum()` evitando el `TypeError` en `.toFixed(1)`, corrección del porcentaje de torrents (escala `0..100 %` evitando `10000 %`), soporte unificado de `systemd_services` (`active`/`state`/`role`) y visualización enriquecida de catálogo y añadidos recientes en Emby; (3) **Paridad Integral en `Inicio`, `Red` y `Más` (`OverviewView.tsx`, `NetworkSecurityView.tsx`, `MoreView.tsx`, `server.py`)**: Alineación de `total_errors`, campos de Pi-hole (`online`, `total_queries`, `blocked_today`), Fail2ban (`active`), versión (`current_version`, `local_commit`, `remote_commit`) y logs del sistema; (4) **Sincronización Canónica y Paquete Debian (Reglas 3, 4, 5 y 6)**: Actualización a `12.0.4` (`v2B.0.4`) en `VERSION`, `package.json`, `packaging/debian/control`, `README.md`, `planes/*_v12.0.4.md` y compilación/instalación verificada de `dist/recursos-cockpit_12.0.4_amd64.deb`. |
 | **`v12.0.3` (`v2B.0.3`)** | `PATCH` | **Resolución de Conflicto de Dependencias `esbuild`/`vite` en GitHub Actions (`ERESOLVE`) y Formateo Dinámico `v2B.x` en Backend/Vite (`v2B.0.3`)**: (1) **Corrección del Fallo `npm install` (`ERESOLVE`) en CI (`package.json` y `.github/workflows/build-deb.yml`)**: Actualización de `esbuild` en `devDependencies` de `^0.25.0` a `^0.28.0` para satisfacer el requisito `peerOptional esbuild@"^0.27.0 \|\| ^0.28.0"` de `vite@8.3.8`, evitando el fallo de resolución en instalaciones limpias de GitHub Actions, junto a `--no-audit --no-fund` en el paso de compilación web; (2) **Formateo Dinámico `2B.x` en Backend y Dev Server (`server.py` y `vite.config.ts`)**: Generalización de `get_display_version()` / `getDisplayVersion()` mediante comprobación por prefijo `12.` para mostrar correctamente `2B.0.3` y futuras versiones `12.x`; (3) **Sincronización Canónica y Paquete Debian (Reglas 3, 4, 5 y 6)**: Actualización a `12.0.3` (`v2B.0.3`) en `VERSION`, `package.json`, `packaging/debian/control`, `README.md`, `./planes/*_v12.0.3.md` y compilación/instalación verificada de `dist/recursos-cockpit_12.0.3_amd64.deb`. |

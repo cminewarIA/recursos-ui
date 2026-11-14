@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   ChevronDown,
@@ -16,20 +16,37 @@ import { formatBytes, formatSpeed } from '../utils/formatters';
 
 type AppsSubTab = 'services' | 'media';
 
+function resolveAppsSubTab(hint?: string): AppsSubTab | undefined {
+  if (!hint) return undefined;
+  const h = hint.toLowerCase();
+  if (h === 'media' || h === 'downloads' || h === 'multimedia' || h === 'descargas') return 'media';
+  if (h === 'services' || h === 'servicios' || h === 'aplicaciones') return 'services';
+  return undefined;
+}
+
 interface AppsMediaViewProps {
   metrics: MetricsPayload | null;
   onServiceAction: (type: 'docker' | 'systemd', target: string, action: 'start' | 'restart' | 'stop') => void;
   actionPendingTarget: string | null;
+  initialSubTab?: string;
+  navTick?: number;
 }
 
 export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
   metrics,
   onServiceAction,
   actionPendingTarget,
+  initialSubTab,
+  navTick,
 }) => {
-  const [subTab, setSubTab] = useState<AppsSubTab>('services');
+  const [subTab, setSubTab] = useState<AppsSubTab>(() => resolveAppsSubTab(initialSubTab) || 'services');
   const [query, setQuery] = useState('');
   const [showTechIds, setShowTechIds] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const mapped = resolveAppsSubTab(initialSubTab);
+    if (mapped) setSubTab(mapped);
+  }, [initialSubTab, navTick]);
 
   const toNum = (val: unknown, fallback = 0): number => {
     if (typeof val === 'number' && Number.isFinite(val)) return val;

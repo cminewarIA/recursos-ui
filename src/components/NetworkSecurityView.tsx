@@ -32,9 +32,21 @@ import { formatBytes, formatSpeed } from '../utils/formatters';
 
 type RedSubTab = 'home' | 'map' | 'security' | 'dns';
 
+function resolveRedSubTab(hint?: string): RedSubTab | undefined {
+  if (!hint) return undefined;
+  const h = hint.toLowerCase();
+  if (h === 'security' || h === 'seguridad') return 'security';
+  if (h === 'dns' || h === 'duckdns') return 'dns';
+  if (h === 'map' || h === 'mapa') return 'map';
+  if (h === 'home' || h === 'red') return 'home';
+  return undefined;
+}
+
 interface NetworkSecurityViewProps {
   metrics: MetricsPayload | null;
   theme: ThemeMode;
+  initialSubTab?: string;
+  navTick?: number;
   onPowerAction: (action: 'wake' | 'shutdown', client: WifiClient) => void;
   actionPendingMac: string | null;
   onRefreshMetrics: () => void;
@@ -43,6 +55,7 @@ interface NetworkSecurityViewProps {
 
 interface DuckDnsStatusPayload {
   available?: boolean;
+  installed?: boolean;
   domain?: string;
   full_domain?: string;
   last_registered_ip?: string;
@@ -59,14 +72,21 @@ interface LogoSearchResult {
 export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   metrics,
   theme,
+  initialSubTab,
+  navTick,
   onPowerAction,
   actionPendingMac,
   onRefreshMetrics,
   onNotify,
 }) => {
-  const [subTab, setSubTab] = useState<RedSubTab>('home');
+  const [subTab, setSubTab] = useState<RedSubTab>(() => resolveRedSubTab(initialSubTab) || 'home');
   const [clientQuery, setClientQuery] = useState('');
   const [showTechNet, setShowTechNet] = useState(false);
+
+  useEffect(() => {
+    const mapped = resolveRedSubTab(initialSubTab);
+    if (mapped) setSubTab(mapped);
+  }, [initialSubTab, navTick]);
 
   // Logo picker modal
   const [logoModalClient, setLogoModalClient] = useState<WifiClient | null>(null);
@@ -806,15 +826,18 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             </div>
 
             <div className="mt-4 space-y-2">
-              {(telegramData?.activity ?? []).slice(0, 6).map((act, i) => (
-                <div key={i} className="rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-800/50">
-                  <div className="flex items-center justify-between gap-2 font-semibold text-slate-900 dark:text-white">
-                    <span>{act.title || 'Aviso'}</span>
-                    <span className="font-mono text-[11px] font-normal text-slate-400">{act.timestamp || ''}</span>
+              {(telegramData?.activity ?? []).slice(0, 6).map((act, i) => {
+                const timeLabel = act.timestamp || (act as unknown as { time_str?: string }).time_str || '';
+                return (
+                  <div key={i} className="rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-800/50">
+                    <div className="flex items-center justify-between gap-2 font-semibold text-slate-900 dark:text-white">
+                      <span>{act.title || 'Aviso'}</span>
+                      <span className="font-mono text-[11px] font-normal text-slate-400">{timeLabel}</span>
+                    </div>
+                    <p className="mt-0.5 text-slate-600 dark:text-slate-300">{act.content}</p>
                   </div>
-                  <p className="mt-0.5 text-slate-600 dark:text-slate-300">{act.content}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         </div>
@@ -855,6 +878,16 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 <span className="text-slate-500 dark:text-slate-400">Última dirección IP registrada</span>
                 <span className="font-mono font-semibold tabular-nums text-slate-900 dark:text-white">
                   {duckDns?.last_registered_ip || metrics?.system?.local_ip || '--'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Servicio DDNS</span>
+                <span className={`font-semibold ${
+                  (duckDns?.available ?? duckDns?.installed)
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-slate-500 dark:text-slate-400'
+                }`}>
+                  {(duckDns?.available ?? duckDns?.installed) ? 'Configurado y activo' : 'No configurado'}
                 </span>
               </div>
               <div className="flex justify-between">

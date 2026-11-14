@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -16,33 +16,40 @@ import { formatBytes, formatMbRate, formatPct, formatTemp } from '../utils/forma
 
 type EquipmentSubTab = 'cpu' | 'ram' | 'gpu' | 'storage' | 'processes';
 
+function resolveEquipmentSubTab(hint?: string): EquipmentSubTab | undefined {
+  if (!hint) return undefined;
+  const h = hint.toLowerCase();
+  if (h === 'cpu' || h === 'procesador') return 'cpu';
+  if (h === 'ram' || h === 'memoria') return 'ram';
+  if (h === 'gpu' || h === 'grafica') return 'gpu';
+  if (h === 'storage' || h === 'almacenamiento') return 'storage';
+  if (h === 'processes' || h === 'procesos') return 'processes';
+  return undefined;
+}
+
 interface EquipmentViewProps {
   metrics: MetricsPayload | null;
   theme: ThemeMode;
   initialSubTab?: string;
+  navTick?: number;
 }
 
 export const EquipmentView: React.FC<EquipmentViewProps> = ({
   metrics,
   theme,
   initialSubTab,
+  navTick,
 }) => {
-  const [subTab, setSubTab] = useState<EquipmentSubTab>(() => {
-    if (
-      initialSubTab === 'cpu' ||
-      initialSubTab === 'ram' ||
-      initialSubTab === 'gpu' ||
-      initialSubTab === 'storage' ||
-      initialSubTab === 'processes'
-    ) {
-      return initialSubTab;
-    }
-    return 'cpu';
-  });
+  const [subTab, setSubTab] = useState<EquipmentSubTab>(() => resolveEquipmentSubTab(initialSubTab) || 'cpu');
   const [showTech, setShowTech] = useState(false);
   const [procQuery, setProcQuery] = useState('');
   const [procSort, setProcSort] = useState<'cpu' | 'mem' | 'vram'>('cpu');
   const [coreTooltip, setCoreTooltip] = useState<FloatingTooltipData | null>(null);
+
+  useEffect(() => {
+    const mapped = resolveEquipmentSubTab(initialSubTab);
+    if (mapped) setSubTab(mapped);
+  }, [initialSubTab, navTick]);
 
   const hist = metrics?.history;
   const timestamps = hist?.timestamps ?? [];

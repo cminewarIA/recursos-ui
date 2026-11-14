@@ -211,7 +211,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </span>
               <button
                 type="button"
-                onClick={() => onNavigate('mas', 'updates')}
+                onClick={() => onNavigate('mas', 'logs')}
                 className="font-semibold text-blue-600 hover:underline dark:text-blue-400"
               >
                 Abrir registro completo
