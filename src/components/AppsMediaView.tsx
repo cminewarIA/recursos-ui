@@ -31,6 +31,15 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
   const [query, setQuery] = useState('');
   const [showTechIds, setShowTechIds] = useState<Record<string, boolean>>({});
 
+  const toNum = (val: unknown, fallback = 0): number => {
+    if (typeof val === 'number' && Number.isFinite(val)) return val;
+    if (typeof val === 'string') {
+      const parsed = parseFloat(val.replace('%', '').trim());
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return fallback;
+  };
+
   const containers: DockerActivity[] = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = metrics?.docker_activities ?? [];
@@ -42,7 +51,11 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
     const q = query.trim().toLowerCase();
     const list = metrics?.systemd_services ?? [];
     if (!q) return list;
-    return list.filter((s) => s.name.toLowerCase().includes(q) || String(s.description || '').toLowerCase().includes(q));
+    return list.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        String(s.description || s.role || '').toLowerCase().includes(q)
+    );
   }, [metrics?.systemd_services, query]);
 
   const torrents = metrics?.torrents ?? [];
@@ -134,7 +147,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                             </span>
                           </div>
                           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                            Procesador: {(c.cpu_percent ?? 0).toFixed(1)} % · Memoria: {c.mem_usage || `${(c.mem_percent ?? 0).toFixed(1)} %`}
+                            Procesador: {toNum(c.cpu_val ?? c.cpu_percent).toFixed(1)} % · Memoria: {c.mem_usage || `${toNum(c.mem_pct_val ?? c.mem_percent).toFixed(1)} %`}
                           </p>
                         </div>
 
@@ -220,7 +233,9 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {systemdServices.slice(0, 30).map((s) => {
                   const unitTarget = s.unit || s.name;
-                  const active = (s.active_state || '').toLowerCase() === 'active';
+                  const active = s.active === true || (s.active_state || s.state || '').toLowerCase() === 'active';
+                  const stateLabel = s.active_state || s.state || 'Inactivo';
+                  const roleDesc = s.description || s.role;
                   const busy = actionPendingTarget === unitTarget;
                   return (
                     <div
@@ -238,11 +253,11 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                               active ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
                             }`}
                           >
-                            {active ? 'Activo' : s.active_state || 'Inactivo'}
+                            {active ? 'Activo' : stateLabel}
                           </span>
                         </div>
-                        {s.description && (
-                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{s.description}</p>
+                        {roleDesc && (
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{roleDesc}</p>
                         )}
                       </div>
 
@@ -276,12 +291,35 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                   Cine y multimedia en casa
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {emby?.online
-                    ? `${emby.server_name || 'Emby'} · ${emby.active_streams || 0} reproducciones en curso`
+                  {(emby?.online ?? emby?.available)
+                    ? `${emby?.server_name || 'Emby'} · ${emby?.active_streams || 0} reproducciones en curso`
                     : 'Sin servidor multimedia activo ahora mismo'}
                 </p>
               </div>
             </div>
+
+            {(emby?.movies_count || emby?.series_count || emby?.episodes_count) ? (
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="rounded-xl bg-slate-50 px-2 py-2 dark:bg-slate-800/60">
+                  <p className="font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                    {emby?.movies_count ?? emby?.library_counts?.['Películas'] ?? 0}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Películas</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-2 py-2 dark:bg-slate-800/60">
+                  <p className="font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                    {emby?.series_count ?? emby?.library_counts?.['Series'] ?? 0}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Series</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-2 py-2 dark:bg-slate-800/60">
+                  <p className="font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                    {emby?.episodes_count ?? emby?.library_counts?.['Episodios'] ?? 0}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Episodios</p>
+                </div>
+              </div>
+            ) : null}
 
             {emby?.sessions && emby.sessions.length > 0 ? (
               <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
@@ -299,6 +337,21 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                       {sess.user || 'Usuario'} · {sess.device || sess.client || 'Pantalla'} ·{' '}
                       {sess.is_paused ? 'En pausa' : 'Viendo ahora'}
                     </p>
+                  </div>
+                ))}
+              </div>
+            ) : emby?.recent_media && emby.recent_media.length > 0 ? (
+              <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+                {emby.recent_media.slice(0, 6).map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-2 py-2.5 text-xs">
+                    <span className="truncate font-medium text-slate-900 dark:text-white">
+                      {item.series ? `${item.series} — ${item.name}` : item.name}
+                    </span>
+                    {item.type && (
+                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        {item.type === 'Movie' ? 'Película' : item.type === 'Episode' ? 'Episodio' : item.type}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -330,7 +383,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
             ) : (
               <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
                 {torrents.slice(0, 15).map((t) => {
-                  const pct = Math.round((t.progress ?? 0) * 100);
+                  const pct = Math.min(100, Math.max(0, Math.round(toNum(t.progress))));
                   return (
                     <div key={t.hash} className="py-3">
                       <div className="flex items-center justify-between gap-2">

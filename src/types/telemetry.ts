@@ -239,8 +239,12 @@ export interface DockerActivity {
   image?: string;
   state?: string;
   status?: string;
-  cpu_percent?: number;
-  mem_percent?: number;
+  cpu_percent?: number | string;
+  cpu_val?: number;
+  cpu_norm_percent?: number;
+  mem_percent?: number | string;
+  mem_pct_val?: number;
+  mem_mb?: number;
   mem_usage?: string;
   net_io?: string;
   block_io?: string;
@@ -252,7 +256,10 @@ export interface DockerActivity {
 export interface SystemdService {
   name: string;
   unit?: string;
+  role?: string;
   description?: string;
+  active?: boolean;
+  state?: string;
   active_state?: string;
   sub_state?: string;
   pid?: number;
@@ -292,13 +299,24 @@ export interface EmbySession {
   progress_percent?: number;
 }
 
+export interface EmbyRecentItem {
+  name: string;
+  series?: string;
+  type?: string;
+}
+
 export interface EmbyData {
   online?: boolean;
+  available?: boolean;
   server_name?: string;
   version?: string;
   active_streams?: number;
   sessions?: EmbySession[];
   library_counts?: Record<string, number>;
+  movies_count?: number;
+  series_count?: number;
+  episodes_count?: number;
+  recent_media?: EmbyRecentItem[];
 }
 
 export interface Fail2banBanItem {
@@ -314,6 +332,7 @@ export interface Fail2banBanItem {
 export interface SecurityData {
   fail2ban?: {
     active?: boolean;
+    available?: boolean;
     jails?: string[];
     banned_ips?: string[];
     banned_details?: Fail2banBanItem[];
@@ -322,10 +341,15 @@ export interface SecurityData {
   };
   pihole?: {
     online?: boolean;
+    available?: boolean;
     total_queries?: number;
+    dns_queries_today?: number;
     blocked_today?: number;
+    ads_blocked_today?: number;
     percent_blocked?: number;
+    ads_percentage_today?: number;
     domains_blocked?: number;
+    domains_being_blocked?: number;
   };
 }
 
@@ -352,11 +376,14 @@ export interface RecentCommitItem {
 
 export interface VersionInfo {
   current_version: string;
+  version?: string;
   display_version?: string;
   remote_version?: string;
   remote_display_version?: string;
   local_commit?: string;
+  local_hash?: string;
   remote_commit?: string;
+  remote_hash?: string;
   update_available?: boolean;
   ahead_of_remote?: boolean;
   has_git?: boolean;
@@ -417,13 +444,16 @@ export interface TrustedDevice {
 
 export interface SystemErrorLogEntry {
   timestamp?: string;
+  time_str?: string;
   unit?: string;
+  source?: string;
   category?: string;
   level?: string;
   message?: string;
 }
 
 export interface SystemErrorsSummary {
+  total?: number;
   total_errors?: number;
   failed_units_count?: number;
   counts_by_category?: Record<string, number>;

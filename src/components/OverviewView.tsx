@@ -153,7 +153,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     [metrics?.wifi_clients]
   );
 
-  const totalErrors = Number(metrics?.system_errors_summary?.total_errors ?? 0);
+  const totalErrors = Number(metrics?.system_errors_summary?.total_errors ?? metrics?.system_errors_summary?.total ?? 0);
   const overallBusy = cpuPct >= 88 || ramPct >= 90 || storageSummary.percent >= 92;
 
   return (

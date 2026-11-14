@@ -384,8 +384,9 @@ export const MoreView: React.FC<MoreViewProps> = ({
             {showTechUpdate && (
               <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                 <div>
-                  Versión interna: {activeVer?.current_version || '12.0.0'} · Commit local:{' '}
-                  {activeVer?.local_commit || 'local'} · Remoto: {activeVer?.remote_commit || '--'}
+                  Versión interna: {activeVer?.current_version || activeVer?.version || '12.0.0'} · Commit local:{' '}
+                  {activeVer?.local_commit || activeVer?.local_hash || 'local'} · Remoto:{' '}
+                  {activeVer?.remote_commit || activeVer?.remote_hash || '--'}
                 </div>
                 {updateOutput && (
                   <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-[11px] dark:bg-slate-800/60">
@@ -397,7 +398,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     <p className="mb-1 font-semibold">Registro de avisos del sistema:</p>
                     {sysLogs.slice(0, 12).map((log, idx) => (
                       <div key={idx} className="truncate">
-                        [{log.timestamp || '--'}] {log.unit || log.category}: {log.message}
+                        [{log.timestamp || log.time_str || '--'}] {log.unit || log.source || log.category}: {log.message}
                       </div>
                     ))}
                   </div>

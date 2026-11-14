@@ -95,13 +95,32 @@ def _detect_default_gateway_ip():
         pass
     return ""
 
-# Configuración dinámica del router/AP (opcional vía variables de entorno)
-ROUTER_IP = os.environ.get("RECURSOS_ROUTER_IP", "").strip() or _detect_default_gateway_ip()
-ROUTER_USER = os.environ.get("RECURSOS_ROUTER_USER", "").strip()
-ROUTER_PASS = os.environ.get("RECURSOS_ROUTER_PASS", "").strip()
+# Directorio base del proyecto y credenciales opcionales del router/AP (Zero-Hardcoding)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _load_router_credentials():
+    """Carga IP/usuario/clave del router desde env o .router_credentials.json local."""
+    cfg_ip = os.environ.get("RECURSOS_ROUTER_IP", "").strip()
+    cfg_user = os.environ.get("RECURSOS_ROUTER_USER", "").strip()
+    cfg_pass = os.environ.get("RECURSOS_ROUTER_PASS", "").strip()
+    creds_file = os.path.join(BASE_DIR, ".router_credentials.json")
+    if os.path.isfile(creds_file):
+        try:
+            with open(creds_file, "r", encoding="utf-8") as f:
+                creds = json.load(f)
+                if isinstance(creds, dict):
+                    cfg_ip = cfg_ip or str(creds.get("router_ip", "")).strip()
+                    cfg_user = cfg_user or str(creds.get("router_user", "")).strip()
+                    cfg_pass = cfg_pass or str(creds.get("router_pass", "")).strip()
+        except Exception:
+            pass
+    if not cfg_ip:
+        cfg_ip = _detect_default_gateway_ip()
+    return cfg_ip, cfg_user, cfg_pass
+
+ROUTER_IP, ROUTER_USER, ROUTER_PASS = _load_router_credentials()
 
 # Zero-Trust Local Pairing Storage & Master Key
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TRUSTED_FILE = os.path.join(BASE_DIR, "trusted_devices.json")
 TRUST_LOCK = threading.Lock()
@@ -1535,6 +1554,7 @@ def get_system_errors_summary():
     failed_u = data.get("failed_units_count", 0)
     return {
         "total": total,
+        "total_errors": total,
         "failed_units_count": failed_u,
         "docker_errors": counts.get("docker", 0),
         "service_errors": counts.get("service", 0),
@@ -3941,6 +3961,7 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
     pub_dom = detect_system_dns_domain()
     result = {
         "version": pkg_version,
+        "current_version": pkg_version,
         "display_version": disp_version,
         "installed_deb_version": installed_deb_ver or pkg_version,
         "package_installed": package_installed,
@@ -3955,16 +3976,19 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
         "repo_url": f"https://github.com/{GITHUB_REPO}",
         "branch": local_branch,
         "local_hash": local_sha,
+        "local_commit": local_sha,
         "local_full_hash": local_full_sha,
         "local_subject": local_msg,
         "local_date": local_date,
         "local_clean": local_clean,
         "remote_hash": remote_sha,
+        "remote_commit": remote_sha,
         "remote_full_hash": remote_full_sha,
         "remote_subject": remote_msg,
         "remote_date": remote_date,
         "remote_author": remote_author,
         "behind_count": behind_count,
+        "commits_behind": behind_count,
         "local": {
             "sha": local_sha,
             "full_sha": local_full_sha,
@@ -5624,14 +5648,15 @@ def fetch_docker_worker():
                     containers.append({
                         "name": cname,
                         "id": data.get("ID", ""),
+                        "image": meta.get("image", ""),
                         "state": meta.get("state", "running"),
                         "status": meta.get("status", "Up"),
-                        "cpu_percent": cpu_raw,
+                        "cpu_percent": round(cpu_val, 2),
                         "cpu_val": cpu_val,
                         "cpu_norm_percent": round(cpu_val / max(1, CORES_LOGICAL), 1),
                         "mem_usage": data.get("MemUsage", ""),
                         "mem_mb": round(mem_mb, 1),
-                        "mem_percent": mem_raw,
+                        "mem_percent": round(mem_pct_val, 2),
                         "mem_pct_val": mem_pct_val,
                         "net_io": data.get("NetIO", ""),
                         "block_io": data.get("BlockIO", ""),
@@ -5646,14 +5671,15 @@ def fetch_docker_worker():
                     containers.append({
                         "name": cname,
                         "id": meta.get("id", ""),
+                        "image": meta.get("image", ""),
                         "state": meta.get("state", "exited"),
                         "status": meta.get("status", "Detenido"),
-                        "cpu_percent": "0.00%",
+                        "cpu_percent": 0.0,
                         "cpu_val": 0.0,
                         "cpu_norm_percent": 0.0,
                         "mem_usage": "0MiB / --",
                         "mem_mb": 0.0,
-                        "mem_percent": "0.00%",
+                        "mem_percent": 0.0,
                         "mem_pct_val": 0.0,
                         "net_io": "0B / 0B",
                         "block_io": "0B / 0B",
@@ -5677,8 +5703,10 @@ def fetch_docker_worker():
                         "unit": unit_id,
                         "name": friendly_name,
                         "role": role_tag,
+                        "description": role_tag,
                         "active": (st == "active"),
-                        "state": st
+                        "state": st,
+                        "active_state": st
                     })
             except Exception:
                 pass
@@ -5747,7 +5775,11 @@ def fetch_docker_worker():
                 "series_count": 0,
                 "episodes_count": 0,
                 "recent_media": [],
-                "available": False
+                "available": False,
+                "online": False,
+                "server_name": "Emby Media Server",
+                "active_streams": 0,
+                "sessions": []
             }
             try:
                 emby_candidates = [
@@ -5792,6 +5824,12 @@ def fetch_docker_worker():
                         })
                     emby_data["recent_media"] = recent
                     emby_data["available"] = True
+                    emby_data["online"] = True
+                    emby_data["library_counts"] = {
+                        "Películas": emby_data["movies_count"],
+                        "Series": emby_data["series_count"],
+                        "Episodios": emby_data["episodes_count"]
+                    }
                     conn_emby.close()
             except Exception:
                 pass
@@ -6457,7 +6495,12 @@ def fetch_wifi_worker():
                         "dev_icon": "server",
                         "brand": "linux",
                         "brand_name": "Este Servidor",
+                        "vendor": "Este Servidor",
                         "status": "online",
+                        "online": True,
+                        "is_online": True,
+                        "is_server": True,
+                        "is_gateway": False,
                         "tx_bytes": tx_b,
                         "rx_bytes": rx_b,
                         "rssi": 1000,
@@ -6484,7 +6527,12 @@ def fetch_wifi_worker():
                         "dev_icon": "router",
                         "brand": gw_meta.get("brand", "generic"),
                         "brand_name": gw_meta.get("brand_name", "Gateway"),
+                        "vendor": gw_meta.get("brand_name", "Gateway"),
                         "status": "online",
+                        "online": True,
+                        "is_online": True,
+                        "is_server": False,
+                        "is_gateway": True,
                         "tx_bytes": 0,
                         "rx_bytes": 0,
                         "rssi": 1000,
@@ -6492,6 +6540,9 @@ def fetch_wifi_worker():
                     })
 
             wifi_clients = []
+            aimesh_wifi_map = {}
+            router_wired_map = {}
+            router_ssh_ok = False
             fcache_stats = {}
             asus_eth0_rx = asus_eth0_tx = 0
             asus_eth4_rx = asus_eth4_tx = 0
@@ -6511,6 +6562,11 @@ def fetch_wifi_worker():
                                 wl -i $iface sta_info $mac 2>/dev/null | grep -E "(in network|tx total bytes|rx data bytes|smoothed rssi|idle)"
                             done
                         done
+                        echo "=== CLIENTLIST_JSON ==="
+                        cat /tmp/clientlist.json 2>/dev/null
+                        echo ""
+                        echo "=== BRCTL_MACS ==="
+                        brctl showmacs br0 2>/dev/null
                         echo "=== ETH_PORTS ==="
                         cat /proc/net/dev | grep -E "(eth0|eth3|eth4):"
                         echo "=== FCACHE_L2 ==="
@@ -6519,14 +6575,25 @@ def fetch_wifi_worker():
                     ]
                     p = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=8)
                     if p.returncode == 0:
+                        router_ssh_ok = True
                         current = None
+                        clientlist_lines = []
+                        brctl_lines = []
                         eth_lines = []
                         fcache_lines = []
                         section = 'wifi'
 
                         for line in p.stdout.splitlines():
                             line = line.strip()
-                            if line == '=== ETH_PORTS ===':
+                            if line == '=== CLIENTLIST_JSON ===':
+                                section = 'clientlist'
+                                current = None
+                                continue
+                            elif line == '=== BRCTL_MACS ===':
+                                section = 'brctl'
+                                current = None
+                                continue
+                            elif line == '=== ETH_PORTS ===':
                                 section = 'eth'
                                 current = None
                                 continue
@@ -6535,7 +6602,15 @@ def fetch_wifi_worker():
                                 current = None
                                 continue
 
-                            if section == 'eth':
+                            if section == 'clientlist':
+                                if line:
+                                    clientlist_lines.append(line)
+                                continue
+                            elif section == 'brctl':
+                                if line:
+                                    brctl_lines.append(line)
+                                continue
+                            elif section == 'eth':
                                 if ':' in line:
                                     eth_lines.append(line)
                                 continue
@@ -6571,6 +6646,105 @@ def fetch_wifi_worker():
                                 elif 'smoothed rssi:' in line:
                                     m = re.search(r'smoothed rssi:\s+([-\d]+)', line)
                                     if m: current['rssi'] = int(m.group(1))
+
+                        explicit_wired_macs = set()
+                        clientlist_raw = "".join(clientlist_lines).strip()
+                        if clientlist_raw:
+                            try:
+                                cl_data = json.loads(clientlist_raw)
+                                if isinstance(cl_data, dict):
+                                    # Pasada 1: recoger todos los clientes Wi-Fi en todos los nodos AiMesh
+                                    for node_mac, node_bands in cl_data.items():
+                                        node_u = str(node_mac).strip().upper()
+                                        if not isinstance(node_bands, dict):
+                                            continue
+                                        for band_key, entries in node_bands.items():
+                                            bk = str(band_key).upper()
+                                            if bk.startswith("2G"):
+                                                band_label = "2.4 GHz"
+                                            elif bk.startswith("5G"):
+                                                band_label = "5 GHz"
+                                            elif bk.startswith("6G"):
+                                                band_label = "6 GHz"
+                                            else:
+                                                continue
+                                            if isinstance(entries, dict):
+                                                iter_items = entries.items()
+                                            elif isinstance(entries, list):
+                                                iter_items = [
+                                                    (e, {}) if isinstance(e, str) else (e.get("mac", ""), e)
+                                                    for e in entries if isinstance(e, (str, dict))
+                                                ]
+                                            else:
+                                                iter_items = []
+                                            for raw_mac, meta in iter_items:
+                                                m_u = str(raw_mac).strip().upper()
+                                                if not re.match(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$', m_u):
+                                                    continue
+                                                rssi_val = 0
+                                                ip_val = ""
+                                                if isinstance(meta, dict):
+                                                    try:
+                                                        rssi_val = int(meta.get("rssi", 0) or 0)
+                                                    except Exception:
+                                                        rssi_val = 0
+                                                    ip_val = str(meta.get("ip", "") or "").strip()
+                                                prev_w = aimesh_wifi_map.get(m_u)
+                                                if not prev_w or (rssi_val != 0 and prev_w.get("rssi", 0) == 0):
+                                                    aimesh_wifi_map[m_u] = {
+                                                        "band": band_label,
+                                                        "node": node_u,
+                                                        "rssi": rssi_val,
+                                                        "ip": ip_val
+                                                    }
+
+                                    # Pasada 2: clientes cableados (wired_mac) excluyendo los asociados por Wi-Fi
+                                    for node_mac, node_bands in cl_data.items():
+                                        node_u = str(node_mac).strip().upper()
+                                        if not isinstance(node_bands, dict):
+                                            continue
+                                        for band_key, entries in node_bands.items():
+                                            if "wired" not in str(band_key).lower():
+                                                continue
+                                            if isinstance(entries, dict):
+                                                iter_items = entries.items()
+                                            elif isinstance(entries, list):
+                                                iter_items = [
+                                                    (e, {}) if isinstance(e, str) else (e.get("mac", ""), e)
+                                                    for e in entries if isinstance(e, (str, dict))
+                                                ]
+                                            else:
+                                                iter_items = []
+                                            for raw_mac, meta in iter_items:
+                                                m_u = str(raw_mac).strip().upper()
+                                                if not re.match(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$', m_u):
+                                                    continue
+                                                if m_u in aimesh_wifi_map:
+                                                    continue
+                                                ip_val = str(meta.get("ip", "") or "").strip() if isinstance(meta, dict) else ""
+                                                explicit_wired_macs.add(m_u)
+                                                router_wired_map[m_u] = {
+                                                    "node": node_u,
+                                                    "iface": "LAN",
+                                                    "ip": ip_val
+                                                }
+                            except Exception:
+                                pass
+
+                        for b_line in brctl_lines:
+                            m_br = re.match(r'^\s*\d+\s+([0-9a-fA-F:]{17})\s+(yes|no)\b', b_line)
+                            if not m_br:
+                                continue
+                            b_mac = m_br.group(1).upper()
+                            is_local = (m_br.group(2).lower() == 'yes')
+                            if is_local or b_mac in aimesh_wifi_map:
+                                continue
+                            if b_mac not in router_wired_map and (b_mac in arp_map or b_mac in explicit_wired_macs):
+                                router_wired_map[b_mac] = {
+                                    "node": "br0",
+                                    "iface": "LAN",
+                                    "ip": arp_map.get(b_mac, {}).get("ip", "")
+                                }
 
                         for f_line in fcache_lines:
                             m_fc = re.search(r'(\d+)\s+(?:EPHY|WPHY)\s+\d+\s+<([0-9a-fA-F:]{17})>\s+<([0-9a-fA-F:]{17})>', f_line)
@@ -6623,17 +6797,57 @@ def fetch_wifi_worker():
                 known_macs.add(c['mac'].upper())
                 known_ips.add(c['ip'])
 
+            # Incorporar clientes cableados reales reportados por el router ASUS / brctl
+            for w_mac, w_info in router_wired_map.items():
+                if w_mac in known_macs:
+                    continue
+                info = arp_map.get(w_mac, {})
+                c_ip = info.get('ip') or w_info.get('ip') or ''
+                if not c_ip or not _is_lan_ipv4(c_ip) or c_ip in known_ips:
+                    continue
+                known_macs.add(w_mac)
+                known_ips.add(c_ip)
+                d_name = friendly_names.get(w_mac) or info.get('name') or c_ip
+                c_meta = classify_device(d_name, w_mac)
+                cable_clients.append({
+                    "conn_type": "cable",
+                    "band": "Cable LAN",
+                    "iface": "LAN",
+                    "mac": w_mac,
+                    "ip": c_ip,
+                    "name": d_name,
+                    "dev_type": c_meta['type'],
+                    "dev_icon": c_meta['icon'],
+                    "brand": c_meta.get('brand', 'generic'),
+                    "brand_name": c_meta.get('brand_name', 'Dispositivo LAN'),
+                    "vendor": c_meta.get('brand_name', 'Dispositivo LAN'),
+                    "status": "online",
+                    "online": True,
+                    "is_online": True,
+                    "is_server": (c_meta.get('type') == 'server'),
+                    "is_gateway": False,
+                    "tx_bytes": 0,
+                    "rx_bytes": 0,
+                    "rssi": 0,
+                    "in_network": int(time.time() - BOOT_TIME)
+                })
+
             dedup_wifi = []
             for c in wifi_clients:
                 mac = c['mac'].upper()
                 if mac not in known_macs:
                     info = arp_map.get(mac, {})
-                    c_ip = info.get('ip', 'Desconocida')
+                    mesh_info = aimesh_wifi_map.get(mac, {})
+                    c_ip = info.get('ip') or mesh_info.get('ip') or 'Desconocida'
                     if c_ip in known_ips:
                         continue
                     known_macs.add(mac)
                     if c_ip != 'Desconocida':
                         known_ips.add(c_ip)
+                    if mesh_info.get('band'):
+                        c['band'] = mesh_info['band']
+                    if c.get('rssi', 0) == 0 and mesh_info.get('rssi'):
+                        c['rssi'] = mesh_info['rssi']
                     c['ip'] = c_ip
                     c['name'] = friendly_names.get(mac) or info.get('name', mac)
                     c_meta = classify_device(c['name'], mac)
@@ -6641,12 +6855,58 @@ def fetch_wifi_worker():
                     c['dev_icon'] = c_meta['icon']
                     c['brand'] = c_meta.get('brand', 'generic')
                     c['brand_name'] = c_meta.get('brand_name', 'Dispositivo')
+                    c['vendor'] = c_meta.get('brand_name', 'Dispositivo')
                     c['status'] = 'online'
-                    if c['band'] == '2.4 GHz':
+                    c['online'] = True
+                    c['is_online'] = True
+                    c['is_server'] = False
+                    c['is_gateway'] = False
+                    if '2.4' in str(c['band']):
                         c_24 += 1
                     else:
                         c_5 += 1
                     dedup_wifi.append(c)
+
+            # Incorporar clientes Wi-Fi en nodos AiMesh secundarios que no estaban en wl local
+            for w_mac, mesh_info in aimesh_wifi_map.items():
+                if w_mac in known_macs:
+                    continue
+                info = arp_map.get(w_mac, {})
+                c_ip = info.get('ip') or mesh_info.get('ip') or 'Desconocida'
+                if c_ip != 'Desconocida' and c_ip in known_ips:
+                    continue
+                known_macs.add(w_mac)
+                if c_ip != 'Desconocida':
+                    known_ips.add(c_ip)
+                d_name = friendly_names.get(w_mac) or info.get('name') or (c_ip if c_ip != 'Desconocida' else w_mac)
+                c_meta = classify_device(d_name, w_mac)
+                band_val = mesh_info.get('band', '5 GHz')
+                if '2.4' in band_val:
+                    c_24 += 1
+                else:
+                    c_5 += 1
+                dedup_wifi.append({
+                    "conn_type": "wifi",
+                    "band": band_val,
+                    "iface": "AiMesh",
+                    "mac": w_mac,
+                    "ip": c_ip,
+                    "name": d_name,
+                    "in_network": int(time.time() - BOOT_TIME),
+                    "tx_bytes": 0,
+                    "rx_bytes": 0,
+                    "rssi": mesh_info.get('rssi') or -62,
+                    "dev_type": c_meta['type'],
+                    "dev_icon": c_meta['icon'],
+                    "brand": c_meta.get('brand', 'generic'),
+                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
+                    "vendor": c_meta.get('brand_name', 'Dispositivo'),
+                    "status": "online",
+                    "online": True,
+                    "is_online": True,
+                    "is_server": False,
+                    "is_gateway": False
+                })
             wifi_clients = dedup_wifi
 
             # Incorporar vecinos ARP activos descubiertos dinámicamente en cualquier subred LAN privada
@@ -6662,27 +6922,63 @@ def fetch_wifi_worker():
                             info = arp_map.get(n_mac, {})
                             d_name = friendly_names.get(n_mac) or info.get('name') or n_ip
                             c_meta = classify_device(d_name, n_mac)
-                            is_24 = any(k in d_name.lower() for k in ["3ds", "esp", "tapo", "enchufe", "bombilla", "iot"])
-                            if is_24: c_24 += 1
-                            else: c_5 += 1
+                            dev_type = c_meta.get("type", "generic")
                             is_active = (n_state in ('REACHABLE', 'DELAY'))
-                            wifi_clients.append({
-                                "conn_type": "wifi" if c_meta.get("type") != "server" else "cable",
-                                "band": "2.4 GHz" if is_24 else "LAN / 5 GHz",
-                                "iface": "arp-lan",
-                                "mac": n_mac,
-                                "ip": n_ip,
-                                "name": d_name,
-                                "tx_bytes": 0,
-                                "rx_bytes": 0,
-                                "rssi": -62 if is_active else -75,
-                                "in_network": int(time.time() - BOOT_TIME),
-                                "dev_type": c_meta['type'],
-                                "dev_icon": c_meta['icon'],
-                                "brand": c_meta.get('brand', 'generic'),
-                                "brand_name": c_meta.get('brand_name', 'Dispositivo'),
-                                "status": "online" if is_active else "idle"
-                            })
+                            is_wired_fallback = (n_mac in router_wired_map) or (dev_type in ("server", "pc", "nas", "network", "tv", "console"))
+                            is_24 = any(k in d_name.lower() for k in ["3ds", "esp", "tapo", "enchufe", "bombilla", "iot"])
+
+                            if is_wired_fallback:
+                                cable_clients.append({
+                                    "conn_type": "cable",
+                                    "band": "Cable LAN",
+                                    "iface": "LAN",
+                                    "mac": n_mac,
+                                    "ip": n_ip,
+                                    "name": d_name,
+                                    "tx_bytes": 0,
+                                    "rx_bytes": 0,
+                                    "rssi": 0,
+                                    "in_network": int(time.time() - BOOT_TIME),
+                                    "dev_type": dev_type,
+                                    "dev_icon": c_meta['icon'],
+                                    "brand": c_meta.get('brand', 'generic'),
+                                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
+                                    "vendor": c_meta.get('brand_name', 'Dispositivo'),
+                                    "status": "online" if is_active else "idle",
+                                    "online": is_active,
+                                    "is_online": is_active,
+                                    "is_server": (dev_type == "server"),
+                                    "is_gateway": False
+                                })
+                            else:
+                                if is_24:
+                                    c_24 += 1
+                                    band_val = "2.4 GHz"
+                                else:
+                                    c_5 += 1
+                                    band_val = "Wi-Fi 5 GHz"
+                                wifi_clients.append({
+                                    "conn_type": "wifi",
+                                    "band": band_val,
+                                    "iface": "arp-lan",
+                                    "mac": n_mac,
+                                    "ip": n_ip,
+                                    "name": d_name,
+                                    "tx_bytes": 0,
+                                    "rx_bytes": 0,
+                                    "rssi": -62 if is_active else -75,
+                                    "in_network": int(time.time() - BOOT_TIME),
+                                    "dev_type": dev_type,
+                                    "dev_icon": c_meta['icon'],
+                                    "brand": c_meta.get('brand', 'generic'),
+                                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
+                                    "vendor": c_meta.get('brand_name', 'Dispositivo'),
+                                    "status": "online" if is_active else "idle",
+                                    "online": is_active,
+                                    "is_online": is_active,
+                                    "is_server": False,
+                                    "is_gateway": False
+                                })
             except Exception:
                 pass
 
@@ -6696,6 +6992,8 @@ def fetch_wifi_worker():
                     c['speed_up'] = fc.get('speed_up', 0)
                     if c['speed_down'] > 30000 or c['speed_up'] > 20000:
                         c['status'] = 'online'
+                        c['online'] = True
+                        c['is_online'] = True
 
             wifi_tx = sum(c.get('tx_bytes', 0) for c in wifi_clients)
             wifi_rx = sum(c.get('rx_bytes', 0) for c in wifi_clients)
@@ -6705,11 +7003,20 @@ def fetch_wifi_worker():
             all_clients = cable_clients + wifi_clients
             all_clients.sort(key=lambda x: (x.get('speed_down', 0), x.get('tx_bytes', 0), x.get('ip', '')), reverse=True)
 
+            online_count = sum(1 for c in all_clients if c.get('online', c.get('status') == 'online'))
+            detected_router_ip = ROUTER_IP or next((c.get('ip', '') for c in cable_clients if c.get('is_gateway')), '')
+
             summary = {
                 "total_clients": len(all_clients),
+                "online_clients": online_count,
                 "clients_cable": len(cable_clients),
+                "wired_clients": len(cable_clients),
                 "clients_24g": c_24,
+                "band_24g": c_24,
                 "clients_5g": c_5,
+                "band_5g": c_5,
+                "router_ip": detected_router_ip,
+                "router_online": bool(router_ssh_ok or any(c.get('is_gateway') for c in cable_clients)),
                 "total_tx_bytes": cable_tx + wifi_tx,
                 "total_rx_bytes": cable_rx + wifi_rx,
                 "cable_tx_bytes": cable_tx,
@@ -6740,7 +7047,20 @@ def fetch_security_worker():
         try:
             now = time.time()
             # 1. Pi-hole Metrics (lectura nativa directa sin subprocesos ni bloqueos)
-            pihole_data = {"available": False, "status": "offline"}
+            pihole_data = {
+                "available": False,
+                "online": False,
+                "status": "offline",
+                "domains_being_blocked": 0,
+                "domains_blocked": 0,
+                "dns_queries_today": 0,
+                "total_queries": 0,
+                "ads_blocked_today": 0,
+                "blocked_today": 0,
+                "ads_percentage_today": 0.0,
+                "percent_blocked": 0.0,
+                "top_blocked": []
+            }
             try:
                 if now - last_gravity_check > 300 or cached_gravity == 0:
                     conn_g = sqlite3.connect("file:/etc/pihole/gravity.db?mode=ro", uri=True, timeout=2.0)
@@ -6764,10 +7084,15 @@ def fetch_security_worker():
                 pct = round((blocked_q / total_q * 100), 1) if total_q > 0 else 0.0
                 pihole_data = {
                     "available": True,
+                    "online": True,
                     "domains_being_blocked": cached_gravity,
+                    "domains_blocked": cached_gravity,
                     "dns_queries_today": total_q,
+                    "total_queries": total_q,
                     "ads_blocked_today": blocked_q,
+                    "blocked_today": blocked_q,
                     "ads_percentage_today": pct,
+                    "percent_blocked": pct,
                     "top_blocked": top_blocked,
                     "status": "online"
                 }
@@ -6776,7 +7101,8 @@ def fetch_security_worker():
 
             # 2. Fail2ban Metrics & All-Time History
             f2b_data = {
-                "available": False, 
+                "available": False,
+                "active": False,
                 "jails": {}, 
                 "total_banned": 0, 
                 "currently_banned": 0, 
@@ -6790,6 +7116,7 @@ def fetch_security_worker():
                 p_f2b = subprocess.run(["fail2ban-client", "status"], capture_output=True, text=True, timeout=2)
                 if p_f2b.returncode == 0:
                     f2b_data["available"] = True
+                    f2b_data["active"] = True
                     f2b_data["status"] = "online"
                     m = re.search(r"Jail list:\s+(.*)", p_f2b.stdout)
                     if m:

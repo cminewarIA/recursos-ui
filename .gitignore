@@ -21,6 +21,9 @@ geoip_cache.json
 geoip_history.db
 nic_history_2h.json
 .auth_secret
+.admin_master_key
+.router_credentials.json
+auto_install_config.json
 .aistudio/
 .gmp_cache/
 .env*

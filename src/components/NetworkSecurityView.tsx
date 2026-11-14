@@ -703,7 +703,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   Bloqueo automático de intrusos
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {metrics?.security?.fail2ban?.active
+                  {(metrics?.security?.fail2ban?.active ?? metrics?.security?.fail2ban?.available)
                     ? `Cortafuegos activo · ${bannedDetails.length} direcciones bloqueadas`
                     : 'Cortafuegos en reposo'}
                 </p>
@@ -878,7 +878,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               Filtro de anuncios y rastreadores (Pi-hole)
             </h2>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {metrics?.security?.pihole?.online
+              {(metrics?.security?.pihole?.online ?? metrics?.security?.pihole?.available)
                 ? 'Protección activa para todos los aparatos conectados al Wi-Fi'
                 : 'Filtro DNS no detectado en este equipo'}
             </p>
@@ -886,13 +886,13 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
                 <span className="text-slate-500 dark:text-slate-400">Consultas hoy</span>
                 <p className="mt-1 font-mono text-xl font-bold tabular-nums text-slate-900 dark:text-white">
-                  {(metrics?.security?.pihole?.total_queries ?? 0).toLocaleString('es-ES')}
+                  {(metrics?.security?.pihole?.total_queries ?? metrics?.security?.pihole?.dns_queries_today ?? 0).toLocaleString('es-ES')}
                 </p>
               </div>
               <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
                 <span className="text-slate-500 dark:text-slate-400">Anuncios bloqueados</span>
                 <p className="mt-1 font-mono text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                  {(metrics?.security?.pihole?.blocked_today ?? 0).toLocaleString('es-ES')}
+                  {(metrics?.security?.pihole?.blocked_today ?? metrics?.security?.pihole?.ads_blocked_today ?? 0).toLocaleString('es-ES')}
                 </p>
               </div>
             </div>
