@@ -4575,15 +4575,28 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
                 out_lines.append("Repositorio sin metadatos Git (.git); sincronización remota omitida en este entorno.")
             else:
                 try:
-                    subprocess.run(
-                        ["git", "fetch", "origin", GITHUB_BRANCH],
-                        cwd=BASE_DIR, capture_output=True, text=True, timeout=20
-                    )
-                    p_pull = subprocess.run(
-                        ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
-                        cwd=BASE_DIR, capture_output=True, text=True, timeout=25
-                    )
-                    if p_pull.returncode != 0:
+                    p_dirty = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=5)
+                    is_dirty_tree = bool(p_dirty.returncode == 0 and p_dirty.stdout.strip())
+                    if is_dirty_tree and trigger_source != "manual":
+                        p_pull = subprocess.CompletedProcess([], 1, "", "Despliegue local modificado; auto-pull omitido.")
+                    else:
+                        subprocess.run(
+                            ["git", "fetch", "origin", GITHUB_BRANCH],
+                            cwd=BASE_DIR, capture_output=True, text=True, timeout=20
+                        )
+                        p_rver = subprocess.run(
+                            ["git", "show", f"origin/{GITHUB_BRANCH}:VERSION"],
+                            cwd=BASE_DIR, capture_output=True, text=True, timeout=5
+                        )
+                        remote_git_ver = p_rver.stdout.strip().lstrip("vV") if (p_rver.returncode == 0 and p_rver.stdout.strip()) else ""
+                        if remote_git_ver and _parse_semver_tuple(get_app_version()) > _parse_semver_tuple(remote_git_ver):
+                            p_pull = subprocess.CompletedProcess([], 0, f"Versión local ({get_app_version()}) > remoto ({remote_git_ver}).", "")
+                        else:
+                            p_pull = subprocess.run(
+                                ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
+                                cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                            )
+                    if p_pull.returncode != 0 and trigger_source == "manual" and not (is_dirty_tree and trigger_source != "manual"):
                         # Guardar solo archivos rastreados; las bases de datos (.db) y caches en tiempo real nunca se tocan al actualizar
                         p_st = subprocess.run(["git", "stash", "push", "-m", "auto-updater-backup"], cwd=BASE_DIR, capture_output=True, text=True, timeout=10)
                         did_stash = (p_st.returncode == 0 and "No local changes" not in (p_st.stdout or ""))
@@ -4677,12 +4690,11 @@ def auto_install_watcher_worker():
                 if not in_perm_cooldown and os.path.isfile(build_script) and os.path.isfile("/usr/bin/recursos-cockpit") and (
                     not inst_ver
                     or _parse_semver_tuple(inst_ver) < _parse_semver_tuple(ver_target)
-                    or (_parse_semver_tuple(inst_ver) == _parse_semver_tuple(ver_target) and not os.path.isfile(deb_path))
                 ):
                     perform_auto_update_and_install(trigger_source="local_package_detected", do_git_pull=False)
 
                 info = get_version_info(force_refresh=True, allow_auto_trigger=False)
-                if info.get("update_available"):
+                if info.get("update_available") and not info.get("ahead_of_remote") and info.get("local_clean", True):
                     perform_auto_update_and_install(trigger_source="github_ota_detected", do_git_pull=True)
         except Exception as e:
             print(f"[-] Advertencia en auto_install_watcher_worker: {e}")
@@ -4802,7 +4814,8 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
         except Exception:
             pass
 
-    # Obtener también versión SemVer canónica publicada en GitHub (VERSION en rama o latest release)
+    # Obtener también versión SemVer canónica publicada en GitHub (VERSION en rama o fallback git show)
+    raw_ver_fetched = False
     try:
         raw_ver_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/VERSION"
         req_rv = urllib.request.Request(raw_ver_url, headers={"User-Agent": "Recursos-Server-Monitor/12.0"})
@@ -4812,11 +4825,31 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
                 if rv_txt:
                     remote_version = rv_txt
                     github_reachable = True
+                    raw_ver_fetched = True
     except Exception:
         pass
+    if not raw_ver_fetched and has_git:
+        try:
+            p_rv = subprocess.run(
+                ["git", "show", f"origin/{GITHUB_BRANCH}:VERSION"],
+                cwd=BASE_DIR, capture_output=True, text=True, timeout=2
+            )
+            if p_rv.returncode == 0 and p_rv.stdout.strip():
+                remote_version = p_rv.stdout.strip().lstrip("vV")
+        except Exception:
+            pass
 
     if not recent_commits and local_recent_commits:
         recent_commits = local_recent_commits
+
+    local_clean = True
+    if has_git:
+        try:
+            p_st = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
+            if p_st.returncode == 0:
+                local_clean = (len(p_st.stdout.strip()) == 0)
+        except Exception:
+            pass
 
     ahead_of_remote = False
     update_available = False
@@ -4841,21 +4874,19 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
             if p_anc.returncode == 0:
                 ahead_of_remote = True
                 update_available = False
+            elif not local_clean:
+                ahead_of_remote = True
+                update_available = False
             else:
                 update_available = True
         except Exception:
-            update_available = (remote_sha != local_sha)
+            update_available = bool(local_clean and remote_sha != local_sha)
     elif has_git and github_reachable and remote_sha and local_sha not in ("local", "desconocido") and remote_sha != local_sha:
-        update_available = True
-
-    local_clean = True
-    if has_git:
-        try:
-            p_st = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
-            if p_st.returncode == 0:
-                local_clean = (len(p_st.stdout.strip()) == 0)
-        except Exception:
-            pass
+        if not local_clean:
+            ahead_of_remote = True
+            update_available = False
+        else:
+            update_available = True
 
     if update_available and recent_commits:
         for idx, rc in enumerate(recent_commits):
@@ -7162,11 +7193,15 @@ def get_arp_and_pihole_names():
             "ORDER BY network_addresses.lastSeen DESC;"
         )
         for row in cur_pi.fetchall():
-            mac = (row[0] or "").upper()
+            mac = (row[0] or "").strip().upper()
             vendor = row[1] or ""
             name = row[2] or ""
-            ip = row[3] or ""
+            ip = (row[3] or "").strip()
             last_seen = int(row[4] or 0) if len(row) > 4 and row[4] is not None else 0
+            if not mac or mac in ("00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"):
+                continue
+            if not ip or ip == "0.0.0.0":
+                continue
             if _is_lan_ipv4(ip):
                 final_name = friendly_names.get(mac) or hosts_ip_to_name.get(ip) or name or vendor or ip
                 if mac not in arp_map:
@@ -8220,16 +8255,16 @@ def fetch_wifi_worker():
             # Incorporar dispositivos LAN offline vistos recientemente en Pi-hole (<24h) o con alias conocido para mantener targets WoL tras expirar ARP
             now_epoch = time.time()
             for r_mac, r_info in arp_map.items():
-                if not r_mac or r_mac in known_macs:
+                if not r_mac or r_mac in ("00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF") or r_mac in known_macs:
                     continue
                 r_ip = str(r_info.get('ip') or '').strip()
-                if not r_ip or r_ip in known_ips or not _is_lan_ipv4(r_ip):
+                if not r_ip or r_ip == "0.0.0.0" or r_ip in known_ips or not _is_lan_ipv4(r_ip):
                     continue
-                # Excluir rango típico Docker bridge 172.16.0.0/12
+                # Excluir rango típico Docker bridge 172.16.0.0/12 y direcciones no especificadas
                 try:
                     ip_obj_r = ipaddress.ip_address(r_ip)
                     octs = r_ip.split('.')
-                    if ip_obj_r.is_loopback or (len(octs) == 4 and octs[0] == '172' and 16 <= int(octs[1]) <= 31):
+                    if ip_obj_r.is_unspecified or ip_obj_r.is_loopback or (len(octs) == 4 and octs[0] == '172' and 16 <= int(octs[1]) <= 31):
                         continue
                 except Exception:
                     continue
