@@ -1615,6 +1615,18 @@ function realOsTelemetryMiddleware(mapsApiKey = ''): Plugin {
           enqueueRemoteIpsForGeoIp([xff]);
         }
 
+        if (url === '/manual' || url === '/manual.html' || url === '/readme') {
+          const manualPath = path.resolve(__dirname, 'static', 'manual.html');
+          const fallbackDocsPath = path.resolve(__dirname, 'docs', 'index.html');
+          const chosen = fs.existsSync(manualPath) ? manualPath : fallbackDocsPath;
+          if (fs.existsSync(chosen)) {
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.end(fs.readFileSync(chosen, 'utf-8'));
+            return;
+          }
+        }
+
         if (url === '/api/net/geoip' && req.method === 'GET') {
           res.setHeader('Content-Type', 'application/json');
           res.end(

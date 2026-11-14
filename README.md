@@ -1,93 +1,59 @@
 <div align="center">
 
-# 🛸 SYSTEM COCKPIT · TELEMETRÍA & CONTROL DE MISIÓN
-### *Centro de Mando de Alto Rendimiento para Servidores Linux & Homelabs*
+# Panel de Recursos · Recursos Cockpit (`v2B.1.0`)
+### *Monitorización de Servidores Linux, Topología Mesh, Ciberdefensa Zero-Trust y Control Multiplataforma*
 
-[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v2B.0.6_(12.0.6)-0284C7?style=for-the-badge)](./VERSION)
-[![Diseño](https://img.shields.io/badge/Dise%C3%B1o-Claro_Minimalista_%2B_Oscuro-059669?style=for-the-badge)](#-filosof%C3%ADa-de-dise%C3%B1o)
+[![Versión Canónica](https://img.shields.io/badge/Versi%C3%B3n-v2B.1.0_(12.1.0)-0284C7?style=for-the-badge)](./VERSION)
+[![Manual Web Interactivo](https://img.shields.io/badge/Manual_Web_Interactivo-Abrir_Gu%C3%ADa_Visual-059669?style=for-the-badge&logo=readthedocs&logoColor=white)](./docs/index.html)
+[![Frontend](https://img.shields.io/badge/UI-React_19_%2B_Tailwind_v4-0EA5E9?style=for-the-badge&logo=react&logoColor=white)](#-arquitectura-general-y-flujo-de-datos)
 [![Arquitectura](https://img.shields.io/badge/Arquitectura-100%25_Zero--Hardcoding-7C3AED?style=for-the-badge&logo=linux&logoColor=white)](#-principio-estricto-100-zero-hardcoding)
-[![App Nativa Linux](https://img.shields.io/badge/App_Linux-WebKit2_.deb-0284C7?style=for-the-badge&logo=debian&logoColor=white)](#-8-apps-nativas-linux-deb--android-apk-con-motor-html5-unificado--dex-por-hardware)
-[![App Nativa Android](https://img.shields.io/badge/App_Android-WebView_.apk-059669?style=for-the-badge&logo=android&logoColor=white)](#-8-apps-nativas-linux-deb--android-apk-con-motor-html5-unificado--dex-por-hardware)
-[![CI/CD Releases](https://img.shields.io/badge/CI%2FCD-Releases_.deb_%2B_.apk-5856D6?style=for-the-badge&logo=githubactions&logoColor=white)](#-compilación-continua-en-github-actions)
-[![Rendimiento](https://img.shields.io/badge/Rendimiento-React_19_%2B_HiDPI_Canvas-D97706?style=for-the-badge&logo=speedtest&logoColor=white)](#-rendimiento-y-motor-desacoplado)
-[![Ciberseguridad](https://img.shields.io/badge/Ciberdefensa-Fail2ban_IPS_%2B_Pi--hole_DNS-DC2626?style=for-the-badge&logo=shield&logoColor=white)](#-ciberdefensa-activa-ips-y-seguridad-zero-trust)
-[![Licencia](https://img.shields.io/badge/Licencia-MIT-64D2FF?style=for-the-badge)](#-licencia)
+[![App Nativa Linux](https://img.shields.io/badge/App_Linux-WebKit2_.deb-0284C7?style=for-the-badge&logo=debian&logoColor=white)](#-descargas-oficiales-deb-linux-y-apk-android)
+[![App Nativa Android](https://img.shields.io/badge/App_Android-WebView_.apk-059669?style=for-the-badge&logo=android&logoColor=white)](#-descargas-oficiales-deb-linux-y-apk-android)
+[![Ciberdefensa](https://img.shields.io/badge/Seguridad-HMAC--256_%2B_Fail2ban-DC2626?style=for-the-badge&logo=shield&logoColor=white)](#-seguridad-zero-trust-y-ciberdefensa)
+[![Licencia](https://img.shields.io/badge/Licencia-MIT-64748B?style=for-the-badge)](#-licencia)
 
 <p align="center">
-  <b>Panel del Servidor (CMineWar)</b> es una plataforma integral de monitorización y control en tiempo real rediseñada desde cero en <b>React 19 + TypeScript + Tailwind CSS v4</b> con estética <b>Claro Minimalista / Oscuro</b>, lenguaje en español de España cotidiano, navegación inferior táctil responsiva y aplicaciones nativas para <b>Linux/Ubuntu (GTK 3 + WebKit2)</b> y <b>Android (Kotlin + WebView)</b> conectadas automáticamente por red local y dominio externo seguro.
+  Plataforma unificada en español (<code>es-ES</code>) de telemetría en tiempo real, ciberseguridad doméstica y control remoto de equipos, construida sobre <b>Python Asíncrono + React 19 + TypeScript + Tailwind CSS v4</b> con diseño <b>Claro Minimalista / Modo Oscuro</b> y aplicaciones nativas para <b>Ubuntu Linux (.deb)</b> y <b>Android (.apk)</b>.
 </p>
+
+> [!TIP]
+> **Nuevo Manual Web Interactivo (`v2B.1.0`)**
+> Hemos transformado la documentación estática en una experiencia visual con gráficos e inspectores en vivo:
+> - **Desde tu propio servidor**: abre **`http://<tu-nodo>:8085/manual`** (o **`/readme`**), o accede desde la aplicación en **Más → Manual interactivo**.
+> - **Desde el repositorio / GitHub Pages**: archivo autocontenido en [`docs/index.html`](./docs/index.html) ([Vista Web Interactivo en GitHub Pages](https://cminewaria.github.io/recursos-ui/)).
+> - **Incluye**: explorador SVG clicable de las 3 capas, simulador HiDPI interactivo de CPU/RAM/GPU/Disco, gráfico Donut de topología ASUS AiMesh, simulador paso a paso de Zero-Trust HMAC-SHA256 y consola API REST en vivo.
 
 </div>
 
 ---
 
-```
-╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║  🟢 NODO PRINCIPAL ACTIVO  │  ⚡ REACT 19 + CANVAS │  🛡️ IPS ACTIVO (FAIL2BAN)  │  📡 PI-HOLE DNS FLOWS  │v2B.0.6 ║
-╠══════════════════════════════════════════════════════════════════════════════════════════════════════════════╣
-║                                                                                                              ║
-║   ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  ┌──────────────────────────┐   ║
-║   │  🧠 CPU TELEMETRÍA   │  │       🌍 MAPA MUNDIAL GEOESPACIAL EN VIVO    │  │  🍩 D3.JS TRÁFICO DE RED │   ║
-║   │  ████████░░░  74.2%  │  │         . _..::__:  ,-"-"._                  │  │      ╭────────────╮      │   ║
-║   │  3.80 GHz · 52.0°C   │  │       /  🌍 NODO LOCAL ──► 🗽 WAN DESTINO    │  │    ╭─┤ LAN / WAN  ├─╮    │   ║
-║   ├──────────────────────┤  │       \      ╰──────────► 🗼 SERVICIOS NUBE  │  │    │ ╰────────────╯ │    │   ║
-║   │  💾 RAM + ZRAM       │  │        `._ .._,-'                            │  │    ╰─── 68.4% RX ───╯    │   ║
-║   │  ██████░░░░░  58.1%  │  │  [✓] OpenStreetMap Libre · Cluster Dinámico │  │  Interpolación Cúbica    │   ║
-║   └──────────────────────┘  └──────────────────────────────────────────────┘  └──────────────────────────┘   ║
-║                                                                                                              ║
-║           ╔══════════════════════════════════════════════════════════════════════════════════════╗           ║
-║           ║  🏠 Cockpit   🧠 CPU   💾 RAM   🎮 GPU   💿 Discos   🌐 Red   🛡️ IPS   🐳 Docker ║           ║
-║           ╚══════════════════════════════════════════════════════════════════════════════════════╝           ║
-║                                     ▲ FLOATING TOUCH DOCK (TESLA UI)                                         ║
-╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
-```
+## 📥 Descargas Oficiales (`.deb` Linux y `.apk` Android)
 
----
+### 🚀 Versión Canónica Activa (`v2B.1.0` · `12.1.0`)
 
-## 📥 Centro de Descargas Directas de Paquetes Oficiales (.deb Linux & .apk Android)
-
-Descarga directamente los binarios compilados y firmados oficialmente para cada plataforma, sin intermediarios:
-
-### 🚀 Última Versión Canónica (`v2B.0.6` · `12.0.6`)
-
-| Paquete Oficial | Plataforma / Arquitectura | Enlace de Descarga Directa | Firma & Verificación |
+| Paquete Oficial | Plataforma / Arquitectura | Descarga Directa | Verificación Criptográfica |
 | :--- | :--- | :--- | :--- |
-| **🐧 Recursos Cockpit (`.deb`)** | Linux Ubuntu / Debian 64-bit (`amd64`) | [**`recursos-cockpit_12.0.6_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.6/recursos-cockpit_12.0.6_amd64.deb) | Firmado GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.6/SHA256SUMS.txt) |
-| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ (ARM64 / x86_64 / Tablets & Móviles) | [**`recursos-cockpit_12.0.6.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.6/recursos-cockpit_12.0.6.apk) | Firmado v1/v2/v3 con Keystore Oficial Permanente |
-| **⚡ Symlink Última Release (`latest`)** | Paquete Debian canónico | [**`recursos-cockpit.deb` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) | Canonical Release Asset |
-| **⚡ Symlink Última Release (`latest`)** | Paquete Android canónico | [**`recursos-cockpit.apk` (Latest)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Canonical Release Asset |
+| **🐧 Recursos Cockpit (`.deb`)** | Ubuntu / Debian 64-bit (`amd64`) | [**`recursos-cockpit_12.1.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.1.0/recursos-cockpit_12.1.0_amd64.deb) | Firma GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.1.0/SHA256SUMS.txt) |
+| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ (Móviles y Tablets) | [**`recursos-cockpit_12.1.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.1.0/recursos-cockpit_12.1.0.apk) | Keystore Oficial Permanente (`v1`/`v2`/`v3`) |
+| **⚡ Enlace permanente (`latest`)** | Última Release Debian / Android | [`.deb Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) · [`.apk Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Assets Canónicos Automáticos |
 
----
-
-### 🛡️ Guía de Actualización Fluida Sin Advertencias ni Conflictos
-
-#### 🤖 En Dispositivos Android (Actualización Directa Sin Desinstalar)
-* **Firma Criptográfica Oficial Permanente**: Todas las compilaciones del APK se firman de manera consistente y determinista con el **Release Keystore Oficial** (`recursos-release.jks` con esquema v1, v2 y v3).
-* **Actualización en un Clic**: Al compartir el mismo certificado criptográfico en todas las versiones, Android permite instalar nuevas versiones directamente sobre la existente **sin desinstalar primero**, preservando intactas las configuraciones, credenciales de emparejamiento y tokens guardados sin advertencias de conflicto de firma (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`).
-* **Instalación vía terminal o ADB**:
+#### Instalación y Actualización Limpia (sin desinstalar)
+* **Ubuntu / Debian**:
   ```bash
-  adb install -r dist/recursos-cockpit_12.0.6.apk
+  sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.1.0_amd64.deb
   ```
-  O descarga el archivo directamente desde el navegador de tu tablet o móvil y pulsa **Actualizar**.
-
-#### 🐧 En Ubuntu y Debian Linux (Actualización Limpia Sin Bloqueos de Archivo)
-* **Gestión de Procesos en `prerm`**: El paquete Debian canónico incluye control previo a la instalación que detiene de forma limpia cualquier instancia activa antes de sobrescribir archivos, erradicando errores de archivo ocupado (*text file busy*).
-* **Directivas de Reemplazo Limpio**: El metadato `DEBIAN/control` declara `Replaces: recursos-cockpit` y `Provides: recursos-cockpit`, garantizando que `dpkg` y `apt` gestionen la actualización sin conflictos de dependencia ni advertencias residuales.
-* **Comando recomendado de actualización limpia**:
+* **Android (ADB o instalador del dispositivo)**:
   ```bash
-  sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.0.6_amd64.deb
+  adb install -r dist/recursos-cockpit_12.1.0.apk
   ```
-  O con `dpkg`:
-  ```bash
-  sudo dpkg -i --force-overwrite ./dist/recursos-cockpit_12.0.6_amd64.deb
-  ```
+  Al firmarse siempre con el mismo keystore permanente (`recursos-release.jks`), Android actualiza sobre la versión anterior conservando la vinculación Zero-Trust sin avisos.
 
----
-
-### 📜 Histórico de Descargas Directas por Versión
+<details>
+<summary><strong>📜 Histórico de Descargas Directas de Versiones Anteriores</strong></summary>
 
 | Versión | Paquete Linux (`.deb`) | Paquete Android (`.apk`) | Sumas Criptográficas |
 | :---: | :--- | :--- | :--- |
+| **`v12.0.6`** | [recursos-cockpit_12.0.6_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.6/recursos-cockpit_12.0.6_amd64.deb) | [recursos-cockpit_12.0.6.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.6/recursos-cockpit_12.0.6.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.6/SHA256SUMS.txt) |
 | **`v12.0.5`** | [recursos-cockpit_12.0.5_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.5/recursos-cockpit_12.0.5_amd64.deb) | [recursos-cockpit_12.0.5.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.5/recursos-cockpit_12.0.5.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.5/SHA256SUMS.txt) |
 | **`v12.0.4`** | [recursos-cockpit_12.0.4_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.4/recursos-cockpit_12.0.4_amd64.deb) | [recursos-cockpit_12.0.4.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.4/recursos-cockpit_12.0.4.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.4/SHA256SUMS.txt) |
 | **`v12.0.3`** | [recursos-cockpit_12.0.3_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.3/recursos-cockpit_12.0.3_amd64.deb) | [recursos-cockpit_12.0.3.apk](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.3/recursos-cockpit_12.0.3.apk) | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.0.3/SHA256SUMS.txt) |
@@ -122,232 +88,145 @@ Descarga directamente los binarios compilados y firmados oficialmente para cada 
 | **`v8.3.1`** | [recursos-cockpit_8.3.1_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v8.3.1/recursos-cockpit_8.3.1_amd64.deb) | — | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v8.3.1/SHA256SUMS.txt) |
 | **`v6.0.2`** | [recursos-cockpit_6.0.2_amd64.deb](https://github.com/cminewarIA/recursos-ui/releases/download/v6.0.2/recursos-cockpit_6.0.2_amd64.deb) | — | [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v6.0.2/SHA256SUMS.txt) |
 
----
-
-## 📑 Tabla de Contenidos
-
-1. [Arquitectura General](#-arquitectura-general)
-2. [Filosofía de Diseño: Apple Liquid Glass + Tesla UI](#-filosofía-de-diseño)
-3. [Características Principales](#-características-principales)
-   - [Pilares de Telemetría de Hardware](#1-pilares-de-telemetría-de-hardware)
-   - [Inteligencia Geoespacial en Vivo (100% Libre)](#2-inteligencia-geoespacial-en-vivo-100-libre)
-   - [Flujos de Red de Dispositivos del Hogar (Pi-hole DNS)](#3-flujos-de-red-de-dispositivos-del-hogar-pi-hole-dns)
-   - [Ciberdefensa Activa IPS y Seguridad Zero-Trust](#4-ciberdefensa-activa-ips-y-seguridad-zero-trust)
-   - [Analítica de Ancho de Banda con D3.js](#5-analítica-de-ancho-de-banda-con-d3js)
-   - [Ecosistema Multimedia y Docker](#6-ecosistema-multimedia-y-docker)
-   - [Centro Unificado de Registro de Fallos del Sistema (Apps, Servicios & Kernel)](#7-centro-unificado-de-registro-de-fallos-del-sistema-apps-servicios--kernel)
-   - [App Nativa Linux (.deb) & Proyección USB DeX / Modo Escritorio Android](#8-app-nativa-linux-deb--proyección-usb-dex--modo-escritorio-android)
-4. [Principio Estricto 100% Zero-Hardcoding](#-principio-estricto-100-zero-hardcoding)
-5. [Mapa de Vistas SPA (12 Pantallas Web)](#-mapa-de-vistas-spa-12-pantallas-web)
-6. [Referencia de la API REST](#-referencia-de-la-api-rest)
-7. [Guía de Instalación y Despliegue](#-guía-de-instalación-y-despliegue)
-8. [Historial de Versiones](#-historial-de-versiones)
-9. [Licencia](#-licencia)
+</details>
 
 ---
 
-## 🏛 Arquitectura General
+## 📑 Índice Rápido
 
-El sistema opera bajo un modelo **desacoplado y de latencia ultrabaja**, donde el backend en Python orquesta múltiples hilos especializados que interactúan directamente con subsistemas del kernel de Linux, volcando la telemetría en cachés atómicas en memoria consumidas de forma reactiva por el cliente web:
+1. [Arquitectura General y Flujo de Datos](#-arquitectura-general-y-flujo-de-datos)
+2. [Seguridad Zero-Trust y Ciberdefensa](#-seguridad-zero-trust-y-ciberdefensa)
+3. [Principio Estricto 100% Zero-Hardcoding](#-principio-estricto-100-zero-hardcoding)
+4. [Vistas Unificadas React 19 y Ecosistema Nativo](#-vistas-unificadas-react-19-y-ecosistema-nativo)
+5. [Referencia de la API REST y Rutas Web](#-referencia-de-la-api-rest-y-rutas-web)
+6. [Guía Rápida de Despliegue](#-guía-rápida-de-despliegue)
+7. [Historial de Versiones](#-historial-de-versiones)
+8. [Licencia](#-licencia)
+
+---
+
+## 🏛 Arquitectura General y Flujo de Datos
+
+El backend en Python (`server.py`) opera de forma desacoplada mediante hilos en segundo plano, serializando el estado completo en `METRICS_CACHE_BYTES` para servir `/api/metrics` por *byte-splicing* en ~17 ms sin bloquear ninguna petición HTTP:
 
 ```mermaid
-flowchart TD
-    subgraph KERNEL["🐧 Kernel de Linux & Subsistemas del Sistema Operativo"]
-        K1["/proc & psutil (CPU, Frecuencias, RAM)"]
-        K2["/sys/class/thermal & lm-sensors"]
-        K3["conntrack & ss (Sockets Activos)"]
-        K4["NVIDIA NVML / GPU Driver (/sys/class/drm)"]
-        K5["Fail2ban Daemon (fail2ban-client & iptables)"]
-        K6["Pi-hole FTL SQLite (/etc/pihole/pihole-FTL.db)"]
-        K7["Docker Socket (/var/run/docker.sock)"]
+flowchart LR
+    subgraph CAPA1["1 · Kernel Linux y Red Física"]
+        K1["CPU / RAM / ZRAM / GPU / Disk IO"]
+        K2["ss -tulpn + conntrack (CAP_NET_ADMIN)"]
+        K3["Router ASUS AiMesh (SSH AES-256-GCM)"]
+        K4["Pi-hole SQLite · Fail2ban · Docker"]
     end
 
-    subgraph BACKEND["⚡ Backend Servidor Cockpit (Python 3.10+ / server.py)"]
-        B1["ThreadingHTTPServer (:8085)"]
-        B2["Worker Asíncrono de Telemetría (0.8s)"]
-        B3["Worker GeoIP con Caché Reentrante (RLock)"]
-        B4["PiholeDnsTranslator (Resolución LAN/WAN & rDNS)"]
-        B5["Controlador Criptográfico Zero-Trust (HMAC-SHA256)"]
-        B6["Buffer Circular de Métricas en Memoria"]
+    subgraph CAPA2["2 · Backend Python Async (:8085)"]
+        B1["8 Workers Daemon en Segundo Plano"]
+        B2["Caché Atómica (Byte-Splicing ~17 ms)"]
+        B3["Bóveda PBKDF2 + Zero-Trust HMAC-256"]
+        B4["Historial SQLite WAL (GeoIP + Flujos)"]
     end
 
-    subgraph FRONTEND["🍏 Frontend Reactivo 60 FPS (Apple Liquid Glass + Tesla UI)"]
-        F1["Floating Touch Dock & Navegación Gestual Swipe"]
-        F2["Motor Cartográfico OpenStreetMap + Leaflet (Clustering Dinámico)"]
-        F3["Web Worker Asíncrono de Geolocalización"]
-        F4["Visualizador D3.js v7 de Ancho de Banda"]
-        F5["View Transitions API (Transiciones Suaves)"]
-        F6["Inspector Táctil de Scrubbing en Modales"]
+    subgraph CAPA3["3 · Ecosistema Unificado React 19"]
+        C1["Web SPA + Manual Interactivo (/manual)"]
+        C2["Ubuntu GTK 3 + WebKit2 (.deb + DeX USB)"]
+        C3["Android Compose + WebView (.apk)"]
     end
 
-    KERNEL ==> BACKEND
-    BACKEND ==>|REST API JSON / SSE| FRONTEND
+    CAPA1 --> CAPA2
+    CAPA2 -->|REST JSON / HTML5| CAPA3
 ```
 
 ---
 
-## 🎨 Filosofía de Diseño
+## 🛡️ Seguridad Zero-Trust y Ciberdefensa
 
-System Cockpit rompe con la estética tradicional de paneles de administración y adopta una interfaz inspirada en dos referentes de clase mundial:
+```mermaid
+sequenceDiagram
+    participant Cliente as Dispositivo (Web / Ubuntu / Android)
+    participant Server as Guardián Zero-Trust (server.py)
+    participant IPS as Fail2ban & KeyStore/Keyring
 
-### 🍏 Apple visionOS / macOS Liquid Glass
-- **Óptica Translúcida Multicapa**: Fondos de cristal esmerilado impulsados por aceleración de GPU (`backdrop-filter: blur(36px) saturate(190%)`).
-- **Bordes Especulares**: Reflejos de luz dinámicos en los contornos (`border: 1px solid rgba(255, 255, 255, 0.14)`).
-- **Tarjetas Bento Grid**: Disposición geométrica modular con radios continuos (`border-radius: 24px`).
-- **Temas de Titanio**: *Space Black Titanium* (por defecto, negro profundo con acentos esmeralda/zafiro) y *Natural Brushed Titanium* (modo claro de alta legibilidad).
+    alt En Red Local (Wi-Fi / Cable LAN)
+        Cliente->>Server: GET /api/metrics (IP RFC1918)
+        Server->>Server: Emite o agrupa certificado por MAC / hardware_id
+        Server-->>Cliente: 200 OK + Cookie HttpOnly + X-Device-Token
+    else Desde Internet (WAN vía Caddy TLS + DuckDNS)
+        Cliente->>Server: GET /api/metrics + Bearer / X-Device-Token
+        Server->>Server: Validación HMAC-SHA256 en tiempo constante
+        alt Token válido
+            Server-->>Cliente: 200 OK · Acceso completo cifrado
+        else Sin autorización
+            Server-->>Cliente: 403 Forbidden (Pantalla de bloqueo + lockout 3 intentos)
+            Server->>IPS: Registro / Baneo en 1 clic si hay abuso
+        end
+    end
+```
 
-### ⚡ Tesla Touch Cockpit Ergonomics
-- **Floating Touch Dock**: Barra de navegación flotante inferior (`#floatingTouchDock`) adaptada ergonómicamente al alcance del pulgar en pantallas móviles o consolas táctiles.
-- **Hitboxes Táctiles Generosos**: Todos los botones interactivos cuentan con una zona de impacto táctil `≥ 48px`, eliminando la dependencia del puntero de ratón.
-- **Navegación Gestual (Touch Swipe)**: Deslizamiento lateral con inercia para alternar fluidamente entre las 12 vistas del sistema.
-- **Scrubbing Táctil en Tiempo Real**: Gráficas históricas con inspección interactiva continua punto a punto en modales `<dialog>`.
-
----
-
-## 🚀 Características Principales
-
-### 1. Pilares de Telemetría de Hardware
-* **CPU en Tiempo Real**: Monitorización de uso global y por núcleo independiente, detección dinámica de frecuencias (`psutil.cpu_freq()`) y sensores térmicos de silicio leídos directamente desde `/sys/class/thermal` y controladores `coretemp`.
-* **Memoria RAM & ZRAM**: Desglose visual instantáneo de memoria física activa, en búfer, en caché, SWAP en disco y compresión ultra-rápida ZRAM.
-* **GPU Heterogénea**: Detección dinámica automática para GPUs dedicadas (NVIDIA NVML) e integradas (Intel / AMD Radeon), mostrando carga de cómputo, VRAM consumida, potencia en vatios y temperatura.
-* **Almacenamiento & Rendimiento I/O**: Detección dinámica de todas las particiones montadas (`df`), uso porcentual, espacio libre y tasa de transferencia I/O en tiempo real (MB/s de lectura/escritura e IOPS).
-
-### 2. Inteligencia Geoespacial en Vivo (100% Libre)
-* **Motor Cartográfico OpenStreetMap + Leaflet**: Sistema cartográfico 100% libre, sin cuotas ni dependencias de APIs propietarias de pago como Google Maps.
-* **Clustering Dinámico Inteligente**: Los nodos geográficos se agrupan o separan de forma fluida y natural al ajustar el zoom, evaluando distancias relativas en pantalla sin ubicaciones predefinidas.
-* **Popups Persistentes Multinivel**: Arquitectura de retención de popups de hasta 5 niveles que previene cierres involuntarios al navegar, interactuar o refrescar datos.
-* **Resolución GeoIP Asíncrona sin Bloqueos**: Motor de resolución en segundo plano protegido con cerrojos reentrantes (`threading.RLock()`), caché LRU acotada en el navegador y almacenamiento persistente en disco en el servidor (`geoip_cache.json`).
-
-### 3. Flujos de Red de Dispositivos del Hogar (Pi-hole DNS)
-* **Traducción Dinámica de IPs (`PiholeDnsTranslator`)**: Módulo avanzado que analiza la base de datos `/etc/pihole/pihole-FTL.db`, listas estáticas y tablas DHCP para traducir IPs locales anónimas a nombres de dispositivos reconocibles (`tv-de-la-sala-de-estar`, `xbox-series-s`, `Redmi-A3`, etc.).
-* **Visibilidad Total de la Red Doméstica**: Permite observar en el mapa mundial y en la tabla de conexiones qué destinos remotos están consumiendo los distintos dispositivos del hogar.
-* **Filtros Segmentados en Vivo**: Conmutador rápido entre conexiones locales del servidor, flujos de dispositivos del hogar y tráfico global consolidado.
-
-### 4. Ciberdefensa Activa IPS y Seguridad Zero-Trust
-* **Integración Nativa con Fail2ban**: Monitorización de cárceles activas (`sshd`, `recidive`, etc.), registro cronológico de intrusiones e inspección de direcciones IP hostiles.
-* **Bloqueo / Desbloqueo en 1 Clic**: Acciones directas para expulsar atacantes o revocar sanciones directamente desde el mapa geográfico o desde la tabla de conexiones.
-* **Arquitectura Zero-Trust**:
-  - **Acceso en LAN**: Emparejamiento automático transparente para dispositivos conectados a la red local.
-  - **Acceso WAN (Exterior / Móvil)**: Verificación estricta mediante credenciales criptográficas HMAC-SHA256 (`X-Device-Token` / `_sysmon_trust`). Los dispositivos deben haber sido vinculados previamente en LAN o desbloqueados mediante clave maestra protegida contra fuerza bruta.
-
-### 5. Analítica de Ancho de Banda con D3.js
-* **Gráfico de Anillo Animado con D3.js v7**: Renderizado vectorial fluido con interpolación cúbica suave (`d3.interpolate` + `attrTween`, 550ms cubic-out).
-* **Distribución Multidimensional**:
-  - `🌐 Subredes IP`: Visualización por segmento y rangos `/24`.
-  - `📶 Grupos de Enlace`: Desglose entre enlaces cableados Ethernet y bandas Wi-Fi 5 GHz / 2.4 GHz.
-  - `🖥️ Categorías`: Clasificación funcional (Servidores, Smart TVs, Smartphones, IoT, etc.).
-  - `📱 Dispositivos de Red`: Visualización directa de cada dispositivo cliente individual de la red con sus consumos reales medidos (`tx_bytes`, `rx_bytes`, caudal de subida/bajada en tiempo real), segregando de forma inteligente contadores de hardware acumulados de interfaces troncales para una lectura fidedigna.
-* **Alerta Visual por Umbral NIC**: Notificaciones visuales en tiempo real configurables cuando una interfaz de red sobrepasa un caudal de tráfico determinado (por ejemplo, `eth0 > 150 Mbps`).
-
-### 6. Ecosistema Multimedia y Docker
-* **Contenedores Docker**: Estado de salud, tiempo de actividad, CPU y consumo de memoria por contenedor consultando directamente el socket de Docker.
-* **Descargas qBittorrent & Emby**: Seguimiento de torrents activos, velocidades de descarga/subida, ratios de compartición y sesiones activas en el servidor multimedia.
-* **DuckDNS & Proxy Inverso Caddy**: Integración con DNS dinámico DuckDNS y proxy inverso Caddy con certificados SSL TLS automáticos.
-
-### 7. Centro Unificado de Registro de Fallos del Sistema (Apps, Servicios & Kernel)
-* **Agregador Global de Diagnóstico**: Recolecta en tiempo real todos los eventos con nivel de severidad `emerg`, `alert`, `crit`, `err` (y opcionalmente `warning`) generados por:
-  - **Contenedores de Aplicaciones**: Registros de salida estándar y error de Docker (`Immich`, `Postgres`, `Nextcloud`, `Collabora`, `HomeAssistant`, etc.) capturados por el journal de Docker.
-  - **Servicios del Sistema Systemd**: Fallos y excepciones de daemons como `pxe-dnsmasq`, `fail2ban`, `caddy`, `smbd`, `systemd-resolved`, etc., junto con la detección en tiempo real de unidades en estado `failed`.
-  - **Núcleo del Sistema Operativo (Kernel)**: Eventos de I/O de almacenamiento, errores de módulos, `dmesg`, eventos térmicos y del subsistema de red.
-* **Decodificación Binaria Segura**: Resiliente ante buffers de salida de aplicaciones (como Postgres o Collabora) que emiten secuencias de bytes binarios en JSON.
-* **Diseño Plegable y Modal Panorámico**:
-  - Indicador rápido en la cabecera de la Vista General (`📋 Fallos: X detectados`) con resaltado de color dinámico ante incidencias.
-  - Tarjeta Bento colapsable (`#systemLogsCenterCard`) con filtros por categoría (`🐳 Apps & Docker`, `⚙️ Servicios`, `🐧 Kernel`), búsqueda en vivo y cambio de severidad.
-  - Visor nativo HTML5 `<dialog>` a pantalla completa para auditorías exhaustivas.
-
-### 8. Apps Nativas Linux (.deb) & Android (.apk) con Motor HTML5 Unificado & DeX por Hardware
-* **Motor de Interfaz HTML5 Unificado con Contenedores Nativos Acelerados por Hardware**: Tanto la aplicación nativa de Ubuntu (`desktop_app/recursos_app.py`) como la aplicación nativa de Android (`android_app/`) renderizan directamente el motor visual canónico HTML5/CSS3/D3.js v7/Leaflet (`index.html`), garantizando paridad píxel a píxel del 100% en las 12 vistas operativas del Cockpit (incluyendo el mapa geoespacial interactivo OpenStreetMap + Leaflet, el anillo de ancho de banda D3.js y el gráfico horizontal animado D3.js de Top 10 CPU).
-* **Puente Local Loopback + WebKit2 en Ubuntu (`LocalHtmlBridgeServer`)**: En Linux/Ubuntu, la ventana GTK 3 embebe `WebKit2.WebView` acelerado por GPU conectado a un servidor puente HTTP local en `127.0.0.1` que inyecta automáticamente las credenciales Zero-Trust, proxifica las llamadas `/api/*` hacia el nodo LAN/WAN autodescubierto (con fallback a telemetría local `psutil` si opera sin red) e intercepta localmente `/api/dex/*` para controlar el hardware físico USB (`/dev/uhid`, `scrcpy`, `adb`).
-* **Puente Nativo `JavascriptInterface` + `AndroidView(WebView)` en Android (`RecursosAndroidBridge`)**: En Android, Jetpack Compose aloja un contenedor `android.webkit.WebView` acelerado por hardware acoplado con `DiscoveryManager` (autodescubrimiento concurrente de subred `/24` y conmutación automática LAN ↔ WAN) y `SecurePreferences` (`EncryptedSharedPreferences` AES256-GCM), sincronizando bidireccionalmente el token criptográfico `X-Device-Token` con el runtime HTML5.
-* **Desbloqueo Contractual Exclusivo de DeX en Ubuntu**: La 13.ª vista (`📱 DeX USB`) y sus controles de resolución (`1920x1080`, `2560x1440`, `2960x1848`), tasa de refresco (`60/90/120 FPS`), teclado/ratón físico UHID y auto-proyección se desbloquean dinámicamente **solo en la App Nativa de Ubuntu**, permaneciendo ocultos/bloqueados en navegadores web y clientes externos con el mensaje pasivo *"Esperando dispositivo para conectarse en su versión nativa"*.
+* **Bóveda Cifrada `AES-256-GCM`**: Las credenciales SSH del router ASUS AiMesh en `.router_credentials.json` viajan en memoria con `SSHPASS` (sin exponerse en `/proc/<pid>/cmdline`) y se cifran en reposo con clave derivada vía `PBKDF2-HMAC-SHA256` (`200.000` iteraciones).
+* **Erradicación Total de Spam `sudo`**: Las utilidades `ss` y `conntrack` se ejecutan de forma nativa aprovechando capacidades POSIX del servicio (`CAP_NET_ADMIN`, `CAP_DAC_READ_SEARCH`, `CAP_SYS_PTRACE`), reservando `sudo -n` únicamente como respaldo.
 
 ---
 
 ## 🧭 Principio Estricto 100% Zero-Hardcoding
 
-System Cockpit se rige por una regla arquitectónica absoluta: **cero valores estáticos o suposiciones cableadas en el código fuente**.
-
-1. **Ubicaciones, Ciudades y Proveedores**: Queda prohibido codificar nombres de ciudades, países o proveedores fijos. Todo dato geográfico se calcula dinámicamente en tiempo de ejecución a partir de la telemetría viva de red (`remote_ip`, `city`, `country`, `isp`, `asn`).
-2. **Hardware e Interfaces**: El número de núcleos, sensores térmicos, discos duros, tarjetas de red (NICs), particiones y aceleradoras GPU se detectan y renderizan en base a las lecturas reales del sistema en `/sys` y `/proc`.
-3. **Clustering y Agrupamientos**: Los clusters del mapa se computan matemáticamente por proximidad en pantalla según el nivel de zoom actual, sin identificadores artificiales.
+1. **Cero ubicaciones o nombres fijos**: Ningún proveedor, ciudad o equipo se codifica en fuente; la geolocalización y el mapeo Pi-hole/AiMesh nacen de la telemetría viva.
+2. **Hardware e interfaces 100% dinámicos**: Núcleos CPU, particiones, discos I/O, GPUs (NVIDIA NVML / sysfs DRM) e interfaces filtradas (`ip neigh` excluyendo puentes `docker0`, `br-*`, `veth*`, `tailscale*`) se autodescubren en vivo.
+3. **Control de Versión Único**: `./VERSION` rige simultáneamente el servidor HTTP, React 19, el paquete `.deb`, el `.apk` de Android y el Manual Interactivo.
 
 ---
 
-## 📱 Mapa de Vistas SPA (12 Pantallas Web)
+## 📱 Vistas Unificadas React 19 y Ecosistema Nativo
 
-El frontend opera como una Single Page Application (SPA) desacoplada con animaciones mediante **View Transitions API**:
+Toda la experiencia comparte un mismo diseño **Claro Minimalista + Modo Oscuro** optimizado en 5 bloques táctiles con actualización cada `1.5s`, tooltips flotantes en gráficas HiDPI Canvas y desbloqueo contractual exclusivo de **Pantalla móvil USB (DeX)** solo en Ubuntu:
 
-| Ruta | Nombre de Vista | Descripción Operativa |
+| Vista / Ruta | Contenido Principal | Exclusividad / Interacción |
 | :--- | :--- | :--- |
-| `/` | **Vista General** | Cockpit panorámico con los pilares de hardware, bento grid de 10 tarjetas y accesos rápidos. |
-| `/procesador` | **CPU & Frecuencias** | Monitor detallado por hilo lógico, frecuencias dinámicas y termografía del procesador. |
-| `/memoria` | **RAM & ZRAM** | Desglose de memoria física, swap, búferes y compresión ZRAM en tiempo real. |
-| `/grafica` | **GPU & Aceleración** | Carga de GPU, reloj de núcleo, temperatura y consumo de memoria VRAM. |
-| `/almacenamiento` | **Discos & Particiones** | Monitor de espacio en disco, particiones montadas y tasas de I/O en MB/s. |
-| `/red` | **Mapa Mundial & Tráfico** | Cartografía interactiva OpenStreetMap, flujos de Pi-hole y sockets del kernel. |
-| `/procesos` | **Gestor de Procesos** | Gráfico de barras horizontal animado con D3.js (Top 10 CPU) y tabla interactiva de procesos del kernel. |
-| `/servicios` | **Servicios Systemd** | Catálogo interactivo de servicios del sistema, estados y reinicios. |
-| `/contenedores` | **Docker Runtime** | Monitor de contenedores Docker activos, memoria, CPU y tiempos de actividad. |
-| `/seguridad` | **Ciberdefensa IPS** | Centro de control Fail2ban, cárceles, IPs bloqueadas y gestión Zero-Trust. |
-| `/descargas` | **Multimedia & Torrents**| Panel unificado para descargas qBittorrent, streaming y gestor del bot de Telegram. |
-| `/dns` | **DNS & Tráfico por IP** | Sincronización DuckDNS, resolución por clientes de la red y tabla de tráfico DNS. |
-| `/version` | **Control de Versión** | Información de versión canónica, hash de Git y actualización OTA en 1 clic. |
+| **`/inicio`** | Salud global, KPIs en vivo de CPU/RAM/GPU, gráfica dual de **Almacenamiento (`MB/s` + `%`)**, estado de servicios y dispositivos rápidos | Encender (**WoL**) y apagar (**SoL / SSH / Webhook**) simétricos |
+| **`/equipo`** | Carga por núcleo lógico, desglose RAM + ZRAM, sensores térmicos, GPU/VRAM, particiones y Top procesos | Etiquetas técnicas opcionales en desplegables |
+| **`/red`** | Mapa geoespacial **OpenStreetMap + Leaflet** con clustering dinámico, dispositivos ASUS AiMesh (`Cable LAN`, `5 GHz`, `2.4 GHz`), Pi-hole, DuckDNS y Fail2ban | Filtrado instantáneo por equipo y baneo de IP en 1 clic |
+| **`/programas`** | Contenedores Docker (CPU/RAM/actividad), unidades Systemd, descargas qBittorrent, videoteca Emby y **Bot de Telegram** | Reinicio/control directo de servicios y difusión Telegram |
+| **`/mas`** | **Actualizador GitHub OTA**, conmutador **Claro / Oscuro**, dispositivos HMAC agrupados, **Manual interactivo** embebido (`/manual`) y **DeX USB** | **DeX USB** (`scrcpy` + `/dev/uhid`) visible exclusivamente en `.deb` Ubuntu |
 
 ---
 
-## 🔌 Referencia de la API REST
+## 🔌 Referencia de la API REST y Rutas Web
 
-El servidor expone una API REST ligera en formato JSON:
-
-| Método | Endpoint | Descripción | Acceso / Auth |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/metrics` | Telemetría consolidada del sistema (CPU, RAM, GPU, Red, Discos, Versión). | Público (LAN / Token WAN) |
-| `GET` | `/api/version` | Versión canónica activa (`VERSION`), hash Git y estado del repo remoto. | Público |
-| `GET` | `/api/system/logs` | Registro unificado de fallos y errores (filtros: `level`, `category`, `limit`, `refresh`). | Público (LAN / Token WAN) |
-| `GET` | `/download/recursos-cockpit.deb` | Descarga directa del paquete Debian oficial compilado para Linux amd64. | Público |
-| `GET` | `/download/recursos-cockpit.apk` | Descarga directa del APK oficial compilado y firmado para Android. | Público |
-| `POST` | `/api/net/geoip/resolve` | Resolución en lote de coordenadas geográficas para el mapa. | Abierto para clientes del mapa |
-| `POST` | `/api/net/geoip/clear-errors`| Limpia el historial de eventos del Worker GeoIP en el servidor. | Requiere sesión de confianza |
-| `POST` | `/api/fail2ban/ban` | Bloquea una dirección IP maliciosa en una cárcel de Fail2ban. | Requiere sesión de confianza |
-| `POST` | `/api/fail2ban/unban` | Desbloquea una IP previamente sancionada en Fail2ban. | Requiere sesión de confianza |
-| `POST` | `/api/auth/unlock` | Desbloqueo remoto de cliente WAN mediante clave maestra HMAC. | Protegido contra fuerza bruta |
-| `GET` | `/api/trust/status` | Comprueba el estado de confianza y emparejamiento del cliente. | Público |
-| `POST` | `/api/custom-logos` | Actualiza o restablece logos personalizados de servicios/equipos. | Requiere sesión de confianza |
-| `GET` | `/api/dex/status` | Estado en tiempo real del puerto USB y dispositivos conectados para proyección Samsung DeX / Android Desktop. | Requiere sesión de confianza |
-| `POST` | `/api/dex/start` | Inicia la proyección de vídeo por USB en baja latencia (`scrcpy` + UHID). | Requiere sesión de confianza |
-| `POST` | `/api/dex/stop` | Detiene la sesión activa de proyección de vídeo por USB. | Requiere sesión de confianza |
+| Método | Ruta / Endpoint | Descripción | Acceso |
+| :---: | :--- | :--- | :--- |
+| `GET` | `/manual`, `/readme` | **Manual Web Interactivo** autocontenido con simuladores e inspector API | Red Local / Sesión |
+| `GET` | `/api/metrics` | Telemetría unificada en `<18 ms` (CPU, RAM, GPU, Disco, Red, Docker, Versión) | LAN / Token HMAC |
+| `GET` | `/api/version` | Versión canónica activa (`VERSION`), display `2B.x`, commit Git y estado OTA | LAN / Token HMAC |
+| `GET` | `/api/system/logs` | Centro unificado de avisos y fallos (Docker, Systemd, Kernel) | LAN / Token HMAC |
+| `GET` | `/api/auth/devices` | Dispositivos físicos agrupados con su certificado HMAC y clientes | LAN / Token HMAC |
+| `GET` | `/download/recursos-cockpit.deb` | Descarga directa del paquete Ubuntu / Debian (`amd64`) | Público |
+| `GET` | `/download/recursos-cockpit.apk` | Descarga directa del paquete Android firmado (`v1/v2/v3`) | Público |
+| `POST` | `/api/auth/unlock` | Desbloqueo WAN con clave maestra y protección contra fuerza bruta | WAN protegido |
+| `POST` | `/api/fail2ban/ban`, `.../unban` | Bloqueo o desbloqueo inmediato de IPs maliciosas | LAN / Token HMAC |
+| `POST` | `/api/wol/wake`, `/api/wol/shutdown` | Encendido Wake-on-LAN y apagado multicanal seguro | LAN / Token HMAC |
+| `GET`/`POST` | `/api/dex/status`, `.../start`, `.../stop` | Control USB Samsung DeX / Android Desktop en la app Ubuntu | Nativo Ubuntu |
 
 ---
 
-## 🛠 Guía de Instalación y Despliegue
+## 🛠️ Guía Rápida de Despliegue
 
-### Requisitos del Sistema
-- **Sistema Operativo**: Linux (Ubuntu 22.04+, Debian 12+, Arch Linux o similar).
-- **Python**: Versión 3.10 o superior.
-- **Herramientas del Sistema**: `conntrack`, `fail2ban`, `iproute2`, `sqlite3` (para Pi-hole).
-
-### 1. Clonar el Repositorio
 ```bash
+# 1. Clonar repositorio y preparar entorno Python
 git clone https://github.com/cminewarIA/recursos-ui.git /home/servidor/servicios/dashboard
 cd /home/servidor/servicios/dashboard
-```
-
-### 2. Instalar Dependencias de Python
-```bash
 pip3 install -r requirements.txt || pip3 install psutil
+
+# 2. Compilar interfaz web (opcional si modificas src/)
+npm install && npm run build
+
+# 3. Configurar .env opcional (PORT=8085, DUCKDNS_DOMAIN, DUCKDNS_TOKEN, TELEGRAM_BOT_TOKEN)
+# 4. Compilar e instalar el paquete nativo Ubuntu
+bash packaging/build_deb.sh
+sudo apt-get install --reinstall -y ./dist/recursos-cockpit_$(cat VERSION)_amd64.deb
 ```
 
-### 3. Configuración de Variables de Entorno (`.env`)
-Crea un archivo `.env` en el directorio raíz si deseas personalizar puertos o credenciales maestras:
-```env
-PORT=8085
-ADMIN_MASTER_KEY=tu_clave_maestra_segura_aqui
-DUCKDNS_DOMAIN=tu-dominio.duckdns.org
-DUCKDNS_TOKEN=tu-token-duckdns
-```
+<details>
+<summary><strong>Ejemplo de Servicio Systemd (`CAP_NET_ADMIN` sin spam sudo) y Caddy Proxy SSL</strong></summary>
 
-### 4. Despliegue como Servicio Systemd
-Crea el archivo de servicio `/etc/systemd/system/system-dashboard.service`:
+`/etc/systemd/system/system-dashboard.service`:
 ```ini
 [Unit]
 Description=System Cockpit - Telemetría y Ciberdefensa en Tiempo Real
@@ -357,6 +236,7 @@ After=network.target
 Type=simple
 User=servidor
 WorkingDirectory=/home/servidor/servicios/dashboard
+AmbientCapabilities=CAP_NET_ADMIN CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
 ExecStart=/usr/bin/python3 /home/servidor/servicios/dashboard/server.py
 Restart=always
 RestartSec=3
@@ -365,23 +245,13 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-Habilita e inicia el servicio:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now system-dashboard.service
-```
-
-### 5. Configuración con Caddy (Proxy Inverso SSL)
-Ejemplo de directiva para `/etc/caddy/Caddyfile`:
+`/etc/caddy/Caddyfile`:
 ```caddy
 tu-dominio.duckdns.org {
     reverse_proxy 127.0.0.1:8085
 }
 ```
-Recarga Caddy:
-```bash
-sudo systemctl reload caddy
-```
+</details>
 
 ---
 
@@ -394,6 +264,7 @@ El proyecto sigue un criterio estricto de incremento semántico (`MAJOR.MINOR.PA
 
 | Versión | Tipo | Descripción de Cambios |
 | :--- | :---: | :--- |
+| **`v12.1.0` (`v2B.1.0`)** | `MINOR` | **Conversión de `README.md` en Manual Web Interactivo con Gráficos Dinámicos y Rediseño Visual Documental (`v2B.1.0`)**: (1) **Manual Web Interactivo Autocontenido (`static/manual.html` y `docs/index.html`)**: Nueva experiencia visual interactiva con soporte **Claro Minimalista / Modo Oscuro** sincronizado con `localStorage`, buscador rápido (`Ctrl+K`), índice lateral reactivo (`IntersectionObserver`), explorador SVG clicable de las 3 capas del sistema, simulador HiDPI Canvas en vivo de CPU/RAM+ZRAM/GPU/Disco con tooltip interactivo y carga directa desde el nodo, gráfico Donut SVG interactivo de topología ASUS AiMesh/Pi-hole, simulador paso a paso de verificación Zero-Trust HMAC-SHA256, comparador de plataformas con bloques CLI copiables y consola interactiva de API REST en vivo; (2) **Integración Completa Web, Backend y Nativa (`server.py`, `desktop_app/recursos_app.py`, `vite.config.ts`, `src/components/MoreView.tsx`, `packaging/build_deb.sh`)**: Exposición en `/manual`, `/manual.html` y `/readme` con protección Zero-Trust e inyección dinámica de versión tanto en `server.py` como en `LocalHtmlBridgeServer` de Ubuntu, integración dentro de la app React 19 bajo **Más → Manual interactivo** con sincronización de tema vía `postMessage`, y empaquetado automático de `manual.html` en el `.deb`; (3) **Modernización Visual de `README.md` y Sincronización Canónica (Reglas 3, 4, 5 y 6)**: Reemplazo del banner ASCII heredado de `v11` por diagramas Mermaid v12 actualizados, tablas limpias, actualización a `12.1.0` (`v2B.1.0`) en `VERSION`, `package.json`, `packaging/debian/control`, `planes/*_v12.1.0.md` y compilación/instalación verificada de `dist/recursos-cockpit_12.1.0_amd64.deb`. |
 | **`v12.0.6` (`v2B.0.6`)** | `PATCH` | **Auditoría Integral, Optimización de CPU/SQLite, Erradicación de Spam `sudo` PAM en `journalctl`, Serie Real `disk_pct` y Reactividad de Subpestañas (`v2B.0.6`)**: (1) **Erradicación del Spam `sudo` PAM y Optimización del Backend (`server.py`)**: Ejecución directa sin `sudo` de `conntrack -L` y `ss -tulpn -H` aprovechando `CAP_NET_ADMIN`/`CAP_DAC_READ_SEARCH`/`CAP_SYS_PTRACE` del servicio con fallback automático a `sudo -n` solo si hace falta; poda periódica acotada cada `60s` en `record_connections_to_sqlite()` (en lugar de cada `2.5s`), eliminación de `maps.googleapis.com` obsoleto de `outbound_targets` y reintentos DNS cada `30s`; caché de `/var/log/fail2ban.log` por `(st_mtime, st_size)` y TTL de `18s` en consultas SQLite de Pi-hole dentro de `fetch_security_worker()`; (2) **Serie Histórica Real `disk_pct`, Caché Asíncrona de Versión y Respuesta Rápida `/api/metrics` (`server.py`)**: Incorporación de `HISTORY["disk_pct"]` al colector cada `1.5s`, cálculo no bloqueante `get_version_info_cached_async()` y `get_local_git_sha_cached()` (evitando `git rev-parse` en cada petición HTML), inclusión de `version_info`, `custom_logos` y `maps_engine` en `background_collector()` y empalme directo de `METRICS_CACHE_BYTES` en `/api/metrics`; normalización de `telegram_bot.online` / `timestamp` y `duckdns.available` / `message`; (3) **Reactividad de Subpestañas y Enlaces Profundos en React 19 (`src/`)**: Sincronización reactiva de `initialSubTab` con contador `navTick` en `App.tsx`, `EquipmentView.tsx`, `MoreView.tsx`, `AppsMediaView.tsx` y `NetworkSecurityView.tsx`, extracción de subpestaña inicial desde URL (`extractInitialSubTabFromRoute()`), apertura directa de logs desde `"Abrir registro completo"` en `OverviewView.tsx`, compatibilidad `timestamp \|\| time_str` en Telegram y estado visual de servicio DuckDNS; (4) **Sincronización Canónica, Documentación y Paquete Debian (Reglas 3, 4, 5 y 6)**: Actualización de enlaces de instalación en `README.md`, actualización a `12.0.6` (`v2B.0.6`) en `VERSION`, `package.json`, `packaging/debian/control`, `planes/*_v12.0.6.md` y compilación/instalación verificada de `dist/recursos-cockpit_12.0.6_amd64.deb`. |
 | **`v12.0.5` (`v2B.0.5`)** | `PATCH` | **Cifrado `AES-256-GCM` en Reposo para Credenciales del Router ASUS AiMesh, Sondeo SSH sin Exposición en `cmdline` y Filtrado de Puentes Docker (`v2B.0.5`)**: (1) **Bóveda Cifrada `AES-256-GCM` + `PBKDF2-HMAC-SHA256` (`server.py`, `.router_credentials.json`)**: Protección de las credenciales del router mediante sobre cifrado `AES-256-GCM` con clave derivada mediante `PBKDF2-HMAC-SHA256` (`200000` iteraciones) vinculada a `.admin_master_key` y `/etc/machine-id`, incluyendo migración automática transparente y permisos `0600`; (2) **Endurecimiento SSH y Filtrado `ip neigh` (`server.py`)**: Sustitución de `sshpass -p` por `sshpass -e` con entorno privado (`SSHPASS`) evitando exposición de contraseñas en `/proc/<pid>/cmdline`, exclusión de interfaces virtuales/Docker (`docker*`, `br-*`, `veth*`, `virbr*`, `tailscale*`, `tun*`, `wg*`) en `ip neigh` y publicación de `router_encrypted` y `router_auth_mode` en `wifi_summary`; (3) **Interfaz React 19 (`telemetry.ts`, `NetworkSecurityView.tsx`)**: Indicador del estado cifrado junto a la puerta de enlace dentro de los detalles técnicos de Red; (4) **Sincronización Canónica y Paquete Debian (Reglas 3, 4, 5 y 6)**: Actualización a `12.0.5` (`v2B.0.5`) en `VERSION`, `package.json`, `packaging/debian/control`, `README.md`, `planes/*_v12.0.5.md` y compilación/instalación verificada de `dist/recursos-cockpit_12.0.5_amd64.deb`. |
 | **`v12.0.4` (`v2B.0.4`)** | `PATCH` | **Telemetría Real de Banda/Cable desde Router ASUS AiMesh y Corrección del Crash de `Programas` + Paridad de Esquemas (`v2B.0.4`)**: (1) **Erradicación de `"LAN / 5 GHz"` mediante Sondeo ASUS AiMesh (`server.py` y `.router_credentials.json`)**: Extracción real vía SSH de `/tmp/clientlist.json` y `brctl showmacs br0` con carga *Zero-Hardcoding* de credenciales desde `.router_credentials.json` (git-ignored `0600`) o variables `RECURSOS_ROUTER_*`; algoritmo en dos pasadas que clasifica primero todas las conexiones inalámbricas (`2.4 GHz`, `5 GHz`, `6 GHz`) de todos los nodos AiMesh antes de consolidar enlaces `"Cable LAN"` reales en `br0`/`wired_mac`, sustituyendo `"LAN / 5 GHz"` por `"Cable LAN"`, `"2.4 GHz"` o `"Wi-Fi 5 GHz"` y añadiendo banderas y contadores (`online`, `is_online`, `is_server`, `is_gateway`, `vendor`, `wired_clients`, `band_24g`, `band_5g`, `online_clients`, `router_ip`, `router_online`); (2) **Corrección del Crash de la Pestaña `Programas` (`AppsMediaView.tsx`, `server.py`, `telemetry.ts`)**: Emisión numérica de `cpu_percent`/`mem_percent` e `image` en `fetch_docker_worker()`, parseo numérico seguro `toNum()` evitando el `TypeError` en `.toFixed(1)`, corrección del porcentaje de torrents (escala `0..100 %` evitando `10000 %`), soporte unificado de `systemd_services` (`active`/`state`/`role`) y visualización enriquecida de catálogo y añadidos recientes en Emby; (3) **Paridad Integral en `Inicio`, `Red` y `Más` (`OverviewView.tsx`, `NetworkSecurityView.tsx`, `MoreView.tsx`, `server.py`)**: Alineación de `total_errors`, campos de Pi-hole (`online`, `total_queries`, `blocked_today`), Fail2ban (`active`), versión (`current_version`, `local_commit`, `remote_commit`) y logs del sistema; (4) **Sincronización Canónica y Paquete Debian (Reglas 3, 4, 5 y 6)**: Actualización a `12.0.4` (`v2B.0.4`) en `VERSION`, `package.json`, `packaging/debian/control`, `README.md`, `planes/*_v12.0.4.md` y compilación/instalación verificada de `dist/recursos-cockpit_12.0.4_amd64.deb`. |

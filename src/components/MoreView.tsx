@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  BookOpen,
   Check,
   ChevronDown,
   ChevronUp,
   Download,
+  ExternalLink,
   GitCommit,
   Laptop,
   Lock,
@@ -26,13 +28,14 @@ import {
 import { apiFetchJson, detectNativeEnvironment } from '../utils/api';
 import { getDisplayVersionString } from '../utils/formatters';
 
-type MoreSubTab = 'updates' | 'devices' | 'dex';
+type MoreSubTab = 'updates' | 'devices' | 'manual' | 'dex';
 
 function resolveMoreSubTab(hint?: string): MoreSubTab | undefined {
   if (!hint) return undefined;
   const h = hint.toLowerCase();
   if (h === 'updates' || h === 'logs' || h === 'sistema' || h === 'version') return 'updates';
   if (h === 'devices' || h === 'dispositivos' || h === 'nodos') return 'devices';
+  if (h === 'manual' || h === 'readme' || h === 'ayuda' || h === 'docs') return 'manual';
   if (h === 'dex') return 'dex';
   return undefined;
 }
@@ -58,6 +61,15 @@ export const MoreView: React.FC<MoreViewProps> = ({
 }) => {
   const { isUbuntuNative, isNativeApp } = detectNativeEnvironment();
   const [subTab, setSubTab] = useState<MoreSubTab>(() => resolveMoreSubTab(initialSubTab) || 'updates');
+  const manualIframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  useEffect(() => {
+    try {
+      manualIframeRef.current?.contentWindow?.postMessage({ type: 'RECURSOS_THEME', theme }, '*');
+    } catch {
+      // ignore cross-origin frame message errors
+    }
+  }, [theme]);
 
   // Updates state
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(metrics?.version_info ?? null);
@@ -251,6 +263,18 @@ export const MoreView: React.FC<MoreViewProps> = ({
           <ShieldCheck className="h-4 w-4" />
           <span>Dispositivos conectados</span>
         </button>
+        <button
+          type="button"
+          onClick={() => setSubTab('manual')}
+          className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+            subTab === 'manual'
+              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+          }`}
+        >
+          <BookOpen className="h-4 w-4" />
+          <span>Manual interactivo</span>
+        </button>
         {isUbuntuNative && (
           <button
             type="button"
@@ -400,7 +424,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             {showTechUpdate && (
               <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                 <div>
-                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.0.6'} · Commit local:{' '}
+                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.1.0'} · Commit local:{' '}
                   {activeVer?.local_commit || activeVer?.local_hash || 'local'} · Remoto:{' '}
                   {activeVer?.remote_commit || activeVer?.remote_hash || '--'}
                 </div>
@@ -586,7 +610,47 @@ export const MoreView: React.FC<MoreViewProps> = ({
         </section>
       )}
 
-      {/* 3. Pantalla móvil USB (Solo en Ubuntu nativa; en web/Android mensaje pasivo) */}
+      {/* 3. Manual Interactivo */}
+      {subTab === 'manual' && (
+        <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                Manual web interactivo
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Diagrama de arquitectura, simuladores de telemetría y seguridad Zero-Trust e inspector de API en vivo
+              </p>
+            </div>
+            <a
+              href="/manual"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[40px] items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+            >
+              <span>Abrir en pantalla completa</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+            <iframe
+              ref={manualIframeRef}
+              src="/manual"
+              title="Manual Interactivo de Recursos"
+              onLoad={() => {
+                try {
+                  manualIframeRef.current?.contentWindow?.postMessage({ type: 'RECURSOS_THEME', theme }, '*');
+                } catch {
+                  // ignore
+                }
+              }}
+              className="h-[74vh] w-full bg-white dark:bg-slate-950"
+            />
+          </div>
+        </section>
+      )}
+
+      {/* 4. Pantalla móvil USB (Solo en Ubuntu nativa; en web/Android mensaje pasivo) */}
       {subTab === 'dex' && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           {!isUbuntuNative ? (

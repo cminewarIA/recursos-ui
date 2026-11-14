@@ -51,6 +51,11 @@ if [ -f "$PROJECT_ROOT/static/index.html" ]; then
 else
     cp "$PROJECT_ROOT/index.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"
 fi
+if [ -f "$PROJECT_ROOT/static/manual.html" ]; then
+    cp "$PROJECT_ROOT/static/manual.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/manual.html"
+elif [ -f "$PROJECT_ROOT/docs/index.html" ]; then
+    cp "$PROJECT_ROOT/docs/index.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/manual.html"
+fi
 cp "$PROJECT_ROOT/static/"*.png "$PROJECT_ROOT/static/favicon.ico" "$PKG_DIR/usr/lib/$PKG_NAME/static/" 2>/dev/null || true
 cp "$PROJECT_ROOT/desktop_app/assets/"* "$PKG_DIR/usr/lib/$PKG_NAME/assets/"
 cp "$PROJECT_ROOT/VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/VERSION"

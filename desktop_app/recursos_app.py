@@ -1429,11 +1429,12 @@ class LocalHtmlBridgeServer:
                 self.end_headers()
                 self.wfile.write(raw)
 
-            def _serve_html(self):
-                if not parent.html_path or not os.path.isfile(parent.html_path):
+            def _serve_html(self, target_html_path=None):
+                html_file = target_html_path or parent.html_path
+                if not html_file or not os.path.isfile(html_file):
                     self._send_json({"error": "HTML UI not found"}, 404)
                     return
-                with open(parent.html_path, "r", encoding="utf-8") as f:
+                with open(html_file, "r", encoding="utf-8") as f:
                     html = f.read()
 
                 token_js = json.dumps(parent.conn_mgr.device_token or "")
@@ -1641,6 +1642,17 @@ class LocalHtmlBridgeServer:
                         return
                     self._send_json({"ok": True, "logs": [], "entries": [], "connections": []})
                     return
+
+                # 2b. Manual Web Interactivo (/manual, /manual.html, /readme)
+                if clean_path in ("/manual", "/manual.html", "/readme"):
+                    manual_path = resolve_static_asset_path("manual.html")
+                    if not manual_path:
+                        docs_fallback = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "docs", "index.html"))
+                        if os.path.isfile(docs_fallback):
+                            manual_path = docs_fallback
+                    if manual_path and os.path.isfile(manual_path):
+                        self._serve_html(manual_path)
+                        return
 
                 # 3. Rutas SPA HTML5
                 self._serve_html()

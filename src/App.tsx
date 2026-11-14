@@ -158,7 +158,7 @@ export function App() {
           ? 'android_native'
           : 'web_browser',
       full_access: env.isNativeApp,
-      app_version: window.__INITIAL_APP_VERSION__ || '12.0.6',
+      app_version: window.__INITIAL_APP_VERSION__ || '12.1.0',
       screen_width: window.screen?.width,
       screen_height: window.screen?.height,
     };

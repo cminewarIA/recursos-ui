@@ -83,7 +83,7 @@ export function normalizeExternalRoute(pathStr: string): 'inicio' | 'equipo' | '
   if (['equipo', 'procesador', 'cpu', 'memoria', 'ram', 'grafica', 'gpu', 'almacenamiento', 'storage', 'procesos', 'processes'].includes(clean)) return 'equipo';
   if (['red', 'seguridad', 'security', 'dns', 'duckdns', 'mapa', 'map'].includes(clean)) return 'red';
   if (['programas', 'aplicaciones', 'servicios', 'services', 'multimedia', 'media', 'descargas', 'downloads'].includes(clean)) return 'programas';
-  if (['mas', 'sistema', 'version', 'updates', 'dispositivos', 'devices', 'dex', 'logs'].includes(clean)) return 'mas';
+  if (['mas', 'sistema', 'version', 'updates', 'dispositivos', 'devices', 'dex', 'logs', 'manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(clean)) return 'mas';
   return 'inicio';
 }
 
@@ -103,5 +103,6 @@ export function extractInitialSubTabFromRoute(pathStr: string): string | undefin
   if (['dispositivos', 'devices'].includes(clean)) return 'devices';
   if (['logs'].includes(clean)) return 'logs';
   if (['dex'].includes(clean)) return 'dex';
+  if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(clean)) return 'manual';
   return undefined;
 }

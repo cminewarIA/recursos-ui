@@ -8136,6 +8136,56 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         self.send_security_headers()
         self.end_headers()
 
+    def _serve_html_with_bootstrap(self, auth, html_path, is_dashboard=True):
+        """Sirve un documento HTML verificando Zero-Trust e inyectando metadatos de versión."""
+        if not auth["is_trusted"]:
+            locked_page = get_locked_page_html(auth["client_ip"]).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(locked_page)))
+            self.end_headers()
+            self.wfile.write(locked_page)
+            return
+
+        try:
+            with open(html_path, 'r', encoding='utf-8') as f:
+                content_str = f.read()
+            current_ver = get_app_version()
+            disp_ver = get_display_version(current_ver)
+            local_sha = get_local_git_sha_cached()
+            if is_dashboard:
+                content_str = content_str.replace(
+                    'id="sidebarVersionTag">Sincronizando...<',
+                    f'id="sidebarVersionTag">v{disp_ver}<'
+                )
+            build_injection = (
+                f'<meta name="recursos-app-version" content="{current_ver}" data-display="{disp_ver}" data-commit="{local_sha}">'
+                f'<script>window.__INITIAL_APP_VERSION__ = "{current_ver}"; window.__INITIAL_DISPLAY_VERSION__ = "{disp_ver}"; window.__INITIAL_APP_HASH__ = "{local_sha}";</script>'
+            )
+            if '</head>' in content_str:
+                content_str = content_str.replace('</head>', f'{build_injection}\n</head>', 1)
+            content = content_str.encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+            self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+        except Exception as e:
+            self.send_response(500)
+            self.send_security_headers()
+            self.end_headers()
+            self.wfile.write(f"Error loading document: {e}".encode('utf-8'))
+
     def do_GET(self):
         auth = check_trust_status(self)
         clean_path = self.path.split('?')[0].rstrip('/') or '/'
@@ -8680,54 +8730,20 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # 2j. MANUAL WEB INTERACTIVO (/manual, /manual.html, /readme)
+        elif clean_path in ("/manual", "/manual.html", "/readme"):
+            manual_path = os.path.join(STATIC_DIR, "manual.html")
+            if not os.path.isfile(manual_path):
+                manual_path = os.path.join(BASE_DIR, "docs", "index.html")
+            self._serve_html_with_bootstrap(auth, manual_path, is_dashboard=False)
+            return
+
         # 3. RUTAS WEB LIMPIAS MULTIPÁGINA (History API + Acceso Directo)
         elif clean_path in VALID_WEB_ROUTES:
-            if not auth["is_trusted"]:
-                locked_page = get_locked_page_html(auth["client_ip"]).encode('utf-8')
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/html; charset=utf-8')
-                self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-                self.send_header('Pragma', 'no-cache')
-                self.send_header('Expires', '0')
-                self.send_security_headers()
-                self.send_header('Content-Length', str(len(locked_page)))
-                self.end_headers()
-                self.wfile.write(locked_page)
-                return
-
             index_path = os.path.join(STATIC_DIR, "index.html")
             if not os.path.isfile(index_path):
                 index_path = os.path.join(BASE_DIR, "index.html")
-            try:
-                with open(index_path, 'r', encoding='utf-8') as f:
-                    content_str = f.read()
-                current_ver = get_app_version()
-                disp_ver = get_display_version(current_ver)
-                local_sha = get_local_git_sha_cached()
-                content_str = content_str.replace('id="sidebarVersionTag">Sincronizando...<', f'id="sidebarVersionTag">v{disp_ver}<')
-                build_injection = (
-                    f'<meta name="recursos-app-version" content="{current_ver}" data-display="{disp_ver}" data-commit="{local_sha}">'
-                    f'<script>window.__INITIAL_APP_VERSION__ = "{current_ver}"; window.__INITIAL_DISPLAY_VERSION__ = "{disp_ver}"; window.__INITIAL_APP_HASH__ = "{local_sha}";</script>'
-                )
-                if '</head>' in content_str:
-                    content_str = content_str.replace('</head>', f'{build_injection}\n</head>', 1)
-                content = content_str.encode('utf-8')
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/html; charset=utf-8')
-                self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-                self.send_header('Pragma', 'no-cache')
-                self.send_header('Expires', '0')
-                self.send_security_headers()
-                if auth.get("new_token"):
-                    self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
-                self.send_header('Content-Length', str(len(content)))
-                self.end_headers()
-                self.wfile.write(content)
-            except Exception as e:
-                self.send_response(500)
-                self.send_security_headers()
-                self.end_headers()
-                self.wfile.write(f"Error loading dashboard: {e}".encode('utf-8'))
+            self._serve_html_with_bootstrap(auth, index_path, is_dashboard=True)
             return
 
         # 4. ARCHIVOS ESTÁTICOS / DESCARGAS RDP CON DNS AUTODETECTADO

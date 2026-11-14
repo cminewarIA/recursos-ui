@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manual Interactivo · Panel de Recursos (Cockpit)</title>
+  <link rel="icon" type="image/png" href="/favicon-32x32.png" />
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --bg-elevated: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-soft: #64748b;
+      --accent: #0284c7;
+      --accent-soft: rgba(2, 132, 199, 0.12);
+      --emerald: #059669;
+      --emerald-soft: rgba(5, 150, 105, 0.12);
+      --amber: #d97706;
+      --amber-soft: rgba(217, 119, 6, 0.12);
+      --rose: #dc2626;
+      --rose-soft: rgba(220, 38, 38, 0.12);
+      --violet: #7c3aed;
+      --violet-soft: rgba(124, 58, 237, 0.12);
+      --code-bg: #0f172a;
+      --code-text: #e2e8f0;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.08);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    html[data-theme="dark"] {
+      --bg: #020617;
+      --bg-elevated: #0f172a;
+      --bg-subtle: #1e293b;
+      --border: #1e293b;
+      --border-strong: #334155;
+      --text: #f8fafc;
+      --text-muted: #cbd5e1;
+      --text-soft: #94a3b8;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.15);
+      --emerald: #34d399;
+      --emerald-soft: rgba(52, 211, 153, 0.15);
+      --amber: #fbbf24;
+      --amber-soft: rgba(251, 191, 36, 0.15);
+      --rose: #f87171;
+      --rose-soft: rgba(248, 113, 113, 0.15);
+      --violet: #a78bfa;
+      --violet-soft: rgba(167, 139, 250, 0.15);
+      --code-bg: #020617;
+      --code-text: #e2e8f0;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+      --shadow-md: 0 12px 32px -10px rgba(0, 0, 0, 0.55);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .tabular { font-variant-numeric: tabular-nums; }
+    .mono { font-family: var(--font-mono); }
+
+    /* Barra superior fija */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--emerald), var(--violet));
+      z-index: 60;
+      transition: width 0.1s linear;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar-inner {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .brand-logo img { width: 28px; height: 28px; object-fit: contain; }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-soft);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .pill.accent { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+    .pill.emerald { background: var(--emerald-soft); color: var(--emerald); border-color: transparent; }
+    .pill.amber { background: var(--amber-soft); color: var(--amber); border-color: transparent; }
+    .pill.rose { background: var(--rose-soft); color: var(--rose); border-color: transparent; }
+    .pill.violet { background: var(--violet-soft); color: var(--violet); border-color: transparent; }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1 1 auto;
+      justify-content: flex-end;
+      min-width: 240px;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 0 1 290px;
+      min-width: 170px;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 38px;
+      padding: 0 36px 0 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      background: var(--bg-elevated);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-soft);
+      pointer-events: none;
+    }
+
+    .kbd-hint {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-soft);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 1px 5px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 38px;
+      padding: 0 13px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s, transform 0.08s;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: var(--bg-subtle); border-color: var(--border-strong); }
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: var(--text);
+      color: var(--bg-elevated);
+      border-color: var(--text);
+    }
+
+    .btn-primary:hover { opacity: 0.9; background: var(--text); }
+
+    .btn-sm { min-height: 32px; padding: 0 10px; font-size: 11px; border-radius: 8px; }
+
+    /* Layout principal */
+    .layout {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 24px 20px 64px;
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 78px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-soft);
+      padding: 4px 10px 8px;
+    }
+
+    .nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 9px 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .nav-link:hover { background: var(--bg-subtle); color: var(--text); }
+    .nav-link.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .nav-num {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      min-width: 0;
+    }
+
+    .section-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      scroll-margin-top: 84px;
+    }
+
+    .section-card.is-hidden { display: none; }
+
+    .section-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-kicker {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .section-desc {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--text-muted);
+      max-width: 720px;
+    }
+
+    /* Hero */
+    .hero {
+      background: radial-gradient(circle at top right, var(--accent-soft), transparent 45%),
+                  radial-gradient(circle at bottom left, var(--emerald-soft), transparent 40%),
+                  var(--bg-elevated);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .hero h1 {
+      margin: 8px 0 10px;
+      font-size: clamp(24px, 3.2vw, 34px);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .kpi-box {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .kpi-label { font-size: 11px; color: var(--text-soft); font-weight: 600; }
+    .kpi-val { font-size: 20px; font-weight: 700; margin-top: 2px; }
+    .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Grids & Tabs */
+    .split-2 {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .split-equal {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .panel-box {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .tabs-bar {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 12px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-elevated);
+      color: var(--text);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* SVG Arquitectura */
+    .arch-svg-wrap {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    .arch-node { cursor: pointer; transition: opacity 0.15s, transform 0.15s; }
+    .arch-node:hover rect { stroke: var(--accent); stroke-width: 2; }
+    .arch-node.selected rect { stroke: var(--accent); stroke-width: 2.5; fill: var(--accent-soft); }
+
+    /* Sliders y Canvas */
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .slider-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .canvas-stage {
+      position: relative;
+      height: 250px;
+      width: 100%;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .canvas-stage canvas { width: 100%; height: 100%; display: block; }
+
+    .chart-tooltip {
+      position: fixed;
+      z-index: 90;
+      pointer-events: none;
+      background: var(--code-bg);
+      color: var(--code-text);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 11px;
+      box-shadow: var(--shadow-md);
+      display: none;
+    }
+
+    .ram-bar {
+      height: 14px;
+      border-radius: 999px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      display: flex;
+    }
+
+    .ram-seg { height: 100%; transition: width 0.25s ease; }
+
+    /* Donut & Flujos */
+    .donut-layout {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      cursor: pointer;
+      font-size: 12px;
+      transition: border-color 0.15s;
+    }
+
+    .legend-row:hover, .legend-row.active { border-color: var(--accent); }
+
+    .swatch { width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; }
+
+    /* Paso a paso Zero Trust */
+    .step-timeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .step-box {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      opacity: 0.55;
+      transition: all 0.2s;
+    }
+
+    .step-box.active {
+      opacity: 1;
+      border-color: var(--accent);
+      background: var(--bg-elevated);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Code blocks */
+    .code-wrap {
+      position: relative;
+      background: var(--code-bg);
+      color: var(--code-text);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-x: auto;
+      border: 1px solid var(--border-strong);
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #f8fafc;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 7px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .copy-btn:hover { background: rgba(255, 255, 255, 0.22); }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-soft);
+      font-weight: 700;
+    }
+
+    .api-console {
+      background: var(--code-bg);
+      color: var(--code-text);
+      border-radius: 12px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      max-height: 290px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border: 1px solid var(--border-strong);
+    }
+
+    .mobile-menu-btn { display: none; }
+
+    /* Modo embebido en iframe */
+    body.is-embedded .topbar { position: static; }
+    body.is-embedded .layout { padding-top: 14px; }
+    body.is-embedded #openLiveAppBtn { display: none; }
+
+    @media (max-width: 1020px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        display: none;
+      }
+      .sidebar.open { display: block; }
+      .mobile-menu-btn { display: inline-flex; }
+      .hero-grid, .split-2, .split-equal, .donut-layout { grid-template-columns: 1fr; }
+      .grid-3, .step-timeline { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-bar" id="readProgress"></div>
+  <div class="chart-tooltip" id="chartTooltip"></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <button type="button" class="btn btn-sm mobile-menu-btn" id="mobileMenuBtn" aria-label="Índice">☰ Índice</button>
+        <div class="brand-logo">
+          <img src="/favicon-192x192.png" alt="CMineWar" onerror="this.style.display='none'" />
+        </div>
+        <div>
+          <div class="brand-title">Manual Interactivo · Panel de Recursos</div>
+          <div class="brand-sub">
+            <span class="pill accent mono" id="manualVersionBadge">v2B.1.0 (12.1.0)</span>
+            <span class="pill emerald" id="liveServerBadge">Modo autónomo</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="search-wrap">
+          <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="search" id="manualSearch" class="search-input" placeholder="Buscar sección, métrica o API..." />
+          <span class="kbd-hint">Ctrl+K</span>
+        </div>
+        <button type="button" class="btn" id="themeToggleBtn">Oscuro</button>
+        <a href="/inicio" target="_top" class="btn btn-primary" id="openLiveAppBtn">Abrir Panel</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" id="manualSidebar">
+      <div class="sidebar-title">Índice interactivo</div>
+      <nav class="nav-list" id="sidebarNav">
+        <a class="nav-link active" href="#intro"><span>Resumen ejecutivo</span><span class="nav-num">00</span></a>
+        <a class="nav-link" href="#arquitectura"><span>Arquitectura 3 capas</span><span class="nav-num">01</span></a>
+        <a class="nav-link" href="#telemetria"><span>Simulador CPU / RAM / Disco</span><span class="nav-num">02</span></a>
+        <a class="nav-link" href="#red-geoip"><span>Topología ASUS + GeoIP</span><span class="nav-num">03</span></a>
+        <a class="nav-link" href="#seguridad"><span>Flujo Zero-Trust HMAC</span><span class="nav-num">04</span></a>
+        <a class="nav-link" href="#plataformas"><span>Apps Nativas y Descargas</span><span class="nav-num">05</span></a>
+        <a class="nav-link" href="#api-live"><span>Consola API en Vivo</span><span class="nav-num">06</span></a>
+        <a class="nav-link" href="#vistas-changelog"><span>Vistas y Versionado</span><span class="nav-num">07</span></a>
+      </nav>
+    </aside>
+
+    <div class="content">
+      <!-- 00. HERO -->
+      <section class="section-card hero" id="intro" data-keywords="resumen cockpit react python zero hardcoding ubuntu android version">
+        <div class="hero-grid">
+          <div>
+            <span class="pill emerald">Documentación Viva · Español (es-ES) · 100% Zero-Hardcoding</span>
+            <h1>Centro de Mando para Servidores Linux, Redes AiMesh y Apps Nativas</h1>
+            <p class="section-desc">
+              Guía visual e interactiva de <strong>Panel de Recursos (Recursos Cockpit)</strong>: explora la arquitectura en Python + React 19, simula cargas térmicas y de disco en tiempo real, inspecciona el aislamiento Zero-Trust y prueba los endpoints REST reales de tu nodo.
+            </p>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:16px;">
+              <a href="#arquitectura" class="btn btn-primary">Explorar diagrama</a>
+              <a href="#telemetria" class="btn">Simular telemetría</a>
+              <a href="#api-live" class="btn">Probar API en vivo</a>
+            </div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi-box">
+              <div class="kpi-label">Motor Backend</div>
+              <div class="kpi-val tabular">8 Workers</div>
+              <div class="kpi-sub">Python asíncrono · Caché &lt;18 ms</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-label">Interfaz Unificada</div>
+              <div class="kpi-val tabular">React 19</div>
+              <div class="kpi-sub">Claro Minimalista + Modo Oscuro</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-label">Ecosistema Nativo</div>
+              <div class="kpi-val">.deb + .apk</div>
+              <div class="kpi-sub">WebKit2 Ubuntu (DeX) + Android</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-label">Seguridad</div>
+              <div class="kpi-val tabular">HMAC-256</div>
+              <div class="kpi-sub">AES-256-GCM + Fail2ban IPS</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 01. ARQUITECTURA INTERACTIVA -->
+      <section class="section-card" id="arquitectura" data-keywords="arquitectura kernel python workers react webkit2 webview dex caching conntrack ss aes">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">01 · Explorador de Arquitectura</div>
+            <h2 class="section-title">Diagrama Interactivo de las 3 Capas del Sistema</h2>
+            <p class="section-desc">Pulsa sobre cualquier bloque del diagrama SVG para inspeccionar su función, archivos fuente, intervalo de refresco y garantías Zero-Hardcoding.</p>
+          </div>
+          <span class="pill accent">Haz clic en un nodo</span>
+        </div>
+
+        <div class="split-2">
+          <div class="arch-svg-wrap">
+            <svg viewBox="0 0 740 430" width="100%" height="auto" role="img" aria-label="Diagrama de arquitectura de 3 capas">
+              <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="currentColor" opacity="0.55" />
+                </marker>
+              </defs>
+
+              <!-- Etiquetas de capas -->
+              <text x="16" y="24" font-size="11" font-weight="700" fill="var(--text-soft)">CAPA 1 · KERNEL LINUX, HARDWARE Y RED FÍSICA</text>
+              <text x="16" y="168" font-size="11" font-weight="700" fill="var(--text-soft)">CAPA 2 · SERVIDOR PYTHON ASÍNCRONO (PORT 8085)</text>
+              <text x="16" y="312" font-size="11" font-weight="700" fill="var(--text-soft)">CAPA 3 · ECOSISTEMA CLIENTE UNIFICADO</text>
+
+              <!-- Flechas -->
+              <g stroke="var(--text-soft)" stroke-width="1.6" fill="none" opacity="0.6" marker-end="url(#arrow)">
+                <line x1="95" y1="110" x2="95" y2="180" />
+                <line x1="275" y1="110" x2="275" y2="180" />
+                <line x1="455" y1="110" x2="455" y2="180" />
+                <line x1="635" y1="110" x2="635" y2="180" />
+                <line x1="185" y1="254" x2="135" y2="324" />
+                <line x1="370" y1="254" x2="370" y2="324" />
+                <line x1="555" y1="254" x2="605" y2="324" />
+              </g>
+
+              <!-- Capa 1 nodos -->
+              <g class="arch-node selected" data-node="kernel">
+                <rect x="16" y="36" width="160" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="28" y="60" font-size="12" font-weight="700" fill="var(--text)">Kernel &amp; Silicio</text>
+                <text x="28" y="78" font-size="10.5" fill="var(--text-soft)">/proc · /sys · nvidia-smi</text>
+                <text x="28" y="95" font-size="10" fill="var(--emerald)" font-weight="600">Sensores dinámicos</text>
+              </g>
+
+              <g class="arch-node" data-node="sockets">
+                <rect x="196" y="36" width="160" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="208" y="60" font-size="12" font-weight="700" fill="var(--text)">Sockets &amp; Conntrack</text>
+                <text x="208" y="78" font-size="10.5" fill="var(--text-soft)">ss -tulpn · conntrack -L</text>
+                <text x="208" y="95" font-size="10" fill="var(--accent)" font-weight="600">CAP_NET_ADMIN sin sudo</text>
+              </g>
+
+              <g class="arch-node" data-node="asus">
+                <rect x="376" y="36" width="160" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="388" y="60" font-size="12" font-weight="700" fill="var(--text)">Router ASUS AiMesh</text>
+                <text x="388" y="78" font-size="10.5" fill="var(--text-soft)">SSH + clientlist + br0</text>
+                <text x="388" y="95" font-size="10" fill="var(--violet)" font-weight="600">Wi-Fi 2.4/5 GHz + Cable</text>
+              </g>
+
+              <g class="arch-node" data-node="pihole_f2b">
+                <rect x="556" y="36" width="168" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="568" y="60" font-size="12" font-weight="700" fill="var(--text)">Pi-hole, Docker, F2B</text>
+                <text x="568" y="78" font-size="10.5" fill="var(--text-soft)">FTL SQLite · iptables · Socket</text>
+                <text x="568" y="95" font-size="10" fill="var(--rose)" font-weight="600">Ciberdefensa + Contenedores</text>
+              </g>
+
+              <!-- Capa 2 nodos -->
+              <g class="arch-node" data-node="workers">
+                <rect x="16" y="180" width="225" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="28" y="204" font-size="12" font-weight="700" fill="var(--text)">8 Workers en Segundo Plano</text>
+                <text x="28" y="222" font-size="10.5" fill="var(--text-soft)">Métricas 1.5s · Red · GeoIP · DuckDNS</text>
+                <text x="28" y="239" font-size="10" fill="var(--emerald)" font-weight="600">SQLite + Caché en memoria</text>
+              </g>
+
+              <g class="arch-node" data-node="cache_fast">
+                <rect x="256" y="180" width="225" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="268" y="204" font-size="12" font-weight="700" fill="var(--text)">Caché Atómica &amp; Fast Path</text>
+                <text x="268" y="222" font-size="10.5" fill="var(--text-soft)">METRICS_CACHE_BYTES (byte-splicing)</text>
+                <text x="268" y="239" font-size="10" fill="var(--accent)" font-weight="600">Respuesta /api/metrics ~17 ms</text>
+              </g>
+
+              <g class="arch-node" data-node="vault">
+                <rect x="496" y="180" width="228" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="508" y="204" font-size="12" font-weight="700" fill="var(--text)">Motor Zero-Trust &amp; Bóveda</text>
+                <text x="508" y="222" font-size="10.5" fill="var(--text-soft)">HMAC-SHA256 · AES-256-GCM</text>
+                <text x="508" y="239" font-size="10" fill="var(--amber)" font-weight="600">Certificado por equipo físico</text>
+              </g>
+
+              <!-- Capa 3 nodos -->
+              <g class="arch-node" data-node="web_spa">
+                <rect x="16" y="324" width="225" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="28" y="348" font-size="12" font-weight="700" fill="var(--text)">Web SPA (React 19 + TS)</text>
+                <text x="28" y="366" font-size="10.5" fill="var(--text-soft)">Claro Minimalista / Oscuro · Leaflet</text>
+                <text x="28" y="383" font-size="10" fill="var(--accent)" font-weight="600">5 Bloques · 100% Adaptativo</text>
+              </g>
+
+              <g class="arch-node" data-node="ubuntu_deb">
+                <rect x="256" y="324" width="225" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="268" y="348" font-size="12" font-weight="700" fill="var(--text)">App Ubuntu Nativa (.deb)</text>
+                <text x="268" y="366" font-size="10.5" fill="var(--text-soft)">GTK 3 + WebKit2 + LocalHtmlBridge</text>
+                <text x="268" y="383" font-size="10" fill="var(--violet)" font-weight="600">Desbloqueo exclusivo DeX USB</text>
+              </g>
+
+              <g class="arch-node" data-node="android_apk">
+                <rect x="496" y="324" width="228" height="74" rx="12" fill="var(--bg-elevated)" stroke="var(--border-strong)" stroke-width="1.5" />
+                <text x="508" y="348" font-size="12" font-weight="700" fill="var(--text)">App Android Nativa (.apk)</text>
+                <text x="508" y="366" font-size="10.5" fill="var(--text-soft)">Compose + WebView + KeyStore AES</text>
+                <text x="508" y="383" font-size="10" fill="var(--emerald)" font-weight="600">Conmutación auto LAN &lt;-&gt; WAN</text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="panel-box" id="archInspector">
+            <div class="pill accent" id="archNodeBadge">Capa 1 · Hardware</div>
+            <h3 id="archNodeTitle" style="margin:10px 0 6px; font-size:17px;">Kernel &amp; Silicio</h3>
+            <p id="archNodeDesc" style="margin:0 0 12px; font-size:13px; color:var(--text-muted);"></p>
+            <div style="display:grid; gap:8px; font-size:12px;">
+              <div><strong>Archivos clave:</strong> <span class="mono" id="archNodeFiles"></span></div>
+              <div><strong>Cadencia / Protocolo:</strong> <span id="archNodeCycle"></span></div>
+              <div><strong>Principio Zero-Hardcoding:</strong> <span id="archNodeZero"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 02. SIMULADOR DE TELEMETRÍA -->
+      <section class="section-card" id="telemetria" data-keywords="cpu ram zram gpu almacenamiento disco mb s lectura escritura canvas grafica salud">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">02 · Simulador Gráfico de Telemetría</div>
+            <h2 class="section-title">Gráfica Dinámica de CPU, Memoria ZRAM, GPU y Disco en Vivo</h2>
+            <p class="section-desc">Mueve los controles deslizantes para observar en tiempo real cómo evalúa el panel los umbrales de salud y cómo dibuja la curva dual de I/O (MB/s) y espacio ocupado (%). Pasa el cursor sobre la gráfica para inspeccionar puntos.</p>
+          </div>
+          <button type="button" class="btn btn-sm" id="loadLiveTelemetryBtn">Cargar telemetría real del nodo</button>
+        </div>
+
+        <div class="split-2">
+          <div class="panel-box">
+            <div class="slider-row">
+              <div class="slider-head">
+                <span>Uso de procesador (CPU)</span>
+                <span class="tabular" id="simCpuVal">28 % · <strong id="simCpuBadge" style="color:var(--emerald)">Funcionando bien</strong></span>
+              </div>
+              <input type="range" id="simCpuRange" min="2" max="100" value="28" />
+            </div>
+
+            <div class="slider-row">
+              <div class="slider-head">
+                <span>Memoria ocupada (RAM + ZRAM)</span>
+                <span class="tabular" id="simRamVal">54 %</span>
+              </div>
+              <input type="range" id="simRamRange" min="10" max="98" value="54" />
+              <div class="ram-bar" aria-label="Desglose de memoria">
+                <div class="ram-seg" id="ramActiveBar" style="width:36%; background:var(--accent);"></div>
+                <div class="ram-seg" id="ramCacheBar" style="width:12%; background:var(--emerald);"></div>
+                <div class="ram-seg" id="ramZramBar" style="width:6%; background:var(--violet);"></div>
+              </div>
+              <div style="display:flex; gap:12px; font-size:11px; color:var(--text-soft); flex-wrap:wrap;">
+                <span>● Activa (Azul)</span>
+                <span>● Caché/Buffer (Verde)</span>
+                <span>● ZRAM comprimida (Violeta)</span>
+              </div>
+            </div>
+
+            <div class="slider-row">
+              <div class="slider-head">
+                <span>Carga de gráfica (GPU)</span>
+                <span class="tabular" id="simGpuVal">19 % · 44 °C</span>
+              </div>
+              <input type="range" id="simGpuRange" min="0" max="100" value="19" />
+            </div>
+
+            <div class="slider-row">
+              <div class="slider-head">
+                <span>Tráfico de disco (MB/s lectura + escritura)</span>
+                <span class="tabular" id="simDiskIoVal">42 MB/s</span>
+              </div>
+              <input type="range" id="simDiskIoRange" min="0" max="450" value="42" />
+            </div>
+
+            <div class="slider-row" style="margin-bottom:0;">
+              <div class="slider-head">
+                <span>Espacio ocupado del almacenamiento (%)</span>
+                <span class="tabular" id="simDiskPctVal">62 %</span>
+              </div>
+              <input type="range" id="simDiskPctRange" min="5" max="98" value="62" />
+            </div>
+          </div>
+
+          <div class="panel-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px; flex-wrap:wrap;">
+              <strong style="font-size:13px;">Almacenamiento en Vivo · Lectura/Escritura (MB/s) vs Ocupación (%)</strong>
+              <span class="pill amber tabular" id="simCanvasLivePill">42 MB/s · 62%</span>
+            </div>
+            <div class="canvas-stage" id="simCanvasStage">
+              <canvas id="telemetrySimCanvas"></canvas>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:11px; color:var(--text-soft);">
+              <span>━ Azul: Lectura/Escritura (MB/s)</span>
+              <span>┈ Ámbar discontinua: Espacio usado (% Real)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03. RED ASUS AIMESH, PI-HOLE Y GEOIP -->
+      <section class="section-card" id="red-geoip" data-keywords="red asus aimesh pihole geoip mapa openstreetmap leaflet wifi cable docker brigde donut">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">03 · Topología LAN/WAN y Mapa Geoespacial</div>
+            <h2 class="section-title">Distribución de Enlaces ASUS AiMesh, Filtrado Docker y GeoIP Libre</h2>
+            <p class="section-desc">Explora cómo el backend combina SSH cifrado AES-256-GCM al router principal con la tabla ARP filtrada y Pi-hole FTL sin depender de APIs de pago.</p>
+          </div>
+          <div class="tabs-bar" id="netBandTabs">
+            <button type="button" class="tab-btn active" data-band="all">Todos</button>
+            <button type="button" class="tab-btn" data-band="cable">Cable LAN</button>
+            <button type="button" class="tab-btn" data-band="5g">Wi-Fi 5 GHz</button>
+            <button type="button" class="tab-btn" data-band="24g">Wi-Fi 2.4 GHz</button>
+          </div>
+        </div>
+
+        <div class="donut-layout">
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <svg viewBox="0 0 220 220" width="210" height="210" id="netDonutSvg" role="img" aria-label="Distribución de dispositivos en red"></svg>
+          </div>
+
+          <div style="display:grid; gap:10px;">
+            <div id="netDonutLegend" style="display:grid; gap:8px;"></div>
+            <div class="panel-box" style="margin-top:4px;">
+              <div style="font-size:12px; font-weight:700; margin-bottom:6px;">Algoritmo de Deduplicación en 2 Pasadas (Cero Falsos Positivos)</div>
+              <div style="font-size:12px; color:var(--text-muted); display:grid; gap:4px;">
+                <div>1. Se excluyen interfaces virtuales Docker (<code class="mono">docker0</code>, <code class="mono">br-*</code>, <code class="mono">veth*</code>, <code class="mono">tailscale*</code>) en <code class="mono">ip neigh</code>.</div>
+                <div>2. Pasada 1: se registran primero todos los clientes Wi-Fi en <code class="mono">/tmp/clientlist.json</code> de cada nodo AiMesh.</div>
+                <div>3. Pasada 2: solo entran como <span class="pill emerald">Cable LAN</span> las MACs en <code class="mono">brctl showmacs br0</code> / <code class="mono">wired_mac</code> ausentes de la pasada Wi-Fi.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04. SIMULADOR ZERO-TRUST HMAC -->
+      <section class="section-card" id="seguridad" data-keywords="seguridad zero trust hmac sha256 fail2ban ban bloqueo certificado lan wan clave maestra">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">04 · Ciberdefensa Zero-Trust &amp; Fail2ban</div>
+            <h2 class="section-title">Simulador de Verificación Criptográfica por Dispositivo Físico</h2>
+            <p class="section-desc">Selecciona un escenario de conexión para visualizar cómo <code class="mono">check_trust_status()</code> valida la identidad física y protege el acceso externo.</p>
+          </div>
+          <div class="tabs-bar" id="ztScenarioTabs">
+            <button type="button" class="tab-btn active" data-scenario="lan">1. Red Local (Wi-Fi/LAN)</button>
+            <button type="button" class="tab-btn" data-scenario="wan_ok">2. Móvil / Ubuntu WAN Emparejado</button>
+            <button type="button" class="tab-btn" data-scenario="intruder">3. Intruso WAN / Fail2ban</button>
+          </div>
+        </div>
+
+        <div class="panel-box">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <span class="pill" id="ztResultBadge">ESTADO: CONFIANZA AUTOMÁTICA LAN</span>
+              <div id="ztScenarioTitle" style="font-size:15px; font-weight:700; margin-top:6px;"></div>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary" id="ztNextStepBtn">Simular siguiente paso →</button>
+          </div>
+          <div class="step-timeline" id="ztStepsGrid"></div>
+          <div class="code-wrap" style="margin-top:12px;" id="ztHeaderPreview"></div>
+        </div>
+      </section>
+
+      <!-- 05. PLATAFORMAS Y DESCARGAS -->
+      <section class="section-card" id="plataformas" data-keywords="ubuntu deb android apk dex usb scrcpy uhid descarga instalar webkit2 webview">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">05 · Ecosistema Nativo y Descargas Oficiales</div>
+            <h2 class="section-title">Comparador Interactivo de Plataformas (.deb / .apk / Web)</h2>
+            <p class="section-desc">Paridad estética del 100% entre plataformas y desbloqueo exclusivo de proyección Android por cable USB (<code class="mono">scrcpy + UHID</code>) en la app nativa de Ubuntu.</p>
+          </div>
+          <div class="tabs-bar" id="platformTabs">
+            <button type="button" class="tab-btn active" data-plat="ubuntu">Ubuntu Nativa (.deb)</button>
+            <button type="button" class="tab-btn" data-plat="android">Android Nativa (.apk)</button>
+            <button type="button" class="tab-btn" data-plat="web">Navegador Web (SPA)</button>
+          </div>
+        </div>
+
+        <div class="split-equal">
+          <div class="panel-box" id="platformDetailBox"></div>
+          <div class="panel-box">
+            <div style="font-size:14px; font-weight:700; margin-bottom:10px;">Descarga directa y actualización limpia</div>
+            <div style="display:grid; gap:8px; margin-bottom:12px;">
+              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.1.0</a>
+              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android (.apk) · 12.1.0</a>
+            </div>
+            <div class="code-wrap">
+              <button type="button" class="copy-btn" data-copy-target="cmdInstallBlock">Copiar</button>
+              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.1.0_amd64.deb</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 06. CONSOLA INTERACTIVA DE API REST -->
+      <section class="section-card" id="api-live" data-keywords="api rest json endpoints metrics version logs auth devices duckdns telegram dex">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">06 · Live API Inspector</div>
+            <h2 class="section-title">Consola Interactiva de Endpoints REST</h2>
+            <p class="section-desc">Pulsa cualquier endpoint para consultar en tiempo real las respuestas JSON de tu servidor (si estás autenticado en el nodo) o inspeccionar su estructura real de esquema.</p>
+          </div>
+          <span class="pill mono" id="apiLatencyBadge">Listo</span>
+        </div>
+
+        <div class="split-2">
+          <div style="display:grid; gap:8px;" id="apiEndpointList"></div>
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span class="mono" style="font-size:12px; font-weight:700;" id="apiSelectedLabel">/api/version</span>
+              <button type="button" class="btn btn-sm btn-primary" id="apiRunBtn">Probar en vivo</button>
+            </div>
+            <div class="api-console" id="apiOutputBox">Selecciona un endpoint y pulsa "Probar en vivo" para inspeccionar su respuesta JSON...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 07. VISTAS Y VERSIONADO SEMÁNTICO -->
+      <section class="section-card" id="vistas-changelog" data-keywords="vistas resumen equipo red programas mas versionado semántico major minor patch changelog">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">07 · Mapa de Vistas React 19 e Historial</div>
+            <h2 class="section-title">Navegación Unificada en 5 Bloques y Criterio Semántico</h2>
+            <p class="section-desc">Resumen de las pantallas del panel v12 (`v2B`) y regla estricta de incremento <code class="mono">MAJOR.MINOR.PATCH</code>.</p>
+          </div>
+          <div class="tabs-bar" id="verFilterTabs">
+            <button type="button" class="tab-btn active" data-vtype="all">Todas</button>
+            <button type="button" class="tab-btn" data-vtype="MAJOR">MAJOR</button>
+            <button type="button" class="tab-btn" data-vtype="MINOR">MINOR</button>
+            <button type="button" class="tab-btn" data-vtype="PATCH">PATCH</button>
+          </div>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px;">
+          <div class="panel-box"><strong>1. Inicio (<code class="mono">/inicio</code>)</strong><p style="font-size:12px; color:var(--text-muted); margin:6px 0 0;">Salud global, gráficas en vivo CPU/RAM/GPU/Almacenamiento, dispositivos LAN/WAN con WoL y apagado remoto.</p></div>
+          <div class="panel-box"><strong>2. Equipo (<code class="mono">/equipo</code>)</strong><p style="font-size:12px; color:var(--text-muted); margin:6px 0 0;">Núcleos lógicos, RAM+ZRAM, temperaturas térmicas del silicio, particiones montadas y Top procesos.</p></div>
+          <div class="panel-box"><strong>3. Red y seguridad (<code class="mono">/red</code>)</strong><p style="font-size:12px; color:var(--text-muted); margin:6px 0 0;">Mapa GeoIP OpenStreetMap + Leaflet, sockets activos, clientes Pi-hole, ASUS AiMesh y Fail2ban IPS.</p></div>
+          <div class="panel-box"><strong>4. Programas (<code class="mono">/programas</code>)</strong><p style="font-size:12px; color:var(--text-muted); margin:6px 0 0;">Contenedores Docker en vivo, unidades Systemd, qBittorrent, Emby y Bot de Telegram.</p></div>
+          <div class="panel-box"><strong>5. Más (<code class="mono">/mas</code>)</strong><p style="font-size:12px; color:var(--text-muted); margin:6px 0 0;">Actualizador GitHub OTA, Aspecto Claro/Oscuro, Dispositivos conectados, DeX USB (Ubuntu) y <strong>Manual interactivo</strong>.</p></div>
+          <div class="panel-box"><strong>Criterio <code class="mono">VERSION</code></strong><p style="font-size:12px; color:var(--text-muted); margin:6px 0 0;"><strong>X.0.0</strong> rediseño global · <strong>0.X.0</strong> función nueva o rediseño parcial · <strong>0.0.X</strong> optimizaciones y bugfixes.</p></div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Versión</th><th>Tipo</th><th>Resumen técnico</th></tr>
+            </thead>
+            <tbody id="changelogBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const isEmbedded = window.self !== window.top;
+      if (isEmbedded) document.body.classList.add('is-embedded');
+
+      // 1. Tema Claro / Oscuro sincronizado con localStorage y ventana padre
+      function applyTheme(next) {
+        const t = next === 'dark' ? 'dark' : 'light';
+        root.setAttribute('data-theme', t);
+        try { localStorage.setItem('recursos_theme', t); } catch (e) {}
+        const btn = document.getElementById('themeToggleBtn');
+        if (btn) btn.textContent = t === 'dark' ? 'Claro' : 'Oscuro';
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const urlTheme = params.get('theme');
+      let storedTheme = 'light';
+      try { storedTheme = localStorage.getItem('recursos_theme') || 'light'; } catch (e) {}
+      applyTheme(urlTheme || storedTheme);
+
+      document.getElementById('themeToggleBtn').addEventListener('click', function () {
+        applyTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      });
+
+      window.addEventListener('storage', function (ev) {
+        if (ev.key === 'recursos_theme' && ev.newValue) applyTheme(ev.newValue);
+      });
+      window.addEventListener('message', function (ev) {
+        if (ev.data && ev.data.type === 'RECURSOS_THEME' && ev.data.theme) {
+          applyTheme(ev.data.theme);
+        }
+      });
+
+      // Menú móvil
+      document.getElementById('mobileMenuBtn').addEventListener('click', function () {
+        document.getElementById('manualSidebar').classList.toggle('open');
+      });
+
+      // Detección dinámica de versión y servidor activo (Zero-Hardcoding)
+      const isFileProto = window.location.protocol === 'file:' || window.location.hostname.endsWith('github.io');
+      const liveBtn = document.getElementById('openLiveAppBtn');
+      if (isFileProto) {
+        liveBtn.href = 'https://github.com/cminewarIA/recursos-ui';
+        liveBtn.textContent = 'Ver en GitHub';
+        document.getElementById('dlDebLink').href = 'https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb';
+        document.getElementById('dlApkLink').href = 'https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk';
+      }
+
+      function setVersionText(ver, disp, extra) {
+        const badge = document.getElementById('manualVersionBadge');
+        if (badge) badge.textContent = 'v' + (disp || '2B.1.0') + ' (' + (ver || '12.1.0') + ')' + (extra ? ' · ' + extra : '');
+      }
+
+      if (window.__INITIAL_APP_VERSION__) {
+        setVersionText(window.__INITIAL_APP_VERSION__, window.__INITIAL_DISPLAY_VERSION__, '');
+      }
+
+      let serverOnline = false;
+      function buildAuthHeaders() {
+        const hdrs = {};
+        try {
+          const tok = localStorage.getItem('recursos_device_token') || localStorage.getItem('sysmon_device_token');
+          if (tok) hdrs['X-Device-Token'] = tok;
+        } catch (e) {}
+        return hdrs;
+      }
+
+      async function detectLiveServer() {
+        if (isFileProto) return;
+        try {
+          const r = await fetch('/api/version', { credentials: 'include', headers: buildAuthHeaders() });
+          if (r.ok) {
+            const d = await r.json();
+            serverOnline = true;
+            setVersionText(d.current_version || '12.1.0', d.display_version || '2B.1.0', d.local_commit || '');
+            const b = document.getElementById('liveServerBadge');
+            b.textContent = 'Conectado al nodo en vivo';
+            b.className = 'pill emerald';
+            try {
+              const mr = await fetch('/api/metrics', { credentials: 'include', headers: buildAuthHeaders() });
+              if (mr.ok) {
+                const m = await mr.json();
+                const ws = m.wifi_summary || {};
+                const wiredN = Number(ws.wired_clients ?? 0);
+                const g5N = Number(ws.band_5g ?? 0);
+                const g24N = Number(ws.band_24g ?? 0);
+                if (wiredN + g5N + g24N > 0) {
+                  NET_DATA.all = [
+                    { label: 'Cable LAN Gigabit (br0 / wired_mac)', count: wiredN, color: '#059669' },
+                    { label: 'Wi-Fi 5 GHz (Nodos AiMesh)', count: g5N, color: '#0284c7' },
+                    { label: 'Wi-Fi 2.4 GHz (IoT y Domótica)', count: g24N, color: '#d97706' }
+                  ].filter(function (x) { return x.count > 0; });
+                  NET_DATA.cable = [{ label: 'Cable LAN Gigabit (br0)', count: wiredN, color: '#059669' }];
+                  NET_DATA['5g'] = [{ label: 'Wi-Fi 5 GHz Alta Velocidad', count: g5N, color: '#0284c7' }];
+                  NET_DATA['24g'] = [{ label: 'Wi-Fi 2.4 GHz Larga Cobertura', count: g24N, color: '#d97706' }];
+                  renderDonut('all');
+                }
+              }
+            } catch (me) {}
+          }
+        } catch (e) {}
+      }
+
+      // 2. Progreso lectura & IntersectionObserver & Buscador Ctrl+K
+      window.addEventListener('scroll', function () {
+        const h = document.documentElement;
+        const max = (h.scrollHeight - h.clientHeight) || 1;
+        document.getElementById('readProgress').style.width = Math.min(100, (h.scrollTop / max) * 100) + '%';
+      }, { passive: true });
+
+      const navLinks = Array.from(document.querySelectorAll('#sidebarNav .nav-link'));
+      const sections = Array.from(document.querySelectorAll('.section-card'));
+      if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              const id = entry.target.id;
+              navLinks.forEach(function (lnk) {
+                lnk.classList.toggle('active', lnk.getAttribute('href') === '#' + id);
+              });
+            }
+          });
+        }, { rootMargin: '-25% 0px -60% 0px' });
+        sections.forEach(function (sec) { obs.observe(sec); });
+      }
+
+      const searchInput = document.getElementById('manualSearch');
+      searchInput.addEventListener('input', function () {
+        const q = searchInput.value.trim().toLowerCase();
+        sections.forEach(function (sec) {
+          if (!q) { sec.classList.remove('is-hidden'); return; }
+          const txt = (sec.innerText + ' ' + (sec.dataset.keywords || '')).toLowerCase();
+          sec.classList.toggle('is-hidden', !txt.includes(q));
+        });
+      });
+
+      window.addEventListener('keydown', function (ev) {
+        if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') {
+          ev.preventDefault();
+          searchInput.focus();
+        }
+      });
+
+      // 3. Explorador de Arquitectura Clicable
+      const ARCH_NODES = {
+        kernel: {
+          badge: 'Capa 1 · Hardware y Kernel',
+          title: 'Kernel Linux, Sensores Térmicos y GPU',
+          desc: 'Lee dinámicamente CPU por núcleo, frecuencias reales, ZRAM/Swap, particiones montadas, temperaturas en /sys/class/thermal y estadísticas NVIDIA vía nvidia-smi (con fallback sysfs DRM para Intel/AMD).',
+          files: 'server.py (collect_hardware_metrics, get_gpu_telemetry)',
+          cycle: 'Muestreo cada 1.5 segundos en hilo dedicado',
+          zero: 'Nunca hardcodea núcleos, discos ni nombres de GPU; enumera los dispositivos presentes en tiempo de ejecución.'
+        },
+        sockets: {
+          badge: 'Capa 1 · Red del Kernel sin Sudo',
+          title: 'Sockets TCP/UDP y Tabla Conntrack',
+          desc: 'Ejecuta ss -tulpn -H y conntrack -L directamente usando capacidades POSIX del servicio (CAP_NET_ADMIN, CAP_DAC_READ_SEARCH, CAP_SYS_PTRACE) eliminando al 100% el spam de sesiones PAM sudo en journalctl.',
+          files: 'server.py (update_listening_ports_map, poll_socket_traffic_metrics)',
+          cycle: 'Telemetría cada 2.5s · Poda SQLite acotada cada 60s',
+          zero: 'Mapea PIDs e inodos abiertos en vivo por delta de bytes transmitidos y recibidos.'
+        },
+        asus: {
+          badge: 'Capa 1 · Router Mesh',
+          title: 'Router Principal ASUS AiMesh',
+          desc: 'Se autentica por SSH con contraseña protegida mediante cifrado AES-256-GCM en .router_credentials.json y env SSHPASS (invisible en /proc/cmdline) leyendo /tmp/clientlist.json y brctl showmacs br0.',
+          files: 'server.py (.router_credentials.json, fetch_network_devices_worker)',
+          cycle: 'Sondeo asíncrono de topología + caudales fcache',
+          zero: 'Puerta de enlace detectada desde /proc/net/route sin IPs fijas.'
+        },
+        pihole_f2b: {
+          badge: 'Capa 1 · Defensa y Contenedores',
+          title: 'Pi-hole DNS, Fail2ban IPS y Docker',
+          desc: 'Traduce IPs LAN mediante /etc/pihole/pihole-FTL.db (con TTL de 18s), audita cárceles Fail2ban con caché por st_mtime y lee métricas reales por contenedor directamente del demonio Docker.',
+          files: 'server.py (PiholeDnsTranslator, fetch_security_worker, fetch_docker_worker)',
+          cycle: 'Caché inteligente por cambios en disco',
+          zero: 'Cualquier contenedor, jail o cliente DNS nuevo aparece de forma automática.'
+        },
+        workers: {
+          badge: 'Capa 2 · Motor Asíncrono',
+          title: '8 Workers Daemon en Segundo Plano',
+          desc: 'Desacoplan completamente las llamadas bloqueantes (GeoIP, GitHub, DuckDNS, Telegram Bot, Docker, Systemd logs) de las peticiones HTTP de los clientes.',
+          files: 'server.py (background_collector, geoip_resolver_daemon_worker, telegram_bot_worker)',
+          cycle: 'Threads daemon con RLock reentrante y SQLite WAL',
+          zero: 'Los hilos se adaptan a las integraciones realmente disponibles en el host.'
+        },
+        cache_fast: {
+          badge: 'Capa 2 · Latencia Ultrabaja',
+          title: 'Caché Atómica Byte-Splicing',
+          desc: 'Serializa METRICS_CACHE_BYTES una sola vez en segundo plano e inyecta auth_status por concatenación de bytes al atender /api/metrics en ~17 ms para payloads de ~290 KB.',
+          files: 'server.py (do_GET /api/metrics, METRICS_CACHE_BYTES)',
+          cycle: 'Respuesta inmediata < 20 ms sin bloquear la CPU en JSON dumps repetidos',
+          zero: 'Incluye dinámicamente version_info, custom_logos y nic_history_2h.'
+        },
+        vault: {
+          badge: 'Capa 2 · Criptografía y Confianza',
+          title: 'Seguridad Zero-Trust y Bóveda AES-256-GCM',
+          desc: 'Emite un certificado HMAC-SHA256 único por dispositivo físico (MAC + hardware_id + SO) y protege credenciales de router y clave maestra con PBKDF2-HMAC-SHA256 (200.000 iteraciones).',
+          files: 'server.py (check_trust_status, consolidate_devices_by_hardware)',
+          cycle: 'Validado en cada endpoint REST y cabecera X-Device-Token',
+          zero: 'Clave maestra generada aleatoriamente por equipo en .admin_master_key (0600).'
+        },
+        web_spa: {
+          badge: 'Capa 3 · Web Frontend',
+          title: 'SPA React 19 + TypeScript + Tailwind v4',
+          desc: 'Interfaz Claro Minimalista y Oscuro en español cotidiano, gráficas Canvas HiDPI interactivas con tooltips, mapa OpenStreetMap/Leaflet y compilación en HTML único standalone.',
+          files: 'src/App.tsx, src/components/*, vite.config.ts -> static/index.html',
+          cycle: 'Polling cada 1.5s con hidratación instantánea',
+          zero: 'Disposición y etiquetas construidas desde las listas dinámicas de /api/metrics.'
+        },
+        ubuntu_deb: {
+          badge: 'Capa 3 · Desktop Linux',
+          title: 'App Nativa Ubuntu (.deb · WebKit2 + DeX)',
+          desc: 'Ventana GTK 3 + WebKit2 conectada a LocalHtmlBridgeServer (127.0.0.1). Incluye lanzador de 3 tarjetas, autodescubrimiento mDNS/LAN y desbloqueo exclusivo de proyección USB DeX (/dev/uhid + scrcpy).',
+          files: 'desktop_app/recursos_app.py, desktop_app/dex_controller.py, packaging/build_deb.sh',
+          cycle: 'Paquete .deb firmado con GPG (_gpgorigin)',
+          zero: 'Sincroniza el dominio DuckDNS guardado tras vincularse por Wi-Fi local.'
+        },
+        android_apk: {
+          badge: 'Capa 3 · Móvil Android',
+          title: 'App Nativa Android (.apk · WebView + KeyStore)',
+          desc: 'Contenedor Jetpack Compose + android.webkit.WebView con barra táctica superior, EncryptedSharedPreferences AES256-GCM y DiscoveryManager concurrente LAN/WAN sin configuración manual.',
+          files: 'android_app/app/src/main/java/com/cminewar/recursoscockpit/*',
+          cycle: 'Firmado v1/v2/v3 con keystore oficial permanente',
+          zero: 'Escaneo dinámico de subred local y autoaprendizaje del dominio externo.'
+        }
+      };
+
+      const archNodes = document.querySelectorAll('.arch-node');
+      function selectArchNode(key) {
+        const info = ARCH_NODES[key];
+        if (!info) return;
+        archNodes.forEach(function (n) { n.classList.toggle('selected', n.dataset.node === key); });
+        document.getElementById('archNodeBadge').textContent = info.badge;
+        document.getElementById('archNodeTitle').textContent = info.title;
+        document.getElementById('archNodeDesc').textContent = info.desc;
+        document.getElementById('archNodeFiles').textContent = info.files;
+        document.getElementById('archNodeCycle').textContent = info.cycle;
+        document.getElementById('archNodeZero').textContent = info.zero;
+      }
+      archNodes.forEach(function (n) {
+        n.addEventListener('click', function () { selectArchNode(n.dataset.node); });
+      });
+      selectArchNode('kernel');
+
+      // 4. Simulador Gráfico Canvas HiDPI (Telemetría & Disco)
+      const simCpu = document.getElementById('simCpuRange');
+      const simRam = document.getElementById('simRamRange');
+      const simGpu = document.getElementById('simGpuRange');
+      const simDiskIo = document.getElementById('simDiskIoRange');
+      const simDiskPct = document.getElementById('simDiskPctRange');
+      const canvas = document.getElementById('telemetrySimCanvas');
+      const tooltip = document.getElementById('chartTooltip');
+
+      const simSeries = [];
+      for (let i = 0; i < 36; i++) {
+        simSeries.push({ io: 32 + Math.sin(i * 0.45) * 18, pct: 62 });
+      }
+
+      function updateSlidersUI() {
+        const cpu = Number(simCpu.value);
+        const ram = Number(simRam.value);
+        const gpu = Number(simGpu.value);
+        const io = Number(simDiskIo.value);
+        const dpct = Number(simDiskPct.value);
+
+        const cpuBadge = document.getElementById('simCpuBadge');
+        if (cpu >= 88) { cpuBadge.textContent = 'Carga muy alta'; cpuBadge.style.color = 'var(--rose)'; }
+        else if (cpu >= 70) { cpuBadge.textContent = 'Carga elevada'; cpuBadge.style.color = 'var(--amber)'; }
+        else { cpuBadge.textContent = 'Funcionando bien'; cpuBadge.style.color = 'var(--emerald)'; }
+
+        document.getElementById('simCpuVal').childNodes[0].textContent = cpu + ' % · ';
+        document.getElementById('simRamVal').textContent = ram + ' %';
+        document.getElementById('ramActiveBar').style.width = Math.round(ram * 0.66) + '%';
+        document.getElementById('ramCacheBar').style.width = Math.round(ram * 0.22) + '%';
+        document.getElementById('ramZramBar').style.width = Math.round(ram * 0.12) + '%';
+        document.getElementById('simGpuVal').textContent = gpu + ' % · ' + Math.round(36 + gpu * 0.42) + ' °C';
+        document.getElementById('simDiskIoVal').textContent = io + ' MB/s';
+        document.getElementById('simDiskPctVal').textContent = dpct + ' %';
+        document.getElementById('simCanvasLivePill').textContent = io + ' MB/s · ' + dpct + '%';
+      }
+
+      let hoverIdx = null;
+      function drawSimCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.max(280, Math.floor(rect.width));
+        const h = Math.max(200, Math.floor(rect.height));
+        if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+          canvas.width = w * dpr;
+          canvas.height = h * dpr;
+        }
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        const isDark = root.getAttribute('data-theme') === 'dark';
+        const padL = 38, padR = 38, padT = 18, padB = 24;
+        const cw = w - padL - padR;
+        const ch = h - padT - padB;
+        const gridColor = isDark ? 'rgba(148,163,184,0.14)' : 'rgba(15,23,42,0.08)';
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+        const ioColor = isDark ? '#38bdf8' : '#0284c7';
+        const pctColor = isDark ? '#fbbf24' : '#d97706';
+
+        // Rejilla
+        ctx.strokeStyle = gridColor;
+        ctx.fillStyle = textColor;
+        ctx.font = '10px monospace';
+        for (let i = 0; i <= 4; i++) {
+          const y = padT + (ch * i) / 4;
+          ctx.beginPath();
+          ctx.moveTo(padL, y);
+          ctx.lineTo(w - padR, y);
+          ctx.stroke();
+          const ioLbl = Math.round(500 * (1 - i / 4)) + 'M';
+          const pctLbl = Math.round(100 * (1 - i / 4)) + '%';
+          ctx.fillText(ioLbl, 4, y + 3);
+          ctx.fillText(pctLbl, w - padR + 6, y + 3);
+        }
+
+        const n = simSeries.length;
+        const maxIo = Math.max(100, ...simSeries.map(function (p) { return p.io; })) * 1.15;
+
+        // Área MB/s
+        ctx.beginPath();
+        simSeries.forEach(function (pt, idx) {
+          const x = padL + (idx / (n - 1)) * cw;
+          const y = padT + ch - Math.min(1, pt.io / maxIo) * ch;
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = ioColor;
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+
+        ctx.lineTo(padL + cw, padT + ch);
+        ctx.lineTo(padL, padT + ch);
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, padT, 0, padT + ch);
+        grad.addColorStop(0, isDark ? 'rgba(56,189,248,0.28)' : 'rgba(2,132,199,0.20)');
+        grad.addColorStop(1, 'rgba(2,132,199,0.0)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Línea discontinua % Espacio Usado
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        simSeries.forEach(function (pt, idx) {
+          const x = padL + (idx / (n - 1)) * cw;
+          const y = padT + ch - Math.min(1, pt.pct / 100) * ch;
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = pctColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+
+        if (hoverIdx !== null && simSeries[hoverIdx]) {
+          const pt = simSeries[hoverIdx];
+          const hx = padL + (hoverIdx / (n - 1)) * cw;
+          const hy = padT + ch - Math.min(1, pt.io / maxIo) * ch;
+          ctx.beginPath();
+          ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = ioColor;
+          ctx.fill();
+        }
+      }
+
+      [simCpu, simRam, simGpu, simDiskIo, simDiskPct].forEach(function (el) {
+        el.addEventListener('input', function () {
+          updateSlidersUI();
+          simSeries[simSeries.length - 1] = { io: Number(simDiskIo.value), pct: Number(simDiskPct.value) };
+          drawSimCanvas();
+        });
+      });
+
+      setInterval(function () {
+        const baseIo = Number(simDiskIo.value);
+        const jitter = (Math.random() - 0.48) * Math.max(4, baseIo * 0.14);
+        const nextIo = Math.max(0, Math.round(baseIo + jitter));
+        simSeries.push({ io: nextIo, pct: Number(simDiskPct.value) });
+        if (simSeries.length > 36) simSeries.shift();
+        drawSimCanvas();
+      }, 1200);
+
+      canvas.addEventListener('mousemove', function (ev) {
+        const rect = canvas.getBoundingClientRect();
+        const padL = 38, padR = 38;
+        const relX = ev.clientX - rect.left - padL;
+        const cw = rect.width - padL - padR;
+        if (cw <= 0) return;
+        const idx = Math.max(0, Math.min(simSeries.length - 1, Math.round((relX / cw) * (simSeries.length - 1))));
+        hoverIdx = idx;
+        const pt = simSeries[idx];
+        tooltip.style.display = 'block';
+        tooltip.style.left = (ev.clientX + 12) + 'px';
+        tooltip.style.top = (ev.clientY - 38) + 'px';
+        tooltip.innerHTML = '<strong>Muestra #' + (idx + 1) + '</strong><br>I/O Disco: ' + pt.io.toFixed(1) + ' MB/s · Espacio: ' + pt.pct.toFixed(1) + '%';
+        drawSimCanvas();
+      });
+      canvas.addEventListener('mouseleave', function () {
+        hoverIdx = null;
+        tooltip.style.display = 'none';
+        drawSimCanvas();
+      });
+
+      document.getElementById('loadLiveTelemetryBtn').addEventListener('click', async function () {
+        const btn = this;
+        btn.textContent = 'Consultando...';
+        try {
+          const r = await fetch('/api/metrics', { credentials: 'include', headers: buildAuthHeaders() });
+          if (r.ok) {
+            const m = await r.json();
+            const cpuPct = Math.round((m.cpu && m.cpu.usage_percent) || 18);
+            const ramPct = Math.round((m.memory && m.memory.percent) || 45);
+            const gpuPct = Math.round((m.gpu && (m.gpu.gpu_util_percent || m.gpu.utilization_gpu)) || 10);
+            const ioVal = Math.round(((m.disks && m.disks.io && (m.disks.io.read_mb_s + m.disks.io.write_mb_s)) || 12));
+            const diskUsed = Math.round((m.disks && m.disks.root_percent) || 50);
+            simCpu.value = Math.min(100, cpuPct);
+            simRam.value = Math.min(98, ramPct);
+            simGpu.value = Math.min(100, gpuPct);
+            simDiskIo.value = Math.min(450, ioVal);
+            simDiskPct.value = Math.min(98, diskUsed);
+            updateSlidersUI();
+            btn.textContent = 'Telemetría real cargada';
+            drawSimCanvas();
+            return;
+          }
+        } catch (e) {}
+        btn.textContent = 'Nodo no accesible (modo demo)';
+        setTimeout(function () { btn.textContent = 'Cargar telemetría real del nodo'; }, 2400);
+      });
+
+      updateSlidersUI();
+      drawSimCanvas();
+      window.addEventListener('resize', drawSimCanvas);
+
+      // 5. Donut SVG de Red ASUS AiMesh
+      const NET_DATA = {
+        all: [
+          { label: 'Cable LAN Gigabit (br0 / wired_mac)', count: 6, color: '#059669' },
+          { label: 'Wi-Fi 5 GHz (Nodos AiMesh)', count: 5, color: '#0284c7' },
+          { label: 'Wi-Fi 2.4 GHz (IoT y Domótica)', count: 4, color: '#d97706' },
+          { label: 'Túnel VPN / Tailscale Filtrado', count: 2, color: '#7c3aed' }
+        ],
+        cable: [{ label: 'Cable LAN Gigabit (br0)', count: 6, color: '#059669' }],
+        '5g': [{ label: 'Wi-Fi 5 GHz Alta Velocidad', count: 5, color: '#0284c7' }],
+        '24g': [{ label: 'Wi-Fi 2.4 GHz Larga Cobertura', count: 4, color: '#d97706' }]
+      };
+
+      function renderDonut(filterKey) {
+        const items = NET_DATA[filterKey] || NET_DATA.all;
+        const total = items.reduce(function (acc, it) { return acc + it.count; }, 0) || 1;
+        const svg = document.getElementById('netDonutSvg');
+        const legend = document.getElementById('netDonutLegend');
+        const r = 74, c = 2 * Math.PI * r;
+        let offset = 0;
+        let paths = '<circle cx="110" cy="110" r="' + r + '" fill="none" stroke="var(--border)" stroke-width="24"></circle>';
+        items.forEach(function (it) {
+          const len = (it.count / total) * c;
+          paths += '<circle cx="110" cy="110" r="' + r + '" fill="none" stroke="' + it.color + '" stroke-width="24" stroke-dasharray="' + len.toFixed(2) + ' ' + c.toFixed(2) + '" stroke-dashoffset="' + (-offset).toFixed(2) + '" transform="rotate(-90 110 110)"></circle>';
+          offset += len;
+        });
+        paths += '<text x="110" y="106" text-anchor="middle" font-size="26" font-weight="700" fill="var(--text)">' + total + '</text>';
+        paths += '<text x="110" y="126" text-anchor="middle" font-size="11" fill="var(--text-soft)">Clientes activos</text>';
+        svg.innerHTML = paths;
+
+        legend.innerHTML = items.map(function (it) {
+          const pct = Math.round((it.count / total) * 100);
+          return '<div class="legend-row"><div style="display:flex;align-items:center;gap:8px;"><span class="swatch" style="background:' + it.color + '"></span><strong>' + it.label + '</strong></div><span class="tabular mono">' + it.count + ' eq (' + pct + '%)</span></div>';
+        }).join('');
+      }
+
+      document.querySelectorAll('#netBandTabs .tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('#netBandTabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          renderDonut(btn.dataset.band);
+        });
+      });
+      renderDonut('all');
+
+      // 6. Simulador Zero-Trust HMAC-SHA256
+      const ZT_SCENARIOS = {
+        lan: {
+          badge: 'PERMITIDO AUTOMÁTICAMENTE · LAN',
+          badgeClass: 'pill emerald',
+          title: 'Acceso desde la red Wi-Fi / Cable local del hogar',
+          steps: [
+            { t: '1. Detección IP LAN', d: 'is_local_ip() valida origen RFC1918 local.' },
+            { t: '2. Huella Física', d: 'MAC (ARP) + hardware_id + OS agrupan sesiones.' },
+            { t: '3. Firma HMAC-SHA256', d: 'Se emite/reutiliza certificado ZT único por equipo.' },
+            { t: '4. Sesión Lista', d: 'Cookie HttpOnly + X-Device-Token sincronizados.' }
+          ],
+          headers: 'GET /api/metrics HTTP/1.1\nX-Forwarded-For: [IP_LAN_LOCAL]\nSet-Cookie: _sysmon_trust=<HMAC-SHA256-FIRMADO>; HttpOnly; SameSite=Lax\nEstado HTTP: 200 OK · Acceso completo para enlaces posteriores en WAN'
+        },
+        wan_ok: {
+          badge: 'ACCESO REMOTO CIFRADO · WAN VERIFICADO',
+          badgeClass: 'pill accent',
+          title: 'Acceso desde Internet usando dominio DuckDNS + Caddy TLS',
+          steps: [
+            { t: '1. Túnel HTTPS TLS', d: 'Caddy valida certificado y reenvía X-Forwarded-For.' },
+            { t: '2. Extracción Token', d: 'Bearer / X-Device-Token desde KeyStore o Cookie.' },
+            { t: '3. Validación Firma', d: 'verify_device_token() comprueba HMAC en tiempo constante.' },
+            { t: '4. Telemetría Segura', d: 'El móvil consulta métricas con latencia mínima.' }
+          ],
+          headers: 'GET /api/metrics HTTP/2\nHost: <DUCKDNS_CONFIGURADO>.duckdns.org\nAuthorization: Bearer <TOKEN_DEVICE_HMAC_SHA256>\nX-Client-Type: android_native (EncryptedSharedPreferences AES256-GCM)\nEstado HTTP: 200 OK · Dispositivo emparejado reconocido'
+        },
+        intruder: {
+          badge: 'BLOQUEO 403 + PROTECCIÓN FAIL2BAN',
+          badgeClass: 'pill rose',
+          title: 'Cliente externo sin emparejar o intento de fuerza bruta',
+          steps: [
+            { t: '1. Origen Externo', d: 'is_local = False sin cookie ni cabecera HMAC.' },
+            { t: '2. Bloqueo 403', d: 'Los endpoints /api/* deniegan datos con 403 Forbidden.' },
+            { t: '3. Tarpit + Lockout', d: 'Clave incorrecta bloquea IP temporalmente (3 intentos).' },
+            { t: '4. Fail2ban Ban', d: 'El administrador puede banear la IP con 1 clic en IPS.' }
+          ],
+          headers: 'GET /api/metrics HTTP/2\nX-Forwarded-For: [IP_EXTERNA_NO_AUTORIZADA]\nAutorización: Ninguna\nEstado HTTP: 403 Forbidden -> {"status":"locked","error":"Acceso externo denegado"}'
+        }
+      };
+
+      let curScenario = 'lan';
+      let curStep = 0;
+
+      function renderZtScenario() {
+        const sc = ZT_SCENARIOS[curScenario];
+        const b = document.getElementById('ztResultBadge');
+        b.textContent = sc.badge;
+        b.className = sc.badgeClass;
+        document.getElementById('ztScenarioTitle').textContent = sc.title;
+        document.getElementById('ztStepsGrid').innerHTML = sc.steps.map(function (st, idx) {
+          return '<div class="step-box ' + (idx <= curStep ? 'active' : '') + '"><div style="font-size:12px;font-weight:700;">' + st.t + '</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">' + st.d + '</div></div>';
+        }).join('');
+        document.getElementById('ztHeaderPreview').innerHTML = '<pre style="margin:0;">' + sc.headers + '</pre>';
+      }
+
+      document.querySelectorAll('#ztScenarioTabs .tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('#ztScenarioTabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          curScenario = btn.dataset.scenario;
+          curStep = 0;
+          renderZtScenario();
+        });
+      });
+      document.getElementById('ztNextStepBtn').addEventListener('click', function () {
+        curStep = (curStep + 1) % 4;
+        renderZtScenario();
+      });
+      renderZtScenario();
+
+      // 7. Comparador de Plataformas
+      const PLATFORMS = {
+        ubuntu: {
+          title: 'App Nativa Ubuntu / Debian (.deb)',
+          level: 'FULL_NATIVE_ACCESS · DeX USB Desbloqueado',
+          bullets: [
+            'Motor GTK 3 + WebKit2 acelerado por hardware conectado a LocalHtmlBridgeServer.',
+            'Desbloquea en exclusiva "Pantalla móvil USB (DeX)" mediante adb, scrcpy y /dev/uhid.',
+            'Lanzador inteligente en 3 tarjetas con autodescubrimiento LAN y gestor local.',
+            'Paquete firmado con GPG (_gpgorigin) compatible con apt y Ubuntu App Center.'
+          ],
+          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.1.0_amd64.deb'
+        },
+        android: {
+          title: 'App Nativa Android (.apk)',
+          level: 'FULL_NATIVE_ACCESS · Zero-Config Auto LAN/WAN',
+          bullets: [
+            'Jetpack Compose + WebView acelerado por hardware con barra superior táctica.',
+            'Almacenamiento de tokens HMAC en EncryptedSharedPreferences (AES256-GCM).',
+            'Conmutación transparente entre red Wi-Fi local y dominio DuckDNS al salir de casa.',
+            'Firmada con keystore oficial v1/v2/v3 para actualizar encima sin desinstalar.'
+          ],
+          cmd: 'adb install -r dist/recursos-cockpit_12.1.0.apk'
+        },
+        web: {
+          title: 'Navegador Web Moderno (SPA React 19)',
+          level: 'WEB_SANDBOX · Acceso Responsivo Universal',
+          bullets: [
+            'Carga en menos de 1 segundo sin instalación en Linux, macOS, Windows o iOS.',
+            'Diseño Claro Minimalista + Modo Oscuro sincronizado mediante localStorage.',
+            'Inspector de red OpenStreetMap/Leaflet, simuladores y Manual interactivo integrado.',
+            'Submenú DeX USB protegido pasivamente por arquitectura contractual.'
+          ],
+          cmd: 'curl -fsS http://127.0.0.1:8085/api/version | jq .'
+        }
+      };
+
+      function renderPlatform(platKey) {
+        const p = PLATFORMS[platKey] || PLATFORMS.ubuntu;
+        document.getElementById('platformDetailBox').innerHTML =
+          '<span class="pill violet">' + p.level + '</span>' +
+          '<h3 style="margin:10px 0 8px; font-size:16px;">' + p.title + '</h3>' +
+          '<ul style="margin:0; padding-left:18px; font-size:12.5px; color:var(--text-muted); display:grid; gap:6px;">' +
+          p.bullets.map(function (b) { return '<li>' + b + '</li>'; }).join('') +
+          '</ul>';
+        document.getElementById('cmdInstallBlock').textContent = p.cmd;
+      }
+
+      document.querySelectorAll('#platformTabs .tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('#platformTabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          renderPlatform(btn.dataset.plat);
+        });
+      });
+      renderPlatform('ubuntu');
+
+      // Botones Copiar CLI
+      document.querySelectorAll('.copy-btn').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const target = document.getElementById(btn.dataset.copyTarget);
+          if (!target) return;
+          try {
+            await navigator.clipboard.writeText(target.textContent);
+            const old = btn.textContent;
+            btn.textContent = 'Copiado';
+            setTimeout(function () { btn.textContent = old; }, 1600);
+          } catch (e) {}
+        });
+      });
+
+      // 8. Consola API REST en Vivo
+      const API_ENDPOINTS = [
+        { method: 'GET', path: '/api/version', desc: 'Versión canónica, commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.1.0', display_version: '2B.1.0', branch: 'main', update_available: false } },
+        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { display_version: '2B.1.0' } } },
+        { method: 'GET', path: '/api/system/logs?limit=10', desc: 'Agregador unificado de fallos de Systemd, Docker y Kernel', sample: { ok: true, total_errors: 0, counts_by_category: { systemd: 0, docker: 0, kernel: 0 } } },
+        { method: 'GET', path: '/api/auth/devices', desc: 'Listado de dispositivos físicos agrupados con certificados HMAC', sample: [{ id: 'dev_ejemplo', access_level: 'FULL_NATIVE_ACCESS', certificate_scope: 'PER_PHYSICAL_DEVICE' }] },
+        { method: 'GET', path: '/api/dns/duckdns', desc: 'Estado y última sincronización del dominio dinámico DuckDNS', sample: { available: true, online: true, message: 'DuckDNS sincronizado correctamente' } },
+        { method: 'GET', path: '/api/telegram_bot', desc: 'Estado operativo del bot Telegram y lista blanca autorizada', sample: { success: true, bot_status: { online: true, running: true }, activity: [] } },
+        { method: 'GET', path: '/api/dex/status', desc: 'Detección USB ADB / scrcpy para proyección Samsung DeX (Ubuntu)', sample: { ok: true, usb_only: true, session_running: false, devices: [] } }
+      ];
+
+      let activeEndpoint = API_ENDPOINTS[0];
+      const epContainer = document.getElementById('apiEndpointList');
+      epContainer.innerHTML = API_ENDPOINTS.map(function (ep, idx) {
+        return '<button type="button" class="legend-row ' + (idx === 0 ? 'active' : '') + '" data-ep-idx="' + idx + '">' +
+          '<div style="text-align:left;"><span class="pill accent mono">' + ep.method + '</span> <strong class="mono" style="margin-left:6px;">' + ep.path + '</strong><div style="font-size:11px;color:var(--text-soft);margin-top:3px;">' + ep.desc + '</div></div>' +
+          '<span>→</span></button>';
+      }).join('');
+
+      epContainer.querySelectorAll('[data-ep-idx]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          epContainer.querySelectorAll('[data-ep-idx]').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          activeEndpoint = API_ENDPOINTS[Number(btn.dataset.epIdx)];
+          document.getElementById('apiSelectedLabel').textContent = activeEndpoint.path;
+        });
+      });
+
+      document.getElementById('apiRunBtn').addEventListener('click', async function () {
+        const out = document.getElementById('apiOutputBox');
+        const lat = document.getElementById('apiLatencyBadge');
+        out.textContent = 'Consultando ' + activeEndpoint.path + '...';
+        const t0 = performance.now();
+        if (!isFileProto) {
+          try {
+            const resp = await fetch(activeEndpoint.path, { credentials: 'include', headers: buildAuthHeaders() });
+            const ms = Math.round(performance.now() - t0);
+            const text = await resp.text();
+            lat.textContent = 'HTTP ' + resp.status + ' · ' + ms + ' ms';
+            try {
+              const parsed = JSON.parse(text);
+              const trimmed = JSON.stringify(parsed, null, 2);
+              out.textContent = trimmed.length > 4500 ? trimmed.slice(0, 4500) + '\n... (respuesta truncada para lectura rápida)' : trimmed;
+            } catch (je) {
+              out.textContent = text.slice(0, 2000);
+            }
+            return;
+          } catch (e) {}
+        }
+        lat.textContent = 'Modo demostración estática';
+        out.textContent = '// Esquema de ejemplo (abre el manual desde /manual en tu nodo para datos reales):\n' + JSON.stringify(activeEndpoint.sample, null, 2);
+      });
+
+      // 9. Changelog interactivo filtrado por tipo SemVer
+      const CHANGELOG = [
+        { ver: 'v12.1.0 (v2B.1.0)', type: 'MINOR', desc: 'Nuevo Manual Web Interactivo (/manual, /readme y docs/index.html) con explorador SVG de arquitectura, simulador HiDPI de CPU/RAM/Disco, donut interactivo ASUS AiMesh, simulador Zero-Trust HMAC, consola API en vivo y modernización visual de README.md.' },
+        { ver: 'v12.0.6 (v2B.0.6)', type: 'PATCH', desc: 'Erradicación total de spam sudo PAM en journalctl (capacidades CAP_NET_ADMIN), poda SQLite acotada cada 60s, caché de Fail2ban/Pi-hole, caché byte-splicing (<18 ms), serie histórica real disk_pct y reactividad de subpestañas en React 19.' },
+        { ver: 'v12.0.5 (v2B.0.5)', type: 'PATCH', desc: 'Bóveda cifrada AES-256-GCM + PBKDF2-HMAC-SHA256 para credenciales del router ASUS AiMesh, SSH sin exposición en cmdline y filtrado de puentes virtuales Docker.' },
+        { ver: 'v12.0.0 (v2B.0.0)', type: 'MAJOR', desc: 'Reescritura integral en React 19 + TypeScript + Tailwind CSS v4, diseño Claro Minimalista + Oscuro, idioma español cotidiano, gráfica dual de almacenamiento y nuevo emblema CMineWar.' },
+        { ver: 'v11.3.0', type: 'MINOR', desc: 'Botón simétrico de apagado remoto junto a Wake-on-LAN con soporte Webhook HTTP, SSH BatchMode, RPC y paquetes UDP Sleep-on-LAN.' },
+        { ver: 'v11.2.1', type: 'PATCH', desc: 'Auditoría integral Zero-Hardcoding, eliminación de credenciales estáticas y autodescubrimiento dinámico de puerta de enlace e interfaces.' }
+      ];
+
+      function renderChangelog(typeFilter) {
+        const list = CHANGELOG.filter(function (c) { return typeFilter === 'all' || c.type === typeFilter; });
+        const badgeCls = { MAJOR: 'pill violet', MINOR: 'pill emerald', PATCH: 'pill accent' };
+        document.getElementById('changelogBody').innerHTML = list.map(function (c) {
+          return '<tr><td class="mono" style="white-space:nowrap;"><strong>' + c.ver + '</strong></td><td><span class="' + (badgeCls[c.type] || 'pill') + '">' + c.type + '</span></td><td>' + c.desc + '</td></tr>';
+        }).join('');
+      }
+
+      document.querySelectorAll('#verFilterTabs .tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('#verFilterTabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          renderChangelog(btn.dataset.vtype);
+        });
+      });
+      renderChangelog('all');
+      detectLiveServer();
+    })();
+  </script>
+</body>
+</html>
