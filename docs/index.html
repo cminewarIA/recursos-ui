@@ -1176,8 +1176,24 @@
       function buildAuthHeaders() {
         const hdrs = {};
         try {
-          const tok = localStorage.getItem('recursos_device_token') || localStorage.getItem('sysmon_device_token');
-          if (tok) hdrs['X-Device-Token'] = tok;
+          let tok = (
+            localStorage.getItem('recursos_device_token') ||
+            localStorage.getItem('sysmon_device_token') ||
+            window.__RECURSOS_DEVICE_TOKEN__ ||
+            (window.RecursosAndroidBridge && window.RecursosAndroidBridge.getDeviceToken ? window.RecursosAndroidBridge.getDeviceToken() : '') ||
+            ''
+          ).trim();
+          if (!tok) {
+            const cfgRaw = localStorage.getItem('recursos_auth_persistence_config');
+            if (cfgRaw) {
+              const cfg = JSON.parse(cfgRaw);
+              if (cfg && cfg.token) tok = String(cfg.token).trim();
+            }
+          }
+          if (tok) {
+            hdrs['X-Device-Token'] = tok;
+            hdrs['Authorization'] = 'Bearer ' + tok;
+          }
         } catch (e) {}
         return hdrs;
       }

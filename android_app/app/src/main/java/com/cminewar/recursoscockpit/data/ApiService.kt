@@ -46,8 +46,8 @@ class ApiService(
     private val gson = Gson()
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(2000, TimeUnit.MILLISECONDS)
-        .readTimeout(3000, TimeUnit.MILLISECONDS)
+        .connectTimeout(3500, TimeUnit.MILLISECONDS)
+        .readTimeout(4500, TimeUnit.MILLISECONDS)
         .build()
 
     // Cliente ultrarrápido para escaneo concurrente de puertos y mDNS en LAN
@@ -291,6 +291,46 @@ class ApiService(
         }
     }
 
+    fun isValidWanDomain(raw: String): Boolean {
+        val clean = raw.trim()
+        if (clean.isEmpty()) return false
+        val host = clean.removePrefix("https://").removePrefix("http://")
+            .substringBefore("/")
+            .substringBefore(":")
+            .trim()
+            .lowercase(Locale.ROOT)
+        if (host.isEmpty() || host == "localhost" || host == "127.0.0.1" || host == "::1" || host.endsWith(".local")) {
+            return false
+        }
+        if (host.matches(Regex("""^\d{1,3}(\.\d{1,3}){3}$""")) || host.contains(":")) {
+            return false
+        }
+        return host.contains(".")
+    }
+
+    private fun learnWanDomain(raw: String) {
+        val clean = raw.trim()
+        if (isValidWanDomain(clean) && clean != securePreferences.wanDomain) {
+            securePreferences.wanDomain = clean
+        }
+    }
+
+    fun buildWebViewAuthHeaders(): Map<String, String> {
+        val headers = mutableMapOf(
+            "X-Recursos-Client" to "android_native"
+        )
+        val telemetryB64 = getEncodedTelemetryHeader()
+        if (telemetryB64.isNotEmpty()) {
+            headers["X-Device-Telemetry"] = telemetryB64
+        }
+        val token = securePreferences.deviceToken.trim()
+        if (token.isNotEmpty()) {
+            headers["X-Device-Token"] = token
+            headers["Authorization"] = "Bearer $token"
+        }
+        return headers
+    }
+
     private fun applyAuthAndTelemetryHeaders(reqBuilder: Request.Builder) {
         val tvFlag = if (isTelevisionDevice()) "; AndroidTV" else ""
         reqBuilder.header("User-Agent", "RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE}; ${Build.MANUFACTURER} ${Build.MODEL}$tvFlag; NativeHTML; FullAccess)")
@@ -299,7 +339,7 @@ class ApiService(
         if (telemetryB64.isNotEmpty()) {
             reqBuilder.header("X-Device-Telemetry", telemetryB64)
         }
-        val token = securePreferences.deviceToken
+        val token = securePreferences.deviceToken.trim()
         if (token.isNotEmpty()) {
             reqBuilder.header("X-Device-Token", token)
             reqBuilder.header("Authorization", "Bearer $token")
@@ -308,7 +348,7 @@ class ApiService(
 
     suspend fun probeNode(baseUrl: String, isQuickScan: Boolean = false): HealthCheckResult = withContext(Dispatchers.IO) {
         try {
-            val url = "$baseUrl/api/version"
+            val url = "${baseUrl.trimEnd('/')}/api/version"
             val reqBuilder = Request.Builder().url(url)
             applyAuthAndTelemetryHeaders(reqBuilder)
 
@@ -316,11 +356,15 @@ class ApiService(
             httpClient.newCall(reqBuilder.build()).execute().use { response ->
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: ""
-                    val isRecursos = body.contains("Recursos") || body.contains("version")
+                    try {
+                        val jsonObj = org.json.JSONObject(body)
+                        learnWanDomain(jsonObj.optString("public_domain", ""))
+                    } catch (_: Exception) {}
+                    val isRecursos = body.contains("Recursos") || body.contains("version") || body.contains("current_version")
                     HealthCheckResult(isOnline = true, isRevoked = false, isRecursosServer = isRecursos)
                 } else if (response.code == 403) {
                     val body = response.body?.string() ?: ""
-                    val isLocked = body.contains("locked") || body.contains("denegado")
+                    val isLocked = body.contains("locked") || body.contains("denegado") || body.isEmpty()
                     HealthCheckResult(isOnline = true, isRevoked = isLocked, isRecursosServer = true)
                 } else {
                     HealthCheckResult(isOnline = false)
@@ -341,8 +385,20 @@ class ApiService(
 
             client.newCall(reqBuilder.build()).execute().use { response ->
                 if (response.isSuccessful) {
+                    val body = response.body?.string() ?: ""
+                    try {
+                        val jsonObj = org.json.JSONObject(body)
+                        val returnedToken = jsonObj.optString("token", "").trim()
+                        if (returnedToken.isNotEmpty() && returnedToken != securePreferences.deviceToken) {
+                            securePreferences.deviceToken = returnedToken
+                        }
+                        securePreferences.isCertRevoked = false
+                    } catch (_: Exception) {}
                     true
                 } else {
+                    if (response.code == 403) {
+                        securePreferences.isCertRevoked = true
+                    }
                     false
                 }
             }
@@ -353,7 +409,7 @@ class ApiService(
 
     suspend fun fetchMetrics(baseUrl: String): Pair<MetricsResponse?, Boolean> = withContext(Dispatchers.IO) {
         try {
-            val url = "$baseUrl/api/metrics"
+            val url = "${baseUrl.trimEnd('/')}/api/metrics"
             val reqBuilder = Request.Builder().url(url)
             applyAuthAndTelemetryHeaders(reqBuilder)
 
@@ -363,26 +419,20 @@ class ApiService(
                     val metrics = gson.fromJson(body, MetricsResponse::class.java)
 
                     // Autoguardado persistente del certificado / token recibido
-                    val receivedToken = metrics.authStatus?.token
+                    val receivedToken = metrics.authStatus?.token?.trim()
                     if (!receivedToken.isNullOrEmpty() && receivedToken != securePreferences.deviceToken) {
-                        Log.i("RecursosCockpit", "Nuevo token certificado recibido y persistido en KeyStore: $receivedToken")
+                        Log.i("RecursosCockpit", "Nuevo token certificado recibido y persistido en KeyStore")
                         securePreferences.deviceToken = receivedToken
                     }
-                    // Autoguardado dinámico del dominio WAN público cuando está disponible en LAN
+                    securePreferences.isCertRevoked = false
+
+                    // Autoguardado dinámico del dominio WAN público para uso exterior
                     val learnedDomain = (metrics.versionInfo?.publicDomain ?: metrics.system?.publicDomain ?: "").trim()
-                    if (
-                        securePreferences.wanDomain.isBlank() &&
-                        learnedDomain.isNotEmpty() &&
-                        !learnedDomain.endsWith(".local") &&
-                        learnedDomain != "localhost" &&
-                        learnedDomain != "127.0.0.1" &&
-                        !learnedDomain.matches(Regex("""^\d{1,3}(\.\d{1,3}){3}$"""))
-                    ) {
-                        securePreferences.wanDomain = learnedDomain
-                    }
+                    learnWanDomain(learnedDomain)
                     Pair(metrics, false)
                 } else if (response.code == 403) {
                     Log.w("RecursosCockpit", "Acceso denegado (HTTP 403): Certificado de dispositivo revocado en el servidor.")
+                    securePreferences.isCertRevoked = true
                     Pair(null, true) // True = Revocado
                 } else {
                     Pair(null, false)

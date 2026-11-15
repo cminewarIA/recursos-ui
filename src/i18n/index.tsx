@@ -189,7 +189,23 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sincronización en vivo con /api/dictionary (si se añade una nueva columna al CSV sin recompilar el frontend)
   useEffect(() => {
     let active = true;
-    fetch('/api/dictionary', { cache: 'no-store' })
+    const dictHeaders: Record<string, string> = {};
+    try {
+      const tok = (
+        window.localStorage.getItem('recursos_device_token') ||
+        window.localStorage.getItem('sysmon_device_token') ||
+        window.__RECURSOS_DEVICE_TOKEN__ ||
+        window.RecursosAndroidBridge?.getDeviceToken?.() ||
+        ''
+      ).trim();
+      if (tok) {
+        dictHeaders['X-Device-Token'] = tok;
+        dictHeaders['Authorization'] = `Bearer ${tok}`;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    fetch('/api/dictionary', { cache: 'no-store', credentials: 'same-origin', headers: dictHeaders })
       .then((res) => (res.ok ? res.json() : null))
       .then((remote: ParsedDictionaryCatalog | null) => {
         if (!active || !remote || !remote.meta?.supported_locales?.length || !remote.flat) return;

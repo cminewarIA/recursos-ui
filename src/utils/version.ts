@@ -42,3 +42,57 @@ export function getCanonicalDisplayVersion(versionInfo?: VersionInfo | null): st
 
   return getCanonicalVersion(versionInfo);
 }
+
+export function compareVersions(a: string, b: string): number {
+  const parsePart = (part: string): [number, string] => {
+    const trimmed = part.trim();
+    if (/^\d+$/.test(trimmed)) return [Number.parseInt(trimmed, 10), ''];
+    const m = trimmed.match(/^(\d+)(.*)$/);
+    if (m) return [Number.parseInt(m[1], 10), m[2]];
+    return [0, trimmed];
+  };
+
+  const splitParts = (val: string) =>
+    String(val || '')
+      .trim()
+      .replace(/^[vV]/, '')
+      .split(/[-+]/)[0]
+      .split('.')
+      .filter((p) => p.length > 0)
+      .map(parsePart);
+
+  const partsA = splitParts(a);
+  const partsB = splitParts(b);
+  const maxLen = Math.max(partsA.length, partsB.length);
+  for (let i = 0; i < maxLen; i++) {
+    const [numA, sufA] = partsA[i] ?? [0, ''];
+    const [numB, sufB] = partsB[i] ?? [0, ''];
+    if (numA > numB) return 1;
+    if (numA < numB) return -1;
+    if (sufA !== sufB) return sufA > sufB ? 1 : -1;
+  }
+  return 0;
+}
+
+export function isRemoteVersionHigher(
+  versionInfo?: VersionInfo | null,
+  currentOverride?: string
+): boolean {
+  if (!versionInfo) return false;
+  const remoteRaw = String(versionInfo.remote_version || versionInfo.github_version || '')
+    .trim()
+    .replace(/^[vV]/, '');
+  const currentRaw = String(currentOverride || getCanonicalVersion(versionInfo))
+    .trim()
+    .replace(/^[vV]/, '');
+
+  if (remoteRaw && remoteRaw !== '0.0.0' && currentRaw && currentRaw !== '0.0.0') {
+    return compareVersions(remoteRaw, currentRaw) > 0;
+  }
+  return Boolean(
+    versionInfo.effective_update_available ||
+      versionInfo.github_above_server ||
+      versionInfo.github_above_app ||
+      versionInfo.update_available
+  );
+}

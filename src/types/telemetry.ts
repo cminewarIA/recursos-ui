@@ -716,6 +716,9 @@ declare global {
     __RECURSOS_UBUNTU_NATIVE__?: boolean;
     __RECURSOS_ANDROID_NATIVE__?: boolean;
     __RECURSOS_ANDROID_TV__?: boolean;
+    __RECURSOS_DEVICE_TOKEN__?: string;
+    __RECURSOS_CONN_MODE__?: string;
+    __RECURSOS_NODE_URL__?: string;
     __RECURSOS_DEVICE_TELEMETRY__?: Record<string, unknown>;
     AndroidBridge?: {
       getAppVersion?: () => string;

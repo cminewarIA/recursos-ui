@@ -36,22 +36,29 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                suspend fun finalizeConnectedEndpoint(endpoint: ResolvedEndpoint) {
+                    if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN) {
+                        apiService.registerDeviceWithServer(endpoint.url)
+                        val (_, isRevoked) = apiService.fetchMetrics(endpoint.url)
+                        activeUrl = endpoint.url
+                        connectionMode = if (isRevoked || securePreferences.isCertRevoked) {
+                            ConnectionMode.REVOKED
+                        } else {
+                            endpoint.mode
+                        }
+                    } else {
+                        activeUrl = endpoint.url
+                        connectionMode = endpoint.mode
+                    }
+                }
+
                 fun triggerDiscoveryAndRefresh() {
                     lifecycleScope.launch {
                         connectionMode = ConnectionMode.SCANNING_LAN
                         val endpoint = discoveryManager.resolveActiveNode { msg ->
                             scanningMessage = msg
                         }
-                        activeUrl = endpoint.url
-                        connectionMode = endpoint.mode
-                        if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN) {
-                            val (_, isRevoked) = apiService.fetchMetrics(endpoint.url)
-                            if (isRevoked) {
-                                connectionMode = ConnectionMode.REVOKED
-                            } else {
-                                apiService.registerDeviceWithServer(endpoint.url)
-                            }
-                        }
+                        finalizeConnectedEndpoint(endpoint)
                     }
                 }
 
@@ -61,11 +68,7 @@ class MainActivity : ComponentActivity() {
                     val endpoint = discoveryManager.resolveActiveNode { msg ->
                         scanningMessage = msg
                     }
-                    activeUrl = endpoint.url
-                    connectionMode = endpoint.mode
-                    if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN) {
-                        apiService.registerDeviceWithServer(endpoint.url)
-                    }
+                    finalizeConnectedEndpoint(endpoint)
 
                     while (isActive) {
                         if (connectionMode == ConnectionMode.REVOKED) {
@@ -82,12 +85,13 @@ class MainActivity : ComponentActivity() {
                                 val newEndpoint = discoveryManager.resolveActiveNode { msg ->
                                     scanningMessage = msg
                                 }
-                                activeUrl = newEndpoint.url
-                                connectionMode = newEndpoint.mode
-                                if (newEndpoint.mode == ConnectionMode.CONNECTED_LAN || newEndpoint.mode == ConnectionMode.CONNECTED_WAN) {
-                                    apiService.registerDeviceWithServer(newEndpoint.url)
-                                }
+                                finalizeConnectedEndpoint(newEndpoint)
                             }
+                        } else {
+                            val newEndpoint = discoveryManager.resolveActiveNode { msg ->
+                                scanningMessage = msg
+                            }
+                            finalizeConnectedEndpoint(newEndpoint)
                         }
                         delay(5000)
                     }
@@ -99,6 +103,7 @@ class MainActivity : ComponentActivity() {
                     activeUrl = activeUrl,
                     scanningMessage = scanningMessage,
                     deviceTelemetryProvider = { apiService.getDeviceTelemetryJson() },
+                    webViewHeadersProvider = { apiService.buildWebViewAuthHeaders() },
                     onRefresh = { triggerDiscoveryAndRefresh() }
                 )
             }

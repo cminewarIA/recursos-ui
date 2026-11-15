@@ -760,3 +760,14 @@ network.map_cluster_count,"Vista Red y Seguridad",{count} conexiones en {place}
 network.map_click_hint,"Vista Red y Seguridad",Toca cualquier marcador o tarjeta inferior para inspeccionar y centrar
 network.focus_on_map,"Vista Red y Seguridad",Centrar en el mapa
 network.map_popup_more,"Vista Red y Seguridad",+{count} conexiones más en esta ubicación
+overview.net_history_24h_title,"Historial de tráfico de red 24h en App",Historial de tráfico de red (24 h)
+overview.net_history_24h_sub,"Historial de tráfico de red 24h en App",Evolución del consumo de bajada y subida en las últimas 24 horas
+overview.net_history_24h_badge,"Historial de tráfico de red 24h en App",Últimas 24 h
+overview.net_history_24h_peak_rx,"Historial de tráfico de red 24h en App",Pico bajada
+overview.net_history_24h_peak_tx,"Historial de tráfico de red 24h en App",Pico subida
+overview.net_history_24h_avg_rx,"Historial de tráfico de red 24h en App",Media bajada
+overview.net_history_24h_avg_tx,"Historial de tráfico de red 24h en App",Media subida
+overview.net_history_24h_samples,"Historial de tráfico de red 24h en App",{count} muestras
+overview.net_history_24h_empty,"Historial de tráfico de red 24h en App",Aún no hay suficientes muestras de tráfico registradas en las últimas 24 horas.
+overview.net_history_24h_error,"Historial de tráfico de red 24h en App",No se pudo cargar el historial de tráfico de las últimas 24 horas.
+overview.net_history_24h_retry,"Historial de tráfico de red 24h en App",Reintentar

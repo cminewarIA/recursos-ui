@@ -5117,36 +5117,111 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
 # ==============================================================================
 AUTH_SECRET_FILE = os.path.join(BASE_DIR, ".auth_secret")
 AUTH_SECRET_LOCK = threading.Lock()
+_AUTH_SECRET_CACHE = {"path": None, "mtime_ns": None, "size": None, "secret": None}
+TOKEN_MAX_AGE_SEC = 31536000       # 365 días de validez máxima
+TOKEN_ROTATION_AGE_SEC = 15552000  # Rotación proactiva a los 180 días en sesiones activas
+_DEVICE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{3,64}$")
+_HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 
 def get_auth_secret():
-    """Obtiene o genera la clave secreta de 256 bits para firmar tokens criptográficos."""
+    """Obtiene o genera la clave secreta de 256 bits con caché en memoria invalidada por ruta/mtime."""
     with AUTH_SECRET_LOCK:
-        if os.path.exists(AUTH_SECRET_FILE):
-            try:
-                with open(AUTH_SECRET_FILE, 'rb') as f:
-                    sec = f.read().strip()
-                    if len(sec) >= 32:
-                        return sec
-            except Exception:
-                pass
+        target_path = AUTH_SECRET_FILE
+        try:
+            st = os.stat(target_path)
+            if (
+                _AUTH_SECRET_CACHE["secret"] is not None
+                and _AUTH_SECRET_CACHE["path"] == target_path
+                and _AUTH_SECRET_CACHE["mtime_ns"] == st.st_mtime_ns
+                and _AUTH_SECRET_CACHE["size"] == st.st_size
+            ):
+                return _AUTH_SECRET_CACHE["secret"]
+            with open(target_path, 'rb') as f:
+                sec = f.read().strip()
+                if len(sec) >= 32:
+                    _AUTH_SECRET_CACHE.update({
+                        "path": target_path,
+                        "mtime_ns": st.st_mtime_ns,
+                        "size": st.st_size,
+                        "secret": sec,
+                    })
+                    return sec
+        except FileNotFoundError:
+            pass
+        except Exception:
+            if _AUTH_SECRET_CACHE["secret"] is not None and _AUTH_SECRET_CACHE["path"] == target_path:
+                return _AUTH_SECRET_CACHE["secret"]
+
         # Generar clave secreta criptográficamente segura de 32 bytes
         new_secret = secrets.token_bytes(32)
+        st_mtime = None
+        st_size = None
         try:
-            with open(AUTH_SECRET_FILE, 'wb') as f:
+            tmp_secret = f"{target_path}.tmp"
+            with open(tmp_secret, 'wb') as f:
                 f.write(new_secret)
-            os.chmod(AUTH_SECRET_FILE, 0o600)
+            os.chmod(tmp_secret, 0o600)
+            os.replace(tmp_secret, target_path)
+            st = os.stat(target_path)
+            st_mtime = st.st_mtime_ns
+            st_size = st.st_size
         except Exception as e:
             print(f"[-] Advertencia creando .auth_secret: {e}")
+        _AUTH_SECRET_CACHE.update({
+            "path": target_path,
+            "mtime_ns": st_mtime,
+            "size": st_size,
+            "secret": new_secret,
+        })
         return new_secret
 
 def create_device_token(device_id):
     """Genera un token firmado con HMAC-SHA256 para un ID de dispositivo."""
+    clean_id = str(device_id or "").strip()
+    if not _DEVICE_ID_RE.match(clean_id):
+        clean_id = re.sub(r"[^a-zA-Z0-9_-]", "", clean_id)[:64] or f"dev_{secrets.token_hex(6)}"
     secret = get_auth_secret()
     ts = int(time.time())
     nonce = secrets.token_hex(16)
-    payload = f"{device_id}:{ts}:{nonce}"
+    payload = f"{clean_id}:{ts}:{nonce}"
     sig = hmac.new(secret, payload.encode('utf-8'), hashlib.sha256).hexdigest()
-    return f"{device_id}.{ts}.{nonce}.{sig}"
+    return f"{clean_id}.{ts}.{nonce}.{sig}"
+
+def parse_verified_device_token(token_str):
+    """
+    Valida formato estricto, expiración, deriva futura y firma HMAC-SHA256 en tiempo constante.
+    Retorna (device_id, timestamp_int) si es válido, o (None, None) en caso contrario.
+    """
+    if not token_str or not isinstance(token_str, str):
+        return None, None
+    clean_tok = token_str.strip()
+    if not clean_tok or len(clean_tok) > 256:
+        return None, None
+    parts = clean_tok.split('.')
+    if len(parts) != 4:
+        return None, None
+    device_id, ts, nonce, sig = parts
+    if not _DEVICE_ID_RE.match(device_id):
+        return None, None
+    if not ts.isdigit():
+        return None, None
+    if not (8 <= len(nonce) <= 64 and _HEX_RE.match(nonce)):
+        return None, None
+    if len(sig) != 64 or not _HEX_RE.match(sig):
+        return None, None
+    try:
+        ts_int = int(ts)
+        now_ts = time.time()
+        if (now_ts - ts_int) > TOKEN_MAX_AGE_SEC or (ts_int - now_ts) > 86400:
+            return None, None
+    except Exception:
+        return None, None
+    payload = f"{device_id}:{ts}:{nonce}"
+    secret = get_auth_secret()
+    expected_sig = hmac.new(secret, payload.encode('utf-8'), hashlib.sha256).hexdigest()
+    if hmac.compare_digest(sig.lower(), expected_sig):
+        return device_id, ts_int
+    return None, None
 
 def verify_device_token(token_str):
     """
@@ -5154,24 +5229,8 @@ def verify_device_token(token_str):
     Valida además que el token no haya expirado (máximo 1 año de validez).
     Retorna el device_id si es válido, o None si es inválido o fue manipulado.
     """
-    if not token_str or not isinstance(token_str, str):
-        return None
-    parts = token_str.split('.')
-    if len(parts) != 4:
-        return None
-    device_id, ts, nonce, sig = parts
-    try:
-        ts_int = int(ts)
-        if abs(time.time() - ts_int) > 31536000:  # 1 año en segundos
-            return None
-    except Exception:
-        return None
-    payload = f"{device_id}:{ts}:{nonce}"
-    secret = get_auth_secret()
-    expected_sig = hmac.new(secret, payload.encode('utf-8'), hashlib.sha256).hexdigest()
-    if hmac.compare_digest(sig, expected_sig):
-        return device_id
-    return None
+    dev_id, _ = parse_verified_device_token(token_str)
+    return dev_id
 
 def resolve_arp_mac_for_ip(ip_str):
     """
@@ -5543,42 +5602,118 @@ def save_trusted_devices(devices):
     except Exception as e:
         print(f"[-] Error guardando dispositivos de confianza: {e}")
 
+def _normalize_ip_str(ip_str):
+    """
+    Normaliza direcciones IP eliminando corchetes IPv6, puertos adjuntos,
+    identificadores de zona (%eth0) y envoltorios IPv4-mapped IPv6 (::ffff:x.x.x.x -> x.x.x.x).
+    """
+    raw = str(ip_str or "").strip()
+    if not raw:
+        return ""
+    if raw.startswith("[") and "]" in raw:
+        raw = raw[1:raw.index("]")]
+    elif raw.count(":") == 1 and "." in raw:
+        raw = raw.split(":", 1)[0]
+    if "%" in raw:
+        raw = raw.split("%", 1)[0]
+    try:
+        ip_obj = ipaddress.ip_address(raw)
+        if isinstance(ip_obj, ipaddress.IPv6Address) and ip_obj.ipv4_mapped is not None:
+            return str(ip_obj.ipv4_mapped)
+        return str(ip_obj)
+    except Exception:
+        return raw
+
+def _is_request_https(handler):
+    xfp = str(handler.headers.get('X-Forwarded-Proto') or '')
+    protos = [p.strip().lower() for p in xfp.split(',') if p.strip()]
+    x_ssl = str(handler.headers.get('X-Forwarded-Ssl') or '').strip().lower()
+    return ('https' in protos) or (x_ssl == 'on') or bool(getattr(handler, 'is_https', False))
+
+def _has_trust_cookie(handler):
+    cookie_header = str(handler.headers.get('Cookie') or '')
+    return '_sysmon_trust=' in cookie_header
+
 def get_cookie_header_value(handler, token):
     """
     Construye la cabecera Set-Cookie con HttpOnly estricto.
-    Ajusta SameSite y Secure según si la conexión es HTTPS/proxy o HTTP directo en LAN.
+    Usa SameSite=Lax (más fiable y persistente en navegadores modernos y WebViews)
+    y activa Secure automáticamente cuando el tráfico llega por HTTPS / reverse proxy.
     """
-    is_https = handler.headers.get('X-Forwarded-Proto') == 'https' or getattr(handler, 'is_https', False)
-    if is_https:
-        return f"_sysmon_trust={token}; Path=/; Max-Age=31536000; HttpOnly; SameSite=None; Secure; Partitioned"
-    else:
-        return f"_sysmon_trust={token}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax"
+    if _is_request_https(handler):
+        return f"_sysmon_trust={token}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax; Secure"
+    return f"_sysmon_trust={token}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax"
+
+def get_clear_cookie_header_value(handler):
+    """Construye la cabecera Set-Cookie para invalidar cookies revocadas o caducadas."""
+    if _is_request_https(handler):
+        return "_sysmon_trust=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax; Secure"
+    return "_sysmon_trust=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax"
+
+def _is_trusted_proxy_ip(ip_str):
+    norm_ip = _normalize_ip_str(ip_str)
+    if not norm_ip:
+        return False
+    norm_server_ip = _normalize_ip_str(SERVER_LOCAL_IP)
+    if norm_ip in ('127.0.0.1', '::1', 'localhost') or (norm_server_ip and norm_ip == norm_server_ip):
+        return True
+    try:
+        ip_obj = ipaddress.ip_address(norm_ip)
+        return ip_obj.is_loopback or (ip_obj in ipaddress.ip_network('172.16.0.0/12'))
+    except Exception:
+        return False
 
 def get_client_ip(handler):
     """
-    Extrae la IP real del cliente con validación estricta anti-spoofing.
-    Si la conexión directa proviene de localhost (Caddy proxy) o del servidor local,
-    se extrae la IP sanitizada por el proxy (X-Real-IP o el cliente original en X-Forwarded-For).
+    Extrae la IP real del cliente con validación estricta anti-spoofing (rightmost-untrusted).
+    Acepta cabeceras de proxy inverso únicamente si el socket directo proviene
+    de loopback, de la IP local del servidor o de subredes bridge Docker (172.16.0.0/12).
     """
-    direct_ip = handler.client_address[0]
-    if direct_ip in ('127.0.0.1', '::1', 'localhost', SERVER_LOCAL_IP):
+    raw_direct = handler.client_address[0] if getattr(handler, 'client_address', None) else ''
+    direct_ip = _normalize_ip_str(raw_direct)
+    if _is_trusted_proxy_ip(direct_ip):
         x_real = handler.headers.get('X-Real-IP')
         if x_real:
-            return x_real.strip()
+            cand = _normalize_ip_str(x_real)
+            if cand:
+                try:
+                    ipaddress.ip_address(cand)
+                    return cand
+                except Exception:
+                    pass
         xff = handler.headers.get('X-Forwarded-For')
         if xff:
-            parts = [p.strip() for p in xff.split(',') if p.strip()]
-            if parts:
-                return parts[0]
+            valid_parts = []
+            for raw_part in xff.split(','):
+                if not raw_part.strip():
+                    continue
+                cand = _normalize_ip_str(raw_part)
+                try:
+                    ipaddress.ip_address(cand)
+                    valid_parts.append(cand)
+                except Exception:
+                    continue
+            if valid_parts:
+                # Recorrer de derecha a izquierda para evitar spoofing por prefijos falsos en proxys que anexan IPs
+                for part in reversed(valid_parts):
+                    if not _is_trusted_proxy_ip(part):
+                        return part
+                return valid_parts[0]
     return direct_ip
 
 def is_local_ip(ip_str):
     """
-    Determina con total precisión si una dirección IP es local (LAN de casa, loopback o Tailscale).
+    Determina con total precisión si una dirección IP es local (LAN de casa, loopback o Tailscale),
+    desempaquetando direcciones IPv4-mapped IPv6 (::ffff:x.x.x.x).
     Cualquier IP pública o externa fuera de estas subredes se considera EXTERIOR (Datos móviles / WAN).
     """
     try:
-        ip = ipaddress.ip_address(ip_str)
+        clean_ip = _normalize_ip_str(ip_str)
+        if not clean_ip:
+            return False
+        ip = ipaddress.ip_address(clean_ip)
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
         if ip.is_loopback or ip.is_private or ip.is_link_local:
             return True
         for net in [ipaddress.ip_network('192.168.0.0/16'),
@@ -5808,10 +5943,11 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     return entry
 
 
-def find_device_by_id_or_physical(devices, verified_device_id, tel, client_ip, ua, is_local):
+def find_device_by_id_or_physical(devices, verified_device_id, tel, client_ip, ua, is_local, allow_wan_hw_match=False):
     """
     Localiza el registro único del dispositivo físico ya sea por su ID de certificado,
     por un alias_id fusionado previamente, o por su identidad física de hardware/red (MAC, IP LAN + SO, hardware_id).
+    En peticiones WAN sin token HMAC válido está estrictamente prohibido asociar por cabeceras de telemetría.
     """
     if verified_device_id:
         if verified_device_id in devices:
@@ -5820,7 +5956,7 @@ def find_device_by_id_or_physical(devices, verified_device_id, tel, client_ip, u
             if verified_device_id in (ex_dev.get("alias_ids") or []):
                 return ex_id, ex_dev, True
 
-    if not is_local and not tel:
+    if not is_local and not (allow_wan_hw_match and tel):
         return None, None, False
 
     cand_phys = compute_physical_device_key(tel, client_ip, ua, is_local=is_local)
@@ -5851,35 +5987,48 @@ def find_device_by_id_or_physical(devices, verified_device_id, tel, client_ip, u
     return None, None, False
 
 
+def _find_trusted_match_for_token(devices, candidate_token):
+    if not candidate_token:
+        return None, None, False
+    verified_id = verify_device_token(candidate_token)
+    if not verified_id:
+        return None, None, False
+    if verified_id in devices:
+        return verified_id, devices[verified_id], False
+    for ex_id, ex_dev in devices.items():
+        if verified_id in (ex_dev.get("alias_ids") or []):
+            return ex_id, ex_dev, True
+    return None, None, False
+
+
 def check_trust_status(handler):
     """
     Verifica el origen de la petición y valida el certificado HMAC por dispositivo físico.
     - Los certificados se emiten por DISPOSITIVO FÍSICO (no por cada navegador/cliente aislado).
     - Múltiples clientes del mismo dispositivo comparten el certificado del equipo y se agrupan bajo él.
+    - Prioriza tokens válidos de cabecera (Bearer / X-Device-Token) sobre cookies caducadas o revocadas,
+      y reemite automáticamente la cookie _sysmon_trust si falta en la petición.
     """
     client_ip = get_client_ip(handler)
     is_local = is_local_ip(client_ip)
     norm_client_ip = normalize_lan_ip(client_ip) if is_local else client_ip
 
-    # Extraer credencial HMAC: verificar Authorization Bearer, cabecera X-Device-Token o Cookie _sysmon_trust
-    token = None
+    # Extraer candidatos HMAC por separado (cabeceras tienen prioridad frente a cookies antiguas)
+    hdr_bearer = ""
     auth_hdr = handler.headers.get('Authorization', '')
     if auth_hdr and auth_hdr.lower().startswith('bearer '):
-        token = auth_hdr[7:].strip()
-    if not token:
-        x_tok = handler.headers.get('X-Device-Token', '')
-        if x_tok:
-            token = x_tok.strip()
-    if not token:
-        cookie_header = handler.headers.get('Cookie', '')
-        if cookie_header:
-            c = cookies.SimpleCookie()
-            try:
-                c.load(cookie_header)
-                if '_sysmon_trust' in c:
-                    token = c['_sysmon_trust'].value
-            except Exception:
-                pass
+        hdr_bearer = auth_hdr[7:].strip()
+    hdr_xtoken = handler.headers.get('X-Device-Token', '').strip()
+    cookie_token = ""
+    cookie_header = handler.headers.get('Cookie', '')
+    if cookie_header:
+        c = cookies.SimpleCookie()
+        try:
+            c.load(cookie_header)
+            if '_sysmon_trust' in c:
+                cookie_token = str(c['_sysmon_trust'].value or '').strip()
+        except Exception:
+            pass
 
     hdr_telemetry = extract_header_telemetry(handler)
     ua = handler.headers.get('User-Agent', '')
@@ -5887,16 +6036,44 @@ def check_trust_status(handler):
 
     with TRUST_LOCK:
         devices = load_trusted_devices()
-        verified_device_id = verify_device_token(token) if token else None
-        matched_id, device_entry, token_needs_unification = find_device_by_id_or_physical(
-            devices, verified_device_id, hdr_telemetry, norm_client_ip, ua, is_local
-        )
+        token = None
+        verified_device_id = None
+        token_ts = None
+        matched_id = None
+        device_entry = None
+        token_needs_unification = False
+
+        for cand_tok in [t for t in (hdr_bearer, hdr_xtoken, cookie_token) if t]:
+            m_id, m_dev, needs_uni = _find_trusted_match_for_token(devices, cand_tok)
+            if m_id and m_dev and m_dev.get("trusted", True):
+                token = cand_tok
+                matched_id = m_id
+                device_entry = m_dev
+                verified_device_id, token_ts = parse_verified_device_token(cand_tok)
+                token_needs_unification = needs_uni
+                break
+
+        if not matched_id and is_local:
+            matched_id, device_entry, token_needs_unification = find_device_by_id_or_physical(
+                devices, None, hdr_telemetry, norm_client_ip, ua, is_local=True
+            )
+
+        cookie_matched_id = None
+        if cookie_token:
+            c_mid, c_dev, _ = _find_trusted_match_for_token(devices, cookie_token)
+            if c_mid and c_dev and c_dev.get("trusted", True):
+                cookie_matched_id = c_mid
+        has_valid_cookie = bool(matched_id and cookie_matched_id == matched_id)
+        needs_proactive_rotation = bool(token_ts and (time.time() - token_ts) > TOKEN_ROTATION_AGE_SEC)
 
         new_token = None
-        if matched_id and (token_needs_unification or not token or verified_device_id != matched_id):
+        if matched_id and (token_needs_unification or not token or verified_device_id != matched_id or needs_proactive_rotation):
             verified_device_id = matched_id
             new_token = create_device_token(matched_id)
             token = new_token
+        elif matched_id and token and not has_valid_cookie:
+            # Regenerar Set-Cookie si el cliente autenticó por header sin cookie activa
+            new_token = token
 
         if is_local:
             # Omitir persistencia de tokens para herramientas CLI locales sin telemetría nativa
@@ -6224,6 +6401,100 @@ def get_locked_page_html(client_ip):
   <script>
     let countdownInterval = null;
 
+    function getSavedCandidateToken() {{
+      try {{
+        if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.getDeviceToken === 'function') {{
+          const tBridge = (window.RecursosAndroidBridge.getDeviceToken() || '').trim();
+          if (tBridge) return tBridge;
+        }}
+      }} catch (e) {{}}
+      try {{
+        if (window.__RECURSOS_DEVICE_TOKEN__) return String(window.__RECURSOS_DEVICE_TOKEN__).trim();
+      }} catch (e) {{}}
+      try {{
+        const tRec = (localStorage.getItem('recursos_device_token') || '').trim();
+        if (tRec) return tRec;
+        const tLegacy = (localStorage.getItem('sysmon_device_token') || '').trim();
+        if (tLegacy) return tLegacy;
+        const cfgRaw = localStorage.getItem('recursos_auth_persistence_config');
+        if (cfgRaw) {{
+          const cfg = JSON.parse(cfgRaw);
+          if (cfg && cfg.token) return String(cfg.token).trim();
+        }}
+      }} catch (e) {{}}
+      return '';
+    }}
+
+    function persistTokenLocally(tok) {{
+      if (!tok) return;
+      try {{
+        localStorage.setItem('recursos_device_token', tok);
+        localStorage.setItem('sysmon_device_token', tok);
+        let cfg = {{}};
+        try {{ cfg = JSON.parse(localStorage.getItem('recursos_auth_persistence_config') || '{{}}') || {{}}; }} catch (e) {{ cfg = {{}}; }}
+        cfg.token = tok;
+        cfg.origin = window.location.origin;
+        cfg.updatedAt = new Date().toISOString();
+        localStorage.setItem('recursos_auth_persistence_config', JSON.stringify(cfg));
+      }} catch (e) {{}}
+      try {{
+        window.__RECURSOS_DEVICE_TOKEN__ = tok;
+        if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.onTokenUpdated === 'function') {{
+          window.RecursosAndroidBridge.onTokenUpdated(tok);
+        }}
+      }} catch (e) {{}}
+    }}
+
+    function clearStoredTokens() {{
+      try {{
+        localStorage.removeItem('recursos_device_token');
+        localStorage.removeItem('sysmon_device_token');
+        let cfg = {{}};
+        try {{ cfg = JSON.parse(localStorage.getItem('recursos_auth_persistence_config') || '{{}}') || {{}}; }} catch (e) {{ cfg = {{}}; }}
+        cfg.token = '';
+        cfg.updatedAt = new Date().toISOString();
+        localStorage.setItem('recursos_auth_persistence_config', JSON.stringify(cfg));
+      }} catch (e) {{}}
+    }}
+
+    async function tryAutoRestoreSession() {{
+      const savedToken = getSavedCandidateToken();
+      if (!savedToken) return;
+      const msg = document.getElementById('statusMsg');
+      try {{
+        const res = await fetch('/api/auth/restore-session', {{
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {{
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + savedToken,
+            'X-Device-Token': savedToken
+          }},
+          body: JSON.stringify({{ token: savedToken }})
+        }});
+        if (res.ok) {{
+          const data = await res.json();
+          if (data && data.success) {{
+            if (data.token) persistTokenLocally(data.token);
+            if (msg) {{
+              msg.style.color = 'var(--success)';
+              msg.textContent = 'Credencial verificada. Restaurando sesión segura...';
+            }}
+            window.location.reload();
+            return;
+          }}
+        }} else if (res.status === 403) {{
+          clearStoredTokens();
+        }}
+      }} catch (e) {{}}
+    }}
+
+    if (document.readyState === 'loading') {{
+      document.addEventListener('DOMContentLoaded', tryAutoRestoreSession);
+    }} else {{
+      tryAutoRestoreSession();
+    }}
+
     function togglePasswordVisibility() {{
       const input = document.getElementById('masterKey');
       input.type = input.type === 'password' ? 'text' : 'password';
@@ -6264,13 +6535,14 @@ def get_locked_page_html(client_ip):
       try {{
         const res = await fetch('/api/auth/unlock', {{
           method: 'POST',
+          credentials: 'same-origin',
           headers: {{ 'Content-Type': 'application/json' }},
           body: JSON.stringify({{ key: key }})
         }});
         const data = await res.json();
         if (res.ok && data.success) {{
           if (data.token) {{
-            try {{ localStorage.setItem('sysmon_device_token', data.token); }} catch(e) {{}}
+            persistTokenLocally(data.token);
           }}
           msg.style.color = 'var(--success)';
           msg.textContent = '¡Listo! Dispositivo autorizado. Entrando...';
@@ -10128,6 +10400,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Pragma', 'no-cache')
             self.send_header('Expires', '0')
             self.send_security_headers()
+            if _has_trust_cookie(self):
+                self.send_header('Set-Cookie', get_clear_cookie_header_value(self))
             self.send_header('Content-Length', str(len(locked_page)))
             self.end_headers()
             self.wfile.write(locked_page)
@@ -11065,7 +11339,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 with TRUST_LOCK:
                     devices = load_trusted_devices()
                     matched_id, existing_entry, _ = find_device_by_id_or_physical(
-                        devices, None, hdr_tel, client_ip, ua, is_local=False
+                        devices, None, hdr_tel, client_ip, ua, is_local=False, allow_wan_hw_match=True
                     )
                     if matched_id and existing_entry:
                         dev_id = matched_id
@@ -11303,6 +11577,72 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(resp)))
             self.end_headers()
             self.wfile.write(resp)
+            return
+
+        # 2c-bis. Restauración criptográfica de sesión desde token persistido (cookie regenerada en WAN)
+        elif clean_path == "/api/auth/restore-session":
+            body, err_code = self._read_json_body(max_bytes=4096)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            candidate_tok = str((body or {}).get('token') or '').strip()
+            if not candidate_tok:
+                auth_hdr = self.headers.get('Authorization', '')
+                if auth_hdr and auth_hdr.lower().startswith('bearer '):
+                    candidate_tok = auth_hdr[7:].strip()
+            if not candidate_tok:
+                candidate_tok = self.headers.get('X-Device-Token', '').strip()
+
+            ua = self.headers.get('User-Agent', '')
+            hdr_tel = extract_header_telemetry(self)
+            is_local = is_local_ip(client_ip)
+            norm_ip = normalize_lan_ip(client_ip) if is_local else client_ip
+            now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            matched_id = None
+            issued_token = None
+            with TRUST_LOCK:
+                devices = load_trusted_devices()
+                m_id, entry, needs_uni = _find_trusted_match_for_token(devices, candidate_tok)
+                if m_id and entry and entry.get("trusted", False) and entry.get("verified_in_lan", True):
+                    matched_id = m_id
+                    verified_raw, tok_ts = parse_verified_device_token(candidate_tok)
+                    needs_rot = bool(tok_ts and (time.time() - tok_ts) > TOKEN_ROTATION_AGE_SEC)
+                    issued_token = create_device_token(matched_id) if (needs_uni or verified_raw != matched_id or needs_rot) else candidate_tok
+                    entry["last_seen"] = now_iso
+                    if not is_local:
+                        entry["last_external_ip"] = client_ip
+                    enrich_device_entry(entry, ua, hdr_tel, norm_ip, is_local=is_local)
+                    save_trusted_devices(devices)
+
+            if not matched_id or not issued_token:
+                err_resp = json.dumps({"success": False, "status": "locked"}).encode('utf-8')
+                self.send_response(403)
+                self.send_header('Content-Type', 'application/json')
+                self.send_security_headers()
+                if _has_trust_cookie(self):
+                    self.send_header('Set-Cookie', get_clear_cookie_header_value(self))
+                self.send_header('Content-Length', str(len(err_resp)))
+                self.end_headers()
+                self.wfile.write(err_resp)
+                return
+
+            ok_resp = json.dumps({
+                "success": True,
+                "device_id": matched_id,
+                "token": issued_token
+            }).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Set-Cookie', get_cookie_header_value(self, issued_token))
+            self.send_header('Content-Length', str(len(ok_resp)))
+            self.end_headers()
+            self.wfile.write(ok_resp)
             return
 
         # 2d. Renombrar alias personalizado de un dispositivo en el Panel de Seguridad

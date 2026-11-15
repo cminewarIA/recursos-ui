@@ -420,7 +420,7 @@ git clone https://github.com/cminewarIA/recursos-ui.git /opt/recursos-cockpit
 cd /opt/recursos-cockpit
 
 pip3 install -r requirements.txt || pip3 install psutil
-npm install && npm run build
+npm install --legacy-peer-deps && npm run build
 
 # Generar el paquete .deb local desde ./VERSION e instalarlo (+ Android TV si hay ADB en LAN)
 bash packaging/install_all.sh

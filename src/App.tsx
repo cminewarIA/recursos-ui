@@ -1,12 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion, MotionConfig } from 'motion/react';
 import {
   Activity,
+  ArrowDownUp,
   Cpu,
   Grid,
   Home,
+  Maximize2,
   Moon,
   MoreHorizontal,
+  RefreshCw,
   Sun,
   Wifi,
 } from 'lucide-react';
@@ -17,10 +20,11 @@ import { NetworkSecurityView } from './components/NetworkSecurityView';
 import { AppsMediaView } from './components/AppsMediaView';
 import { MoreView } from './components/MoreView';
 import { ExpandedChartModal } from './components/ExpandedChartModal';
-import { MainTabId, MetricsPayload, ThemeMode, WifiClient } from './types/telemetry';
+import { ChartSeries, TelemetryChart } from './components/TelemetryChart';
+import { MainTabId, MetricsPayload, TelemetryHistoryResponse, ThemeMode, VersionInfo, WifiClient } from './types/telemetry';
 import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/api';
-import { extractInitialSubTabFromRoute, normalizeExternalRoute } from './utils/formatters';
-import { getCanonicalDisplayVersion, getCanonicalVersion } from './utils/version';
+import { extractInitialSubTabFromRoute, formatSpeed, normalizeExternalRoute } from './utils/formatters';
+import { getCanonicalDisplayVersion, getCanonicalVersion, isRemoteVersionHigher } from './utils/version';
 import { useI18n } from './i18n';
 
 interface ToastState {
@@ -56,9 +60,16 @@ export function App() {
   const [navTick, setNavTick] = useState(0);
 
   const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [connError, setConnError] = useState<string | null>(null);
   const [logoBroken, setLogoBroken] = useState(false);
+
+  const [netHistory24h, setNetHistory24h] = useState<TelemetryHistoryResponse | null>(null);
+  const [netHistoryLoading, setNetHistoryLoading] = useState<boolean>(true);
+  const [netHistoryError, setNetHistoryError] = useState<boolean>(false);
+  const netHistorySeqRef = useRef(0);
 
   const [expandedChart, setExpandedChart] = useState<ExpandChartSpec | null>(null);
   const [pendingMac, setPendingMac] = useState<string | null>(null);
@@ -179,10 +190,14 @@ export function App() {
       if (token) setStoredToken(token);
       if (telemetry) {
         window.__RECURSOS_DEVICE_TELEMETRY__ = telemetry;
-        void apiFetchJson('/api/auth/register-device', {
+        void apiFetchJson<{ token?: string }>('/api/auth/register-device', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ device_telemetry: telemetry }),
+        }).then((res) => {
+          if (res.ok && res.data?.token) {
+            setStoredToken(res.data.token);
+          }
         });
       }
       if (detectNativeEnvironment().isAndroidTv) {
@@ -229,12 +244,62 @@ export function App() {
       screen_width: window.screen?.width,
       screen_height: window.screen?.height,
     };
-    void apiFetchJson('/api/auth/register-device', {
+    void apiFetchJson<{ token?: string }>('/api/auth/register-device', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ device_telemetry: payload }),
+    }).then((res) => {
+      if (res.ok && res.data?.token) {
+        setStoredToken(res.data.token);
+      }
     });
   }, []);
+
+  // Fetch /api/version on app load, update display version and updateAvailable state
+  useEffect(() => {
+    let cancelled = false;
+    const loadVersionOnStartup = async () => {
+      const res = await apiFetchJson<VersionInfo>('/api/version');
+      if (cancelled || !res.ok || !res.data) return;
+      setVersionInfo(res.data);
+      setUpdateAvailable(isRemoteVersionHigher(res.data));
+    };
+    void loadVersionOnStartup();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Fetch 24h persistent network traffic history from /api/metrics/history
+  const fetchNetworkHistory24h = useCallback(async (showSpinner = false) => {
+    const seq = ++netHistorySeqRef.current;
+    if (showSpinner) {
+      setNetHistoryLoading(true);
+    }
+    const res = await apiFetchJson<TelemetryHistoryResponse>('/api/metrics/history?window_sec=86400&limit=288');
+    if (seq !== netHistorySeqRef.current) return;
+    if (res.ok && res.data?.ok) {
+      setNetHistory24h(res.data);
+      setNetHistoryError(false);
+    } else {
+      setNetHistoryError(true);
+    }
+    setNetHistoryLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const isPaused = () =>
+      (typeof document !== 'undefined' && document.hidden) ||
+      Boolean((window as unknown as { __RECURSOS_PAUSED__?: boolean }).__RECURSOS_PAUSED__);
+
+    void fetchNetworkHistory24h(true);
+    const intervalId = window.setInterval(() => {
+      if (!isPaused()) {
+        void fetchNetworkHistory24h(false);
+      }
+    }, 30000);
+    return () => window.clearInterval(intervalId);
+  }, [fetchNetworkHistory24h]);
 
   const navigateTo = useCallback((tab: MainTabId, sub?: string) => {
     setActiveTab(tab);
@@ -306,7 +371,14 @@ export function App() {
     [fetchMetrics, notify, t]
   );
 
-  const displayVersion = getCanonicalDisplayVersion(metrics?.version_info);
+  const activeVersionInfo = versionInfo ?? metrics?.version_info;
+  const displayVersion = getCanonicalDisplayVersion(activeVersionInfo);
+  const remoteDisplayVersion = activeVersionInfo?.remote_version
+    ? getCanonicalDisplayVersion({
+        current_version: activeVersionInfo.remote_version,
+        display_version: activeVersionInfo.remote_display_version,
+      })
+    : displayVersion;
   const topbarErrors = Number(
     metrics?.system_errors_summary?.total_errors ?? metrics?.system_errors_summary?.total ?? 0
   );
@@ -321,6 +393,70 @@ export function App() {
     { id: 'programas', label: t('nav.programas'), icon: <Grid className="h-5 w-5" /> },
     { id: 'mas', label: t('nav.mas'), icon: <MoreHorizontal className="h-5 w-5" /> },
   ];
+
+  const network24hView = useMemo(() => {
+    const dbSeries = netHistory24h?.series;
+    const dbRx = dbSeries?.net_rx ?? [];
+    const dbTx = dbSeries?.net_tx ?? [];
+    const useFallbackLive = dbRx.length < 2 && (metrics?.history?.net_rx?.length ?? 0) >= 2;
+    const rxData = useFallbackLive ? (metrics?.history?.net_rx ?? []) : dbRx;
+    const txData = useFallbackLive ? (metrics?.history?.net_tx ?? []) : dbTx;
+    const timestamps = useFallbackLive ? (metrics?.history?.timestamps ?? []) : (dbSeries?.timestamps ?? []);
+    const dateTimestamps = useFallbackLive ? (metrics?.history?.date_timestamps ?? []) : (dbSeries?.date_timestamps ?? []);
+    const epochTs = useFallbackLive ? (metrics?.history?.epoch_ts ?? []) : (dbSeries?.epoch_ts ?? []);
+
+    const peakRxMb = rxData.length > 0 ? Math.max(...rxData) : 0;
+    const peakTxMb = txData.length > 0 ? Math.max(...txData) : 0;
+    const avgRxMb = rxData.length > 0 ? rxData.reduce((acc, v) => acc + v, 0) / rxData.length : 0;
+    const avgTxMb = txData.length > 0 ? txData.reduce((acc, v) => acc + v, 0) / txData.length : 0;
+
+    const series: ChartSeries[] = [
+      {
+        id: 'net_rx_24h',
+        metricKey: 'net_rx',
+        label: t('hardware.net.download'),
+        data: rxData,
+        color: '#0284c7',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.18,
+      },
+      {
+        id: 'net_tx_24h',
+        metricKey: 'net_tx',
+        label: t('hardware.net.upload'),
+        data: txData,
+        color: '#10b981',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.08,
+      },
+    ];
+
+    return {
+      series,
+      timestamps,
+      dateTimestamps,
+      epochTs,
+      sampleCount: Math.max(rxData.length, txData.length),
+      peakRxMb,
+      peakTxMb,
+      avgRxMb,
+      avgTxMb,
+    };
+  }, [netHistory24h, metrics?.history, t]);
+
+  const openNetwork24hExpanded = useCallback(() => {
+    setExpandedChart({
+      title: t('overview.net_history_24h_title'),
+      subtitle: t('overview.net_history_24h_sub'),
+      series: network24hView.series,
+      timestamps: network24hView.timestamps,
+      epochTs: network24hView.epochTs,
+      leftUnit: 'MB/s',
+      chartKind: 'net',
+    });
+  }, [network24hView.series, network24hView.timestamps, network24hView.epochTs, t]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -440,9 +576,24 @@ export function App() {
                   whileTap={{ scale: 0.95 }}
                   type="button"
                   onClick={() => navigateTo('mas', 'updates')}
-                  className="cockpit-pill-cyan min-h-[36px] rounded-xl px-2.5 py-1 font-mono text-xs font-semibold tabular-nums transition-opacity hover:opacity-90 whitespace-nowrap"
+                  title={
+                    updateAvailable
+                      ? t('more.new_version_available', { ver: remoteDisplayVersion })
+                      : `v${displayVersion}`
+                  }
+                  aria-label={
+                    updateAvailable
+                      ? t('more.new_version_available', { ver: remoteDisplayVersion })
+                      : `v${displayVersion}`
+                  }
+                  className={`${
+                    updateAvailable ? 'cockpit-pill-emerald' : 'cockpit-pill-cyan'
+                  } inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-2.5 py-1 font-mono text-xs font-semibold tabular-nums transition-opacity hover:opacity-90 whitespace-nowrap`}
                 >
-                  v{displayVersion}
+                  {updateAvailable && (
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 cockpit-live-dot" />
+                  )}
+                  <span>v{displayVersion}</span>
                 </motion.button>
               </div>
             </div>
@@ -529,6 +680,148 @@ export function App() {
               )}
             </ViewStage>
           )}
+
+          {/* 24-Hour Network Traffic Evolution Section */}
+          <motion.section
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.08, ease: COCKPIT_EASE }}
+            aria-labelledby="network-24h-history-title"
+            className="cockpit-bento mt-6 p-5"
+          >
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="cockpit-pill-cyan inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+                    <ArrowDownUp className="h-4 w-4" />
+                  </span>
+                  <h2
+                    id="network-24h-history-title"
+                    className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white sm:text-lg"
+                  >
+                    {t('overview.net_history_24h_title')}
+                  </h2>
+                </div>
+                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  <span>{t('overview.net_history_24h_sub')}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {t('overview.net_history_24h_badge')}
+                  </span>
+                  {network24hView.sampleCount > 0 && (
+                    <>
+                      <span aria-hidden="true"> · </span>
+                      <span className="font-mono tabular-nums">
+                        {t('overview.net_history_24h_samples', { count: network24hView.sampleCount })}
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <div className="flex items-center gap-3 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
+                    <span>{t('hardware.net.download')}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#10b981]" />
+                    <span>{t('hardware.net.upload')}</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    type="button"
+                    aria-label={t('network.refresh')}
+                    onClick={() => void fetchNetworkHistory24h(true)}
+                    className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${netHistoryLoading ? 'animate-spin' : ''}`} />
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    type="button"
+                    aria-label={t('hardware.net.expand_aria')}
+                    onClick={openNetwork24hExpanded}
+                    className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary KPI row separated by clean hairline divider */}
+            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200/80 pt-4 sm:grid-cols-4 dark:border-slate-800">
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {t('overview.net_history_24h_peak_rx')}
+                </p>
+                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-sky-700 dark:text-sky-300">
+                  ↓ {formatSpeed(network24hView.peakRxMb * 1024 * 1024)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {t('overview.net_history_24h_avg_rx')}
+                </p>
+                <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-slate-900 dark:text-white">
+                  ↓ {formatSpeed(network24hView.avgRxMb * 1024 * 1024)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {t('overview.net_history_24h_peak_tx')}
+                </p>
+                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                  ↑ {formatSpeed(network24hView.peakTxMb * 1024 * 1024)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {t('overview.net_history_24h_avg_tx')}
+                </p>
+                <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-slate-900 dark:text-white">
+                  ↑ {formatSpeed(network24hView.avgTxMb * 1024 * 1024)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-800/80">
+              {netHistoryLoading && network24hView.sampleCount < 2 ? (
+                <div className="h-[220px] w-full animate-pulse rounded-xl bg-slate-100/80 dark:bg-slate-800/50" />
+              ) : netHistoryError && network24hView.sampleCount < 2 ? (
+                <div className="flex h-[220px] flex-col items-center justify-center gap-3 text-center">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {t('overview.net_history_24h_error')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void fetchNetworkHistory24h(true)}
+                    className="cockpit-subtile min-h-[40px] px-4 py-2 text-xs font-semibold text-sky-700 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-sky-300 dark:hover:bg-slate-800 whitespace-nowrap"
+                  >
+                    {t('overview.net_history_24h_retry')}
+                  </button>
+                </div>
+              ) : (
+                <TelemetryChart
+                  series={network24hView.series}
+                  timestamps={network24hView.timestamps}
+                  dateTimestamps={network24hView.dateTimestamps}
+                  epochTs={network24hView.epochTs}
+                  height={220}
+                  leftUnit="MB/s"
+                  intervalSec={300}
+                  theme={theme}
+                  emptyMessage={t('overview.net_history_24h_empty')}
+                  onExpandClick={openNetwork24hExpanded}
+                />
+              )}
+            </div>
+          </motion.section>
         </main>
 
         {/* Centered Floating Glassmorphic Dock with Spring Morph Pill */}

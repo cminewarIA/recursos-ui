@@ -15,6 +15,7 @@ import base64
 import collections
 import hashlib
 import http.server
+import ipaddress
 import json
 import os
 import platform
@@ -749,6 +750,21 @@ headerbar .titlebutton.close:hover image {
 """
 
 
+def _is_valid_wan_domain(dom):
+    """Valida que el dominio público detectado sea un DNS real y no una IP LAN ni .local."""
+    clean = str(dom or "").strip()
+    if not clean:
+        return False
+    host = clean.split("://")[-1].split("/")[0].split(":")[0].strip().lower()
+    if not host or host in ("localhost", "127.0.0.1", "::1") or host.endswith(".local"):
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        return "." in host
+
+
 class ServerConnectionManager:
     """
     Gestor de autodescubrimiento en red local (LAN), conmutación inteligente a WAN (DDNS)
@@ -812,7 +828,8 @@ class ServerConnectionManager:
     def _save_config(self):
         try:
             os.makedirs(self.config_dir, exist_ok=True)
-            with open(self.config_file, "w", encoding="utf-8") as f:
+            tmp_file = f"{self.config_file}.tmp"
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(
                     {
                         "device_token": self.device_token,
@@ -826,6 +843,11 @@ class ServerConnectionManager:
                     f,
                     indent=2,
                 )
+            try:
+                os.chmod(tmp_file, 0o600)
+            except Exception:
+                pass
+            os.replace(tmp_file, self.config_file)
         except Exception:
             pass
 
@@ -1613,15 +1635,25 @@ class ServerConnectionManager:
             raw = json.dumps({"device_telemetry": telemetry}, ensure_ascii=False).encode("utf-8")
             headers = self._build_auth_headers({"Content-Type": "application/json"})
             req = urllib.request.Request(url, data=raw, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=2.0) as resp:
+            with urllib.request.urlopen(req, timeout=3.5) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
-                    new_tok = data.get("token")
+                    cfg_changed = False
+                    new_tok = str(data.get("token") or "").strip()
                     if new_tok and new_tok != self.device_token:
                         self.device_token = new_tok
+                        cfg_changed = True
+                    if self.is_revoked:
                         self.is_revoked = False
+                        cfg_changed = True
+                    if cfg_changed:
                         self._save_config()
                     return True
+        except urllib.error.HTTPError as he:
+            if he.code == 403:
+                self.is_revoked = True
+                self.connection_mode = "REVOKED"
+                self._save_config()
         except Exception:
             pass
         return False
@@ -1637,12 +1669,7 @@ class ServerConnectionManager:
                     try:
                         parsed = json.loads(body)
                         pub_dom = str(parsed.get("public_domain") or "").strip()
-                        if (
-                            pub_dom
-                            and not pub_dom.endswith(".local")
-                            and not pub_dom.replace(".", "").isdigit()
-                            and pub_dom not in ("localhost", "127.0.0.1")
-                        ):
+                        if _is_valid_wan_domain(pub_dom) and pub_dom != self.wan_domain:
                             self.wan_domain = pub_dom
                             self._save_config()
                     except Exception:
@@ -1696,6 +1723,7 @@ class ServerConnectionManager:
                 if is_rev:
                     self.is_revoked = True
                     self.connection_mode = "REVOKED"
+                    self._save_config()
                     return cand
                 if ok:
                     self.active_url = cand
@@ -1714,6 +1742,7 @@ class ServerConnectionManager:
                     if is_rev:
                         self.is_revoked = True
                         self.connection_mode = "REVOKED"
+                        self._save_config()
                         return cand
                     if ok:
                         self.active_url = cand
@@ -1724,17 +1753,19 @@ class ServerConnectionManager:
                         return cand
 
             wan_dom = (self.wan_domain or "").strip().rstrip("/")
-            if wan_dom:
+            if wan_dom and _is_valid_wan_domain(wan_dom):
                 wan_cand = wan_dom if wan_dom.startswith(("http://", "https://")) else f"https://{wan_dom}"
-                ok, is_rev = self._probe(wan_cand, timeout=1.5)
+                ok, is_rev = self._probe(wan_cand, timeout=3.5)
                 if is_rev:
                     self.is_revoked = True
                     self.connection_mode = "REVOKED"
+                    self._save_config()
                     return wan_cand
                 if ok:
                     self.active_url = wan_cand
                     self.connection_mode = "WAN"
                     self.is_revoked = False
+                    self._save_config()
                     return wan_cand
 
             self.connection_mode = "LOCAL"
@@ -1757,11 +1788,11 @@ class ServerConnectionManager:
 
         req = urllib.request.Request(url, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=2.5) as resp:
+            with urllib.request.urlopen(req, timeout=3.5) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     cfg_changed = False
-                    new_token = data.get("auth_status", {}).get("token")
+                    new_token = str(data.get("auth_status", {}).get("token") or "").strip()
                     if new_token and new_token != self.device_token:
                         self.device_token = new_token
                         self.is_revoked = False
@@ -1771,13 +1802,7 @@ class ServerConnectionManager:
                         or data.get("system", {}).get("public_domain")
                         or ""
                     ).strip()
-                    if (
-                        pub_dom
-                        and pub_dom != self.wan_domain
-                        and not pub_dom.endswith(".local")
-                        and not pub_dom.replace(".", "").isdigit()
-                        and pub_dom not in ("localhost", "127.0.0.1")
-                    ):
+                    if pub_dom and pub_dom != self.wan_domain and _is_valid_wan_domain(pub_dom):
                         self.wan_domain = pub_dom
                         cfg_changed = True
                     if cfg_changed:
@@ -1965,6 +1990,21 @@ class LocalHtmlBridgeServer:
                 mode_js = json.dumps(parent.conn_mgr.connection_mode or "LOCAL")
                 node_js = json.dumps(parent.conn_mgr.active_url or "local")
                 dev_info_js = json.dumps(parent.conn_mgr.refresh_device_telemetry(), ensure_ascii=False)
+                auth_cfg_js = json.dumps(
+                    {
+                        "token": parent.conn_mgr.device_token or "",
+                        "wanDomain": parent.conn_mgr.wan_domain or "",
+                        "lanIp": parent.conn_mgr.saved_host or parent.conn_mgr.get_primary_lan_ip() or "",
+                        "origin": parent.conn_mgr.active_url or "",
+                        "mode": (
+                            "WAN"
+                            if parent.conn_mgr.connection_mode == "WAN"
+                            else ("LAN" if parent.conn_mgr.connection_mode == "LAN" else "UNKNOWN")
+                        ),
+                        "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    },
+                    ensure_ascii=False,
+                )
                 app_ver = get_app_version()
                 disp_ver = get_display_version(app_ver)
                 bridge_script = (
@@ -1979,7 +2019,11 @@ class LocalHtmlBridgeServer:
                     f"window.__RECURSOS_CONN_MODE__ = {mode_js};"
                     f"window.__RECURSOS_NODE_URL__ = {node_js};"
                     f"window.__RECURSOS_DEVICE_TELEMETRY__ = {dev_info_js};"
-                    f"try {{ if ({token_js}) {{ localStorage.setItem('recursos_device_token', {token_js}); localStorage.setItem('sysmon_device_token', {token_js}); }} }} catch(e) {{}}"
+                    f"try {{ var _cfg = {auth_cfg_js}; "
+                    "if (_cfg.token) { localStorage.setItem('recursos_device_token', _cfg.token); localStorage.setItem('sysmon_device_token', _cfg.token); } "
+                    "var _prev = {}; try { _prev = JSON.parse(localStorage.getItem('recursos_auth_persistence_config') || '{}') || {}; } catch(_) {} "
+                    "var _merged = Object.assign({}, _prev, _cfg, { token: _cfg.token || _prev.token || '', wanDomain: _cfg.wanDomain || _prev.wanDomain || '', lanIp: _cfg.lanIp || _prev.lanIp || '' }); "
+                    "localStorage.setItem('recursos_auth_persistence_config', JSON.stringify(_merged)); } catch(e) {}"
                     "</script>"
                 )
                 if "<head>" in html:
@@ -1997,6 +2041,11 @@ class LocalHtmlBridgeServer:
 
             def _proxy_to_remote(self, method="GET", body=None):
                 active_base = parent.conn_mgr.active_url
+                if not active_base and not parent.conn_mgr.is_revoked:
+                    now_ts = time.time()
+                    if now_ts - getattr(parent.conn_mgr, "_last_bridge_rediscover_ts", 0.0) > 8.0:
+                        parent.conn_mgr._last_bridge_rediscover_ts = now_ts
+                        active_base = parent.conn_mgr.discover_server()
                 if not active_base:
                     return False
                 target_url = f"{active_base.rstrip('/')}{self.path}"
@@ -2013,12 +2062,33 @@ class LocalHtmlBridgeServer:
                     with urllib.request.urlopen(req, timeout=req_timeout) as resp:
                         resp_body = resp.read()
                         ctype = resp.headers.get("Content-Type", "application/json")
-                        if "application/json" in ctype and self.path.startswith("/api/metrics"):
+                        if "application/json" in ctype and (
+                            self.path.startswith("/api/metrics")
+                            or self.path.startswith("/api/auth/register-device")
+                            or self.path.startswith("/api/auth/restore-session")
+                        ):
                             try:
                                 parsed = json.loads(resp_body.decode("utf-8"))
-                                new_tok = parsed.get("auth_status", {}).get("token")
+                                cfg_dirty = False
+                                new_tok = str(
+                                    parsed.get("token")
+                                    or parsed.get("auth_status", {}).get("token")
+                                    or ""
+                                ).strip()
                                 if new_tok and new_tok != parent.conn_mgr.device_token:
                                     parent.conn_mgr.device_token = new_tok
+                                    parent.conn_mgr.is_revoked = False
+                                    cfg_dirty = True
+                                pub_dom = str(
+                                    parsed.get("auth_status", {}).get("public_domain")
+                                    or parsed.get("version_info", {}).get("public_domain")
+                                    or parsed.get("system", {}).get("public_domain")
+                                    or ""
+                                ).strip()
+                                if pub_dom and pub_dom != parent.conn_mgr.wan_domain and _is_valid_wan_domain(pub_dom):
+                                    parent.conn_mgr.wan_domain = pub_dom
+                                    cfg_dirty = True
+                                if cfg_dirty:
                                     parent.conn_mgr._save_config()
                                 if isinstance(parsed.get("version_info"), dict):
                                     srv_vinfo = parsed["version_info"]
@@ -2106,6 +2176,7 @@ class LocalHtmlBridgeServer:
                     self.wfile.write(err_body)
                     return True
                 except Exception:
+                    parent.conn_mgr.active_url = ""
                     return False
 
             def do_GET(self):
@@ -2182,6 +2253,10 @@ class LocalHtmlBridgeServer:
                             with urllib.request.urlopen(req_v, timeout=4.0) as rv:
                                 if rv.status == 200:
                                     srv_payload = json.loads(rv.read().decode("utf-8"))
+                                    pub_dom_v = str((srv_payload or {}).get("public_domain") or "").strip()
+                                    if _is_valid_wan_domain(pub_dom_v) and pub_dom_v != parent.conn_mgr.wan_domain:
+                                        parent.conn_mgr.wan_domain = pub_dom_v
+                                        parent.conn_mgr._save_config()
                         except Exception:
                             srv_payload = None
 
@@ -2617,8 +2692,9 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
         def worker():
             self.conn_mgr.discover_server()
-            self.conn_mgr.fetch_metrics()
-            self.conn_mgr.register_device_with_server()
+            if self.conn_mgr.active_url and not self.conn_mgr.is_revoked:
+                self.conn_mgr.register_device_with_server()
+                self.conn_mgr.fetch_metrics()
             GLib.idle_add(self._on_node_connected_ui, target_view)
 
         threading.Thread(target=worker, daemon=True).start()

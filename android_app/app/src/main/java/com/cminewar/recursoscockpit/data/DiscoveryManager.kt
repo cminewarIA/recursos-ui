@@ -30,6 +30,7 @@ class DiscoveryManager(
                 return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.REVOKED)
             }
             if (res.isOnline && res.isRecursosServer) {
+                securePreferences.isCertRevoked = false
                 return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.CONNECTED_LAN)
             }
         }
@@ -58,6 +59,7 @@ class DiscoveryManager(
                     return@withContext ResolvedEndpoint(url, ConnectionMode.REVOKED)
                 }
                 if (res.isOnline && res.isRecursosServer) {
+                    securePreferences.isCertRevoked = false
                     securePreferences.savedHost = extractHostFromUrl(url)
                     return@withContext ResolvedEndpoint(url, ConnectionMode.CONNECTED_LAN)
                 }
@@ -83,6 +85,7 @@ class DiscoveryManager(
                         securePreferences.isCertRevoked = true
                         return@withContext ResolvedEndpoint(foundUrl, ConnectionMode.REVOKED)
                     }
+                    securePreferences.isCertRevoked = false
                     securePreferences.savedHost = extractHostFromUrl(foundUrl)
                     return@withContext ResolvedEndpoint(foundUrl, ConnectionMode.CONNECTED_LAN)
                 }
@@ -91,7 +94,7 @@ class DiscoveryManager(
 
         // 3. Conmutación a WAN exterior (Caddy proxy / DDNS detectado) con token firmado
         val wanDomain = securePreferences.wanDomain.trim().trimEnd('/')
-        if (wanDomain.isNotEmpty()) {
+        if (apiService.isValidWanDomain(wanDomain)) {
             val wanCandidate = if (wanDomain.startsWith("http://") || wanDomain.startsWith("https://")) wanDomain else "https://$wanDomain"
             onScanningProgress?.invoke(
                 I18nDictionary.t(apiService.appContext, "native_android.connecting_wan", "Conectando desde fuera de casa de forma segura...")
@@ -101,7 +104,8 @@ class DiscoveryManager(
                 securePreferences.isCertRevoked = true
                 return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.REVOKED)
             }
-            if (wanRes.isOnline) {
+            if (wanRes.isOnline && wanRes.isRecursosServer) {
+                securePreferences.isCertRevoked = false
                 return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.CONNECTED_WAN)
             }
             // 4. Fallback de error con dominio WAN configurado

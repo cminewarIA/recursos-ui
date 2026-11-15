@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -142,6 +143,7 @@ fun CockpitDashboard(
     activeUrl: String,
     scanningMessage: String,
     deviceTelemetryProvider: () -> String,
+    webViewHeadersProvider: () -> Map<String, String> = { emptyMap() },
     onRefresh: () -> Unit
 ) {
     val context = LocalContext.current
@@ -150,6 +152,7 @@ fun CockpitDashboard(
     var canGoBack by remember { mutableStateOf(false) }
     var isPageLoading by remember { mutableStateOf(true) }
     var lastLoadedBaseUrl by remember { mutableStateOf("") }
+    var lastLoadedToken by remember { mutableStateOf("") }
     var refreshFocused by remember { mutableStateOf(false) }
     var revokedBtnFocused by remember { mutableStateOf(false) }
     val isDark = isSystemInDarkTheme()
@@ -189,6 +192,14 @@ fun CockpitDashboard(
         val telemetryJson = deviceTelemetryProvider().ifBlank { "{}" }
         val tvFlag = if (isTvDevice) "true" else "false"
 
+        val modeFlag = when (connectionMode) {
+            ConnectionMode.CONNECTED_WAN -> "WAN"
+            ConnectionMode.CONNECTED_LAN -> "LAN"
+            else -> "UNKNOWN"
+        }
+        val activeUrlEscaped = activeUrl.replace("'", "\\'")
+        val wanDomainEscaped = securePreferences.wanDomain.replace("'", "\\'")
+
         val jsPayload = """
             (function() {
                 window.__RECURSOS_ANDROID_NATIVE__ = true;
@@ -206,12 +217,22 @@ fun CockpitDashboard(
                     window.__RECURSOS_NATIVE_DEVICE_INFO__ = $telemetryJson;
                     window.__RECURSOS_DEVICE_TELEMETRY__ = window.__RECURSOS_NATIVE_DEVICE_INFO__;
                 } catch(e) {}
-                if ('$tokenEscaped') {
-                    try {
+                try {
+                    if ('$tokenEscaped') {
                         localStorage.setItem('recursos_device_token', '$tokenEscaped');
                         localStorage.setItem('sysmon_device_token', '$tokenEscaped');
-                    } catch(e) {}
-                }
+                    }
+                    var _prev = {};
+                    try { _prev = JSON.parse(localStorage.getItem('recursos_auth_persistence_config') || '{}') || {}; } catch(_) {}
+                    var _merged = Object.assign({}, _prev, {
+                        token: '$tokenEscaped' || _prev.token || '',
+                        wanDomain: '$wanDomainEscaped' || _prev.wanDomain || '',
+                        origin: '$activeUrlEscaped' || _prev.origin || '',
+                        mode: '$modeFlag',
+                        updatedAt: new Date().toISOString()
+                    });
+                    localStorage.setItem('recursos_auth_persistence_config', JSON.stringify(_merged));
+                } catch(e) {}
                 if (typeof window.injectNativeSession === 'function') {
                     window.injectNativeSession('$tokenEscaped', window.__RECURSOS_DEVICE_TELEMETRY__);
                 }
@@ -223,14 +244,52 @@ fun CockpitDashboard(
         }
     }
 
+    fun syncWebViewAuthCookie(targetUrl: String, wv: WebView? = webViewRef) {
+        val token = securePreferences.deviceToken.trim()
+        if (targetUrl.isEmpty() || token.isEmpty()) return
+        try {
+            val cookieManager = CookieManager.getInstance()
+            cookieManager.setAcceptCookie(true)
+            if (wv != null) {
+                cookieManager.setAcceptThirdPartyCookies(wv, true)
+            }
+            val isHttps = targetUrl.startsWith("https://", ignoreCase = true)
+            val secureAttr = if (isHttps) "; Secure" else ""
+            cookieManager.setCookie(
+                targetUrl,
+                "_sysmon_trust=$token; Path=/; Max-Age=31536000; SameSite=Lax$secureAttr"
+            )
+            cookieManager.flush()
+        } catch (_: Exception) {}
+    }
+
+    fun reloadWithAuthHeaders(wv: WebView?) {
+        val targetWv = wv ?: return
+        if (activeUrl.isNotEmpty()) {
+            syncWebViewAuthCookie(activeUrl, targetWv)
+            lastLoadedBaseUrl = activeUrl
+            lastLoadedToken = securePreferences.deviceToken.trim()
+            isPageLoading = true
+            targetWv.loadUrl(activeUrl, webViewHeadersProvider())
+        } else {
+            targetWv.reload()
+        }
+    }
+
     LaunchedEffect(activeUrl, connectionMode, securePreferences.deviceToken) {
         val wv = webViewRef ?: return@LaunchedEffect
-        if (activeUrl.isNotEmpty() && activeUrl != lastLoadedBaseUrl) {
-            lastLoadedBaseUrl = activeUrl
-            isPageLoading = true
-            wv.loadUrl(activeUrl)
-        } else {
-            injectNativeContext(wv)
+        val currentToken = securePreferences.deviceToken.trim()
+        if (activeUrl.isNotEmpty()) {
+            syncWebViewAuthCookie(activeUrl, wv)
+            val needsReloadWithToken = lastLoadedToken.isEmpty() && currentToken.isNotEmpty()
+            if (activeUrl != lastLoadedBaseUrl || needsReloadWithToken) {
+                lastLoadedBaseUrl = activeUrl
+                lastLoadedToken = currentToken
+                isPageLoading = true
+                wv.loadUrl(activeUrl, webViewHeadersProvider())
+            } else {
+                injectNativeContext(wv)
+            }
         }
     }
 
@@ -340,7 +399,7 @@ fun CockpitDashboard(
                         IconButton(
                             onClick = {
                                 onRefresh()
-                                webViewRef?.reload()
+                                reloadWithAuthHeaders(webViewRef)
                             },
                             modifier = Modifier
                                 .size(if (isTvDevice) 38.dp else 34.dp)
@@ -423,7 +482,7 @@ fun CockpitDashboard(
                             if (event.action == KeyEvent.ACTION_DOWN) {
                                 if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
                                     onRefresh()
-                                    (view as? WebView)?.reload()
+                                    reloadWithAuthHeaders(view as? WebView)
                                     return@setOnKeyListener true
                                 }
                             }
@@ -462,8 +521,10 @@ fun CockpitDashboard(
 
                         webViewRef = this
                         if (activeUrl.isNotEmpty()) {
+                            syncWebViewAuthCookie(activeUrl, this)
                             lastLoadedBaseUrl = activeUrl
-                            loadUrl(activeUrl)
+                            lastLoadedToken = securePreferences.deviceToken.trim()
+                            loadUrl(activeUrl, webViewHeadersProvider())
                         }
                     }
                 },
