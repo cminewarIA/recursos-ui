@@ -196,7 +196,12 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         if (r.ok && r.data) setDuckDns(r.data);
       });
       void apiFetchJson<{ logs?: string[] }>('/api/dns/logs').then((r) => {
-        if (r.ok && r.data?.logs) setDuckLogs(r.data.logs);
+        if (r.ok && Array.isArray(r.data?.logs)) {
+          const cleanLogs = r.data.logs
+            .map((line) => String(line || '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+/g, '').trim())
+            .filter(Boolean);
+          setDuckLogs(cleanLogs);
+        }
       });
     }
   }, [subTab]);
@@ -504,13 +509,27 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
     mapContainerEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     const targetLat = entry?.lat ?? conn.lat;
     const targetLng = entry?.lng ?? conn.lng;
-    if (typeof targetLat === 'number' && typeof targetLng === 'number') {
-      map.flyTo([targetLat, targetLng], Math.max(map.getZoom(), 6), { duration: 0.45 });
-    }
-    if (entry?.hitMarker) {
-      window.setTimeout(() => {
+    const openTargetPopup = () => {
+      const latest = markerRegistryRef.current.get(key);
+      if (latest?.hitMarker) {
+        latest.hitMarker.openPopup();
+      } else if (entry?.hitMarker) {
         entry.hitMarker.openPopup();
-      }, 220);
+      }
+    };
+    if (typeof targetLat === 'number' && typeof targetLng === 'number') {
+      let opened = false;
+      const fireOnce = () => {
+        if (opened) return;
+        opened = true;
+        window.clearTimeout(fallbackTimer);
+        openTargetPopup();
+      };
+      const fallbackTimer = window.setTimeout(fireOnce, 520);
+      map.once('moveend', fireOnce);
+      map.flyTo([targetLat, targetLng], Math.max(map.getZoom(), 6), { duration: 0.45 });
+    } else {
+      openTargetPopup();
     }
   };
 

@@ -240,10 +240,15 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
       id: 'video',
       title: t('hardware.gpu.graph_video_title'),
       subtitle: t('hardware.gpu.graph_video_sub', {
-        enc: gpu?.encoder_util_percent ?? '--',
-        dec: gpu?.decoder_util_percent ?? '--',
+        enc: hasEncoder ? (gpu?.encoder_util_percent ?? '--') : '--',
+        dec: hasDecoder ? (gpu?.decoder_util_percent ?? '--') : '--',
       }),
-      headline: `${gpu?.encoder_util_percent ?? 0}% / ${gpu?.decoder_util_percent ?? 0}%`,
+      headline:
+        hasEncoder && hasDecoder
+          ? `${formatPct(gpu?.encoder_util_percent ?? 0)} / ${formatPct(gpu?.decoder_util_percent ?? 0)}`
+          : hasEncoder
+          ? formatPct(gpu?.encoder_util_percent ?? 0)
+          : formatPct(gpu?.decoder_util_percent ?? 0),
       available: hasVideo && videoSeriesList.length > 0,
       leftUnit: '%',
       maxLeft: 100,
@@ -406,7 +411,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
       ? list.filter((p) => p.name.toLowerCase().includes(q) || String(p.user || '').toLowerCase().includes(q))
       : list;
     filtered.sort((a, b) => {
-      if (procSort === 'mem') return Number(b.priv_mb || b.mem_mb || 0) - Number(a.priv_mb || a.mem_mb || 0);
+      if (procSort === 'mem') return Number(b.priv_mb ?? b.mem_mb ?? 0) - Number(a.priv_mb ?? a.mem_mb ?? 0);
       if (procSort === 'vram') return Number(b.vram_mb || 0) - Number(a.vram_mb || 0);
       if (procSort === 'io') return Number(b.io_total_bps || 0) - Number(a.io_total_bps || 0);
       return Number(b.cpu_percent || 0) - Number(a.cpu_percent || 0);
@@ -1166,10 +1171,10 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                         {formatPct(proc.cpu_norm_percent ?? proc.cpu_percent)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
-                        {Math.round(proc.priv_mb ?? proc.mem_mb ?? 0)} MB
+                        {formatBytes(Number(proc.priv_mb ?? proc.mem_mb ?? 0) * 1024 * 1024)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400">
-                        {proc.vram_mb ? `${Math.round(proc.vram_mb)} MB` : '--'}
+                        {proc.vram_mb ? formatBytes(Number(proc.vram_mb) * 1024 * 1024) : '--'}
                       </td>
                       <td className="py-2.5 pl-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400">
                         {proc.io_total_bps

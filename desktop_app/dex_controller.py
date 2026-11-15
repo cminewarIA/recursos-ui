@@ -300,6 +300,24 @@ class DexController:
             cmd_candidates.append(base_cmd + ["-m", "1920", "--video-bit-rate=16M"])
             cmd_candidates.append(["scrcpy", "-s", target_id, f"--window-title=Recursos — {mode_label}"])
 
+            def _drain_pipe(pipe, tail_lines):
+                if pipe is None:
+                    return
+                try:
+                    for raw_line in iter(pipe.readline, ""):
+                        clean_l = raw_line.strip()
+                        if clean_l:
+                            tail_lines.append(clean_l)
+                            if len(tail_lines) > 10:
+                                del tail_lines[0]
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        pipe.close()
+                    except Exception:
+                        pass
+
             for attempt_idx, cmd in enumerate(cmd_candidates):
                 try:
                     proc = subprocess.Popen(
@@ -307,7 +325,11 @@ class DexController:
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
+                        bufsize=1,
                     )
+                    err_tail = []
+                    threading.Thread(target=_drain_pipe, args=(proc.stdout, []), daemon=True).start()
+                    threading.Thread(target=_drain_pipe, args=(proc.stderr, err_tail), daemon=True).start()
                     with self._lock:
                         self.scrcpy_proc = proc
                         self.active_device = target_id
@@ -320,6 +342,8 @@ class DexController:
                         )
                         proc.wait()
                         break
+                    if attempt_idx == len(cmd_candidates) - 1 and err_tail:
+                        self._emit_status(f"scrcpy finalizó: {err_tail[-1]}", "error")
                 except Exception as exc:
                     if attempt_idx == len(cmd_candidates) - 1:
                         self._emit_status(f"Error al iniciar proyección USB: {exc}", "error")

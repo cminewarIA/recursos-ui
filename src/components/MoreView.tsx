@@ -177,8 +177,8 @@ export const MoreView: React.FC<MoreViewProps> = ({
   };
 
   useEffect(() => {
-    if (metrics?.version_info && !versionInfo) setVersionInfo(metrics.version_info);
-  }, [metrics?.version_info, versionInfo]);
+    if (metrics?.version_info) setVersionInfo(metrics.version_info);
+  }, [metrics?.version_info]);
 
   useEffect(() => {
     if (subTab === 'updates') {

@@ -377,18 +377,27 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
               </div>
             ) : emby?.recent_media && emby.recent_media.length > 0 ? (
               <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
-                {emby.recent_media.slice(0, 6).map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between gap-2 py-2.5 text-xs">
-                    <span className="truncate font-medium text-slate-900 dark:text-white">
-                      {item.series ? `${item.series} — ${item.name}` : item.name}
-                    </span>
-                    {item.type && (
-                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {item.type ? t(`hardware.media.emby_type.${item.type}`, undefined, item.type) : ''}
+                {emby.recent_media.slice(0, 6).map((item, idx) => {
+                  const rawTitle = (item.title || item.name || '').trim();
+                  const rawSeries = (item.series_name || item.series || '').trim();
+                  const displayTitle =
+                    rawSeries && rawTitle && !rawTitle.toLowerCase().includes(rawSeries.toLowerCase())
+                      ? `${rawSeries} — ${rawTitle}`
+                      : rawTitle || rawSeries || '--';
+                  const typeKey = item.type ? item.type.trim().toLowerCase() : '';
+                  return (
+                    <div key={item.id ?? idx} className="flex items-center justify-between gap-2 py-2.5 text-xs">
+                      <span className="truncate font-medium text-slate-900 dark:text-white">
+                        {displayTitle}
                       </span>
-                    )}
-                  </div>
-                ))}
+                      {item.type && (
+                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {t(`hardware.media.emby_type.${typeKey}`, undefined, t(`hardware.media.emby_type.${item.type}`, undefined, item.type))}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">

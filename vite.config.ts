@@ -7,14 +7,19 @@ import http from 'http';
 import nodeNet from 'net';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { defineConfig, Plugin } from 'vite';
+
+const ROOT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 // Real-time OS Telemetry state for Vite preview server (100% real system calls, zero fake specs)
 let prevCpuTimes: { idle: number; total: number }[] = [];
 let prevNetStats: Record<string, { rx: number; tx: number; ts: number }> = {};
 let prevDiskIo: { readSectors: number; writeSectors: number; ts: number } | null = null;
 const nicHistory2h: Record<string, { t: number; rx: number; tx: number }[]> = {};
-const nicHistoryFilePath = path.resolve(__dirname, 'nic_history_2h.json');
+let devLogsAckTs = 0;
+let devLogsAckTimeStr = '';
+const nicHistoryFilePath = path.resolve(ROOT_DIR, 'nic_history_2h.json');
 let lastNicHistorySaveMs = 0;
 
 function loadNicHistory2hFromDisk() {
@@ -61,7 +66,7 @@ function saveNicHistory2hToDiskIfNeeded(nowMs: number) {
 }
 
 loadNicHistory2hFromDisk();
-const telemetryHistoryDevPath = path.resolve(__dirname, 'telemetry_history_dev.json');
+const telemetryHistoryDevPath = path.resolve(ROOT_DIR, 'telemetry_history_dev.json');
 interface TelemetryHistoryRow {
   ts: number;
   time_str: string;
@@ -192,7 +197,7 @@ syncHistoryBufferDev();
 
 function readAppVersion(): string {
   try {
-    return fs.readFileSync(path.resolve(__dirname, 'VERSION'), 'utf-8').trim() || '0.0.0';
+    return fs.readFileSync(path.resolve(ROOT_DIR, 'VERSION'), 'utf-8').trim() || '0.0.0';
   } catch {
     return '0.0.0';
   }
@@ -263,7 +268,7 @@ function parseViteCsvRows(text: string, delimiter: string): string[][] {
 }
 
 function loadViteDictionary(): ParsedViteDict {
-  const dictPath = path.resolve(__dirname, 'i18n/dictionary.csv');
+  const dictPath = path.resolve(ROOT_DIR, 'i18n/dictionary.csv');
   try {
     const stat = fs.statSync(dictPath);
     if (viteDictCache && viteDictCache.mtime === stat.mtimeMs) {
@@ -607,7 +612,7 @@ interface GeoIpRecord {
   ts: number;
 }
 
-const GEOIP_DISK_CACHE_PATH = path.resolve(__dirname, 'geoip_cache.json');
+const GEOIP_DISK_CACHE_PATH = path.resolve(ROOT_DIR, 'geoip_cache.json');
 const GEOIP_TTL_MS = 7 * 86400 * 1000; // 7 days TTL
 const GEOIP_NEG_TTL_MS = 15 * 60 * 1000; // 15 min negative cache cooldown
 const GEOIP_MAX_ENTRIES = 2000;
@@ -1881,7 +1886,7 @@ function getInstalledDebVersion(): string {
 }
 
 function hasGitRepo(): boolean {
-  return fs.existsSync(path.resolve(__dirname, '.git'));
+  return fs.existsSync(path.resolve(ROOT_DIR, '.git'));
 }
 
 function getRecentCommitsCached(localSha: string): Array<{ sha: string; message: string; date: string; is_local_head?: boolean }> {
@@ -1919,7 +1924,7 @@ function triggerViteAutoBuildAndInstallAsync(targetVer: string, doGitPull = fals
   return new Promise((resolve) => {
     const runStep = (cmd: string, timeoutMs = 45000): Promise<{ ok: boolean; out: string }> =>
       new Promise((res) => {
-        exec(cmd, { cwd: __dirname, timeout: timeoutMs }, (err, stdout, stderr) => {
+        exec(cmd, { cwd: ROOT_DIR, timeout: timeoutMs }, (err, stdout, stderr) => {
           const combined = `${stdout || ''}\n${stderr || ''}`.trim();
           res({ ok: !err, out: combined });
         });
@@ -1942,8 +1947,8 @@ function triggerViteAutoBuildAndInstallAsync(targetVer: string, doGitPull = fals
         const ver = readAppVersion() || targetVer;
         const dispVer = getDisplayVersion(ver);
         const debRel = `dist/recursos-cockpit_${ver}_amd64.deb`;
-        const debAbs = path.resolve(__dirname, debRel);
-        const buildScript = path.resolve(__dirname, 'packaging/build_deb.sh');
+        const debAbs = path.resolve(ROOT_DIR, debRel);
+        const buildScript = path.resolve(ROOT_DIR, 'packaging/build_deb.sh');
 
         if (!fs.existsSync(debAbs) && fs.existsSync(buildScript)) {
           const bRes = await runStep(`bash "${buildScript}"`, 60000);
@@ -2069,7 +2074,7 @@ function getRealVersionPayload(hostHeader: string) {
   };
 }
 
-const CUSTOM_LOGOS_PATH = path.resolve(__dirname, 'custom_logos.json');
+const CUSTOM_LOGOS_PATH = path.resolve(ROOT_DIR, 'custom_logos.json');
 
 const BRAND_CATALOG: Record<string, { label: string; domain: string; logo: string }> = {
   ubuntu: { label: 'Ubuntu Linux', domain: 'ubuntu.com', logo: 'https://cdn.simpleicons.org/ubuntu/E95420' },
@@ -2149,8 +2154,8 @@ function realOsTelemetryMiddleware(): Plugin {
         }
 
         if (url === '/manual' || url === '/manual.html' || url === '/readme') {
-          const manualPath = path.resolve(__dirname, 'static', 'manual.html');
-          const fallbackDocsPath = path.resolve(__dirname, 'docs', 'index.html');
+          const manualPath = path.resolve(ROOT_DIR, 'static', 'manual.html');
+          const fallbackDocsPath = path.resolve(ROOT_DIR, 'docs', 'index.html');
           const chosen = fs.existsSync(manualPath) ? manualPath : fallbackDocsPath;
           if (fs.existsSync(chosen)) {
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -2537,7 +2542,13 @@ function realOsTelemetryMiddleware(): Plugin {
             },
             version_info: ver,
             system_errors_summary: {
+              total: geoIpErrorHistory.length,
               total_errors: geoIpErrorHistory.length,
+              log_errors_count: geoIpErrorHistory.length,
+              failed_units_count: 0,
+              failed_units: [],
+              ack_ts: devLogsAckTs,
+              ack_time_str: devLogsAckTimeStr,
               counts_by_category: {
                 all: geoIpErrorHistory.length,
                 total: geoIpErrorHistory.length,
@@ -2659,7 +2670,7 @@ function realOsTelemetryMiddleware(): Plugin {
 
         const isViteModuleImport = /(?:^|&)(?:raw|import|url|inline)(?:=|&|$)/.test(queryStr || '');
         if (url === '/i18n/dictionary.csv' && !isViteModuleImport) {
-          const csvFile = path.resolve(__dirname, 'i18n/dictionary.csv');
+          const csvFile = path.resolve(ROOT_DIR, 'i18n/dictionary.csv');
           res.setHeader('Content-Type', 'text/csv; charset=utf-8');
           res.setHeader('Cache-Control', 'no-cache');
           res.end(fs.existsSync(csvFile) ? fs.readFileSync(csvFile) : 'key,context,es\n');
@@ -2677,6 +2688,7 @@ function realOsTelemetryMiddleware(): Plugin {
             id: err.id || `err_${idx}`,
             timestamp: err.ts,
             date_str: err.time_str,
+            time_str: err.time_str,
             category: 'network',
             level: 'ERROR',
             unit: err.source || 'GeoIP',
@@ -2689,7 +2701,13 @@ function realOsTelemetryMiddleware(): Plugin {
               ok: true,
               logs,
               entries: logs,
+              total: logs.length,
               total_errors: logs.length,
+              log_errors_count: logs.length,
+              failed_units_count: 0,
+              failed_units: [],
+              ack_ts: devLogsAckTs,
+              ack_time_str: devLogsAckTimeStr,
               counts_by_category: {
                 all: logs.length,
                 total: logs.length,
@@ -2710,18 +2728,25 @@ function realOsTelemetryMiddleware(): Plugin {
           (req.method === 'POST' || req.method === 'DELETE')
         ) {
           clearGeoIpWorkerErrors();
+          devLogsAckTs = Date.now() / 1000;
+          devLogsAckTimeStr = new Date().toLocaleTimeString('es-ES', { hour12: false });
           res.setHeader('Content-Type', 'application/json');
           res.end(
             JSON.stringify({
               ok: true,
               success: true,
               cleared: true,
+              message: translateViteDict('errors.system_logs_acked'),
+              ack_ts: devLogsAckTs,
+              ack_time_str: devLogsAckTimeStr,
               system_errors_summary: {
                 total: 0,
                 total_errors: 0,
                 log_errors_count: 0,
                 failed_units_count: 0,
                 failed_units: [],
+                ack_ts: devLogsAckTs,
+                ack_time_str: devLogsAckTimeStr,
               },
             })
           );
@@ -2805,7 +2830,7 @@ function realOsTelemetryMiddleware(): Plugin {
 
         if (url?.startsWith('/download/recursos-cockpit') || url === '/download/app.deb' || url === '/download/app.apk') {
           const isApk = url.endsWith('.apk');
-          const distDir = path.resolve(__dirname, 'dist');
+          const distDir = path.resolve(ROOT_DIR, 'dist');
           const curVer = readAppVersion();
           const localTarget = isApk
             ? path.join(distDir, `recursos-cockpit_${curVer}.apk`)
@@ -3360,9 +3385,9 @@ function emitStandaloneStaticHtmlPlugin(): Plugin {
     name: 'emit-standalone-static-html',
     apply: 'build',
     closeBundle() {
-      const distDir = path.resolve(__dirname, 'dist');
+      const distDir = path.resolve(ROOT_DIR, 'dist');
       const distHtmlPath = path.join(distDir, 'index.html');
-      const staticOutPath = path.resolve(__dirname, 'static', 'index.html');
+      const staticOutPath = path.resolve(ROOT_DIR, 'static', 'index.html');
       if (!fs.existsSync(distHtmlPath)) return;
       let html = fs.readFileSync(distHtmlPath, 'utf-8');
 
@@ -3403,7 +3428,7 @@ export default defineConfig(() => {
     plugins: [realOsTelemetryMiddleware(), react(), tailwindcss(), emitStandaloneStaticHtmlPlugin()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(ROOT_DIR, '.'),
       },
     },
     server: {

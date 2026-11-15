@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Cpu, HardDrive, ListChecks, MemoryStick, Monitor, Network } from 'lucide-react';
 import { MetricsPayload } from '../types/telemetry';
 import { formatBytes, formatPct, formatSpeed } from '../utils/formatters';
-import { useI18n } from '../i18n';
+import { formatGpuProcessName, useI18n } from '../i18n';
 
 export type ResourceProcessKind = 'cpu' | 'ram' | 'gpu' | 'storage' | 'net';
 
@@ -31,7 +31,7 @@ export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
   compact = false,
   onViewAllProcesses,
 }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [expandedList, setExpandedList] = useState(false);
 
   const defaultLimit = compact ? 8 : 10;
@@ -115,7 +115,7 @@ export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
         const gpuUtil = gp.gpu_util_percent !== undefined ? gp.gpu_util_percent : null;
         const primaryPct = gpuUtil !== null && gpuUtil !== undefined ? Number(gpuUtil) : vramPct;
         const vramFormatted = formatBytes(vramMb * 1024 * 1024);
-        const displayName = gp.name_key ? t(`hardware.gpu.proc.${gp.name_key}`, undefined) || gp.name || '' : gp.name || '';
+        const displayName = formatGpuProcessName(gp, locale);
         const pctLabel =
           gpuUtil !== null && gpuUtil !== undefined
             ? `${formatPct(gpuUtil)} · ${formatPct(vramPct)} VRAM`

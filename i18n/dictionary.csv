@@ -175,10 +175,14 @@ hardware.net.band.wifi_5ghz,Lecturas y etiquetas de hardware,Wi-Fi 5 GHz
 hardware.net.band.wifi_24ghz,Lecturas y etiquetas de hardware,2.4 GHz
 hardware.net.band.wifi_6ghz,Lecturas y etiquetas de hardware,Wi-Fi 6 GHz
 hardware.net.band.wifi_offline,Lecturas y etiquetas de hardware,Wi-Fi (Offline)
+hardware.net.band.ethernet_local,Lecturas y etiquetas de hardware,Ethernet Local
+hardware.net.band.gateway_uplink,Lecturas y etiquetas de hardware,Gateway Uplink
+hardware.net.band.cable_mbps,Lecturas y etiquetas de hardware,Cable ({mbps} Mbps)
 hardware.net.device.gateway,Lecturas y etiquetas de hardware,Gateway
 hardware.net.device.server_node,Lecturas y etiquetas de hardware,Servidor
 hardware.net.device.lan_device,Lecturas y etiquetas de hardware,Dispositivo LAN
 hardware.net.device.generic,Lecturas y etiquetas de hardware,Dispositivo
+hardware.net.device.this_server,Lecturas y etiquetas de hardware,Este Servidor
 hardware.net.geo.internal_gateway,Lecturas y etiquetas de hardware,Enlace Red Interna / Gateway
 hardware.net.geo.resolving_geoip,Lecturas y etiquetas de hardware,Resolviendo GeoIP...
 hardware.net.geo.unknown_ip,Lecturas y etiquetas de hardware,Desconocida
@@ -212,6 +216,10 @@ hardware.media.emby_type.Movie,Lecturas y etiquetas de hardware,Película
 hardware.media.emby_type.Episode,Lecturas y etiquetas de hardware,Episodio
 hardware.media.emby_type.Series,Lecturas y etiquetas de hardware,Serie
 hardware.media.emby_type.Audio,Lecturas y etiquetas de hardware,Audio
+hardware.media.emby_type.movie,Lecturas y etiquetas de hardware,Película
+hardware.media.emby_type.episode,Lecturas y etiquetas de hardware,Episodio
+hardware.media.emby_type.series,Lecturas y etiquetas de hardware,Serie
+hardware.media.emby_type.audio,Lecturas y etiquetas de hardware,Audio
 hardware.media.emby_state.paused,Lecturas y etiquetas de hardware,En pausa
 hardware.media.emby_state.playing,Lecturas y etiquetas de hardware,Viendo ahora
 hardware.telemetry.no_sensor,Lecturas y etiquetas de hardware,Sin sensor

@@ -7875,7 +7875,8 @@ def get_duckdns_status():
     if os.path.isfile(log_file):
         try:
             with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
-                lines = [l.strip() for l in f if l.strip()]
+                lines = [re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+', '', l).strip() for l in f]
+                lines = [l for l in lines if l]
                 if lines:
                     last_log_line = lines[-1]
                     m_ts = re.search(r'\[(.*?)\]', last_log_line)
@@ -7921,7 +7922,8 @@ def get_duckdns_logs(limit=60):
         return []
     try:
         with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
-            lines = [l.strip() for l in f if l.strip()]
+            lines = [re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+', '', l).strip() for l in f]
+            lines = [l for l in lines if l]
             return lines[-limit:]
     except Exception as e:
         return [f"Error leyendo log: {e}"]
@@ -8314,6 +8316,8 @@ def fetch_wifi_worker():
                     cable_clients.append({
                         "conn_type": "cable",
                         "band": f"Cable ({link_mbps} Mbps)" if link_mbps else "Ethernet Local",
+                        "band_key": "cable_mbps" if link_mbps else "ethernet_local",
+                        "band_params": {"mbps": link_mbps} if link_mbps else None,
                         "iface": if_name,
                         "mac": mac_addr or f"IFACE:{if_name.upper()}",
                         "ip": ipv4_addr,
@@ -8323,6 +8327,7 @@ def fetch_wifi_worker():
                         "brand": "linux",
                         "brand_name": "Este Servidor",
                         "vendor": "Este Servidor",
+                        "vendor_key": "this_server",
                         "status": "online",
                         "online": True,
                         "is_online": True,
@@ -8346,6 +8351,7 @@ def fetch_wifi_worker():
                     cable_clients.append({
                         "conn_type": "cable",
                         "band": "Gateway Uplink",
+                        "band_key": "gateway_uplink",
                         "iface": "WAN / LAN",
                         "mac": gw_mac or f"GW:{gw_ip}",
                         "ip": gw_ip,
@@ -8355,6 +8361,7 @@ def fetch_wifi_worker():
                         "brand": gw_meta.get("brand", "generic"),
                         "brand_name": gw_meta.get("brand_name", "Gateway"),
                         "vendor": gw_meta.get("brand_name", "Gateway"),
+                        "vendor_key": "gateway" if gw_meta.get("brand_name", "Gateway") == "Gateway" else None,
                         "status": "online",
                         "online": True,
                         "is_online": True,

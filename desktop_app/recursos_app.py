@@ -2355,7 +2355,13 @@ class LocalHtmlBridgeServer:
                                 "ok": True,
                                 "logs": [],
                                 "entries": [],
+                                "total": 0,
                                 "total_errors": 0,
+                                "log_errors_count": 0,
+                                "failed_units_count": 0,
+                                "failed_units": [],
+                                "ack_ts": 0,
+                                "ack_time_str": "",
                                 "counts_by_category": {
                                     "all": 0,
                                     "total": 0,
@@ -2469,7 +2475,19 @@ class LocalHtmlBridgeServer:
                     return
 
                 if clean_path in ("/api/system/logs/clear", "/api/system/logs/ack"):
-                    self._send_json({"ok": True, "success": True})
+                    self._send_json(
+                        {
+                            "ok": True,
+                            "success": True,
+                            "system_errors_summary": {
+                                "total": 0,
+                                "total_errors": 0,
+                                "log_errors_count": 0,
+                                "failed_units_count": 0,
+                                "failed_units": [],
+                            },
+                        }
+                    )
                     return
 
                 self._send_json({"ok": False, "error": "Modo sin conexión al servidor remoto"}, 503)
@@ -2626,6 +2644,21 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         if hasattr(self, "btn_back_home"):
             self.btn_back_home.set_visible(True)
         return False
+
+    def _on_webview_create(self, _webview, navigation_action):
+        """Open target=_blank / external links safely in system browser without leaving the cockpit blank."""
+        try:
+            req = navigation_action.get_request() if navigation_action else None
+            uri = req.get_uri() if req else ""
+            if uri and (uri.startswith("http://") or uri.startswith("https://")):
+                subprocess.Popen(
+                    ["xdg-open", uri],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+        except Exception:
+            pass
+        return None
 
     def _on_webview_load_changed(self, _webview, load_event):
         if HAS_WEBKIT2 and WebKit2 is not None and load_event == WebKit2.LoadEvent.FINISHED:
@@ -2944,6 +2977,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
             self._target_webview_uri = target_uri
             self.webview.connect("load-changed", self._on_webview_load_changed)
+            self.webview.connect("create", self._on_webview_create)
             # Carga diferida: no cargar HTML5/animations hasta entrar al panel o --dex (evita consumo CPU en menú inicio)
             if self.start_in_dex:
                 self.webview.load_uri(target_uri)

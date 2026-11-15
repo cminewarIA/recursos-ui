@@ -267,8 +267,12 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       if (m > maxLeftLabelW) maxLeftLabelW = m;
     }
 
+    const resolvedRightUnit = series.find((s) => s.axis === 'right')?.unit ?? '%';
+    const maxRightLabelW = hasRightAxis
+      ? ctx.measureText(`${Math.round(maxRight)}${resolvedRightUnit}`).width
+      : 0;
     const padL = Math.max(leftUnit === '%' ? 34 : 48, Math.ceil(maxLeftLabelW) + 10);
-    const padR = hasRightAxis ? 36 : 12;
+    const padR = hasRightAxis ? Math.max(36, Math.ceil(maxRightLabelW) + 12) : 12;
     const padT = compact ? 9 : 11;
     const padB = compact ? 18 : 20;
     plotBoundsRef.current = { padL, padR, padT, padB };
@@ -306,7 +310,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
         ctx.textAlign = 'left';
         ctx.fillStyle = axisLabelColor;
         const rVal = Math.round(maxRight * (1 - frac));
-        ctx.fillText(`${rVal}%`, padL + plotW + 6, yText);
+        ctx.fillText(`${rVal}${resolvedRightUnit}`, padL + plotW + 6, yText);
       }
     });
 

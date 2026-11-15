@@ -280,6 +280,7 @@ export interface WifiClient {
   interface?: string;
   band?: string;
   band_key?: string;
+  band_params?: Record<string, string | number>;
   rssi?: number | string;
   tx_rate?: string;
   rx_rate?: string;
@@ -409,8 +410,14 @@ export interface EmbySession {
 }
 
 export interface EmbyRecentItem {
-  name: string;
+  id?: number | string;
+  name?: string;
+  title?: string;
   series?: string;
+  series_name?: string;
+  season?: number | null;
+  episode?: number | null;
+  year?: number | null;
   type?: string;
 }
 

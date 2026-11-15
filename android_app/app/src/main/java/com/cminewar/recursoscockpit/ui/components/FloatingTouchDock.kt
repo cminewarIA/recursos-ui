@@ -18,9 +18,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DeveloperBoard
-import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
@@ -57,7 +57,7 @@ enum class CockpitTab(val id: String, val titleKey: String, val title: String, v
     NETWORK("network", "native_android.tab_network", "Red", Icons.Default.Wifi),
     DOCKER("apps", "native_android.tab_docker", "Docker", Icons.Default.Widgets),
     SECURITY("security", "native_android.tab_shield", "Escudo", Icons.Default.Shield),
-    PROCESSES("processes", "native_android.tab_processes", "Procesos", Icons.Default.FormatListBulleted)
+    PROCESSES("processes", "native_android.tab_processes", "Procesos", Icons.AutoMirrored.Filled.FormatListBulleted)
 }
 
 @Composable

@@ -99,11 +99,17 @@ export function formatDiskFstype(disk?: DiskInfo | null, locale: SupportedLocale
 export function formatBandLabel(client?: WifiClient | null, locale: SupportedLocale = activeLocaleRuntime): string {
   if (!client) return '';
   if (client.band_key) {
-    return translateKey(locale, `hardware.net.band.${client.band_key}`, undefined, client.band || '');
+    return translateKey(locale, `hardware.net.band.${client.band_key}`, client.band_params, client.band || '');
   }
   const raw = (client.band || '').trim();
+  const mbpsMatch = raw.match(/^Cable\s*\((\d+)\s*Mbps\)$/i);
+  if (mbpsMatch) {
+    return translateKey(locale, 'hardware.net.band.cable_mbps', { mbps: mbpsMatch[1] }, raw);
+  }
   const map: Record<string, string> = {
     'Cable LAN': 'cable_lan',
+    'Ethernet Local': 'ethernet_local',
+    'Gateway Uplink': 'gateway_uplink',
     'LAN (Offline)': 'lan_offline',
     'Wi-Fi 5 GHz': 'wifi_5ghz',
     '5 GHz': 'wifi_5ghz',
@@ -124,6 +130,7 @@ export function formatClientVendor(client?: WifiClient | null, locale: Supported
   const map: Record<string, string> = {
     Gateway: 'gateway',
     Servidor: 'server_node',
+    'Este Servidor': 'this_server',
     'Dispositivo LAN': 'lan_device',
     Dispositivo: 'generic',
   };
@@ -132,7 +139,7 @@ export function formatClientVendor(client?: WifiClient | null, locale: Supported
 }
 
 export function formatGpuProcessName(
-  proc: { name?: string; name_key?: string } | null | undefined,
+  proc: { name?: string | null; name_key?: string | null } | null | undefined,
   locale: SupportedLocale = activeLocaleRuntime
 ): string {
   if (!proc) return translateKey(locale, 'hardware.gpu.proc.gpu_process');
