@@ -551,7 +551,9 @@ export interface VersionInfo {
   commits_behind?: number;
   recent_commits?: RecentCommitItem[];
   auto_install_enabled?: boolean;
+  auto_install_in_progress?: boolean;
   auto_install_status?: string;
+  last_auto_install?: string;
   last_checked?: string;
   public_domain?: string;
   local_ip?: string;

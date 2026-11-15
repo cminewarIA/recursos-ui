@@ -255,20 +255,40 @@ export function App() {
     });
   }, []);
 
-  // Fetch /api/version on app load, update display version and updateAvailable state
-  useEffect(() => {
-    let cancelled = false;
-    const loadVersionOnStartup = async () => {
-      const res = await apiFetchJson<VersionInfo>('/api/version');
-      if (cancelled || !res.ok || !res.data) return;
-      setVersionInfo(res.data);
-      setUpdateAvailable(isRemoteVersionHigher(res.data));
-    };
-    void loadVersionOnStartup();
-    return () => {
-      cancelled = true;
-    };
+  const handleVersionChange = useCallback((nextVer: VersionInfo) => {
+    setVersionInfo(nextVer);
+    setUpdateAvailable(isRemoteVersionHigher(nextVer));
   }, []);
+
+  // Fetch /api/version on app load & periodically, update display version and updateAvailable state
+  const refreshVersionInfo = useCallback(async () => {
+    const res = await apiFetchJson<VersionInfo>('/api/version');
+    if (res.ok && res.data) {
+      handleVersionChange(res.data);
+    }
+  }, [handleVersionChange]);
+
+  useEffect(() => {
+    void refreshVersionInfo();
+    const timerId = window.setInterval(() => {
+      if (typeof document === 'undefined' || !document.hidden) {
+        void refreshVersionInfo();
+      }
+    }, 300000);
+    return () => window.clearInterval(timerId);
+  }, [refreshVersionInfo]);
+
+  const metricsCurrentVersion = metrics?.version_info?.current_version;
+  useEffect(() => {
+    if (!metricsCurrentVersion) return;
+    if (!versionInfo) {
+      setUpdateAvailable(isRemoteVersionHigher(metrics?.version_info));
+      return;
+    }
+    if (metricsCurrentVersion !== versionInfo.current_version && !versionInfo.ubuntu_native_bridge) {
+      void refreshVersionInfo();
+    }
+  }, [metricsCurrentVersion, metrics?.version_info, versionInfo, refreshVersionInfo]);
 
   // Fetch 24h persistent network traffic history from /api/metrics/history
   const fetchNetworkHistory24h = useCallback(async (showSpinner = false) => {
@@ -675,6 +695,7 @@ export function App() {
                   initialSubTab={subTabHint}
                   navTick={navTick}
                   onRefreshMetrics={() => void fetchMetrics()}
+                  onVersionChange={handleVersionChange}
                   onNotify={notify}
                 />
               )}

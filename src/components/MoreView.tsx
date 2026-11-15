@@ -56,6 +56,7 @@ interface MoreViewProps {
   initialSubTab?: string;
   navTick?: number;
   onRefreshMetrics: () => void;
+  onVersionChange?: (ver: VersionInfo) => void;
   onNotify: (msg: string, isError?: boolean) => void;
 }
 
@@ -66,6 +67,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
   initialSubTab,
   navTick,
   onRefreshMetrics,
+  onVersionChange,
   onNotify,
 }) => {
   const { locale, supportedLocales, localeNames, setLocale, t } = useI18n();
@@ -117,8 +119,11 @@ export const MoreView: React.FC<MoreViewProps> = ({
     setCheckingUpdate(true);
     const res = await apiFetchJson<VersionInfo>(`/api/version${force ? '?refresh=1' : ''}`);
     setCheckingUpdate(false);
-    if (res.ok && res.data) setVersionInfo(res.data);
-  }, []);
+    if (res.ok && res.data) {
+      setVersionInfo(res.data);
+      onVersionChange?.(res.data);
+    }
+  }, [onVersionChange]);
 
   const loadDevices = useCallback(async () => {
     const res = await apiFetchJson<TrustedDevice[]>('/api/auth/devices');
@@ -177,7 +182,31 @@ export const MoreView: React.FC<MoreViewProps> = ({
   };
 
   useEffect(() => {
-    if (metrics?.version_info) setVersionInfo(metrics.version_info);
+    const incoming = metrics?.version_info;
+    if (!incoming) return;
+    setVersionInfo((prev) => {
+      if (!prev) return incoming;
+      if (prev.ubuntu_native_bridge && !incoming.ubuntu_native_bridge) {
+        const nextServerVer = incoming.current_version || prev.server_version;
+        if (nextServerVer && nextServerVer !== prev.server_version) {
+          return {
+            ...prev,
+            server_version: nextServerVer,
+            server_display_version: incoming.display_version || prev.server_display_version,
+          };
+        }
+        return prev;
+      }
+      const nextCommits =
+        Array.isArray(incoming.recent_commits) && incoming.recent_commits.length > 0
+          ? incoming.recent_commits
+          : prev.recent_commits;
+      return {
+        ...prev,
+        ...incoming,
+        recent_commits: nextCommits,
+      };
+    });
   }, [metrics?.version_info]);
 
   useEffect(() => {
@@ -194,27 +223,63 @@ export const MoreView: React.FC<MoreViewProps> = ({
   const activeVer = versionInfo || metrics?.version_info;
   const displayVer = getCanonicalDisplayVersion(activeVer);
   const remoteDisplayVer = activeVer?.remote_display_version || getDisplayVersionString(activeVer?.remote_version);
+  const prevAutoRunningRef = useRef(false);
+
+  useEffect(() => {
+    const running = Boolean(activeVer?.auto_install_in_progress);
+    if (prevAutoRunningRef.current && !running) {
+      onRefreshMetrics();
+      void loadVersion(false);
+    }
+    prevAutoRunningRef.current = running;
+
+    if (subTab !== 'updates' || !running) return;
+    const pollId = window.setInterval(() => {
+      void loadVersion(false);
+    }, 2500);
+    return () => window.clearInterval(pollId);
+  }, [subTab, activeVer?.auto_install_in_progress, loadVersion, onRefreshMetrics]);
 
   const handleApplyUpdate = async () => {
     setInstallingUpdate(true);
     const res = await apiFetchJson<{
       success?: boolean;
+      already_running?: boolean;
       deb_installed?: boolean;
       web_synced?: boolean;
+      code_updated?: boolean;
+      restarting?: boolean;
+      relaunching?: boolean;
       message?: string;
       output?: string;
       version_info?: VersionInfo;
     }>('/api/system/update', { method: 'POST' });
     setInstallingUpdate(false);
     if (res.data?.output) setUpdateOutput(res.data.output);
-    if (res.data?.version_info) setVersionInfo(res.data.version_info);
+    if (res.data?.version_info) {
+      setVersionInfo(res.data.version_info);
+      onVersionChange?.(res.data.version_info);
+    }
+    if (res.data?.already_running) {
+      onNotify(res.data?.message || t('more.auto_in_progress'));
+      void loadVersion(false);
+      return;
+    }
+    if (!res.ok || res.data?.success === false || res.data?.deb_installed === false) {
+      if (res.data?.output) setShowTechUpdate(true);
+    }
     if (res.ok && res.data?.success !== false) {
       onNotify(res.data?.message || t('more.update_checked_ok'));
       onRefreshMetrics();
-      if (res.data?.web_synced) {
+      if (res.data?.relaunching) {
+        onNotify(res.data?.message || t('more.update_restarting'));
+      } else if (res.data?.restarting || res.data?.web_synced) {
+        const delayMs = res.data?.restarting ? 2500 : 900;
         setTimeout(() => {
           window.location.reload();
-        }, 900);
+        }, delayMs);
+      } else {
+        void loadVersion(false);
       }
     } else {
       onNotify(res.error || res.data?.message || t('more.update_failed'), true);
@@ -223,22 +288,44 @@ export const MoreView: React.FC<MoreViewProps> = ({
 
   const handleToggleAutoUpdate = async () => {
     const next = !(activeVer?.auto_install_enabled ?? true);
-    const res = await apiFetchJson<{ auto_install_enabled?: boolean; status?: string }>('/api/system/auto-update', {
+    const res = await apiFetchJson<{
+      auto_install_enabled?: boolean;
+      auto_install_in_progress?: boolean;
+      status?: string;
+      version_info?: VersionInfo;
+    }>('/api/system/auto-update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled: next }),
     });
     if (res.ok) {
-      setVersionInfo((prev) =>
-        prev
-          ? {
-              ...prev,
-              auto_install_enabled: res.data?.auto_install_enabled ?? next,
-              auto_install_status: res.data?.status || prev.auto_install_status,
-            }
-          : prev
-      );
+      if (res.data?.version_info) {
+        setVersionInfo(res.data.version_info);
+        onVersionChange?.(res.data.version_info);
+      } else {
+        setVersionInfo((prev) => {
+          if (!prev) return prev;
+          const updated: VersionInfo = {
+            ...prev,
+            auto_install_enabled: res.data?.auto_install_enabled ?? next,
+            auto_install_in_progress: res.data?.auto_install_in_progress ?? prev.auto_install_in_progress,
+            auto_install_status:
+              res.data?.status ||
+              (next ? t('more.auto_enabled_status') : t('more.auto_paused_status')),
+          };
+          onVersionChange?.(updated);
+          return updated;
+        });
+      }
       onNotify(next ? t('more.auto_on_toast') : t('more.auto_off_toast'));
+      if (next) {
+        setTimeout(() => {
+          void loadVersion(false);
+          onRefreshMetrics();
+        }, 1200);
+      }
+    } else {
+      onNotify(res.error || t('more.update_failed'), true);
     }
   };
 
@@ -424,6 +511,12 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold">
                     v{displayVer}
                   </span>
+                  {activeVer?.auto_install_in_progress && (
+                    <span className="cockpit-pill-emerald inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span>{t('more.auto_in_progress')}</span>
+                    </span>
+                  )}
                 </div>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {activeVer?.update_summary
@@ -435,7 +528,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
                         : t('more.up_to_date')}
                 </p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {activeVer?.auto_install_status || t('more.auto_enabled_status')}
+                  {activeVer?.auto_install_status ||
+                    (activeVer?.auto_install_enabled === false
+                      ? t('more.auto_paused_status')
+                      : t('more.auto_enabled_status'))}
                 </p>
 
                 {(activeVer?.ubuntu_native_bridge || activeVer?.app_version || activeVer?.server_version) && (
@@ -518,7 +614,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  disabled={installingUpdate}
+                  disabled={installingUpdate || Boolean(activeVer?.auto_install_in_progress)}
                   onClick={handleApplyUpdate}
                   className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-all disabled:opacity-50 ${
                     activeVer?.effective_update_available || activeVer?.update_available
@@ -528,7 +624,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 >
                   <Download className="h-3.5 w-3.5" />
                   <span>
-                    {installingUpdate
+                    {installingUpdate || activeVer?.auto_install_in_progress
                       ? t('more.updating_btn')
                       : activeVer?.update_action_label || t('more.update_now_btn')}
                   </span>

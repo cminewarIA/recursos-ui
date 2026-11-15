@@ -771,3 +771,8 @@ overview.net_history_24h_samples,"Historial de tráfico de red 24h en App",{coun
 overview.net_history_24h_empty,"Historial de tráfico de red 24h en App",Aún no hay suficientes muestras de tráfico registradas en las últimas 24 horas.
 overview.net_history_24h_error,"Historial de tráfico de red 24h en App",No se pudo cargar el historial de tráfico de las últimas 24 horas.
 overview.net_history_24h_retry,"Historial de tráfico de red 24h en App",Reintentar
+more.auto_paused_status,"Vista Más, ajustes y DeX",Pausado · Actualizaciones automáticas desactivadas
+more.auto_in_progress,"Vista Más, ajustes y DeX",Actualización en curso...
+more.update_restarting,"Vista Más, ajustes y DeX",Actualización aplicada. Reiniciando panel...
+native_ubuntu.auto_perm_pending,App nativa Ubuntu (GTK),Nueva versión v{ver} lista en GitHub (requiere clic para confirmar instalación).
+native_ubuntu.auto_synced_web,App nativa Ubuntu (GTK),Web del servidor sincronizada automáticamente a v{ver}.

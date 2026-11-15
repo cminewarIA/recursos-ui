@@ -4241,6 +4241,16 @@ GITHUB_REPO = "cminewarIA/recursos-ui"
 GITHUB_BRANCH = "main"
 VERSION_CACHE = {"data": None, "timestamp": 0}
 VERSION_LOCK = threading.Lock()
+_GITHUB_COMMITS_CACHE = {
+    "recent_commits": [],
+    "remote_full_sha": "",
+    "remote_sha": "",
+    "remote_msg": "",
+    "remote_date": "",
+    "remote_author": "cminewarIA",
+    "version": "",
+    "timestamp": 0.0,
+}
 _VERSION_REFRESH_IN_FLIGHT = False
 _LOCAL_GIT_SHA_CACHE = None
 DETECTED_DOMAIN_CACHE = None
@@ -4576,11 +4586,18 @@ def load_auto_install_preference():
                     AUTO_INSTALL_STATE["enabled"] = bool(cfg["enabled"])
     except Exception:
         pass
+    if not AUTO_INSTALL_STATE["enabled"]:
+        AUTO_INSTALL_STATE["last_status"] = "Pausado · Actualizaciones automáticas desactivadas"
     return AUTO_INSTALL_STATE["enabled"]
 
 def save_auto_install_preference(enabled):
     with AUTO_INSTALL_LOCK:
         AUTO_INSTALL_STATE["enabled"] = bool(enabled)
+        AUTO_INSTALL_STATE["last_status"] = (
+            "Activo · Vigilancia automática de actualizaciones"
+            if AUTO_INSTALL_STATE["enabled"]
+            else "Pausado · Actualizaciones automáticas desactivadas"
+        )
         try:
             with open(AUTO_INSTALL_CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump({"enabled": bool(enabled), "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}, f)
@@ -4605,10 +4622,10 @@ def get_installed_deb_version():
         pass
     return ""
 
-def ensure_local_deb_built_and_installed(target_version=None):
+def ensure_local_deb_built_and_installed(target_version=None, force_rebuild=False, allow_install=True):
     """
-    Compila el paquete `dist/recursos-cockpit_${VERSION}_amd64.deb` si no existe
-    y lo instala inmediatamente en el sistema operativo al detectarse.
+    Compila el paquete `dist/recursos-cockpit_${VERSION}_amd64.deb` si no existe (o si force_rebuild=True)
+    y lo instala inmediatamente en el sistema operativo cuando corresponde.
     """
     ver = (target_version or get_app_version()).strip()
     deb_rel = os.path.join("dist", f"recursos-cockpit_{ver}_amd64.deb")
@@ -4616,12 +4633,12 @@ def ensure_local_deb_built_and_installed(target_version=None):
     build_script = os.path.join(BASE_DIR, "packaging", "build_deb.sh")
     logs = []
 
-    if not os.path.isfile(deb_abs) and os.path.isfile(build_script):
+    if (force_rebuild or not os.path.isfile(deb_abs)) and os.path.isfile(build_script):
         logs.append(f"[+] Compilando paquete de Ubuntu para v{get_display_version(ver)} ({ver})...")
         try:
             p_build = subprocess.run(
                 ["bash", build_script],
-                cwd=BASE_DIR, capture_output=True, text=True, timeout=120
+                cwd=BASE_DIR, capture_output=True, text=True, timeout=180
             )
             b_out = ((p_build.stdout or "") + "\n" + (p_build.stderr or "")).strip()
             if b_out:
@@ -4630,9 +4647,12 @@ def ensure_local_deb_built_and_installed(target_version=None):
             logs.append(f"[-] Error compilando paquete .deb: {e}")
 
     installed_ver = get_installed_deb_version()
-    if installed_ver and _parse_semver_tuple(installed_ver) >= _parse_semver_tuple(ver) and os.path.isfile("/usr/bin/recursos-cockpit"):
+    if not force_rebuild and installed_ver and _parse_semver_tuple(installed_ver) >= _parse_semver_tuple(ver) and os.path.isfile("/usr/bin/recursos-cockpit"):
         logs.append(f"[✓] Aplicación de escritorio v{get_display_version(installed_ver)} ya instalada y al día.")
         return True, "\n".join(logs)
+
+    if not allow_install:
+        return bool(installed_ver and _parse_semver_tuple(installed_ver) >= _parse_semver_tuple(ver)), "\n".join(logs)
 
     if os.path.isfile(deb_abs):
         logs.append(f"[+] Instalando paquete actualizado: {deb_rel}...")
@@ -4672,13 +4692,15 @@ def ensure_local_deb_built_and_installed(target_version=None):
                 AUTO_INSTALL_STATE["perm_cooldown_until"] = time.time() + 900.0
             logs.append("[!] Se necesitan permisos de administrador (sudo) para instalar el paquete en este equipo. Reintento automático pausado 15 min.")
 
-    return (get_installed_deb_version() == ver), "\n".join(logs)
+    final_inst = get_installed_deb_version()
+    return bool(final_inst and _parse_semver_tuple(final_inst) >= _parse_semver_tuple(ver)), "\n".join(logs)
 
 def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
     """
     Ejecuta la sincronización desde GitHub (`git pull origin main`) cuando procede
     y compila + instala inmediatamente el paquete local `.deb` según se detecta.
     """
+    global _LOCAL_GIT_SHA_CACHE, METRICS_CACHE_BYTES
     if not AUTO_INSTALL_EXEC_LOCK.acquire(blocking=False):
         return {
             "success": True,
@@ -4688,7 +4710,8 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
         }
 
     try:
-        if trigger_source in ("api_request", "manual"):
+        is_manual = trigger_source in ("api_request", "manual")
+        if is_manual:
             with AUTO_INSTALL_LOCK:
                 AUTO_INSTALL_STATE["perm_cooldown_until"] = 0.0
 
@@ -4700,17 +4723,37 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
         out_lines = []
         has_git = os.path.isdir(os.path.join(BASE_DIR, ".git"))
         pull_ok = True
+        code_updated = False
         did_stash = False
 
         if do_git_pull:
             if not has_git:
-                pull_ok = True
-                out_lines.append("Repositorio sin metadatos Git (.git); sincronización remota omitida en este entorno.")
+                remote_ver_no_git = ""
+                try:
+                    raw_ver_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/VERSION"
+                    req_rv = urllib.request.Request(raw_ver_url, headers={"User-Agent": "Recursos-Server-Monitor/12.0"})
+                    with urllib.request.urlopen(req_rv, timeout=3.0) as rv_resp:
+                        if rv_resp.status == 200:
+                            remote_ver_no_git = rv_resp.read().decode("utf-8", errors="ignore").strip().lstrip("vV")
+                except Exception:
+                    pass
+                cur_ver_no_git = get_app_version()
+                if remote_ver_no_git and _parse_semver_tuple(remote_ver_no_git) > _parse_semver_tuple(cur_ver_no_git):
+                    pull_ok = False
+                    out_lines.append(
+                        f"[!] Hay versión nueva en GitHub (v{remote_ver_no_git} > v{cur_ver_no_git}), pero este despliegue no contiene repositorio Git (.git) para ejecutar git pull directo."
+                    )
+                else:
+                    pull_ok = True
+                    out_lines.append("Repositorio sin metadatos Git (.git); sincronización remota omitida en este entorno.")
             else:
                 try:
+                    p_before = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=3)
+                    before_sha = p_before.stdout.strip() if p_before.returncode == 0 else ""
+
                     p_dirty = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=5)
                     is_dirty_tree = bool(p_dirty.returncode == 0 and p_dirty.stdout.strip())
-                    if is_dirty_tree and trigger_source != "manual":
+                    if is_dirty_tree and not is_manual:
                         p_pull = subprocess.CompletedProcess([], 1, "", "Despliegue local modificado; auto-pull omitido.")
                     else:
                         subprocess.run(
@@ -4729,7 +4772,7 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
                                 ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
                                 cwd=BASE_DIR, capture_output=True, text=True, timeout=25
                             )
-                    if p_pull.returncode != 0 and trigger_source == "manual" and not (is_dirty_tree and trigger_source != "manual"):
+                    if p_pull.returncode != 0 and is_manual:
                         # Guardar solo archivos rastreados; las bases de datos (.db) y caches en tiempo real nunca se tocan al actualizar
                         p_st = subprocess.run(["git", "stash", "push", "-m", "auto-updater-backup"], cwd=BASE_DIR, capture_output=True, text=True, timeout=10)
                         did_stash = (p_st.returncode == 0 and "No local changes" not in (p_st.stdout or ""))
@@ -4746,6 +4789,10 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
                             p_pop = subprocess.run(["git", "stash", "pop"], cwd=BASE_DIR, capture_output=True, text=True, timeout=10)
                             if p_pop.returncode != 0:
                                 out_lines.append("[!] Hay cambios locales guardados en git stash (revisa manualmente si hubo conflicto).")
+                    p_after = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=3)
+                    after_sha = p_after.stdout.strip() if p_after.returncode == 0 else ""
+                    code_updated = bool(before_sha and after_sha and before_sha != after_sha)
+
                     pull_out = ((p_pull.stdout or "").strip() + "\n" + (p_pull.stderr or "").strip()).strip()
                     out_lines.append(f"$ git pull origin {GITHUB_BRANCH}\n{pull_out or 'Ya está actualizado.'}")
                     pull_ok = (p_pull.returncode == 0)
@@ -4755,19 +4802,35 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
 
         new_ver = get_app_version()
         in_perm_cooldown = (time.time() < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
-        if in_perm_cooldown and trigger_source not in ("api_request", "manual"):
+        desktop_installed = os.path.isfile("/usr/bin/recursos-cockpit")
+        should_install_deb = bool(desktop_installed or is_manual or trigger_source == "local_package_detected")
+        if in_perm_cooldown and not is_manual:
             deb_ok = False
             deb_log = "Instalación del paquete local en espera (sin permisos sudo)."
         else:
-            deb_ok, deb_log = ensure_local_deb_built_and_installed(new_ver)
+            deb_ok, deb_log = ensure_local_deb_built_and_installed(
+                new_ver,
+                force_rebuild=code_updated,
+                allow_install=should_install_deb,
+            )
         if deb_log:
             out_lines.append(deb_log)
+
+        _LOCAL_GIT_SHA_CACHE = None
+        with VERSION_LOCK:
+            VERSION_CACHE["data"] = None
+            VERSION_CACHE["timestamp"] = 0
+        updated_ver = get_version_info(force_refresh=True, allow_auto_trigger=False)
+        with METRICS_LOCK:
+            if isinstance(METRICS_CACHE, dict):
+                METRICS_CACHE["version_info"] = updated_ver
+            METRICS_CACHE_BYTES = b"{}"
 
         combined_output = "\n".join([line for line in out_lines if line]).strip()
         now_str = datetime.now().strftime("%H:%M:%S")
         disp_ver = get_display_version(new_ver)
 
-        overall_ok = bool(pull_ok and (deb_ok or not do_git_pull))
+        overall_ok = bool(pull_ok and (deb_ok or not should_install_deb or not do_git_pull))
         if not do_git_pull:
             overall_ok = bool(deb_ok)
 
@@ -4782,9 +4845,7 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
             else:
                 AUTO_INSTALL_STATE["last_status"] = f"Revisión con avisos ({now_str})"
 
-        updated_ver = get_version_info(force_refresh=True, allow_auto_trigger=False)
-
-        if do_git_pull and has_git and pull_ok and "Ya está actualizado" not in combined_output and "Already up to date" not in combined_output:
+        if code_updated:
             def delayed_service_restart():
                 time.sleep(1.5)
                 try:
@@ -4796,6 +4857,9 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
         return {
             "success": bool(pull_ok),
             "deb_installed": bool(deb_ok),
+            "code_updated": bool(code_updated),
+            "web_synced": bool(code_updated),
+            "restarting": bool(code_updated),
             "message": f"Comprobación y actualización v{disp_ver} completada." if pull_ok else "No se pudo completar la descarga desde GitHub.",
             "output": combined_output or "Todo está al día.",
             "version_info": updated_ver,
@@ -4810,14 +4874,13 @@ def auto_install_watcher_worker():
     Hilo guardián que supervisa periódicamente si existe una nueva versión en GitHub
     o un paquete local `.deb` pendiente de compilar/instalar y lo instala según se detecta.
     """
-    time.sleep(2.0)
+    time.sleep(4.0)
     while True:
         try:
             if AUTO_INSTALL_STATE.get("enabled", True):
                 now_ts = time.time()
                 ver_target = get_app_version()
                 inst_ver = get_installed_deb_version()
-                deb_path = os.path.join(BASE_DIR, "dist", f"recursos-cockpit_{ver_target}_amd64.deb")
                 build_script = os.path.join(BASE_DIR, "packaging", "build_deb.sh")
                 in_perm_cooldown = (now_ts < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
                 if not in_perm_cooldown and os.path.isfile(build_script) and os.path.isfile("/usr/bin/recursos-cockpit") and (
@@ -4826,12 +4889,12 @@ def auto_install_watcher_worker():
                 ):
                     perform_auto_update_and_install(trigger_source="local_package_detected", do_git_pull=False)
 
-                info = get_version_info(force_refresh=True, allow_auto_trigger=False)
-                if info.get("update_available") and not info.get("ahead_of_remote") and info.get("local_clean", True):
+                info = get_version_info(force_refresh=False, allow_auto_trigger=False)
+                if info.get("update_available") and info.get("has_git") and not info.get("ahead_of_remote") and info.get("local_clean", True):
                     perform_auto_update_and_install(trigger_source="github_ota_detected", do_git_pull=True)
         except Exception as e:
             print(f"[-] Advertencia en auto_install_watcher_worker: {e}")
-        time.sleep(60)
+        time.sleep(90)
 
 def get_version_info(force_refresh=False, allow_auto_trigger=True):
     """
@@ -4899,55 +4962,7 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
     recent_commits = []
     github_reachable = False
 
-    try:
-        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/commits?sha={GITHUB_BRANCH}&per_page=5"
-        req = urllib.request.Request(
-            api_url,
-            headers={
-                "User-Agent": "Recursos-Server-Monitor/12.0",
-                "Accept": "application/vnd.github.v3+json"
-            }
-        )
-        with urllib.request.urlopen(req, timeout=3.5) as resp:
-            if resp.status == 200:
-                commits_data = json.loads(resp.read().decode("utf-8"))
-                if isinstance(commits_data, list) and len(commits_data) > 0:
-                    github_reachable = True
-                    latest = commits_data[0]
-                    remote_full_sha = latest.get("sha", "")
-                    remote_sha = remote_full_sha[:7] if remote_full_sha else local_sha
-                    commit_obj = latest.get("commit", {})
-                    remote_msg = commit_obj.get("message", "").splitlines()[0]
-                    raw_date = commit_obj.get("committer", {}).get("date", "")
-                    if raw_date:
-                        remote_date = raw_date.replace("T", " ").replace("Z", "")[:16]
-                    remote_author = commit_obj.get("author", {}).get("name", "cminewarIA")
-
-                    for c in commits_data:
-                        c_sha = (c.get("sha") or "")[:7]
-                        c_obj = c.get("commit", {})
-                        c_msg = (c_obj.get("message") or "").splitlines()[0]
-                        c_dt = (c_obj.get("committer", {}).get("date") or "").replace("T", " ").replace("Z", "")[:16]
-                        recent_commits.append({
-                            "sha": c_sha,
-                            "message": c_msg,
-                            "date": c_dt,
-                            "is_local_head": (c_sha == local_sha)
-                        })
-    except Exception:
-        try:
-            p_ls = subprocess.run(
-                ["git", "ls-remote", f"https://github.com/{GITHUB_REPO}.git", f"refs/heads/{GITHUB_BRANCH}"],
-                cwd=BASE_DIR, capture_output=True, text=True, timeout=3
-            )
-            if p_ls.returncode == 0 and p_ls.stdout.strip():
-                github_reachable = True
-                remote_full_sha = p_ls.stdout.split()[0].strip()
-                remote_sha = remote_full_sha[:7]
-        except Exception:
-            pass
-
-    # Obtener también versión SemVer canónica publicada en GitHub (VERSION en rama o fallback git show)
+    # 1. Obtener primero versión SemVer canónica publicada en GitHub (sin límite de API REST)
     raw_ver_fetched = False
     try:
         raw_ver_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/VERSION"
@@ -4969,6 +4984,89 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
             )
             if p_rv.returncode == 0 and p_rv.stdout.strip():
                 remote_version = p_rv.stdout.strip().lstrip("vV")
+        except Exception:
+            pass
+
+    # 2. Consultar commits REST API solo bajo demanda o cada 5 min para no agotar cuota de GitHub
+    commits_cache_age = now - _GITHUB_COMMITS_CACHE.get("timestamp", 0.0)
+    should_query_commits_api = bool(
+        force_refresh
+        or _GITHUB_COMMITS_CACHE.get("timestamp", 0.0) == 0.0
+        or commits_cache_age >= 300.0
+        or (raw_ver_fetched and remote_version != _GITHUB_COMMITS_CACHE.get("version"))
+    )
+
+    if should_query_commits_api:
+        try:
+            api_url = f"https://api.github.com/repos/{GITHUB_REPO}/commits?sha={GITHUB_BRANCH}&per_page=5"
+            req = urllib.request.Request(
+                api_url,
+                headers={
+                    "User-Agent": "Recursos-Server-Monitor/12.0",
+                    "Accept": "application/vnd.github.v3+json"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=3.5) as resp:
+                if resp.status == 200:
+                    commits_data = json.loads(resp.read().decode("utf-8"))
+                    if isinstance(commits_data, list) and len(commits_data) > 0:
+                        github_reachable = True
+                        latest = commits_data[0]
+                        remote_full_sha = latest.get("sha", "")
+                        remote_sha = remote_full_sha[:7] if remote_full_sha else local_sha
+                        commit_obj = latest.get("commit", {})
+                        remote_msg = commit_obj.get("message", "").splitlines()[0]
+                        raw_date = commit_obj.get("committer", {}).get("date", "")
+                        if raw_date:
+                            remote_date = raw_date.replace("T", " ").replace("Z", "")[:16]
+                        remote_author = commit_obj.get("author", {}).get("name", "cminewarIA")
+
+                        for c in commits_data:
+                            c_sha = (c.get("sha") or "")[:7]
+                            c_obj = c.get("commit", {})
+                            c_msg = (c_obj.get("message") or "").splitlines()[0]
+                            c_dt = (c_obj.get("committer", {}).get("date") or "").replace("T", " ").replace("Z", "")[:16]
+                            recent_commits.append({
+                                "sha": c_sha,
+                                "message": c_msg,
+                                "date": c_dt,
+                                "is_local_head": (c_sha == local_sha)
+                            })
+                        _GITHUB_COMMITS_CACHE.update({
+                            "recent_commits": list(recent_commits),
+                            "remote_full_sha": remote_full_sha,
+                            "remote_sha": remote_sha,
+                            "remote_msg": remote_msg,
+                            "remote_date": remote_date,
+                            "remote_author": remote_author,
+                            "version": remote_version,
+                            "timestamp": now,
+                        })
+        except Exception:
+            pass
+
+    if not recent_commits and _GITHUB_COMMITS_CACHE.get("recent_commits"):
+        recent_commits = [
+            {**rc, "is_local_head": (rc.get("sha") == local_sha)}
+            for rc in _GITHUB_COMMITS_CACHE["recent_commits"]
+        ]
+        if not remote_full_sha and _GITHUB_COMMITS_CACHE.get("remote_full_sha"):
+            remote_full_sha = _GITHUB_COMMITS_CACHE["remote_full_sha"]
+            remote_sha = _GITHUB_COMMITS_CACHE["remote_sha"] or remote_full_sha[:7]
+            remote_msg = _GITHUB_COMMITS_CACHE["remote_msg"] or remote_msg
+            remote_date = _GITHUB_COMMITS_CACHE["remote_date"] or remote_date
+            remote_author = _GITHUB_COMMITS_CACHE["remote_author"] or remote_author
+
+    if (not remote_full_sha or remote_full_sha == local_full_sha) and has_git and (force_refresh or not raw_ver_fetched):
+        try:
+            p_ls = subprocess.run(
+                ["git", "ls-remote", f"https://github.com/{GITHUB_REPO}.git", f"refs/heads/{GITHUB_BRANCH}"],
+                cwd=BASE_DIR, capture_output=True, text=True, timeout=3
+            )
+            if p_ls.returncode == 0 and p_ls.stdout.strip():
+                github_reachable = True
+                remote_full_sha = p_ls.stdout.split()[0].strip()
+                remote_sha = remote_full_sha[:7]
         except Exception:
             pass
 
@@ -5031,19 +5129,23 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
 
     installed_deb_ver = get_installed_deb_version()
     package_installed = bool(installed_deb_ver)
-    package_needs_install = bool(not installed_deb_ver or _parse_semver_tuple(installed_deb_ver) < local_tuple)
+    desktop_bin_exists = os.path.isfile("/usr/bin/recursos-cockpit")
+    package_needs_install = bool(desktop_bin_exists and (not installed_deb_ver or _parse_semver_tuple(installed_deb_ver) < local_tuple))
     in_perm_cooldown = (now < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
+
+    can_auto_pull = bool(update_available and has_git and not ahead_of_remote and local_clean)
+    can_auto_deb = bool(package_needs_install and not in_perm_cooldown)
 
     if (
         allow_auto_trigger
         and AUTO_INSTALL_STATE.get("enabled", True)
-        and (update_available or (package_needs_install and not in_perm_cooldown))
+        and (can_auto_pull or can_auto_deb)
         and not AUTO_INSTALL_STATE.get("in_progress", False)
         and (now - AUTO_INSTALL_STATE.get("last_attempt_ts", 0.0) > 25.0)
     ):
         threading.Thread(
             target=perform_auto_update_and_install,
-            kwargs={"trigger_source": "detected_on_check", "do_git_pull": bool(update_available)},
+            kwargs={"trigger_source": "detected_on_check", "do_git_pull": can_auto_pull},
             daemon=True,
         ).start()
 
@@ -12464,10 +12566,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 return
             enabled = bool((body or {}).get("enabled", True))
             saved = save_auto_install_preference(enabled)
+            with VERSION_LOCK:
+                if isinstance(VERSION_CACHE.get("data"), dict):
+                    VERSION_CACHE["data"]["auto_install_enabled"] = saved
+                    VERSION_CACHE["data"]["auto_install_status"] = AUTO_INSTALL_STATE.get("last_status", "")
             if saved:
                 threading.Thread(
-                    target=perform_auto_update_and_install,
-                    kwargs={"trigger_source": "auto_toggle_enabled", "do_git_pull": True},
+                    target=get_version_info,
+                    kwargs={"force_refresh": True, "allow_auto_trigger": True},
                     daemon=True,
                 ).start()
             resp = json.dumps({
