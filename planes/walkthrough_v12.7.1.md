@@ -43,3 +43,4 @@
 
 - Siguiendo la pauta de la skill `cockpit-release`, los cambios quedan confirmados localmente en la rama `main` con etiqueta `v12.7.1` y sincronizados con la copia productiva local sin ejecutar `git push` automático hacia GitHub hasta que el usuario lo indique explícitamente.
 - Las aserciones sobre la interfaz web en ejecución se verificaron mediante compilación TypeScript/Vite, análisis del bundle emitido (`static/index.html`) y respuestas en vivo de `127.0.0.1:8085`; la apertura visual directa en Chrome DevTools permaneció limitada al no existir una instancia previa de Chrome con depuración remota habilitada.
+

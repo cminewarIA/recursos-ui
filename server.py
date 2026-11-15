@@ -4029,7 +4029,7 @@ def fetch_cached_map_tile(style, z, x, y):
             ("arcgis-light", f"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{zi}/{yi}/{xi}"),
         ]
 
-    ver_ua = get_app_version() if callable(globals().get("get_app_version")) else "12.7.1"
+    ver_ua = get_app_version() if callable(globals().get("get_app_version")) else "12.7.2"
     headers = {
         "User-Agent": f"RecursosCockpit/{ver_ua} (+https://github.com/cminewarIA/recursos-ui)",
         "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
@@ -5927,8 +5927,8 @@ def get_locked_page_html(client_ip):
       box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
     }}
     .brand-logo {{
-      width: 78px;
-      height: 78px;
+      width: 96px;
+      height: 96px;
       object-fit: contain;
       margin: 0 auto 14px;
       display: block;

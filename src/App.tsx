@@ -222,7 +222,7 @@ export function App() {
           ? 'android_native'
           : 'web_browser',
       full_access: env.isNativeApp,
-      app_version: window.__INITIAL_APP_VERSION__ || '12.7.1',
+      app_version: window.__INITIAL_APP_VERSION__ || '12.7.2',
       screen_width: window.screen?.width,
       screen_height: window.screen?.height,
     };
@@ -333,28 +333,28 @@ export function App() {
           className="mx-auto max-w-6xl px-3 pt-3 sm:px-6 md:sticky md:top-3 md:z-30"
         >
           <header className="cockpit-topbar">
-            <div className="flex h-14 items-center justify-between gap-3 px-3.5 sm:px-5">
-              {/* Zone 1: Brand with CMineWar emblem */}
+            <div className="flex min-h-[68px] items-center justify-between gap-3 px-3.5 py-1.5 sm:min-h-[76px] sm:px-5">
+              {/* Zone 1: Brand with transparent CMineWar emblem */}
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 type="button"
                 onClick={() => navigateTo('inicio')}
-                className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0"
+                className="flex items-center gap-2.5 sm:gap-3 text-left whitespace-nowrap shrink-0"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sky-200 bg-sky-50/80 p-1 dark:border-sky-800/70 dark:bg-sky-950/60">
-                  {!logoBroken ? (
-                    <img
-                      src="/recursos-cockpit.png"
-                      alt="Recursos CMineWar"
-                      onError={() => setLogoBroken(true)}
-                      className="h-full w-full object-contain"
-                    />
-                  ) : (
-                    <Activity className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                  )}
-                </div>
+                {!logoBroken ? (
+                  <img
+                    src="/recursos-cockpit.png"
+                    alt="Recursos CMineWar"
+                    onError={() => setLogoBroken(true)}
+                    className="h-12 w-12 sm:h-[62px] sm:w-[62px] shrink-0 object-contain drop-shadow-[0_3px_10px_rgba(14,165,233,0.22)] dark:drop-shadow-[0_4px_14px_rgba(56,189,248,0.28)]"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 sm:h-[62px] sm:w-[62px] shrink-0 items-center justify-center">
+                    <Activity className="h-6 w-6 text-sky-600 dark:text-sky-400" />
+                  </div>
+                )}
                 <div className="leading-tight">
-                  <span className="block font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white sm:text-base">
+                  <span className="block font-display text-base font-bold tracking-tight text-slate-900 dark:text-white sm:text-lg">
                     Recursos
                   </span>
                   <span className="hidden sm:block font-mono text-[10px] font-medium text-slate-500 dark:text-slate-400">

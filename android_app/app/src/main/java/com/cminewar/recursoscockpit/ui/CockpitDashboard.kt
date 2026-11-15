@@ -494,11 +494,9 @@ fun CockpitDashboard(
                             .padding(horizontal = 32.dp, vertical = 28.dp)
                     ) {
                         Image(
-                            painter = painterResource(id = R.mipmap.ic_launcher),
+                            painter = painterResource(id = R.drawable.app_logo),
                             contentDescription = "CMineWar",
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                            modifier = Modifier.size(104.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         CircularProgressIndicator(color = if (isDark) NeonSky else NeonBlue, strokeWidth = 3.dp)
