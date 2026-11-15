@@ -37,25 +37,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.cminewar.recursoscockpit.theme.CockpitBorder
 import com.cminewar.recursoscockpit.theme.CockpitDockBg
 import com.cminewar.recursoscockpit.theme.NeonCyan
 import com.cminewar.recursoscockpit.theme.TextMuted
 import com.cminewar.recursoscockpit.theme.TextPrimary
 
-enum class CockpitTab(val id: String, val title: String, val icon: ImageVector) {
-    OVERVIEW("overview", "Cabina", Icons.Default.Dashboard),
-    CPU("processor", "CPU", Icons.Default.Memory),
-    MEMORY("memory", "RAM", Icons.Default.DeveloperBoard),
-    GPU("gpu", "GPU", Icons.Default.Speed),
-    DRIVES("drives", "Discos", Icons.Default.Storage),
-    NETWORK("network", "Red", Icons.Default.Wifi),
-    DOCKER("apps", "Docker", Icons.Default.Widgets),
-    SECURITY("security", "Escudo", Icons.Default.Shield),
-    PROCESSES("processes", "Procesos", Icons.Default.FormatListBulleted)
+enum class CockpitTab(val id: String, val titleKey: String, val title: String, val icon: ImageVector) {
+    OVERVIEW("overview", "native_android.tab_cockpit", "Cabina", Icons.Default.Dashboard),
+    CPU("processor", "native_android.tab_cpu", "CPU", Icons.Default.Memory),
+    MEMORY("memory", "native_android.tab_ram", "RAM", Icons.Default.DeveloperBoard),
+    GPU("gpu", "native_android.tab_gpu", "GPU", Icons.Default.Speed),
+    DRIVES("drives", "native_android.tab_drives", "Discos", Icons.Default.Storage),
+    NETWORK("network", "native_android.tab_network", "Red", Icons.Default.Wifi),
+    DOCKER("apps", "native_android.tab_docker", "Docker", Icons.Default.Widgets),
+    SECURITY("security", "native_android.tab_shield", "Escudo", Icons.Default.Shield),
+    PROCESSES("processes", "native_android.tab_processes", "Procesos", Icons.Default.FormatListBulleted)
 }
 
 @Composable
@@ -105,6 +107,7 @@ private fun DockItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val contentColor = if (isSelected) NeonCyan else TextMuted
+    val localizedTitle = I18nDictionary.t(LocalContext.current, tab.titleKey, tab.title)
 
     Column(
         modifier = Modifier
@@ -120,13 +123,13 @@ private fun DockItem(
     ) {
         Icon(
             imageVector = tab.icon,
-            contentDescription = tab.title,
+            contentDescription = localizedTitle,
             tint = contentColor,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = tab.title,
+            text = localizedTitle,
             color = if (isSelected) TextPrimary else TextMuted,
             fontSize = 11.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium

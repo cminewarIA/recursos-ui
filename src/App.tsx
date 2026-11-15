@@ -19,7 +19,9 @@ import { MoreView } from './components/MoreView';
 import { ExpandedChartModal } from './components/ExpandedChartModal';
 import { MainTabId, MetricsPayload, ThemeMode, WifiClient } from './types/telemetry';
 import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/api';
-import { extractInitialSubTabFromRoute, getDisplayVersionString, normalizeExternalRoute } from './utils/formatters';
+import { extractInitialSubTabFromRoute, normalizeExternalRoute } from './utils/formatters';
+import { getCanonicalDisplayVersion, getCanonicalVersion } from './utils/version';
+import { useI18n } from './i18n';
 
 interface ToastState {
   id: number;
@@ -28,6 +30,7 @@ interface ToastState {
 }
 
 export function App() {
+  const { t } = useI18n();
   const [theme, setTheme] = useState<ThemeMode>(() => {
     try {
       return localStorage.getItem('recursos_theme') === 'dark' ? 'dark' : 'light';
@@ -101,11 +104,11 @@ export function App() {
         setStoredToken(res.data.auth_status.token);
       }
     } else if (res.status === 403) {
-      setConnError('Este dispositivo requiere verificación inicial en la red Wi-Fi local.');
+      setConnError(t('status.verify_lan_required'));
     } else {
-      setConnError('Reconectando con el servidor...');
+      setConnError(t('status.reconnecting_server'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const isPaused = () =>
@@ -222,7 +225,7 @@ export function App() {
           ? 'android_native'
           : 'web_browser',
       full_access: env.isNativeApp,
-      app_version: window.__INITIAL_APP_VERSION__ || '12.8.0',
+      app_version: getCanonicalVersion(),
       screen_width: window.screen?.width,
       screen_height: window.screen?.height,
     };
@@ -257,20 +260,20 @@ export function App() {
         body: JSON.stringify({
           mac: client.mac || '',
           ip: client.ip || '',
-          name: client.name || client.hostname || client.ip || 'dispositivo',
+          name: client.name || client.hostname || client.ip || t('overview.device_fallback'),
         }),
       });
       setPendingMac(null);
       if (res.ok && res.data?.success !== false) {
         notify(
           res.data?.message ||
-            (action === 'wake' ? 'Señal de encendido enviada.' : 'Señal de apagado enviada.')
+            (action === 'wake' ? t('status.wake_sent') : t('status.sleep_sent'))
         );
       } else {
-        notify(res.data?.error || res.error || 'No se pudo enviar la señal al dispositivo.', true);
+        notify(res.data?.error || res.error || t('status.signal_error'), true);
       }
     },
-    [notify]
+    [notify, t]
   );
 
   const handlePowerClick = useCallback(
@@ -294,19 +297,16 @@ export function App() {
       });
       setPendingServiceTarget(null);
       if (res.ok) {
-        notify(res.data?.message || 'Orden enviada al servidor.');
+        notify(res.data?.message || t('status.action_sent'));
         setTimeout(() => void fetchMetrics(), 900);
       } else {
-        notify(res.data?.error || res.error || 'No se pudo completar la acción.', true);
+        notify(res.data?.error || res.error || t('status.action_error'), true);
       }
     },
-    [fetchMetrics, notify]
+    [fetchMetrics, notify, t]
   );
 
-  const displayVersion = getDisplayVersionString(
-    metrics?.version_info?.current_version || window.__INITIAL_APP_VERSION__,
-    metrics?.version_info?.display_version || window.__INITIAL_DISPLAY_VERSION__
-  );
+  const displayVersion = getCanonicalDisplayVersion(metrics?.version_info);
   const topbarErrors = Number(
     metrics?.system_errors_summary?.total_errors ?? metrics?.system_errors_summary?.total ?? 0
   );
@@ -315,11 +315,11 @@ export function App() {
   const isHealthy = !connError && topbarErrors === 0 && cpuNow < 88 && ramNow < 90;
 
   const navItems: Array<{ id: MainTabId; label: string; icon: React.ReactNode }> = [
-    { id: 'inicio', label: 'Inicio', icon: <Home className="h-5 w-5" /> },
-    { id: 'equipo', label: 'Equipo', icon: <Cpu className="h-5 w-5" /> },
-    { id: 'red', label: 'Red', icon: <Wifi className="h-5 w-5" /> },
-    { id: 'programas', label: 'Programas', icon: <Grid className="h-5 w-5" /> },
-    { id: 'mas', label: 'Más', icon: <MoreHorizontal className="h-5 w-5" /> },
+    { id: 'inicio', label: t('nav.inicio'), icon: <Home className="h-5 w-5" /> },
+    { id: 'equipo', label: t('nav.equipo'), icon: <Cpu className="h-5 w-5" /> },
+    { id: 'red', label: t('nav.red'), icon: <Wifi className="h-5 w-5" /> },
+    { id: 'programas', label: t('nav.programas'), icon: <Grid className="h-5 w-5" /> },
+    { id: 'mas', label: t('nav.mas'), icon: <MoreHorizontal className="h-5 w-5" /> },
   ];
 
   return (
@@ -344,7 +344,7 @@ export function App() {
                 {!logoBroken ? (
                   <img
                     src="/recursos-cockpit.png"
-                    alt="Recursos CMineWar"
+                    alt={t('app.brand_alt')}
                     onError={() => setLogoBroken(true)}
                     className="h-12 w-12 sm:h-[62px] sm:w-[62px] shrink-0 object-contain drop-shadow-[0_3px_10px_rgba(14,165,233,0.22)] dark:drop-shadow-[0_4px_14px_rgba(56,189,248,0.28)]"
                   />
@@ -355,17 +355,17 @@ export function App() {
                 )}
                 <div className="leading-tight">
                   <span className="block font-display text-base font-bold tracking-tight text-slate-900 dark:text-white sm:text-lg">
-                    Recursos
+                    {t('app.brand')}
                   </span>
                   <span className="hidden sm:block font-mono text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                    {metrics?.system?.hostname || 'Cockpit'} · {theme === 'dark' ? 'Oscuro' : 'Claro'}
+                    {metrics?.system?.hostname || t('app.cockpit_fallback')} · {theme === 'dark' ? t('app.theme_dark') : t('app.theme_light')}
                   </span>
                 </div>
               </motion.button>
 
               {/* Zone 2: Desktop Segmented Pills con layoutId deslizante */}
               <LayoutGroup id="desktop-nav">
-                <nav aria-label="Navegación principal escritorio" className="hidden md:flex items-center gap-1">
+                <nav aria-label={t('nav.desktop_aria')} className="hidden md:flex items-center gap-1">
                   {navItems.map((item) => {
                     const active = activeTab === item.id;
                     return (
@@ -406,19 +406,19 @@ export function App() {
                   />
                   <span>
                     {connError
-                      ? 'Reconectando'
+                      ? t('status.reconnecting')
                       : topbarErrors > 0
-                        ? `${topbarErrors} ${topbarErrors === 1 ? 'aviso' : 'avisos'}`
+                        ? `${topbarErrors} ${topbarErrors === 1 ? t('status.notice_single') : t('status.notice_plural')}`
                         : isHealthy
-                          ? 'Sistema Saludable'
-                          : 'Carga Alta'}
+                          ? t('status.healthy')
+                          : t('status.high_load')}
                   </span>
                 </motion.button>
 
                 <motion.button
                   whileTap={{ scale: 0.9, rotate: 18 }}
                   type="button"
-                  aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                  aria-label={theme === 'dark' ? t('app.toggle_to_light') : t('app.toggle_to_dark')}
                   onClick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}
                   className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-600 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-sky-300"
                 >
@@ -540,7 +540,7 @@ export function App() {
         >
           <LayoutGroup id="dock-nav">
             <nav
-              aria-label="Barra de navegación inferior"
+              aria-label={t('nav.bottom_aria')}
               className="cockpit-dock pointer-events-auto grid w-full max-w-[540px] grid-cols-5 items-center gap-1 p-1.5"
             >
               {navItems.map((item) => {
@@ -607,10 +607,10 @@ export function App() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <h3 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  ¿Enviar señal de apagado?
+                  {t('status.power_confirm_title')}
                 </h3>
                 <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                  Se enviará una señal de suspensión o apagado a{' '}
+                  {t('status.power_confirm_body_pre')}{' '}
                   <strong>
                     {confirmShutdownClient.name || confirmShutdownClient.hostname || confirmShutdownClient.ip}
                   </strong>
@@ -622,7 +622,7 @@ export function App() {
                     onClick={() => setConfirmShutdownClient(null)}
                     className="cockpit-subtile min-h-[42px] px-4 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
-                    Cancelar
+                    {t('status.power_confirm_cancel')}
                   </button>
                   <button
                     type="button"
@@ -633,7 +633,7 @@ export function App() {
                     }}
                     className="min-h-[42px] rounded-xl bg-rose-600 px-4 text-xs font-semibold text-white hover:bg-rose-700"
                   >
-                    Sí, apagar
+                    {t('status.power_confirm_yes')}
                   </button>
                 </div>
               </motion.div>

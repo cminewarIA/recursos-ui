@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -16,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.cminewar.recursoscockpit.data.ConnectionMode
 import com.cminewar.recursoscockpit.data.SecurityData
 import com.cminewar.recursoscockpit.data.SystemData
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.cminewar.recursoscockpit.theme.*
 
 @Composable
@@ -25,6 +27,7 @@ fun SystemCard(
     mode: ConnectionMode,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
@@ -42,7 +45,7 @@ fun SystemCard(
                     Text(text = "🛡️", fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "ESTADO DEL NODO Y CIBERDEFENSA",
+                        text = I18nDictionary.t(context, "native_android.node_security_title", "ESTADO DEL NODO Y CIBERDEFENSA"),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextSecondary,
@@ -51,13 +54,13 @@ fun SystemCard(
                 }
 
                 val (badgeText, badgeColor) = when (mode) {
-                    ConnectionMode.CONNECTED_LAN -> "🟢 LAN (BAJA LATENCIA)" to NeonGreen
-                    ConnectionMode.CONNECTED_WAN -> "🌐 WAN (DDNS)" to NeonBlue
-                    ConnectionMode.SCANNING_LAN -> "📡 ESCANEANDO RED..." to NeonOrange
-                    ConnectionMode.CONNECTING -> "🔍 ENLAZANDO..." to NeonOrange
-                    ConnectionMode.REVOKED -> "🔒 CERTIFICADO REVOCADO" to NeonRed
-                    ConnectionMode.ERROR -> "🔴 SIN NODO" to NeonRed
-                    ConnectionMode.DISCONNECTED -> "⚪ DESCONECTADO" to TextSecondary
+                    ConnectionMode.CONNECTED_LAN -> I18nDictionary.t(context, "native_android.lan_low_latency", "🟢 LAN (BAJA LATENCIA)") to NeonGreen
+                    ConnectionMode.CONNECTED_WAN -> I18nDictionary.t(context, "native_android.wan_ddns", "🌐 WAN (DDNS)") to NeonBlue
+                    ConnectionMode.SCANNING_LAN -> I18nDictionary.t(context, "native_android.scanning_net", "📡 ESCANEANDO RED...") to NeonOrange
+                    ConnectionMode.CONNECTING -> I18nDictionary.t(context, "native_android.linking", "🔍 ENLAZANDO...") to NeonOrange
+                    ConnectionMode.REVOKED -> I18nDictionary.t(context, "native_android.cert_revoked", "🔒 CERTIFICADO REVOCADO") to NeonRed
+                    ConnectionMode.ERROR -> I18nDictionary.t(context, "native_android.no_node", "🔴 SIN NODO") to NeonRed
+                    ConnectionMode.DISCONNECTED -> I18nDictionary.t(context, "native_android.disconnected", "⚪ DESCONECTADO") to TextSecondary
                 }
 
                 Box(
@@ -84,7 +87,7 @@ fun SystemCard(
             ) {
                 Column {
                     Text(
-                        text = system?.hostname ?: "Servidor",
+                        text = system?.hostname ?: I18nDictionary.t(context, "native_android.server_fallback", "Servidor"),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -99,7 +102,7 @@ fun SystemCard(
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "Tiempo Activo",
+                        text = I18nDictionary.t(context, "native_android.uptime_label", "Tiempo Activo"),
                         fontSize = 11.sp,
                         color = TextSecondary
                     )
@@ -122,7 +125,7 @@ fun SystemCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Fail2ban IPS:",
+                        text = I18nDictionary.t(context, "native_android.f2b_ips_label", "Fail2ban IPS:"),
                         fontSize = 12.sp,
                         color = TextSecondary
                     )
@@ -130,7 +133,11 @@ fun SystemCard(
                     val f2b = security?.fail2ban
                     val isF2bActive = f2b?.get("available") == true || f2b?.get("active") == true
                     Text(
-                        text = if (isF2bActive) "Activo (IPS Operativo)" else "Monitorizando",
+                        text = if (isF2bActive) {
+                            I18nDictionary.t(context, "native_android.f2b_operational", "Activo (IPS Operativo)")
+                        } else {
+                            I18nDictionary.t(context, "native_android.monitoring", "Monitorizando")
+                        },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isF2bActive) NeonGreen else NeonOrange

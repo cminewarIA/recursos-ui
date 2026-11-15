@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.lifecycle.lifecycleScope
 import com.cminewar.recursoscockpit.data.*
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.cminewar.recursoscockpit.theme.RecursosCockpitTheme
 import com.cminewar.recursoscockpit.ui.CockpitDashboard
 import kotlinx.coroutines.delay
@@ -29,7 +30,11 @@ class MainActivity : ComponentActivity() {
             RecursosCockpitTheme {
                 var connectionMode by remember { mutableStateOf(ConnectionMode.CONNECTING) }
                 var activeUrl by remember { mutableStateOf("") }
-                var scanningMessage by remember { mutableStateOf("Buscando tu servidor en la red Wi-Fi...") }
+                var scanningMessage by remember {
+                    mutableStateOf(
+                        I18nDictionary.t(this@MainActivity, "native_android.searching_wifi", "Buscando tu servidor en la red Wi-Fi...")
+                    )
+                }
 
                 fun triggerDiscoveryAndRefresh() {
                     lifecycleScope.launch {

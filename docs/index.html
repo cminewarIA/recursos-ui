@@ -679,7 +679,7 @@
         <div>
           <div class="brand-title">Manual Interactivo · Panel de Recursos</div>
           <div class="brand-sub">
-            <span class="pill accent mono" id="manualVersionBadge">v12.8.0</span>
+            <span class="pill accent mono" id="manualVersionBadge">./VERSION</span>
             <span class="pill emerald" id="liveServerBadge">Modo autónomo</span>
           </div>
         </div>
@@ -1041,12 +1041,12 @@
           <div class="panel-box">
             <div style="font-size:14px; font-weight:700; margin-bottom:10px;">Descarga directa y actualización limpia</div>
             <div style="display:grid; gap:8px; margin-bottom:12px;">
-              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb) · 12.8.0</a>
-              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android &amp; Android TV (.apk) · 12.8.0</a>
+              <a class="btn btn-primary" href="/download/recursos-cockpit.deb" id="dlDebLink">Descargar Ubuntu / Debian (.deb)</a>
+              <a class="btn" href="/download/recursos-cockpit.apk" id="dlApkLink">Descargar App Android &amp; Android TV (.apk)</a>
             </div>
             <div class="code-wrap">
               <button type="button" class="copy-btn" data-copy-target="cmdInstallBlock">Copiar</button>
-              <pre id="cmdInstallBlock" style="margin:0;">sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.8.0_amd64.deb</pre>
+              <pre id="cmdInstallBlock" style="margin:0;">bash packaging/install_all.sh</pre>
             </div>
           </div>
         </div>
@@ -1163,11 +1163,13 @@
 
       function setVersionText(ver, extra) {
         const badge = document.getElementById('manualVersionBadge');
-        if (badge) badge.textContent = 'v' + (ver || '12.8.0') + (extra ? ' · ' + extra : '');
+        if (badge) badge.textContent = (ver ? 'v' + ver : './VERSION') + (extra ? ' · ' + extra : '');
       }
 
+      let resolvedCanonicalVer = '';
       if (window.__INITIAL_APP_VERSION__) {
-        setVersionText(window.__INITIAL_APP_VERSION__, '');
+        resolvedCanonicalVer = String(window.__INITIAL_APP_VERSION__).trim();
+        setVersionText(resolvedCanonicalVer, '');
       }
 
       let serverOnline = false;
@@ -1180,14 +1182,39 @@
         return hdrs;
       }
 
+      async function resolveFallbackVersionFile() {
+        const candidates = isFileProto
+          ? ['https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/VERSION', '../VERSION', './VERSION']
+          : ['/api/version', '../VERSION', './VERSION'];
+        for (let i = 0; i < candidates.length; i++) {
+          const url = candidates[i];
+          try {
+            const resp = await fetch(url, { credentials: url.startsWith('/') ? 'include' : 'omit', headers: url.startsWith('/') ? buildAuthHeaders() : {} });
+            if (!resp.ok) continue;
+            if (url === '/api/version') {
+              const d = await resp.json();
+              if (d && d.current_version) return { ver: String(d.current_version).trim(), commit: d.local_commit || '', fromApi: true };
+            } else {
+              const txt = (await resp.text()).trim();
+              if (/^\d+\.\d+\.\d+$/.test(txt)) return { ver: txt, commit: '', fromApi: false };
+            }
+          } catch (e) {}
+        }
+        return null;
+      }
+
       async function detectLiveServer() {
+        const resolved = await resolveFallbackVersionFile();
+        if (resolved && resolved.ver) {
+          applyCanonicalVersionToManual(resolved.ver, resolved.commit);
+        }
         if (isFileProto) return;
         try {
           const r = await fetch('/api/version', { credentials: 'include', headers: buildAuthHeaders() });
           if (r.ok) {
             const d = await r.json();
             serverOnline = true;
-            setVersionText(d.current_version || '12.8.0', d.local_commit || '');
+            applyCanonicalVersionToManual(d.current_version || resolvedCanonicalVer, d.local_commit || '');
             const b = document.getElementById('liveServerBadge');
             b.textContent = 'Conectado al nodo en vivo';
             b.className = 'pill emerald';
@@ -1754,7 +1781,7 @@
             'Desbloquea en exclusiva "Pantalla móvil USB (DeX)" mediante adb, scrcpy y /dev/uhid.',
             'Paquete firmado con GPG (_gpgorigin) compatible con apt y Ubuntu App Center.'
           ],
-          cmd: 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.8.0_amd64.deb'
+          cmd: 'VERSION="$(tr -d \' \\r\\n\' < VERSION)" && sudo apt-get install --reinstall -y "./dist/recursos-cockpit_${VERSION}_amd64.deb"'
         },
         android: {
           title: 'App Nativa Android & Android TV (.apk)',
@@ -1765,7 +1792,7 @@
             'Iconos de aplicación nativos con transparencia alfa real tanto en Android como en Ubuntu (.desktop / hicolor), sin cajas ni fondos opacos.',
             'Almacenamiento de tokens HMAC en EncryptedSharedPreferences (AES256-GCM), firma keystore v1/v2/v3 y despliegue automático en Smart TVs de la LAN con packaging/install_all.sh.'
           ],
-          cmd: 'bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.8.0.apk'
+          cmd: 'VERSION="$(tr -d \' \\r\\n\' < VERSION)" && bash packaging/install_tv_apk.sh "./dist/recursos-cockpit_${VERSION}.apk"'
         },
         web: {
           title: 'Navegador Web Moderno (SPA React 19)',
@@ -1780,8 +1807,10 @@
         }
       };
 
+      let activePlatKey = 'ubuntu';
       function renderPlatform(platKey) {
-        const p = PLATFORMS[platKey] || PLATFORMS.ubuntu;
+        activePlatKey = platKey || 'ubuntu';
+        const p = PLATFORMS[activePlatKey] || PLATFORMS.ubuntu;
         document.getElementById('platformDetailBox').innerHTML =
           '<span class="pill violet">' + p.level + '</span>' +
           '<h3 style="margin:10px 0 8px; font-size:16px;">' + p.title + '</h3>' +
@@ -1816,9 +1845,10 @@
 
       // 8. Consola API REST en Vivo
       const API_ENDPOINTS = [
-        { method: 'GET', path: '/api/version', desc: 'Versión canónica (App, Servidor y GitHub), commit Git local/remoto y estado del paquete .deb', sample: { current_version: '12.8.0', display_version: '12.8.0', server_version: '12.8.0', remote_version: '12.8.0', branch: 'main', update_available: false } },
-        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { current_version: '12.8.0', display_version: '12.8.0' } } },
-        { method: 'POST', path: '/api/system/sync-web', desc: 'Sincronización en caliente de archivos web desde la App Nativa de Ubuntu verificada con SHA-256 sin tocar recursos_history.db', sample: { success: true, synced: true, version: '12.8.0', updated_files: ['VERSION', 'package.json', 'static/index.html', 'static/manual.html'] } },
+        { method: 'GET', path: '/api/version', desc: 'Versión canónica (App, Servidor y GitHub), commit Git local/remoto y estado del paquete .deb', sample: { current_version: './VERSION', display_version: './VERSION', server_version: './VERSION', remote_version: './VERSION', branch: 'main', update_available: false } },
+        { method: 'GET', path: '/api/dictionary', desc: 'Catálogo JSON multi-idioma cargado desde la hoja de cálculo ./i18n/dictionary.csv', sample: { ok: true, meta: { version: './VERSION', default_locale: 'es', supported_locales: ['es'], locale_names: { es: 'Español' } } } },
+        { method: 'GET', path: '/api/metrics', desc: 'Telemetría atómica completa (CPU, RAM/ZRAM, GPU, Discos, Red, Pi-hole, Docker)', sample: { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { current_version: './VERSION', display_version: './VERSION' } } },
+        { method: 'POST', path: '/api/system/sync-web', desc: 'Sincronización en caliente de archivos web desde la App Nativa de Ubuntu verificada con SHA-256 sin tocar recursos_history.db', sample: { success: true, synced: true, version: './VERSION', updated_files: ['VERSION', 'package.json', 'i18n/dictionary.csv', 'static/index.html', 'static/manual.html'] } },
         { method: 'GET', path: '/api/metrics/history?window_sec=3600&limit=180', desc: 'Historial persistente de consumo en recursos_history.db para retroceso temporal en la Inspección Táctil', sample: { ok: true, db_file: 'recursos_history.db', total_samples: 18420, returned_samples: 180, has_older: true } },
         { method: 'GET', path: '/api/maps/config', desc: 'Motor cartográfico libre OpenStreetMap / Leaflet sin necesidad de API Key', sample: { success: true, engine: 'leaflet', provider: 'OpenStreetMap', free: true, requires_api_key: false } },
         { method: 'GET', path: '/api/system/logs?limit=10', desc: 'Agregador unificado de fallos de Systemd, Docker y Kernel', sample: { ok: true, total_errors: 0, counts_by_category: { systemd: 0, docker: 0, kernel: 0 } } },
@@ -1827,6 +1857,27 @@
         { method: 'GET', path: '/api/telegram_bot', desc: 'Estado operativo del bot Telegram y lista blanca autorizada', sample: { success: true, bot_status: { online: true, running: true }, activity: [] } },
         { method: 'GET', path: '/api/dex/status', desc: 'Detección USB ADB / scrcpy para proyección Samsung DeX (Ubuntu)', sample: { ok: true, usb_only: true, session_running: false, devices: [] } }
       ];
+
+      function applyCanonicalVersionToManual(ver, commitExtra) {
+        if (!ver) return;
+        resolvedCanonicalVer = ver;
+        setVersionText(ver, commitExtra || '');
+        const debEl = document.getElementById('dlDebLink');
+        if (debEl) debEl.textContent = 'Descargar Ubuntu / Debian (.deb) · v' + ver;
+        const apkEl = document.getElementById('dlApkLink');
+        if (apkEl) apkEl.textContent = 'Descargar App Android & Android TV (.apk) · v' + ver;
+        PLATFORMS.ubuntu.cmd = 'sudo apt-get install --reinstall -y ./dist/recursos-cockpit_' + ver + '_amd64.deb';
+        PLATFORMS.android.cmd = 'bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_' + ver + '.apk';
+        API_ENDPOINTS[0].sample = { current_version: ver, display_version: ver, server_version: ver, remote_version: ver, branch: 'main', update_available: false };
+        API_ENDPOINTS[1].sample = { ok: true, meta: { version: ver, default_locale: 'es', supported_locales: ['es'], locale_names: { es: 'Español' } } };
+        API_ENDPOINTS[2].sample = { cpu: { usage_percent: 14.2, temp_c: 44.5 }, memory: { percent: 48.1 }, version_info: { current_version: ver, display_version: ver } };
+        API_ENDPOINTS[3].sample = { success: true, synced: true, version: ver, updated_files: ['VERSION', 'package.json', 'i18n/dictionary.csv', 'static/index.html', 'static/manual.html'] };
+        renderPlatform(activePlatKey);
+        if (CHANGELOG[0] && CHANGELOG[0].dynamic) {
+          CHANGELOG[0].ver = 'v' + ver;
+          renderChangelog(activeVerFilter);
+        }
+      }
 
       let activeEndpoint = API_ENDPOINTS[0];
       const epContainer = document.getElementById('apiEndpointList');
@@ -1871,7 +1922,9 @@
       });
 
       // 9. Changelog interactivo filtrado por tipo SemVer
+      let activeVerFilter = 'all';
       const CHANGELOG = [
+        { ver: resolvedCanonicalVer ? ('v' + resolvedCanonicalVer) : './VERSION', dynamic: true, type: 'MINOR', desc: 'Punto único de verdad en ./VERSION propagado sin duplicados a Backend Python, App Nativa Ubuntu GTK3, Android/TV Compose, React 19, Manual Interactivo y compilación, junto al Diccionario maestro en hoja de cálculo (./i18n/dictionary.csv, columna inicial Español es) y normalización universal de lecturas descriptivas de hardware.' },
         { ver: 'v12.8.0', type: 'MINOR', desc: 'Layout fluido de ancho completo (.cockpit-shell) sin márgenes laterales desperdiciados en monitores maximizados y sistema de rejilla paralela automática multi-columna (.cockpit-auto-grid, .cockpit-auto-grid-cards, .cockpit-cores-grid) que adapta dinámicamente los widgets, discos, aparatos LAN, contenedores Docker, servicios systemd y conexiones GeoIP al tamaño real de cada pantalla.' },
         { ver: 'v12.7.2', type: 'PATCH', desc: 'Logotipo oficial CMineWar ampliado con transparencia RGBA real en la barra superior (Web, Manual y Nativa), banner oficial Android TV Leanback (640×360 y 960×540) con el logotipo y el nombre de la aplicación sobre fondo transparente, e iconos RGBA transparentes unificados para Android (incluyendo launcher y pantalla nativa) y Ubuntu (.desktop, hicolor y pixmaps).' },
         { ver: 'v12.7.1', type: 'PATCH', desc: 'Ventana en vivo de 5 minutos (300 s) en Inicio y modo En vivo, historial de disco por buckets pico de 5 s (hasta 20 min en Inspección Táctil), ejes X dinámicos con segundos en ventanas cortas y trazado limpio sin saturación de puntos intermedios manteniendo el marcador activo e inspección estrictamente sobre la curva.' },
@@ -1899,7 +1952,8 @@
       ];
 
       function renderChangelog(typeFilter) {
-        const list = CHANGELOG.filter(function (c) { return typeFilter === 'all' || c.type === typeFilter; });
+        activeVerFilter = typeFilter || 'all';
+        const list = CHANGELOG.filter(function (c) { return activeVerFilter === 'all' || c.type === activeVerFilter; });
         const badgeCls = { MAJOR: 'pill violet', MINOR: 'pill emerald', PATCH: 'pill accent' };
         document.getElementById('changelogBody').innerHTML = list.map(function (c) {
           return '<tr><td class="mono" style="white-space:nowrap;"><strong>' + c.ver + '</strong></td><td><span class="' + (badgeCls[c.type] || 'pill') + '">' + c.type + '</span></td><td>' + c.desc + '</td></tr>';
@@ -1913,6 +1967,7 @@
           renderChangelog(btn.dataset.vtype);
         });
       });
+      if (resolvedCanonicalVer) applyCanonicalVersionToManual(resolvedCanonicalVer, '');
       renderChangelog('all');
       detectLiveServer();
     })();

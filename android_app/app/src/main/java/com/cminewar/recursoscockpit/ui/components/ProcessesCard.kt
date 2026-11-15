@@ -12,10 +12,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.cminewar.recursoscockpit.theme.*
 
 @Composable
@@ -23,6 +25,7 @@ fun ProcessesCard(
     processes: List<Map<String, Any>>?,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val procList = processes ?: emptyList()
 
     Box(
@@ -44,12 +47,12 @@ fun ProcessesCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Terminal,
-                        contentDescription = "Procesos",
+                        contentDescription = I18nDictionary.t(context, "native_android.tab_processes", "Procesos"),
                         tint = NeonOrange,
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = "PROCESOS PRINCIPALES",
+                        text = I18nDictionary.t(context, "native_android.card_processes", "PROCESOS PRINCIPALES"),
                         color = TextSecondary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
@@ -65,7 +68,12 @@ fun ProcessesCard(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "${procList.size} PROCESOS",
+                        text = I18nDictionary.t(
+                            context,
+                            "native_android.processes_count",
+                            "{count} PROCESOS",
+                            mapOf("count" to procList.size)
+                        ),
                         color = NeonOrange,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -75,7 +83,7 @@ fun ProcessesCard(
 
             if (procList.isEmpty()) {
                 Text(
-                    text = "No hay datos de procesos disponibles",
+                    text = I18nDictionary.t(context, "native_android.no_processes", "No hay datos de procesos disponibles"),
                     color = TextSecondary,
                     fontSize = 13.sp
                 )
@@ -88,7 +96,11 @@ fun ProcessesCard(
                             .padding(horizontal = 8.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = "PID / NOMBRE", color = TextSecondary, fontSize = 11.sp)
+                        Text(
+                            text = I18nDictionary.t(context, "native_android.pid_name_col", "PID / NOMBRE"),
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Text(text = "% CPU", color = TextSecondary, fontSize = 11.sp)
                             Text(text = "% MEM", color = TextSecondary, fontSize = 11.sp)

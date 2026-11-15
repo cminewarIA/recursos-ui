@@ -16,6 +16,7 @@ import { ChartSeries, TelemetryChart } from './TelemetryChart';
 import { ExpandChartSpec } from './OverviewView';
 import { HistorySeries, MetricsPayload, TelemetryHistoryResponse, ThemeMode } from '../types/telemetry';
 import { apiFetchJson } from '../utils/api';
+import { useI18n } from '../i18n';
 
 type HistoryPresetKey = 'live' | '1200' | '3600' | '21600' | '86400' | 'all';
 
@@ -28,21 +29,21 @@ interface ExpandedChartModalProps {
 
 const LIVE_WINDOW_SECONDS = 300; // Ventana en directo de 5 minutos
 
-const WINDOW_PRESETS: Array<{ key: HistoryPresetKey; label: string; sec?: number }> = [
-  { key: 'live', label: 'En vivo · 5 min' },
-  { key: '1200', label: '20 min', sec: 1200 },
-  { key: '3600', label: '1 h', sec: 3600 },
-  { key: '21600', label: '6 h', sec: 21600 },
-  { key: '86400', label: '24 h', sec: 86400 },
-  { key: 'all', label: 'Todo' },
+const WINDOW_PRESETS: Array<{ key: HistoryPresetKey; labelKey: string; sec?: number }> = [
+  { key: 'live', labelKey: 'charts.presets.live' },
+  { key: '1200', labelKey: 'charts.presets.1200', sec: 1200 },
+  { key: '3600', labelKey: 'charts.presets.3600', sec: 3600 },
+  { key: '21600', labelKey: 'charts.presets.21600', sec: 21600 },
+  { key: '86400', labelKey: 'charts.presets.86400', sec: 86400 },
+  { key: 'all', labelKey: 'charts.presets.all' },
 ];
 
-function formatEpochDateTime(ts: number | null | undefined): string {
+function formatEpochDateTime(ts: number | null | undefined, locale = 'es'): string {
   if (!ts || !Number.isFinite(ts)) return '--';
   const d = new Date(ts * 1000);
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm} ${d.toLocaleTimeString('es-ES')}`;
+  return `${dd}/${mm} ${d.toLocaleTimeString(locale)}`;
 }
 
 export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
@@ -51,6 +52,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   theme,
   onClose,
 }) => {
+  const { locale, t } = useI18n();
   const hasMetricKeys = useMemo(() => spec.series.some((s) => Boolean(s.metricKey)), [spec.series]);
 
   const [preset, setPreset] = useState<HistoryPresetKey>('live');
@@ -472,12 +474,12 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 {isLiveNow ? (
                   <>
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 cockpit-live-dot" />
-                    Tiempo real
+                    {t('charts.realtime')}
                   </>
                 ) : (
                   <>
                     <Clock className="h-3 w-3" />
-                    Inspección histórica
+                    {t('charts.history_inspect')}
                   </>
                 )}
               </span>
@@ -485,13 +487,13 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 truncate">
               {spec.subtitle}
               {metaBounds.totalSamples > 0
-                ? ` · ${metaBounds.totalSamples.toLocaleString('es-ES')} muestras en recursos_history.db`
+                ? t('charts.samples_in_db', { count: metaBounds.totalSamples.toLocaleString(locale) })
                 : ''}
             </p>
           </div>
           <button
             type="button"
-            aria-label="Cerrar gráfica ampliada"
+            aria-label={t('charts.close_aria')}
             onClick={onClose}
             className="cockpit-subtile flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
           >
@@ -503,7 +505,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         {hasMetricKeys && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <LayoutGroup id="expanded-presets">
-              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Ventana temporal">
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('charts.window_aria')}>
                 {WINDOW_PRESETS.map((p) => {
                   const active = preset === p.key;
                   return (
@@ -518,14 +520,14 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                       }`}
                     >
                       {active && <MorphPill layoutId="expanded-preset-pill" className="rounded-xl" />}
-                      <span className="relative z-10">{p.label}</span>
+                      <span className="relative z-10">{t(p.labelKey)}</span>
                     </button>
                   );
                 })}
               </div>
             </LayoutGroup>
 
-            <div className="flex items-center gap-1.5" role="group" aria-label="Modo de interacción táctil">
+            <div className="flex items-center gap-1.5" role="group" aria-label={t('charts.touch_mode_aria')}>
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 type="button"
@@ -537,7 +539,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 }`}
               >
                 <Crosshair className="h-3.5 w-3.5" />
-                <span>Inspeccionar</span>
+                <span>{t('charts.inspect')}</span>
               </motion.button>
               <motion.button
                 whileTap={{ scale: 0.95 }}
@@ -550,7 +552,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 }`}
               >
                 <MoveHorizontal className="h-3.5 w-3.5" />
-                <span>Deslizar tiempo</span>
+                <span>{t('charts.pan_time')}</span>
               </motion.button>
             </div>
           </div>
@@ -560,7 +562,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         <div className="cockpit-subtile relative mt-3 p-3">
           {loadingHistory && (
             <div className="cockpit-pill-cyan pointer-events-none absolute right-3 top-2 z-10 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
-              Cargando historial...
+              {t('charts.loading_history')}
             </div>
           )}
           <TelemetryChart
@@ -579,18 +581,16 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
             <span>
               {isLiveNow
-                ? `Inicio ventana: ${resolvedTimestamps[0] || '--'}`
-                : `Desde: ${formatEpochDateTime(historyData?.window_start_ts)}`}
+                ? t('charts.window_start', { time: resolvedTimestamps[0] || '--' })
+                : t('charts.from_time', { time: formatEpochDateTime(historyData?.window_start_ts, locale) })}
             </span>
             <span className="text-center text-slate-400 dark:text-slate-500">
-              {interactionMode === 'pan'
-                ? 'Arrastra hacia la derecha para retroceder · Rueda o botones también navegan'
-                : 'Toca o desliza sobre la gráfica para inspeccionar valores exactos'}
+              {interactionMode === 'pan' ? t('charts.pan_help_drag') : t('charts.pan_help_hover')}
             </span>
             <span>
               {isLiveNow
-                ? `Último: ${resolvedTimestamps[resolvedTimestamps.length - 1] || '--'}`
-                : `Hasta: ${formatEpochDateTime(historyData?.window_end_ts)}`}
+                ? t('time.last_sample', { time: resolvedTimestamps[resolvedTimestamps.length - 1] || '--' })
+                : t('charts.until_time', { time: formatEpochDateTime(historyData?.window_end_ts, locale) })}
             </span>
           </div>
         </div>
@@ -604,15 +604,18 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
                   <span className="inline-flex items-center gap-1 font-medium">
                     <Database className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
-                    Línea temporal registrada ({formatEpochDateTime(oldestTs)} → {formatEpochDateTime(newestTs)})
+                    {t('charts.timeline_range', {
+                      from: formatEpochDateTime(oldestTs, locale),
+                      to: formatEpochDateTime(newestTs, locale),
+                    })}
                   </span>
                   <span className="font-mono font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
-                    Cursor: {formatEpochDateTime(activeEndTs)}
+                    {t('charts.cursor_time', { time: formatEpochDateTime(activeEndTs, locale) })}
                   </span>
                 </div>
                 <input
                   type="range"
-                  aria-label="Deslizador cronológico de historial"
+                  aria-label={t('charts.timeline_slider_aria')}
                   min={oldestTs + Math.min(30, totalSpanSec * 0.1)}
                   max={newestTs}
                   step={Math.max(1, Math.floor(totalSpanSec / 400))}
@@ -642,7 +645,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <Rewind className="h-4 w-4" />
-                <span>Más antiguo</span>
+                <span>{t('charts.oldest')}</span>
               </button>
               <button
                 type="button"
@@ -651,7 +654,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <ChevronLeft className="h-4 w-4" />
-                <span>Retroceder</span>
+                <span>{t('charts.step_back')}</span>
               </button>
               <button
                 type="button"
@@ -659,7 +662,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 onClick={handleStepForward}
                 className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                <span>Avanzar</span>
+                <span>{t('charts.step_forward')}</span>
                 <ChevronRight className="h-4 w-4" />
               </button>
               <button
@@ -672,7 +675,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 }`}
               >
                 <Radio className="h-4 w-4" />
-                <span>{isLiveNow ? 'En vivo activo' : 'Volver a vivo'}</span>
+                <span>{isLiveNow ? t('charts.live_active') : t('charts.back_to_live')}</span>
               </button>
             </div>
           </div>
@@ -699,10 +702,10 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                   <span>{st.label}</span>
                 </div>
                 <div className="flex items-center gap-3 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
-                  <span>Mín {st.min.toFixed(st.decimals)}</span>
-                  <span>Med {st.avg.toFixed(st.decimals)}</span>
+                  <span>{t('charts.min_val', { val: st.min.toFixed(st.decimals) })}</span>
+                  <span>{t('charts.avg_val', { val: st.avg.toFixed(st.decimals) })}</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
-                    Máx {st.max.toFixed(st.decimals)} {st.unit}
+                    {t('charts.max_val', { val: st.max.toFixed(st.decimals), unit: st.unit })}
                   </span>
                 </div>
               </div>

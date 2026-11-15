@@ -5,15 +5,17 @@ plugins {
 
 val canonicalVersionFile = file("../../VERSION")
 val canonicalVersion = if (canonicalVersionFile.exists()) {
-    canonicalVersionFile.readText().trim().ifEmpty { "12.0.1" }
+    canonicalVersionFile.readText().trim().ifEmpty {
+        throw GradleException("El archivo VERSION raíz está vacío.")
+    }
 } else {
-    "12.0.1"
+    throw GradleException("No se encontró el archivo canónico ../../VERSION.")
 }
 val verParts = canonicalVersion.split(".").mapNotNull { it.toIntOrNull() }
 val computedVersionCode = if (verParts.size >= 3) {
     verParts[0] * 10000 + verParts[1] * 100 + verParts[2]
 } else {
-    120001
+    throw GradleException("VERSION inválida para calcular versionCode: $canonicalVersion")
 }
 
 android {
@@ -77,6 +79,12 @@ android {
         buildConfig = true
     }
 
+    sourceSets {
+        getByName("main") {
+            assets.srcDir(layout.buildDirectory.dir("generated/recursos_assets"))
+        }
+    }
+
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
@@ -86,6 +94,15 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+val syncRecursosDictionary by tasks.registering(Copy::class) {
+    from(file("../../i18n/dictionary.csv"))
+    into(layout.buildDirectory.dir("generated/recursos_assets/i18n"))
+}
+
+tasks.named("preBuild") {
+    dependsOn(syncRecursosDictionary)
 }
 
 dependencies {

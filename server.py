@@ -24,6 +24,46 @@ import urllib.request
 import urllib.parse
 
 try:
+    from i18n_catalog import (
+        get_canonical_version,
+        get_dictionary_bytes,
+        get_dictionary_csv_bytes,
+        get_gpu_process_label,
+        get_hardware_disk_label,
+        get_hardware_transport_label,
+        get_systemd_role_label,
+        t as i18n_t,
+    )
+except ImportError:
+    def get_canonical_version(base_dir=None):
+        v_path = os.path.join(base_dir or os.path.dirname(os.path.abspath(__file__)), "VERSION")
+        if os.path.isfile(v_path):
+            with open(v_path, "r", encoding="utf-8") as vf:
+                return vf.read().strip().lstrip("vV") or "0.0.0"
+        return "0.0.0"
+
+    def i18n_t(key, lang=None, base_dir=None, fallback=None, **params):
+        return (fallback or str(key)).format(**params) if params else (fallback or str(key))
+
+    def get_dictionary_bytes(base_dir=None):
+        return b"{}"
+
+    def get_dictionary_csv_bytes(base_dir=None):
+        return b"key,context,es\n"
+
+    def get_hardware_transport_label(transport_key, lang=None, base_dir=None):
+        return str(transport_key)
+
+    def get_hardware_disk_label(label_key, params=None, lang=None, base_dir=None):
+        return str((params or {}).get("name") or (params or {}).get("leaf") or label_key)
+
+    def get_gpu_process_label(proc_key, fallback=None, lang=None, base_dir=None):
+        return fallback or str(proc_key)
+
+    def get_systemd_role_label(unit_name, lang=None, base_dir=None):
+        return ""
+
+try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 except Exception:
     AESGCM = None
@@ -4029,7 +4069,7 @@ def fetch_cached_map_tile(style, z, x, y):
             ("arcgis-light", f"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{zi}/{yi}/{xi}"),
         ]
 
-    ver_ua = get_app_version() if callable(globals().get("get_app_version")) else "12.8.0"
+    ver_ua = get_canonical_version(BASE_DIR) if "get_canonical_version" in globals() else "0.0.0"
     headers = {
         "User-Agent": f"RecursosCockpit/{ver_ua} (+https://github.com/cminewarIA/recursos-ui)",
         "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
@@ -4390,29 +4430,9 @@ def resolve_request_domain(handler=None):
 
 def get_app_version():
     """
-    Lee la versión oficial canónica desde el archivo centralizado VERSION en la raíz del proyecto.
-    Si no existe o falla la lectura, recurre a package.json o al valor base.
+    Llamada única a la versión oficial canónica definida en ./VERSION mediante i18n_catalog.
     """
-    v_file = os.path.join(BASE_DIR, "VERSION")
-    if os.path.isfile(v_file):
-        try:
-            with open(v_file, "r", encoding="utf-8") as vf:
-                v = vf.read().strip()
-                if v:
-                    return v
-        except Exception:
-            pass
-
-    pkg_path = os.path.join(BASE_DIR, "package.json")
-    if os.path.isfile(pkg_path):
-        try:
-            with open(pkg_path, "r", encoding="utf-8") as pf:
-                pkg_json = json.load(pf)
-                return pkg_json.get("version", "0.0.0")
-        except Exception:
-            pass
-
-    return "0.0.0"
+    return get_canonical_version(BASE_DIR)
 
 def get_display_version(pkg_ver=None):
     ver = (pkg_ver or get_app_version()).strip()
@@ -6279,7 +6299,7 @@ def get_gpu_info():
             
             clean_cmd = pname.strip() if pname else ''
             first_token = clean_cmd.split()[0] if clean_cmd else ''
-            clean_name = os.path.basename(first_token) if first_token else 'Proceso GPU'
+            clean_name = os.path.basename(first_token) if first_token else get_gpu_process_label('gpu_process', 'Proceso GPU', base_dir=BASE_DIR)
             
             try:
                 pid_int = int(pid_str)
@@ -6294,18 +6314,25 @@ def get_gpu_info():
                 pass
                 
             lower = clean_name.lower()
+            name_key = None
             if 'chrome' in lower:
-                display_name = 'Google Chrome (GPU / Render)'
+                name_key = 'chrome_gpu'
+                display_name = get_gpu_process_label(name_key, 'Google Chrome (GPU / Render)', base_dir=BASE_DIR)
             elif 'gnome-shell' in lower:
-                display_name = 'GNOME Shell (Compositor Wayland)'
+                name_key = 'gnome_shell'
+                display_name = get_gpu_process_label(name_key, 'GNOME Shell (Compositor Wayland)', base_dir=BASE_DIR)
             elif 'xwayland' in lower:
-                display_name = 'Xwayland (Compatibilidad X11)'
+                name_key = 'xwayland'
+                display_name = get_gpu_process_label(name_key, 'Xwayland (Compatibilidad X11)', base_dir=BASE_DIR)
             elif 'ptyxis' in lower:
-                display_name = 'Ptyxis (Terminal)'
+                name_key = 'ptyxis'
+                display_name = get_gpu_process_label(name_key, 'Ptyxis (Terminal)', base_dir=BASE_DIR)
             elif 'nautilus' in lower:
-                display_name = 'Nautilus (Archivos)'
+                name_key = 'nautilus'
+                display_name = get_gpu_process_label(name_key, 'Nautilus (Archivos)', base_dir=BASE_DIR)
             elif 'ffmpeg' in lower:
-                display_name = 'FFmpeg (Transcodificación NVENC)'
+                name_key = 'ffmpeg_nvenc'
+                display_name = get_gpu_process_label(name_key, 'FFmpeg (Transcodificación NVENC)', base_dir=BASE_DIR)
             elif 'python' in lower:
                 if 'asterisk' in clean_cmd:
                     display_name = 'Python (Asterisk PBX / Whisper)'
@@ -6314,11 +6341,14 @@ def get_gpu_info():
                 else:
                     display_name = f'Python3 ({clean_name})'
             else:
+                if not first_token:
+                    name_key = 'gpu_process'
                 display_name = clean_name
                 
             processes.append({
                 "pid": pid_str,
                 "name": display_name,
+                "name_key": name_key,
                 "raw_name": clean_name,
                 "full_path": pname,
                 "used_memory": pmem,
@@ -6574,27 +6604,36 @@ def _read_lsblk_metadata():
     return by_path, by_mount, candidates
 
 
-def _format_transport_badge(kind, fstype, tran, dev_name):
+def _resolve_transport_info(kind, fstype, tran, dev_name):
     t = (tran or "").strip().lower()
     fs = (fstype or "").strip().lower()
     dn = (dev_name or "").strip().lower()
     if kind == "network":
         if fs in ("cifs", "smb", "smb3"):
-            return "NAS · SMB"
+            tkey = "nas_smb"
+            return tkey, get_hardware_transport_label(tkey, base_dir=BASE_DIR)
         if fs.startswith("nfs"):
-            return "NAS · NFS"
-        return f"Red · {fs.upper() or 'Remoto'}"
+            tkey = "nas_nfs"
+            return tkey, get_hardware_transport_label(tkey, base_dir=BASE_DIR)
+        return "local_disk", f"{fs.upper() or 'NET'}"
     if t == "usb":
-        return "USB Extraíble"
-    if t == "mmc" or "mmcblk" in dn:
-        return "Tarjeta SD/MMC"
-    if t == "nvme" or "nvme" in dn:
-        return "SSD NVMe"
-    if t in ("sata", "ata"):
-        return "Disco SATA"
-    if kind == "removable":
-        return "Extraíble"
-    return "Disco local"
+        tkey = "usb_removable"
+    elif t == "mmc" or "mmcblk" in dn:
+        tkey = "sd_mmc"
+    elif t == "nvme" or "nvme" in dn:
+        tkey = "nvme_ssd"
+    elif t in ("sata", "ata"):
+        tkey = "sata_disk"
+    elif kind == "removable":
+        tkey = "removable"
+    else:
+        tkey = "local_disk"
+    return tkey, get_hardware_transport_label(tkey, base_dir=BASE_DIR)
+
+
+def _format_transport_badge(kind, fstype, tran, dev_name):
+    _, label = _resolve_transport_info(kind, fstype, tran, dev_name)
+    return label
 
 
 def _compute_pool_key(kind, dev_name, mpoint, total_bytes, blk_meta=None):
@@ -6679,7 +6718,7 @@ def fetch_disks_worker():
                     tran = (blk or {}).get("tran") or ""
                     model = (blk or {}).get("model") or ""
                     fs_label = (blk or {}).get("fs_label") or ""
-                    transport = _format_transport_badge(kind, fstype, tran, dev_name)
+                    transport_key, transport = _resolve_transport_info(kind, fstype, tran, dev_name)
                     pool_key = _compute_pool_key(kind, dev_name, mpoint, total, blk)
 
                     is_primary = pool_key not in pool_primary_mount
@@ -6688,17 +6727,38 @@ def fetch_disks_worker():
                         pool_primary_mount[pool_key] = mpoint
 
                     if mpoint == "/":
-                        label = f"Sistema Raíz · {model or dev_name}" if (model or dev_name) else "Sistema Raíz (/)"
+                        if model or dev_name:
+                            label_key = "root_system"
+                            label_params = {"name": model or dev_name}
+                        else:
+                            label_key = "root_plain"
+                            label_params = {}
                     elif kind == "network":
                         share_leaf = os.path.basename(mpoint.rstrip("/")) or dev_name
                         remote_host = dev_name.lstrip("/").split("/", 1)[0] if dev_name.startswith("//") else dev_name.split(":", 1)[0]
-                        label = f"{share_leaf} · NAS {remote_host}" if remote_host else f"Recurso Red · {share_leaf}"
+                        if remote_host:
+                            label_key = "network_share"
+                            label_params = {"leaf": share_leaf, "host": remote_host}
+                        else:
+                            label_key = "network_share_plain"
+                            label_params = {"leaf": share_leaf}
                     elif kind == "removable":
                         leaf = fs_label or os.path.basename(mpoint.rstrip("/")) or (blk or {}).get("name") or dev_name
-                        label = f"{model} · {leaf}" if model and model.lower() not in leaf.lower() else f"Memoria extraíble · {leaf}"
+                        if model and model.lower() not in leaf.lower():
+                            label_key = "named_volume"
+                            label_params = {"model": model, "name": leaf}
+                        else:
+                            label_key = "removable_media"
+                            label_params = {"name": leaf}
                     else:
                         leaf = fs_label or os.path.basename(mpoint.rstrip("/")) or mpoint
-                        label = f"{model} · {leaf}" if model else f"Volumen {leaf}"
+                        if model:
+                            label_key = "named_volume"
+                            label_params = {"model": model, "name": leaf}
+                        else:
+                            label_key = "device_volume"
+                            label_params = {"name": leaf}
+                    label = get_hardware_disk_label(label_key, label_params, base_dir=BASE_DIR)
 
                     root_disk = (blk or {}).get("root_disk") or ""
                     kname = (blk or {}).get("kname") or ""
@@ -6714,10 +6774,14 @@ def fetch_disks_worker():
                     disks.append({
                         "mountpoint": mpoint,
                         "label": label,
+                        "label_key": label_key,
+                        "label_params": label_params,
                         "device": dev_name,
                         "fstype": part.fstype or fstype,
+                        "fstype_key": None if (part.fstype or fstype) else "unformatted",
                         "kind": kind,
                         "transport": transport,
+                        "transport_key": transport_key,
                         "model": model or None,
                         "mounted": True,
                         "is_removable": is_removable,
@@ -6773,14 +6837,19 @@ def fetch_disks_worker():
                 if not is_rem and not bfstype:
                     continue
                 kind = "removable" if is_rem else "local"
-                transport = _format_transport_badge(kind, bfstype, blk.get("tran"), bpath)
+                transport_key, transport = _resolve_transport_info(kind, bfstype, blk.get("tran"), bpath)
                 model = blk.get("model") or ""
                 leaf = blk.get("fs_label") or blk.get("name") or bpath
-                label = (
-                    f"{model} · {leaf}"
-                    if model and model.lower() not in leaf.lower()
-                    else (f"Memoria extraíble · {leaf}" if is_rem else f"Disco {leaf}")
-                )
+                if model and model.lower() not in leaf.lower():
+                    label_key = "named_volume"
+                    label_params = {"model": model, "name": leaf}
+                elif is_rem:
+                    label_key = "removable_media"
+                    label_params = {"name": leaf}
+                else:
+                    label_key = "disk_generic"
+                    label_params = {"name": leaf}
+                label = get_hardware_disk_label(label_key, label_params, base_dir=BASE_DIR)
                 pool_key = _compute_pool_key(kind, bpath, bpath, bsize, blk)
                 root_disk = blk.get("root_disk") or ""
                 kname = blk.get("kname") or ""
@@ -6788,10 +6857,14 @@ def fetch_disks_worker():
                 disks.append({
                     "mountpoint": bpath,
                     "label": label,
+                    "label_key": label_key,
+                    "label_params": label_params,
                     "device": bpath,
-                    "fstype": bfstype or "sin formato",
+                    "fstype": bfstype or i18n_t("hardware.storage.fstype.unformatted", base_dir=BASE_DIR, fallback="sin formato"),
+                    "fstype_key": None if bfstype else "unformatted",
                     "kind": kind,
                     "transport": transport,
+                    "transport_key": transport_key,
                     "model": model or None,
                     "mounted": False,
                     "is_removable": is_rem,
@@ -6814,11 +6887,14 @@ def fetch_disks_worker():
                     if total > 0:
                         disks.append({
                             "mountpoint": "/",
-                            "label": "Sistema Raíz (/)",
+                            "label": get_hardware_disk_label("root_plain", {}, base_dir=BASE_DIR),
+                            "label_key": "root_plain",
+                            "label_params": {},
                             "device": "rootfs",
                             "fstype": "ext4",
                             "kind": "local",
-                            "transport": "Disco local",
+                            "transport": get_hardware_transport_label("local_disk", base_dir=BASE_DIR),
+                            "transport_key": "local_disk",
                             "model": None,
                             "mounted": True,
                             "is_removable": False,
@@ -6963,13 +7039,17 @@ def fetch_docker_worker():
                 states = p_sys.stdout.strip().split('\n')
                 for idx, (unit_id, friendly_name, role_tag) in enumerate(SYSTEMD_MONITORED_UNITS):
                     st = states[idx].strip() if idx < len(states) else "unknown"
+                    role_key = unit_id.replace(".service", "")
+                    localized_role = get_systemd_role_label(role_key, base_dir=BASE_DIR) or role_tag
                     sysd_list.append({
                         "unit": unit_id,
                         "name": friendly_name,
-                        "role": role_tag,
-                        "description": role_tag,
+                        "role": localized_role,
+                        "role_key": role_key,
+                        "description": localized_role,
                         "active": (st == "active"),
                         "state": st,
+                        "state_key": st,
                         "active_state": st
                     })
             except Exception:
@@ -7899,9 +7979,11 @@ def fetch_wifi_worker():
                             if line.startswith('=== '):
                                 parts = line.split()
                                 if len(parts) >= 3:
+                                    w_band_key = 'wifi_5ghz' if parts[1] == 'eth6' else 'wifi_24ghz'
                                     current = {
                                         'conn_type': 'wifi',
-                                        'band': '5 GHz' if parts[1] == 'eth6' else '2.4 GHz',
+                                        'band': i18n_t(f'hardware.net.band.{w_band_key}', base_dir=BASE_DIR),
+                                        'band_key': w_band_key,
                                         'iface': parts[1],
                                         'mac': parts[2].upper(),
                                         'in_network': 0,
@@ -8088,7 +8170,8 @@ def fetch_wifi_worker():
                 c_meta = classify_device(d_name, w_mac)
                 cable_clients.append({
                     "conn_type": "cable",
-                    "band": "Cable LAN",
+                    "band": i18n_t("hardware.net.band.cable_lan", base_dir=BASE_DIR),
+                    "band_key": "cable_lan",
                     "iface": "LAN",
                     "mac": w_mac,
                     "ip": c_ip,
@@ -8096,8 +8179,9 @@ def fetch_wifi_worker():
                     "dev_type": c_meta['type'],
                     "dev_icon": c_meta['icon'],
                     "brand": c_meta.get('brand', 'generic'),
-                    "brand_name": c_meta.get('brand_name', 'Dispositivo LAN'),
-                    "vendor": c_meta.get('brand_name', 'Dispositivo LAN'),
+                    "brand_name": c_meta.get('brand_name') or i18n_t("hardware.net.device.lan_device", base_dir=BASE_DIR),
+                    "vendor": c_meta.get('brand_name') or i18n_t("hardware.net.device.lan_device", base_dir=BASE_DIR),
+                    "vendor_key": None if c_meta.get('brand_name') else "lan_device",
                     "status": "online",
                     "online": True,
                     "is_online": True,
@@ -8157,14 +8241,17 @@ def fetch_wifi_worker():
                     known_ips.add(c_ip)
                 d_name = friendly_names.get(w_mac) or info.get('name') or (c_ip if c_ip != 'Desconocida' else w_mac)
                 c_meta = classify_device(d_name, w_mac)
-                band_val = mesh_info.get('band', '5 GHz')
-                if '2.4' in band_val:
+                band_raw = mesh_info.get('band', '')
+                band_key = 'wifi_24ghz' if '2.4' in band_raw else ('wifi_6ghz' if '6' in band_raw else 'wifi_5ghz')
+                band_val = i18n_t(f'hardware.net.band.{band_key}', base_dir=BASE_DIR)
+                if band_key == 'wifi_24ghz':
                     c_24 += 1
                 else:
                     c_5 += 1
                 dedup_wifi.append({
                     "conn_type": "wifi",
                     "band": band_val,
+                    "band_key": band_key,
                     "iface": "AiMesh",
                     "mac": w_mac,
                     "ip": c_ip,
@@ -8176,8 +8263,9 @@ def fetch_wifi_worker():
                     "dev_type": c_meta['type'],
                     "dev_icon": c_meta['icon'],
                     "brand": c_meta.get('brand', 'generic'),
-                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
-                    "vendor": c_meta.get('brand_name', 'Dispositivo'),
+                    "brand_name": c_meta.get('brand_name') or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+                    "vendor": c_meta.get('brand_name') or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+                    "vendor_key": None if c_meta.get('brand_name') else "generic",
                     "status": "online",
                     "online": True,
                     "is_online": True,
@@ -8211,7 +8299,8 @@ def fetch_wifi_worker():
                             if is_wired_fallback:
                                 cable_clients.append({
                                     "conn_type": "cable",
-                                    "band": "Cable LAN",
+                                    "band": i18n_t("hardware.net.band.cable_lan", base_dir=BASE_DIR),
+                                    "band_key": "cable_lan",
                                     "iface": "LAN",
                                     "mac": n_mac,
                                     "ip": n_ip,
@@ -8223,8 +8312,9 @@ def fetch_wifi_worker():
                                     "dev_type": dev_type,
                                     "dev_icon": c_meta['icon'],
                                     "brand": c_meta.get('brand', 'generic'),
-                                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
-                                    "vendor": c_meta.get('brand_name', 'Dispositivo'),
+                                    "brand_name": c_meta.get('brand_name') or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+                                    "vendor": c_meta.get('brand_name') or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+                                    "vendor_key": None if c_meta.get('brand_name') else "generic",
                                     "status": "online" if is_active else "idle",
                                     "online": is_active,
                                     "is_online": is_active,
@@ -8234,13 +8324,15 @@ def fetch_wifi_worker():
                             else:
                                 if is_24:
                                     c_24 += 1
-                                    band_val = "2.4 GHz"
+                                    band_key = "wifi_24ghz"
                                 else:
                                     c_5 += 1
-                                    band_val = "Wi-Fi 5 GHz"
+                                    band_key = "wifi_5ghz"
+                                band_val = i18n_t(f"hardware.net.band.{band_key}", base_dir=BASE_DIR)
                                 wifi_clients.append({
                                     "conn_type": "wifi",
                                     "band": band_val,
+                                    "band_key": band_key,
                                     "iface": "arp-lan",
                                     "mac": n_mac,
                                     "ip": n_ip,
@@ -8252,8 +8344,9 @@ def fetch_wifi_worker():
                                     "dev_type": dev_type,
                                     "dev_icon": c_meta['icon'],
                                     "brand": c_meta.get('brand', 'generic'),
-                                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
-                                    "vendor": c_meta.get('brand_name', 'Dispositivo'),
+                                    "brand_name": c_meta.get('brand_name') or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+                                    "vendor": c_meta.get('brand_name') or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+                                    "vendor_key": None if c_meta.get('brand_name') else "generic",
                                     "status": "online" if is_active else "idle",
                                     "online": is_active,
                                     "is_online": is_active,
@@ -8289,9 +8382,11 @@ def fetch_wifi_worker():
                 c_meta = classify_device(d_name, r_mac)
                 dev_type = c_meta.get("type", "generic")
                 is_wired_off = (dev_type in ("server", "pc", "nas", "network", "tv", "console")) or has_friendly
+                off_band_key = "lan_offline" if is_wired_off else "wifi_offline"
                 off_entry = {
                     "conn_type": "cable" if is_wired_off else "wifi",
-                    "band": "LAN (Offline)" if is_wired_off else "Wi-Fi (Offline)",
+                    "band": i18n_t(f"hardware.net.band.{off_band_key}", base_dir=BASE_DIR),
+                    "band_key": off_band_key,
                     "iface": "pihole-wol",
                     "mac": r_mac,
                     "ip": r_ip,
@@ -8303,8 +8398,9 @@ def fetch_wifi_worker():
                     "dev_type": dev_type,
                     "dev_icon": c_meta['icon'],
                     "brand": c_meta.get('brand', 'generic'),
-                    "brand_name": c_meta.get('brand_name', 'Dispositivo'),
-                    "vendor": r_info.get('vendor') or c_meta.get('brand_name', 'Dispositivo'),
+                    "brand_name": c_meta.get('brand_name') or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+                    "vendor": r_info.get('vendor') or c_meta.get('brand_name') or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+                    "vendor_key": None if (r_info.get('vendor') or c_meta.get('brand_name')) else "generic",
                     "status": "offline",
                     "online": False,
                     "is_online": False,
@@ -9576,6 +9672,29 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # 1b-dict. DICCIONARIO TABULAR CENTRALIZADO (CSV Y JSON DERIVADO AL VUELO)
+        elif clean_path == "/api/dictionary":
+            dict_bytes = get_dictionary_bytes(BASE_DIR)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(dict_bytes)))
+            self.end_headers()
+            self.wfile.write(dict_bytes)
+            return
+
+        elif clean_path == "/i18n/dictionary.csv":
+            csv_bytes = get_dictionary_csv_bytes(BASE_DIR)
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/csv; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(csv_bytes)))
+            self.end_headers()
+            self.wfile.write(csv_bytes)
+            return
+
         # 1b. API VERSION & GITHUB SYNC STATUS
         elif clean_path == "/api/version":
             if not auth["is_trusted"]:
@@ -10299,11 +10418,12 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
 
         # 1. Desbloqueo remoto con clave maestra (Blindado contra fuerza bruta)
         if clean_path in ("/api/auth/unlock", "/api/unlock"):
+            req_lang = self.headers.get('X-Recursos-Lang') or self.headers.get('Accept-Language')
             locked, rem_time = is_ip_locked_out(client_ip)
             if locked:
                 resp = json.dumps({
                     "success": False,
-                    "error": f"Demasiados intentos fallidos. IP temporalmente bloqueada durante {rem_time} segundos."
+                    "error": i18n_t("errors.too_many_attempts_secs", lang=req_lang, base_dir=BASE_DIR, seconds=rem_time)
                 }).encode('utf-8')
                 self.send_response(429)
                 self.send_header('Content-Type', 'application/json')
@@ -10363,7 +10483,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                         devices[dev_id] = new_entry
                     save_trusted_devices(consolidate_devices_by_hardware(devices))
 
-                resp = json.dumps({"success": True, "token": new_token, "device_id": dev_id, "message": "Certificado de dispositivo emitido con éxito"}).encode('utf-8')
+                resp = json.dumps({"success": True, "token": new_token, "device_id": dev_id, "message": i18n_t("errors.cert_issued", lang=req_lang, base_dir=BASE_DIR)}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_security_headers()
@@ -10375,9 +10495,9 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 time.sleep(1)  # Mitigación activa contra fuerza bruta
                 is_locked, remaining = record_auth_failure(client_ip)
                 if is_locked:
-                    err_msg = f"Demasiados intentos fallidos. IP bloqueada durante {LOCKOUT_DURATION//60} minutos."
+                    err_msg = i18n_t("errors.too_many_attempts", lang=req_lang, base_dir=BASE_DIR, minutes=LOCKOUT_DURATION // 60)
                 else:
-                    err_msg = f"Clave maestra incorrecta. Quedan {remaining} intentos antes del bloqueo temporal."
+                    err_msg = i18n_t("errors.bad_master_key", lang=req_lang, base_dir=BASE_DIR, remaining=remaining)
                 resp = json.dumps({"success": False, "error": err_msg}).encode('utf-8')
                 self.send_response(401)
                 self.send_header('Content-Type', 'application/json')
@@ -10440,7 +10560,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     save_trusted_devices(devices)
                     resp = json.dumps({"success": True}).encode('utf-8')
                 else:
-                    resp = json.dumps({"success": False, "error": "Dispositivo no encontrado"}).encode('utf-8')
+                    req_lang_rev = self.headers.get('X-Recursos-Lang') or self.headers.get('Accept-Language')
+                    resp = json.dumps({"success": False, "error": i18n_t("errors.device_not_found", lang=req_lang_rev, base_dir=BASE_DIR)}).encode('utf-8')
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -11037,72 +11158,6 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             auth = check_trust_status(self)
             if not auth["is_trusted"]:
                 self.send_response(403)
-                self.send_security_headers()
-                self.end_headers()
-                return
-
-            body, err_code = self._read_json_body(max_bytes=2048)
-            if err_code:
-                self.send_response(err_code)
-                self.send_security_headers()
-                self.end_headers()
-                return
-            try:
-                user_id = int(str((body or {}).get('user_id', '')).strip())
-            except Exception:
-                user_id = 0
-
-            if user_id <= 0:
-                resp = json.dumps({"success": False, "error": "El ID de usuario/chat debe ser un número entero válido"}).encode('utf-8')
-                self.send_response(400)
-                self.send_header('Content-Type', 'application/json')
-                self.send_security_headers()
-                self.send_header('Content-Length', str(len(resp)))
-                self.end_headers()
-                self.wfile.write(resp)
-                return
-
-            wl = load_tg_whitelist()
-            wl.add(user_id)
-            save_tg_whitelist(wl)
-
-            record_tg_activity(
-                direction="out",
-                msg_type="whitelist_update",
-                target=user_id,
-                user_name="Ajustes Dashboard",
-                title="Usuario añadido a lista blanca",
-                content=f"Se ha autorizado al usuario con Chat ID {user_id} para acceder al bot de Telegram.",
-                status="ok"
-            )
-
-            resp = json.dumps({"success": True, "message": f"Usuario {user_id} añadido a la lista blanca", "allowed_users": list(wl)}).encode('utf-8')
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_security_headers()
-            self.send_header('Content-Length', str(len(resp)))
-            self.end_headers()
-            self.wfile.write(resp)
-            return
-
-        # Eliminar usuario de la lista blanca de Telegram
-        elif clean_path == "/api/telegram_bot/whitelist/remove":
-            auth = check_trust_status(self)
-            if not auth["is_trusted"]:
-                self.send_response(403)
-                self.send_security_headers()
-                self.end_headers()
-                return
-
-            body, err_code = self._read_json_body(max_bytes=2048)
-            if err_code:
-                self.send_response(err_code)
-                self.send_security_headers()
-                self.end_headers()
-                return
-            try:
-                user_id = int(str((body or {}).get('user_id', '')).strip())
-            except Exception:
                 user_id = 0
 
             wl = load_tg_whitelist()
@@ -11320,6 +11375,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             ALLOWED_WEB_SYNC_FILES = {
                 "VERSION",
                 "package.json",
+                "i18n_catalog.py",
+                "i18n/dictionary.csv",
                 "static/index.html",
                 "static/manual.html",
                 "docs/index.html",

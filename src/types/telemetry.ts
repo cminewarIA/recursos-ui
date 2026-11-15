@@ -38,6 +38,7 @@ export interface CpuInfo {
 export interface GpuProcessInfo {
   pid?: string;
   name?: string;
+  name_key?: string;
   raw_name?: string;
   full_path?: string;
   used_memory?: string;
@@ -96,10 +97,14 @@ export interface DiskIoSample {
 export interface DiskInfo {
   mountpoint: string;
   label?: string;
+  label_key?: string;
+  label_params?: Record<string, string>;
   device?: string;
   fstype?: string;
+  fstype_key?: string;
   kind?: 'local' | 'removable' | 'network';
   transport?: string;
+  transport_key?: string;
   model?: string | null;
   mounted?: boolean;
   is_removable?: boolean;
@@ -159,6 +164,7 @@ export interface GeoConnectionItem {
   lat?: number;
   lng?: number;
   city?: string;
+  city_key?: string;
   region?: string;
   country?: string;
   country_code?: string;
@@ -209,10 +215,12 @@ export interface WifiClient {
   name?: string;
   hostname?: string;
   vendor?: string;
+  vendor_key?: string;
   brand?: string;
   device_type?: string;
   interface?: string;
   band?: string;
+  band_key?: string;
   rssi?: number | string;
   tx_rate?: string;
   rx_rate?: string;
@@ -279,9 +287,11 @@ export interface SystemdService {
   name: string;
   unit?: string;
   role?: string;
+  role_key?: string;
   description?: string;
   active?: boolean;
   state?: string;
+  state_key?: string;
   active_state?: string;
   sub_state?: string;
   pid?: number;

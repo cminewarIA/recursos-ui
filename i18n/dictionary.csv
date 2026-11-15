@@ -1,0 +1,677 @@
+key,context,es
+__locale_name__,"Nombre visible del idioma para cada columna nueva (ej. Español, English, Français)",Español
+__default_locale__,Idioma predeterminado al arrancar (marca la columna elegida con *),*
+app.brand,Aplicación / Tema,Recursos
+app.brand_alt,Aplicación / Tema,Recursos CMineWar
+app.theme_dark,Aplicación / Tema,Oscuro
+app.theme_light,Aplicación / Tema,Claro
+app.cockpit_fallback,Aplicación / Tema,Cockpit
+app.toggle_to_light,Aplicación / Tema,Cambiar a modo claro
+app.toggle_to_dark,Aplicación / Tema,Cambiar a modo oscuro
+nav.inicio,Navegación principal,Inicio
+nav.equipo,Navegación principal,Equipo
+nav.red,Navegación principal,Red
+nav.programas,Navegación principal,Programas
+nav.mas,Navegación principal,Más
+nav.desktop_aria,Navegación principal,Navegación principal escritorio
+nav.bottom_aria,Navegación principal,Barra de navegación inferior
+status.healthy,Estados globales y energía,Sistema Saludable
+status.high_load,Estados globales y energía,Carga Alta
+status.reconnecting,Estados globales y energía,Reconectando
+status.reconnecting_server,Estados globales y energía,Reconectando con el servidor...
+status.verify_lan_required,Estados globales y energía,Este dispositivo requiere verificación inicial en la red Wi-Fi local.
+status.power_confirm_title,Estados globales y energía,¿Enviar señal de apagado?
+status.power_confirm_body_pre,Estados globales y energía,Se enviará una señal de suspensión o apagado a 
+status.power_confirm_cancel,Estados globales y energía,Cancelar
+status.power_confirm_yes,Estados globales y energía,"Sí, apagar"
+status.wake_sent,Estados globales y energía,Señal de encendido enviada.
+status.sleep_sent,Estados globales y energía,Señal de apagado enviada.
+status.signal_error,Estados globales y energía,No se pudo enviar la señal al dispositivo.
+status.action_sent,Estados globales y energía,Orden enviada al servidor.
+status.action_error,Estados globales y energía,No se pudo completar la acción.
+health.load_very_high,Estado de salud / carga,Carga muy alta
+health.load_elevated,Estado de salud / carga,Carga elevada
+health.working_well,Estado de salud / carga,Funcionando bien
+time.just_now,Tiempo y antigüedad relativa,ahora mismo
+time.seconds_ago,Tiempo y antigüedad relativa,hace {seconds} s
+time.minutes_ago,Tiempo y antigüedad relativa,hace {minutes} min
+time.minutes_seconds_ago,Tiempo y antigüedad relativa,hace {minutes} min {seconds} s
+time.now,Tiempo y antigüedad relativa,Ahora
+time.last_sample,Tiempo y antigüedad relativa,Último: {time}
+time.recent_notice,Tiempo y antigüedad relativa,aviso reciente
+time.recent_notices,Tiempo y antigüedad relativa,avisos recientes
+units.percent,Unidades de medida,%
+units.celsius,Unidades de medida,°C
+units.watts,Unidades de medida,W
+units.mhz,Unidades de medida,MHz
+units.mb_sec,Unidades de medida,MB/s
+units.mb_video,Unidades de medida,MB vídeo
+units.fps_60,Unidades de medida,60 imágenes/seg
+units.fps_30,Unidades de medida,30 imágenes/seg
+units.seconds_short,Unidades de medida,s
+units.cores,Unidades de medida,núcleos
+hardware.cpu.title,Lecturas y etiquetas de hardware,Procesador
+hardware.cpu.main_fallback,Lecturas y etiquetas de hardware,Procesador principal
+hardware.cpu.core_n,Lecturas y etiquetas de hardware,Núcleo {n}
+hardware.cpu.cores_summary,Lecturas y etiquetas de hardware,{model} ({cores} núcleos)
+hardware.cpu.threads_load,Lecturas y etiquetas de hardware,Carga por núcleo ({cores} hilos disponibles)
+hardware.cpu.physical_cores,Lecturas y etiquetas de hardware,Núcleos físicos: {count}
+hardware.cpu.logical_cores,Lecturas y etiquetas de hardware,Núcleos lógicos
+hardware.cpu.architecture,Lecturas y etiquetas de hardware,Arquitectura
+hardware.cpu.vendor,Lecturas y etiquetas de hardware,Fabricante
+hardware.cpu.cache,Lecturas y etiquetas de hardware,Caché
+hardware.cpu.base_freq,Lecturas y etiquetas de hardware,Frecuencia
+hardware.cpu.max_freq,Lecturas y etiquetas de hardware,Máxima
+hardware.cpu.load_avg,Lecturas y etiquetas de hardware,Carga media: {l1} / {l5} / {l15}
+hardware.cpu.idle,Lecturas y etiquetas de hardware,en reposo
+hardware.cpu.usage_current,Lecturas y etiquetas de hardware,Uso actual
+hardware.cpu.expand_aria,Lecturas y etiquetas de hardware,Ampliar gráfica de procesador
+hardware.cpu.inspect_aria,Lecturas y etiquetas de hardware,Inspeccionar historial completo de procesador
+hardware.cpu.chart_live_title,Lecturas y etiquetas de hardware,Uso del procesador en tiempo real
+hardware.cpu.chart_full_title,Lecturas y etiquetas de hardware,Uso del procesador e historial completo
+hardware.cpu.subtitle,Lecturas y etiquetas de hardware,Consumo de núcleos e historial térmico
+hardware.ram.title,Lecturas y etiquetas de hardware,Memoria RAM
+hardware.ram.short_title,Lecturas y etiquetas de hardware,Memoria
+hardware.ram.active_series,Lecturas y etiquetas de hardware,Memoria activa
+hardware.ram.total_cached_series,Lecturas y etiquetas de hardware,Total ocupada (con caché)
+hardware.ram.used_of_total,Lecturas y etiquetas de hardware,{used} usados de {total}
+hardware.ram.used_by_apps_avail,Lecturas y etiquetas de hardware,{used} ocupados por programas · {avail} disponibles
+hardware.ram.installed_total,Lecturas y etiquetas de hardware,Memoria total instalada
+hardware.ram.cached_fast,Lecturas y etiquetas de hardware,En caché para abrir más rápido
+hardware.ram.disk_swap,Lecturas y etiquetas de hardware,Memoria de respaldo en disco
+hardware.ram.zram_active,Lecturas y etiquetas de hardware,ZRAM activa ({used} / {total})
+hardware.ram.expand_aria,Lecturas y etiquetas de hardware,Ampliar gráfica de memoria
+hardware.ram.inspect_aria,Lecturas y etiquetas de hardware,Inspeccionar historial completo de memoria RAM
+hardware.ram.chart_live_title,Lecturas y etiquetas de hardware,Uso de memoria RAM en tiempo real
+hardware.ram.chart_full_title,Lecturas y etiquetas de hardware,Uso de memoria RAM e historial completo
+hardware.gpu.title,Lecturas y etiquetas de hardware,Tarjeta gráfica
+hardware.gpu.short_title,Lecturas y etiquetas de hardware,Gráfica
+hardware.gpu.system_fallback,Lecturas y etiquetas de hardware,Gráfica del sistema
+hardware.gpu.detected_fallback,Lecturas y etiquetas de hardware,Gráfica detectada
+hardware.gpu.integrated_label,Lecturas y etiquetas de hardware,Integrada
+hardware.gpu.idle,Lecturas y etiquetas de hardware,En reposo
+hardware.gpu.no_dedicated,Lecturas y etiquetas de hardware,Sin tarjeta gráfica dedicada activa
+hardware.gpu.integrated_no_media,Lecturas y etiquetas de hardware,Vídeo integrado sin carga multimedia
+hardware.gpu.vram_suffix,Lecturas y etiquetas de hardware, · {used} / {total} MB vídeo
+hardware.gpu.vram_label,Lecturas y etiquetas de hardware,Memoria de vídeo
+hardware.gpu.power_draw,Lecturas y etiquetas de hardware,Consumo eléctrico
+hardware.gpu.fan,Lecturas y etiquetas de hardware,Ventilador
+hardware.gpu.fan_auto,Lecturas y etiquetas de hardware,Automático
+hardware.gpu.driver,Lecturas y etiquetas de hardware,Controlador
+hardware.gpu.expand_aria,Lecturas y etiquetas de hardware,Ampliar gráfica de tarjeta gráfica
+hardware.gpu.inspect_aria,Lecturas y etiquetas de hardware,Inspeccionar historial completo de tarjeta gráfica
+hardware.gpu.chart_live_title,Lecturas y etiquetas de hardware,Actividad de tarjeta gráfica en tiempo real
+hardware.gpu.chart_full_title,Lecturas y etiquetas de hardware,Actividad de tarjeta gráfica e historial completo
+hardware.gpu.proc.gpu_process,Lecturas y etiquetas de hardware,Proceso GPU
+hardware.gpu.proc.chrome_gpu,Lecturas y etiquetas de hardware,Google Chrome (GPU / Render)
+hardware.gpu.proc.gnome_shell,Lecturas y etiquetas de hardware,GNOME Shell (Compositor Wayland)
+hardware.gpu.proc.xwayland,Lecturas y etiquetas de hardware,Xwayland (Compatibilidad X11)
+hardware.gpu.proc.ptyxis,Lecturas y etiquetas de hardware,Ptyxis (Terminal)
+hardware.gpu.proc.nautilus,Lecturas y etiquetas de hardware,Nautilus (Archivos)
+hardware.gpu.proc.ffmpeg_nvenc,Lecturas y etiquetas de hardware,FFmpeg (Transcodificación NVENC)
+hardware.gpu.proc.kernel_drm,Lecturas y etiquetas de hardware,Linux Kernel DRM
+hardware.storage.title,Lecturas y etiquetas de hardware,Almacenamiento
+hardware.storage.read,Lecturas y etiquetas de hardware,Lectura
+hardware.storage.write,Lecturas y etiquetas de hardware,Escritura
+hardware.storage.read_short,Lecturas y etiquetas de hardware,L
+hardware.storage.write_short,Lecturas y etiquetas de hardware,E
+hardware.storage.used_space,Lecturas y etiquetas de hardware,Espacio usado
+hardware.storage.removable_fallback,Lecturas y etiquetas de hardware,Memoria extraíble USB
+hardware.storage.unmounted,Lecturas y etiquetas de hardware,Sin montar
+hardware.storage.removable_badge,Lecturas y etiquetas de hardware,Extraíble
+hardware.storage.connected_badge,Lecturas y etiquetas de hardware,Conectada
+hardware.storage.nas_badge,Lecturas y etiquetas de hardware,NAS
+hardware.storage.mounted_summary,Lecturas y etiquetas de hardware,{used} usados · {free} libres de {total}
+hardware.storage.unmounted_summary,Lecturas y etiquetas de hardware,Extraíble detectada (sin montar) · {total}
+hardware.storage.speed_now,Lecturas y etiquetas de hardware,Velocidad actual: lectura {read} · escritura {write}
+hardware.storage.expand_aria,Lecturas y etiquetas de hardware,Ampliar gráfica de {name}
+hardware.storage.inspect_aria,Lecturas y etiquetas de hardware,Inspeccionar historial completo de almacenamiento
+hardware.storage.chart_full_title,Lecturas y etiquetas de hardware,Actividad de discos y espacio usado
+hardware.storage.chart_full_subtitle,Lecturas y etiquetas de hardware,Lectura {read} · Escritura {write}
+hardware.storage.activity_capacity,Lecturas y etiquetas de hardware,{name} · Actividad y capacidad
+hardware.storage.shared_with_short,Lecturas y etiquetas de hardware,{names} · {transport}
+hardware.storage.transport.nas_nfs,Lecturas y etiquetas de hardware,NAS · NFS
+hardware.storage.transport.nas_smb,Lecturas y etiquetas de hardware,NAS · SMB
+hardware.storage.transport.usb_removable,Lecturas y etiquetas de hardware,USB Extraíble
+hardware.storage.transport.sd_mmc,Lecturas y etiquetas de hardware,Tarjeta SD/MMC
+hardware.storage.transport.nvme_ssd,Lecturas y etiquetas de hardware,SSD NVMe
+hardware.storage.transport.sata_disk,Lecturas y etiquetas de hardware,Disco SATA
+hardware.storage.transport.removable,Lecturas y etiquetas de hardware,Extraíble
+hardware.storage.transport.local_disk,Lecturas y etiquetas de hardware,Disco local
+hardware.storage.label.root_system,Lecturas y etiquetas de hardware,Sistema Raíz · {name}
+hardware.storage.label.root_plain,Lecturas y etiquetas de hardware,Sistema Raíz (/)
+hardware.storage.label.network_share,Lecturas y etiquetas de hardware,{leaf} · NAS {host}
+hardware.storage.label.network_share_plain,Lecturas y etiquetas de hardware,Recurso Red · {leaf}
+hardware.storage.label.removable_media,Lecturas y etiquetas de hardware,Memoria extraíble · {name}
+hardware.storage.label.device_volume,Lecturas y etiquetas de hardware,Volumen {name}
+hardware.storage.label.named_volume,Lecturas y etiquetas de hardware,{model} · {name}
+hardware.storage.label.disk_generic,Lecturas y etiquetas de hardware,Disco {name}
+hardware.storage.fstype.unformatted,Lecturas y etiquetas de hardware,sin formato
+hardware.net.title,Lecturas y etiquetas de hardware,Red e Internet
+hardware.net.download,Lecturas y etiquetas de hardware,Descarga
+hardware.net.upload,Lecturas y etiquetas de hardware,Subida
+hardware.net.active_iface_single,Lecturas y etiquetas de hardware,{count} activo
+hardware.net.active_ifaces_plural,Lecturas y etiquetas de hardware,{count} activos
+hardware.net.lan_tag,Lecturas y etiquetas de hardware,LAN
+hardware.net.main_iface,Lecturas y etiquetas de hardware,Interfaz principal
+hardware.net.local_net,Lecturas y etiquetas de hardware,Red local
+hardware.net.no_local_ip,Lecturas y etiquetas de hardware,Sin dirección local
+hardware.net.active,Lecturas y etiquetas de hardware,Activa
+hardware.net.disconnected,Lecturas y etiquetas de hardware,Desconectada
+hardware.net.iface_title,Lecturas y etiquetas de hardware,Conexión {name}
+hardware.net.iface_full_title,Lecturas y etiquetas de hardware,Tráfico de red {name} e historial completo
+hardware.net.iface_20m_subtitle,Lecturas y etiquetas de hardware,{ip} · Últimos 20 min en vivo + historial en recursos_history.db
+hardware.net.recording_traffic,Lecturas y etiquetas de hardware,Registrando tráfico de red...
+hardware.net.accumulating_20m,Lecturas y etiquetas de hardware,Acumulando historial de últimos 20 minutos...
+hardware.net.expand_aria,Lecturas y etiquetas de hardware,Ampliar gráfica de red
+hardware.net.inspect_aria,Lecturas y etiquetas de hardware,Inspeccionar historial completo de {name}
+hardware.net.chart_live_title,Lecturas y etiquetas de hardware,Tráfico de red global e historial completo
+hardware.net.accumulated_traffic,Lecturas y etiquetas de hardware,Tráfico acumulado: ↓ {rx} · ↑ {tx}
+hardware.net.gateway_label,Lecturas y etiquetas de hardware, · Puerta de enlace: {ip}
+hardware.net.encrypted_creds,Lecturas y etiquetas de hardware, · Credenciales cifradas ({mode})
+hardware.net.band.cable_lan,Lecturas y etiquetas de hardware,Cable LAN
+hardware.net.band.lan_offline,Lecturas y etiquetas de hardware,LAN (Offline)
+hardware.net.band.wifi_5ghz,Lecturas y etiquetas de hardware,Wi-Fi 5 GHz
+hardware.net.band.wifi_24ghz,Lecturas y etiquetas de hardware,2.4 GHz
+hardware.net.band.wifi_6ghz,Lecturas y etiquetas de hardware,Wi-Fi 6 GHz
+hardware.net.band.wifi_offline,Lecturas y etiquetas de hardware,Wi-Fi (Offline)
+hardware.net.device.gateway,Lecturas y etiquetas de hardware,Gateway
+hardware.net.device.server_node,Lecturas y etiquetas de hardware,Servidor
+hardware.net.device.lan_device,Lecturas y etiquetas de hardware,Dispositivo LAN
+hardware.net.device.generic,Lecturas y etiquetas de hardware,Dispositivo
+hardware.net.geo.internal_gateway,Lecturas y etiquetas de hardware,Enlace Red Interna / Gateway
+hardware.net.geo.resolving_geoip,Lecturas y etiquetas de hardware,Resolviendo GeoIP...
+hardware.net.geo.unknown_ip,Lecturas y etiquetas de hardware,Desconocida
+hardware.net.geo.direct_traffic,Lecturas y etiquetas de hardware,Tráfico directo
+hardware.net.geo.external_conn,Lecturas y etiquetas de hardware,Conexión externa
+hardware.net.geo.conn_generic,Lecturas y etiquetas de hardware,Conexión
+hardware.net.geo.location_fallback,Lecturas y etiquetas de hardware,Ubicación
+hardware.systemd.state.active,Lecturas y etiquetas de hardware,Activo
+hardware.systemd.state.inactive,Lecturas y etiquetas de hardware,Inactivo
+hardware.systemd.state.failed,Lecturas y etiquetas de hardware,Con fallo
+hardware.systemd.state.activating,Lecturas y etiquetas de hardware,Iniciando
+hardware.systemd.state.deactivating,Lecturas y etiquetas de hardware,Deteniendo
+hardware.systemd.state.unknown,Lecturas y etiquetas de hardware,Desconocido
+hardware.systemd.role.emby-server,Lecturas y etiquetas de hardware,🎬 Multimedia NVENC
+hardware.systemd.role.pihole-FTL,Lecturas y etiquetas de hardware,🛡️ DNS Sinkhole
+hardware.systemd.role.fail2ban,Lecturas y etiquetas de hardware,🔒 Defensa Intrusos
+hardware.systemd.role.qbittorrent-nox,Lecturas y etiquetas de hardware,📥 Gestor Torrents
+hardware.systemd.role.control-acceso-s10,Lecturas y etiquetas de hardware,🔒 Portal Cautivo TV y Consolas
+hardware.systemd.role.network-monitor,Lecturas y etiquetas de hardware,🌐 Escáner ARP
+hardware.systemd.role.network-watchdog,Lecturas y etiquetas de hardware,📡 Vigilancia LAN/WAN
+hardware.systemd.role.services-monitor,Lecturas y etiquetas de hardware,🤖 Alertas 24/7
+hardware.systemd.role.cockpit-dashboard,Lecturas y etiquetas de hardware,⚡ Recursos Cockpit
+hardware.systemd.role.system-dashboard,Lecturas y etiquetas de hardware,⚡ Recursos Cockpit
+hardware.systemd.role.caddy,Lecturas y etiquetas de hardware,🌐 Proxy Inverso TLS
+hardware.systemd.role.docker,Lecturas y etiquetas de hardware,🐳 Motor Contenedores
+hardware.systemd.role.smbd,Lecturas y etiquetas de hardware,📁 Servidor Archivos SMB
+hardware.systemd.role.nfs-server,Lecturas y etiquetas de hardware,📁 Servidor Archivos NFS
+hardware.systemd.role.ssh,Lecturas y etiquetas de hardware,🔑 Acceso Remoto SSH
+hardware.systemd.role.tailscaled,Lecturas y etiquetas de hardware,🕸️ Malla VPN Tailscale
+hardware.media.emby_type.Movie,Lecturas y etiquetas de hardware,Película
+hardware.media.emby_type.Episode,Lecturas y etiquetas de hardware,Episodio
+hardware.media.emby_type.Series,Lecturas y etiquetas de hardware,Serie
+hardware.media.emby_type.Audio,Lecturas y etiquetas de hardware,Audio
+hardware.media.emby_state.paused,Lecturas y etiquetas de hardware,En pausa
+hardware.media.emby_state.playing,Lecturas y etiquetas de hardware,Viendo ahora
+hardware.telemetry.no_sensor,Lecturas y etiquetas de hardware,Sin sensor
+overview.default_host,Vista Inicio,Servidor doméstico
+overview.subtitle,Vista Inicio,Telemetría y control unificado
+overview.high_load_banner,Vista Inicio,El servidor tiene carga alta ahora mismo
+overview.all_normal_banner,Vista Inicio,Todo funciona con normalidad
+overview.see_equipment_detail,Vista Inicio,Ver equipo al detalle
+overview.errors_banner,Vista Inicio,Se han registrado {count} avisos en los servicios del servidor o en la geolocalización de red.
+overview.perf_grid_aria,Vista Inicio,Panel de rendimiento en tiempo real
+overview.home_devices_title,Vista Inicio,Aparatos de tu red doméstica
+overview.home_devices_sub,Vista Inicio,Enciende o apaga equipos compatibles directamente desde aquí
+overview.home_devices_empty,Vista Inicio,No se detectaron otros aparatos en tu red en este instante. Pulsa en «Ver todos» para revisar la red.
+overview.device_fallback,Vista Inicio,Dispositivo de red
+overview.online_now,Vista Inicio,Conectado ahora
+overview.offline_wait,Vista Inicio,Apagado o en espera
+overview.wake_title,Vista Inicio,Enviar señal de encendido (Wake-on-LAN)
+overview.wake_btn,Vista Inicio,Encender
+overview.sleep_title,Vista Inicio,Enviar señal de apagado o suspensión por red
+overview.sleep_btn,Vista Inicio,Apagar
+overview.view_all,Vista Inicio,Ver todos
+equipment.processes,Vista Equipo,Programas en marcha
+equipment.processes_sub,Vista Equipo,Procesos que están usando procesador o memoria en este momento
+equipment.processes_search,Vista Equipo,Buscar programa...
+equipment.technical_details,Vista Equipo,Ver detalles técnicos
+equipment.sort_cpu,Vista Equipo,Procesador
+equipment.sort_mem,Vista Equipo,Memoria
+equipment.sort_vram,Vista Equipo,Vídeo
+equipment.col_program,Vista Equipo,Programa
+equipment.col_user,Vista Equipo,Usuario
+equipment.col_cpu,Vista Equipo,Procesador
+equipment.col_ram,Vista Equipo,Memoria
+equipment.col_vram,Vista Equipo,Vídeo
+network.subtabs.home,Vista Red y Seguridad,Aparatos en casa
+network.subtabs.map,Vista Red y Seguridad,Mapa de conexiones
+network.subtabs.security,Vista Red y Seguridad,Protección y avisos
+network.subtabs.dns,Vista Red y Seguridad,Dirección e Internet
+network.router_fallback,Vista Red y Seguridad,Router principal
+network.visible_devices,Vista Red y Seguridad,{router} · {count} dispositivos visibles
+network.search_devices,Vista Red y Seguridad,"Buscar teléfono, TV o PC..."
+network.no_devices_found,Vista Red y Seguridad,No se encontraron dispositivos con ese nombre o dirección.
+network.change_icon_title,Vista Red y Seguridad,Cambiar icono del dispositivo
+network.map_title,Vista Red y Seguridad,Ubicación de las conexiones activas
+network.map_engine,Vista Red y Seguridad,OpenStreetMap · Libre sin API
+network.refresh,Vista Red y Seguridad,Actualizar
+network.top_services,Vista Red y Seguridad,Servicios más usados
+network.no_external_conns,Vista Red y Seguridad,Sin conexiones externas activas.
+network.connections_label,Vista Red y Seguridad,Conexiones
+network.block,Vista Red y Seguridad,Bloquear
+network.firewall_title,Vista Red y Seguridad,Bloqueo automático de intrusos
+network.firewall_active,Vista Red y Seguridad,Cortafuegos activo · {count} direcciones bloqueadas
+network.firewall_idle,Vista Red y Seguridad,Cortafuegos en reposo
+network.ip_to_block,Vista Red y Seguridad,Dirección IP a bloquear (ej. 1.2.3.4)
+network.jail_ssh,Vista Red y Seguridad,Acceso SSH
+network.jail_caddy,Vista Red y Seguridad,Web / Caddy
+network.jail_all,Vista Red y Seguridad,Todas las reglas
+network.rule_label,Vista Red y Seguridad,Regla: {jail}
+network.rule_general,Vista Red y Seguridad,general
+network.unblock,Vista Red y Seguridad,Desbloquear
+network.blocked_ok,Vista Red y Seguridad,Dirección {ip} bloqueada.
+network.block_err,Vista Red y Seguridad,No se pudo bloquear esa dirección.
+network.unblock_err,Vista Red y Seguridad,Error al desbloquear la dirección.
+network.telegram_listening,Vista Red y Seguridad,Bot conectado y escuchando
+network.telegram_bg,Vista Red y Seguridad,Estado en segundo plano
+network.telegram_placeholder,Vista Red y Seguridad,Escribe un aviso para enviar al móvil...
+network.send,Vista Red y Seguridad,Enviar
+network.test_sent,Vista Red y Seguridad,Mensaje de prueba enviado a Telegram.
+network.test_err,Vista Red y Seguridad,No se pudo enviar el aviso de prueba.
+network.msg_sent,Vista Red y Seguridad,Mensaje enviado correctamente.
+network.msg_err,Vista Red y Seguridad,Error al enviar el mensaje.
+network.notice_fallback,Vista Red y Seguridad,Aviso
+network.ddns_title,Vista Red y Seguridad,Dirección desde fuera de casa (DDNS)
+network.ddns_sub,Vista Red y Seguridad,Nombre web autodetectado para entrar cuando estás fuera del Wi-Fi
+network.update_now,Vista Red y Seguridad,Actualizar ahora
+network.ddns_public_domain,Vista Red y Seguridad,Dirección pública detectada
+network.ddns_last_ip,Vista Red y Seguridad,Última dirección IP registrada
+network.ddns_service,Vista Red y Seguridad,Servicio DDNS
+network.ddns_configured,Vista Red y Seguridad,Configurado y activo
+network.ddns_not_configured,Vista Red y Seguridad,No configurado
+network.ddns_last_check,Vista Red y Seguridad,Última comprobación
+network.ddns_updated,Vista Red y Seguridad,Dirección externa actualizada.
+network.ddns_err,Vista Red y Seguridad,No se pudo actualizar DuckDNS.
+network.pihole_active,Vista Red y Seguridad,Protección activa para todos los aparatos conectados al Wi-Fi
+network.pihole_missing,Vista Red y Seguridad,Filtro DNS no detectado en este equipo
+network.queries_today,Vista Red y Seguridad,Consultas hoy
+network.ads_blocked,Vista Red y Seguridad,Anuncios bloqueados
+network.icon_updated,Vista Red y Seguridad,Icono actualizado correctamente.
+network.icon_reset,Vista Red y Seguridad,Icono restablecido.
+network.icon_err,Vista Red y Seguridad,No se pudo guardar el icono.
+network.reset_btn,Vista Red y Seguridad,Restablecer
+network.search_brand,Vista Red y Seguridad,"Buscar marca (Apple, Samsung, LG, Sony...)"
+apps.subtabs.services,Vista Programas y Multimedia,Aplicaciones y servicios
+apps.subtabs.media,Vista Programas y Multimedia,Descargas y multimedia
+apps.filter_placeholder,Vista Programas y Multimedia,Filtrar aplicación o servicio...
+apps.containers_empty,Vista Programas y Multimedia,No se detectaron contenedores activos en este entorno.
+apps.container_running,Vista Programas y Multimedia,En funcionamiento
+apps.container_stopped,Vista Programas y Multimedia,Detenida
+apps.start,Vista Programas y Multimedia,Iniciar
+apps.restart,Vista Programas y Multimedia,Reiniciar
+apps.stop,Vista Programas y Multimedia,Detener
+apps.details,Vista Programas y Multimedia,Detalles
+apps.container_metrics,Vista Programas y Multimedia,Procesador: {cpu} % · Memoria: {mem}
+apps.container_io,Vista Programas y Multimedia,Red: {net} · Disco: {disk}
+apps.systemd_title,Vista Programas y Multimedia,Servicios de fondo del servidor
+apps.systemd_sub,Vista Programas y Multimedia,Tareas internas de Ubuntu que mantienen el sistema activo
+apps.systemd_empty,Vista Programas y Multimedia,No hay servicios internos filtrados en este momento.
+apps.media_title,Vista Programas y Multimedia,Cine y multimedia en casa
+apps.emby_streams,Vista Programas y Multimedia,{name} · {count} reproducciones en curso
+apps.emby_unavailable,Vista Programas y Multimedia,Sin servidor multimedia activo ahora mismo
+apps.movies,Vista Programas y Multimedia,Películas
+apps.series,Vista Programas y Multimedia,Series
+apps.episodes,Vista Programas y Multimedia,Episodios
+apps.now_playing,Vista Programas y Multimedia,Reproduciendo
+apps.user_fallback,Vista Programas y Multimedia,Usuario
+apps.screen_fallback,Vista Programas y Multimedia,Pantalla
+apps.nobody_watching,Vista Programas y Multimedia,Nadie está reproduciendo películas o series en este instante.
+apps.downloads_title,Vista Programas y Multimedia,Gestor de descargas
+apps.downloads_empty,Vista Programas y Multimedia,No hay descargas activas en la cola.
+apps.dl_speeds,Vista Programas y Multimedia,Bajada: {dl} · Subida: {up}
+charts.empty_collecting,Gráficas e historial SQLite,Recopilando datos en tiempo real...
+charts.pan_help_drag,Gráficas e historial SQLite,Arrastra hacia la derecha para retroceder · Rueda o botones también navegan
+charts.pan_help_hover,Gráficas e historial SQLite,Toca o desliza sobre la gráfica para inspeccionar valores exactos
+charts.timeline_range,Gráficas e historial SQLite,Línea temporal registrada ({from} → {to})
+charts.close_aria,Gráficas e historial SQLite,Cerrar gráfica ampliada
+charts.history_inspect,Gráficas e historial SQLite,Inspección histórica
+charts.samples_in_db,Gráficas e historial SQLite, · {count} muestras en recursos_history.db
+charts.window_aria,Gráficas e historial SQLite,Ventana temporal
+charts.presets.live,Gráficas e historial SQLite,En vivo · 5 min
+charts.presets.1200,Gráficas e historial SQLite,20 min
+charts.presets.3600,Gráficas e historial SQLite,1 h
+charts.presets.21600,Gráficas e historial SQLite,6 h
+charts.presets.86400,Gráficas e historial SQLite,24 h
+charts.presets.all,Gráficas e historial SQLite,Todo
+charts.touch_mode_aria,Gráficas e historial SQLite,Modo de interacción táctil
+charts.inspect,Gráficas e historial SQLite,Inspeccionar
+charts.pan_time,Gráficas e historial SQLite,Deslizar tiempo
+charts.timeline_slider_aria,Gráficas e historial SQLite,Deslizador cronológico de historial
+charts.oldest,Gráficas e historial SQLite,Más antiguo
+charts.step_back,Gráficas e historial SQLite,Retroceder
+charts.step_forward,Gráficas e historial SQLite,Avanzar
+charts.live_active,Gráficas e historial SQLite,En vivo activo
+charts.back_to_live,Gráficas e historial SQLite,Volver a vivo
+charts.min_val,Gráficas e historial SQLite,Mín {val}
+charts.max_val,Gráficas e historial SQLite,Máx {val} {unit}
+more.subtabs.updates,"Vista Más, ajustes y DeX",Actualizaciones y aspecto
+more.subtabs.devices,"Vista Más, ajustes y DeX",Dispositivos conectados
+more.subtabs.manual,"Vista Más, ajustes y DeX",Manual interactivo
+more.subtabs.dex,"Vista Más, ajustes y DeX",Pantalla móvil USB
+more.appearance_desc,"Vista Más, ajustes y DeX",Cambia al instante entre el diseño claro minimalista y el modo oscuro en web y apps
+more.language_label,"Vista Más, ajustes y DeX",Idioma del diccionario
+more.updates_native,"Vista Más, ajustes y DeX",Actualización unificada
+more.updates_github,"Vista Más, ajustes y DeX",Actualizaciones desde GitHub
+more.new_version_available,"Vista Más, ajustes y DeX",Hay una versión nueva disponible (v{ver}).
+more.ahead_of_repo,"Vista Más, ajustes y DeX",Tienes cambios locales más recientes que el repositorio.
+more.up_to_date,"Vista Más, ajustes y DeX",Tu sistema está al día con la última versión.
+more.auto_enabled_status,"Vista Más, ajustes y DeX",Actualización automática activada
+more.above_github,"Vista Más, ajustes y DeX", · sup. GitHub
+more.no_connection,"Vista Más, ajustes y DeX",Sin conexión
+more.updatable,"Vista Más, ajustes y DeX", · actualizable
+more.no_access,"Vista Más, ajustes y DeX",Sin acceso
+more.auto_on,"Vista Más, ajustes y DeX",Autoactualización activada
+more.auto_off,"Vista Más, ajustes y DeX",Autoactualización pausada
+more.check_btn,"Vista Más, ajustes y DeX",Comprobar
+more.update_now,"Vista Más, ajustes y DeX",Actualizar ahora
+more.latest_changes,"Vista Más, ajustes y DeX",Últimos cambios registrados
+more.update_fallback,"Vista Más, ajustes y DeX",Actualización
+more.internal_version,"Vista Más, ajustes y DeX",Versión interna: {ver} · Commit local: {local} · Remoto: {remote}
+more.system_warnings_title,"Vista Más, ajustes y DeX",Registro de avisos del sistema:
+more.update_checked_ok,"Vista Más, ajustes y DeX",Sistema comprobado y actualizado correctamente.
+more.update_failed,"Vista Más, ajustes y DeX",No se pudo completar la actualización automática.
+more.auto_on_toast,"Vista Más, ajustes y DeX",Instalación automática desde GitHub activada.
+more.auto_off_toast,"Vista Más, ajustes y DeX",Instalación automática pausada.
+more.devices_desc,"Vista Más, ajustes y DeX",Se verifican automáticamente al conectar por Wi-Fi local y funcionan cifradas desde fuera de casa usando el DNS detectado.
+more.ubuntu_app,"Vista Más, ajustes y DeX",App para ordenador Ubuntu (.deb)
+more.ubuntu_app_sub,"Vista Más, ajustes y DeX","Conecta, instala nodo o configura"
+more.android_app,"Vista Más, ajustes y DeX",App para móvil Android (.apk)
+more.android_app_sub,"Vista Más, ajustes y DeX",Conexión directa automática
+more.revoke_others,"Vista Más, ajustes y DeX",Desconectar los demás
+more.native_verified,"Vista Más, ajustes y DeX",Aplicación nativa verificada
+more.web_verified,"Vista Más, ajustes y DeX",Navegador web verificado
+more.save,"Vista Más, ajustes y DeX",Guardar
+more.name_saved,"Vista Más, ajustes y DeX",Nombre guardado.
+more.name_err,"Vista Más, ajustes y DeX",No se pudo cambiar el nombre.
+more.device_revoked,"Vista Más, ajustes y DeX",Dispositivo desconectado.
+more.this_device,"Vista Más, ajustes y DeX",(Este dispositivo)
+more.connected_fallback,"Vista Más, ajustes y DeX",Conectado
+more.last_visit,"Vista Más, ajustes y DeX",Última visita
+more.disconnect,"Vista Más, ajustes y DeX",Desconectar
+more.manual_desc,"Vista Más, ajustes y DeX","Diagrama de arquitectura, simuladores de telemetría y seguridad Zero-Trust e inspector de API en vivo"
+more.open_fullscreen,"Vista Más, ajustes y DeX",Abrir en pantalla completa
+more.manual_title,"Vista Más, ajustes y DeX",Manual Interactivo de Recursos
+more.dex_locked_msg,"Vista Más, ajustes y DeX",Esperando dispositivo para conectarse en su versión nativa
+more.dex_title,"Vista Más, ajustes y DeX",Pantalla del móvil por USB (Modo Escritorio)
+more.dex_desc,"Vista Más, ajustes y DeX",Proyecta y controla tu móvil Android conectado al ordenador por cable USB
+more.scan_usb,"Vista Más, ajustes y DeX",Buscar cable USB
+more.resolution,"Vista Más, ajustes y DeX",Resolución
+more.res_fhd,"Vista Más, ajustes y DeX",Full HD (1920×1080)
+more.res_qhd,"Vista Más, ajustes y DeX",2K QHD (2560×1440)
+more.res_hd,"Vista Más, ajustes y DeX",HD (1280×720)
+more.smoothness,"Vista Más, ajustes y DeX",Fluidez
+more.fullscreen_opt,"Vista Más, ajustes y DeX",Abrir a pantalla completa
+more.stop_projection,"Vista Más, ajustes y DeX",Detener proyección
+more.start_projection,"Vista Más, ajustes y DeX",Iniciar proyección USB
+more.dex_started,"Vista Más, ajustes y DeX",Proyección USB iniciada.
+more.dex_stopped,"Vista Más, ajustes y DeX",Proyección USB detenida.
+more.dex_err,"Vista Más, ajustes y DeX",No se pudo controlar la proyección USB.
+native_ubuntu.choose_mode,App nativa Ubuntu (GTK),Elige cómo quieres utilizar tu equipo ahora
+native_ubuntu.opt1_title,App nativa Ubuntu (GTK),1. Conectar con el nodo
+native_ubuntu.opt1_desc,App nativa Ubuntu (GTK),Escanea tu Wi-Fi local automáticamente o conecta desde fuera con el dominio DNS detectado y guardado.
+native_ubuntu.opt1_btn,App nativa Ubuntu (GTK),Conectar ahora
+native_ubuntu.opt2_title,App nativa Ubuntu (GTK),2. Nodo local y aplicación en este equipo
+native_ubuntu.checking_local,App nativa Ubuntu (GTK),Comprobando instalación y nodo servidor en este ordenador...
+native_ubuntu.checking_github,App nativa Ubuntu (GTK),Comprobando versión publicada en GitHub...
+native_ubuntu.install_node,App nativa Ubuntu (GTK),Instalar nodo local
+native_ubuntu.update_github,App nativa Ubuntu (GTK),Actualizar desde GitHub
+native_ubuntu.opt3_title,App nativa Ubuntu (GTK),3. Configuraciones de conexión
+native_ubuntu.red_local,App nativa Ubuntu (GTK),Red local ({host})
+native_ubuntu.no_remote_node,App nativa Ubuntu (GTK),Sin nodo remoto
+native_ubuntu.update_all_btn,App nativa Ubuntu (GTK),Actualizar app y servidor a v{ver}
+native_ubuntu.update_app_btn,App nativa Ubuntu (GTK),Actualizar app a v{ver}
+native_ubuntu.update_web_btn,App nativa Ubuntu (GTK),Actualizar web local a v{ver}
+native_ubuntu.update_web_github_btn,App nativa Ubuntu (GTK),Actualizar servidor web a v{ver}
+native_ubuntu.update_reinstall_btn,App nativa Ubuntu (GTK),Actualizar / Reinstalar
+native_ubuntu.unified_update_avail,App nativa Ubuntu (GTK),Actualización unificada de App Ubuntu y web local disponible.
+native_ubuntu.unified_update_summary,App nativa Ubuntu (GTK),Actualización disponible a v{ver}.
+native_ubuntu.sha_error,App nativa Ubuntu (GTK),Error de verificación SHA-256 en el paquete descargado de GitHub.
+native_ubuntu.download_error,App nativa Ubuntu (GTK),Error descargando actualización desde GitHub: {error}
+native_ubuntu.update_done,App nativa Ubuntu (GTK),Actualización completada ({parts}).
+native_ubuntu.remote_http_error,App nativa Ubuntu (GTK),Error HTTP {code} en el servidor remoto
+native_ubuntu.gtk_missing,App nativa Ubuntu (GTK),Error: python3-gi / gir1.2-gtk-3.0 no está instalado en este entorno.
+native_android.node_security_title,App nativa Android / TV,ESTADO DEL NODO Y CIBERDEFENSA
+native_android.lan_low_latency,App nativa Android / TV,🟢 LAN (BAJA LATENCIA)
+native_android.wan_ddns,App nativa Android / TV,🌐 WAN (DDNS)
+native_android.scanning_net,App nativa Android / TV,📡 ESCANEANDO RED...
+native_android.linking,App nativa Android / TV,🔍 ENLAZANDO...
+native_android.cert_revoked,App nativa Android / TV,🔒 CERTIFICADO REVOCADO
+native_android.no_node,App nativa Android / TV,🔴 SIN NODO
+native_android.disconnected,App nativa Android / TV,⚪ DESCONECTADO
+native_android.server_fallback,App nativa Android / TV,Servidor
+native_android.red_local,App nativa Android / TV,Red local
+native_android.wan_secure,App nativa Android / TV,Externa segura
+native_android.access_blocked,App nativa Android / TV,Acceso bloqueado
+native_android.searching,App nativa Android / TV,Buscando...
+native_android.connecting,App nativa Android / TV,Conectando...
+native_android.no_connection,App nativa Android / TV,Sin conexión
+native_android.server_panel,App nativa Android / TV,Panel del Servidor
+native_android.revoked_title,App nativa Android / TV,Acceso desautorizado
+native_android.revoked_desc,App nativa Android / TV,Este dispositivo fue desconectado desde el servidor. Conéctate a tu red Wi-Fi de casa y pulsa Reconectar.
+native_android.reconnect,App nativa Android / TV,Reconectar
+native_android.reconnect_aria,App nativa Android / TV,Volver a conectar
+native_android.tab_cockpit,App nativa Android / TV,Cabina
+native_android.tab_cpu,App nativa Android / TV,CPU
+native_android.tab_ram,App nativa Android / TV,RAM
+native_android.tab_gpu,App nativa Android / TV,GPU
+native_android.tab_drives,App nativa Android / TV,Discos
+native_android.tab_network,App nativa Android / TV,Red
+native_android.tab_docker,App nativa Android / TV,Docker
+native_android.tab_shield,App nativa Android / TV,Escudo
+native_android.tab_processes,App nativa Android / TV,Procesos
+manual.download_deb,Manual interactivo,Descargar Ubuntu / Debian (.deb) · {ver}
+manual.download_apk,Manual interactivo,Descargar App Android & Android TV (.apk) · {ver}
+manual.copy,Manual interactivo,Copiar
+manual.copied,Manual interactivo,Copiado ✓
+errors.no_server_conn,Mensajes de error API / GeoIP,Sin conexión con el servidor
+errors.device_not_found,Mensajes de error API / GeoIP,Dispositivo no encontrado
+errors.too_many_attempts,Mensajes de error API / GeoIP,Demasiados intentos fallidos. IP bloqueada durante {minutes} minutos.
+errors.too_many_attempts_secs,Mensajes de error API / GeoIP,Demasiados intentos fallidos. IP temporalmente bloqueada durante {seconds} segundos.
+errors.bad_master_key,Mensajes de error API / GeoIP,Clave maestra incorrecta. Quedan {remaining} intentos antes del bloqueo temporal.
+errors.cert_issued,Mensajes de error API / GeoIP,Certificado de dispositivo emitido con éxito
+errors.geoip_bad_payload,Mensajes de error API / GeoIP,Solicitud GeoIP con payload JSON inválido
+errors.geoip_rate_limit,Mensajes de error API / GeoIP,Límite de tasa alcanzado en ip-api.com/batch (HTTP 429)
+errors.geoip_timeout,Mensajes de error API / GeoIP,Sin respuesta o timeout al conectar con ip-api.com/batch
+errors.geoip_fail_ip,Mensajes de error API / GeoIP,Fallo al geolocalizar IP {ip}: {msg}
+errors.geoip_no_response,Mensajes de error API / GeoIP,Sin respuesta en lote GeoIP para {ip}
+errors.geoip_worker_exc,Mensajes de error API / GeoIP,Excepción en Worker GeoIP: {msg}
+errors.geoip_default_msg,Mensajes de error API / GeoIP,Error de resolución
+native_ubuntu.win_title,App nativa Ubuntu (GTK),Recursos v{ver}
+native_ubuntu.subtitle,App nativa Ubuntu (GTK),v{ver} · Aplicación Nativa Ubuntu
+native_ubuntu.main_menu,App nativa Ubuntu (GTK),Menú principal
+native_ubuntu.main_menu_tip,App nativa Ubuntu (GTK),Volver a las tres opciones de inicio
+native_ubuntu.ready_connect,App nativa Ubuntu (GTK),Listo para conectar
+native_ubuntu.searching_node,App nativa Ubuntu (GTK),Buscando nodo...
+native_ubuntu.searching_node_desc,App nativa Ubuntu (GTK),Buscando tu servidor en el Wi-Fi local y mediante DNS externo detectado...
+native_ubuntu.usb_phone_screen,App nativa Ubuntu (GTK),Pantalla móvil USB
+native_ubuntu.usb_phone_screen_tip,App nativa Ubuntu (GTK),Abrir control de proyección USB
+native_ubuntu.about_tip,App nativa Ubuntu (GTK),Acerca de Recursos (v{ver})
+native_ubuntu.fullscreen,App nativa Ubuntu (GTK),Pantalla completa
+native_ubuntu.fullscreen_tip,App nativa Ubuntu (GTK),Alternar pantalla completa (F11)
+native_ubuntu.about_comments,App nativa Ubuntu (GTK),"Aplicación nativa de Ubuntu con autodetección en red local, conexión cifrada por DNS detectado, instalador de nodo local y control USB para móvil."
+native_ubuntu.title_banner,App nativa Ubuntu (GTK),Recursos · v{ver}
+native_ubuntu.lan_pending,App nativa Ubuntu (GTK),IP en red local (LAN): sin detectar
+native_ubuntu.dns_pending,App nativa Ubuntu (GTK),Dominio externo detectado (DNS): sin detectar
+native_ubuntu.cert_pending,App nativa Ubuntu (GTK),Certificado cifrado del dispositivo: pendiente
+native_ubuntu.lan_prefix,App nativa Ubuntu (GTK),Conexión en red local (LAN): {value}
+native_ubuntu.dns_prefix,App nativa Ubuntu (GTK),Dominio externo detectado (DNS): {value}
+native_ubuntu.cert_prefix,App nativa Ubuntu (GTK),Certificado de seguridad: {value}
+native_ubuntu.lan_wait,App nativa Ubuntu (GTK),Pendiente de conexión en red local
+native_ubuntu.dns_auto,App nativa Ubuntu (GTK),Se guardará automáticamente al conectar por primera vez
+native_ubuntu.cert_ok,App nativa Ubuntu (GTK),Verificado y cifrado correctamente
+native_ubuntu.cert_revoked,App nativa Ubuntu (GTK),Revocado (vuelve a conectar en red local)
+native_ubuntu.cert_verify_lan,App nativa Ubuntu (GTK),Se verificará al conectar en LAN
+native_ubuntu.forget_conn,App nativa Ubuntu (GTK),Olvidar conexión
+native_ubuntu.forgotten_msg,App nativa Ubuntu (GTK),Se han borrado los datos guardados del nodo.
+native_ubuntu.connect_local_node,App nativa Ubuntu (GTK),Conectar al nodo local
+native_ubuntu.start_local_node,App nativa Ubuntu (GTK),Iniciar nodo local
+native_ubuntu.local_state_active,App nativa Ubuntu (GTK),activo
+native_ubuntu.local_state_installed,App nativa Ubuntu (GTK),instalado
+native_ubuntu.node_info_running,App nativa Ubuntu (GTK),Nodo local ya {state}. Conecta en tu Wi-Fi con: {ip} · Puerto {port}
+native_ubuntu.node_info_deb,App nativa Ubuntu (GTK),Aplicación ya instalada en Ubuntu (v{ver}). También puedes instalar el nodo servidor aquí si lo deseas.
+native_ubuntu.node_info_none,App nativa Ubuntu (GTK),No hay ningún nodo instalado en este equipo. Puedes instalarlo para gestionar este ordenador desde la red.
+native_ubuntu.installing_node,App nativa Ubuntu (GTK),Instalando y activando nodo local...
+native_ubuntu.updating_btn,App nativa Ubuntu (GTK),Aplicando actualización...
+native_ubuntu.updating_desc,App nativa Ubuntu (GTK),"Comparando App Ubuntu, Servidor web local y GitHub para aplicar la actualización en un clic..."
+native_ubuntu.check_and_update,App nativa Ubuntu (GTK),Comprobar y actualizar
+native_ubuntu.sync_local_web_btn,App nativa Ubuntu (GTK),Sincronizar web local (v{ver})
+native_ubuntu.sync_local_web_short,App nativa Ubuntu (GTK),Sincronizar web local
+native_ubuntu.version_uptodate,App nativa Ubuntu (GTK),Versión v{ver} al día
+native_ubuntu.summary_gh_all,App nativa Ubuntu (GTK),GitHub (v{gh}) supera a App Ubuntu (v{app}) y Servidor web local (v{srv}). Pulsa para actualizar ambos en un clic.
+native_ubuntu.summary_gh_app,App nativa Ubuntu (GTK),Nueva versión disponible en GitHub: v{gh} (App Ubuntu actual: v{app}). Pulsa para actualizar sin desinstalar.
+native_ubuntu.summary_app_srv_gh,App nativa Ubuntu (GTK),La App Ubuntu (v{app}) es superior a GitHub (v{gh}) y al Servidor web local (v{srv}). Pulsa para actualizar la web local al instante.
+native_ubuntu.summary_app_srv,App nativa Ubuntu (GTK),La App Ubuntu (v{app}) es superior al Servidor web local (v{srv}). Pulsa para actualizar la web local en un clic.
+native_ubuntu.summary_gh_srv,App nativa Ubuntu (GTK),GitHub (v{gh}) es superior al Servidor web local (v{srv}). Pulsa para actualizar el servidor web local.
+native_ubuntu.summary_app_ahead_srv,App nativa Ubuntu (GTK),App Ubuntu y Servidor web local están en v{app} (por delante de GitHub v{gh}).
+native_ubuntu.summary_app_ahead,App nativa Ubuntu (GTK),App Ubuntu v{app} supera a la versión publicada en GitHub (v{gh}).
+native_ubuntu.summary_synced_all,App nativa Ubuntu (GTK),"App Ubuntu, Servidor web local y GitHub sincronizados en v{gh}."
+native_ubuntu.summary_synced_pair,App nativa Ubuntu (GTK),App Ubuntu y GitHub al día en v{gh}.
+native_ubuntu.summary_offline,App nativa Ubuntu (GTK),No se pudo consultar GitHub ahora. Puedes sincronizar la web local si hay un servidor activo.
+native_ubuntu.sync_retry_btn,App nativa Ubuntu (GTK),Sincronizar / Reintentar
+native_ubuntu.restarting_suffix,App nativa Ubuntu (GTK),{msg} Reiniciando aplicación...
+native_ubuntu.external_conn,App nativa Ubuntu (GTK),Externa ({domain})
+native_ubuntu.access_revoked,App nativa Ubuntu (GTK),Acceso revocado
+native_ubuntu.deb_corrupt,App nativa Ubuntu (GTK),El paquete .deb descargado está corrupto o incompleto.
+native_ubuntu.deb_install_fail,App nativa Ubuntu (GTK),No se pudo completar la instalación de actualización: {err}
+native_ubuntu.deb_updated_part,App nativa Ubuntu (GTK),app Ubuntu v{ver}
+native_ubuntu.web_updated_part,App nativa Ubuntu (GTK),web local v{ver}
+native_ubuntu.webkit_missing,App nativa Ubuntu (GTK),"Recursos v{ver}
+Interfaz lista en: {uri}
+Instala gir1.2-webkit2-4.1 para ver el panel integrado."
+native_ubuntu.no_sync_server,App nativa Ubuntu (GTK),No hay ningún servidor accesible en red local o DDNS para sincronizar la web.
+native_ubuntu.no_index_html,App nativa Ubuntu (GTK),No se encontró static/index.html en la instalación de la App Ubuntu.
+native_ubuntu.github_ahead_msg,App nativa Ubuntu (GTK),GitHub al día (v{ver}). Puedes reinstalar o sincronizar cuando quieras.
+native_ubuntu.app_ahead_info,App nativa Ubuntu (GTK),App Ubuntu v{app} (superior a GitHub v{gh}{srv_note}).
+native_ubuntu.app_ahead_srv_note,App nativa Ubuntu (GTK), · Servidor web: v{ver}
+native_android.searching_wifi,App nativa Android / TV,Buscando tu servidor en la red Wi-Fi...
+native_android.connecting_wan,App nativa Android / TV,Conectando desde fuera de casa de forma segura...
+native_android.client_label_tv,App nativa Android / TV,App Nativa Android TV (.apk)
+native_android.client_label_mobile,App nativa Android / TV,App Nativa Android (.apk)
+native_android.chassis_tv,App nativa Android / TV,Android TV / Smart TV
+native_android.chassis_mobile,App nativa Android / TV,Android Mobile / Tablet
+native_android.card_storage,App nativa Android / TV,ALMACENAMIENTO NVME
+native_android.card_ram,App nativa Android / TV,MEMORIA RAM
+native_android.zram_active,App nativa Android / TV,ZRAM ACTIVA
+native_android.swap_pct,App nativa Android / TV,Swap: {pct}%
+native_android.card_docker,App nativa Android / TV,CONTENEDORES DOCKER
+native_android.no_docker,App nativa Android / TV,No se detectaron contenedores activos
+native_android.container_fallback,App nativa Android / TV,Contenedor
+native_android.card_network,App nativa Android / TV,TRÁFICO DE RED EN VIVO
+native_android.card_security,App nativa Android / TV,CIBERDEFENSA & IPS
+native_android.f2b_active,App nativa Android / TV,FAIL2BAN ACTIVO
+native_android.f2b_stopped,App nativa Android / TV,DETENIDO
+native_android.blocked_ips,App nativa Android / TV,IPs Bloqueadas
+native_android.active_jails,App nativa Android / TV,Jails Activas
+native_android.jails_count,App nativa Android / TV,{count} activas
+native_android.monitoring,App nativa Android / TV,Monitorizando
+native_android.uptime_label,App nativa Android / TV,Tiempo Activo
+native_android.f2b_ips_label,App nativa Android / TV,Fail2ban IPS:
+native_android.f2b_operational,App nativa Android / TV,Activo (IPS Operativo)
+native_android.card_cpu,App nativa Android / TV,CPU TELEMETRÍA
+native_android.card_processes,App nativa Android / TV,PROCESOS PRINCIPALES
+native_android.no_processes,App nativa Android / TV,No hay datos de procesos disponibles
+native_android.pid_name_col,App nativa Android / TV,PID / NOMBRE
+native_ubuntu.srv_github_part,App nativa Ubuntu (GTK),servidor local (GitHub)
+native_ubuntu.app_ahead_connect_srv,App nativa Ubuntu (GTK),La App Ubuntu está en v{app} (por encima de GitHub v{gh}). Conecta el servidor local para sincronizar la web.
+native_ubuntu.ecosystem_uptodate,App nativa Ubuntu (GTK),Todo el ecosistema ya está en la última versión (v{ver}).
+native_ubuntu.app_offline_uptodate,App nativa Ubuntu (GTK),App Ubuntu en v{ver} (sin conexión a GitHub ni cambios pendientes en servidor).
+native_android.rx_down,App nativa Android / TV,↓ BAJADA (RX)
+native_android.tx_up,App nativa Android / TV,↑ SUBIDA (TX)
+native_android.cores_count,App nativa Android / TV,{count} Núcleos
+native_android.processes_count,App nativa Android / TV,{count} PROCESOS
+native_android.docker_up_count,App nativa Android / TV,{running} / {total} UP
+status.notice_single,Estados globales y energía,aviso
+status.notice_plural,Estados globales y energía,avisos
+charts.sample_n,Gráficas e historial completo,Muestra {n}
+charts.sample_of,Gráficas e historial completo,Muestra {n} de {total}
+more.language_desc,"Vista Más, ajustes y DeX",Diccionario maestro en formato hoja de cálculo (./i18n/dictionary.csv): añade una columna nueva para sumar idiomas sin editar código
+more.language_active,"Vista Más, ajustes y DeX",Columna activa
+more.language_columns_count,"Vista Más, ajustes y DeX",{count} idioma(s) en CSV
+charts.loading_history,Gráficas e historial completo,Cargando historial...
+charts.window_start,Gráficas e historial completo,Inicio ventana: {time}
+charts.from_time,Gráficas e historial completo,Desde: {time}
+charts.until_time,Gráficas e historial completo,Hasta: {time}
+charts.cursor_time,Gráficas e historial completo,Cursor: {time}
+charts.avg_val,Gráficas e historial completo,Med {val}
+charts.realtime,Gráficas e historial completo,Tiempo real
+overview.uptime_badge,Vista Inicio y resumen,Encendido {uptime}
+overview.connected_devices_count,Vista Inicio y resumen,{count} aparatos conectados
+overview.internet_rate_badge,Vista Inicio y resumen,Internet ↓ {rx} / ↑ {tx}
+overview.open_full_log,Vista Inicio y resumen,Abrir registro completo
+overview.ram_free_ready,Vista Inicio y resumen,Libre y lista: {avail}
+hardware.net.active_link_single,Lecturas y etiquetas de hardware,{count} enlace activo
+hardware.net.active_link_plural,Lecturas y etiquetas de hardware,{count} enlaces activos
+hardware.storage.label.disk_system,Lecturas y etiquetas de hardware,Disco Sistema (/)
+hardware.storage.label.nas_host,Lecturas y etiquetas de hardware,NAS {host}
+hardware.storage.folders_count,Lecturas y etiquetas de hardware,{count} carpetas
+hardware.storage.free_of_total_mount,Lecturas y etiquetas de hardware,{free} libres de {total} ({mount})
+hardware.storage.detected_device,Lecturas y etiquetas de hardware,Dispositivo detectado: {dev}
+hardware.storage.shared_pool_with,Lecturas y etiquetas de hardware,Comparte pool con {pool}
+apps.installed_apps,Aplicaciones y multimedia,Aplicaciones instaladas (Contenedores)
+apps.apps_detected,Aplicaciones y multimedia,{count} aplicaciones detectadas en el servidor
+apps.image_label,Aplicaciones y multimedia,Imagen: {image}
+apps.exact_state_label,Aplicaciones y multimedia,Estado exacto: {state}
+apps.emby_default_server,Aplicaciones y multimedia,Emby
+equipment.cpu_main_fallback,Vista Equipo,Procesador principal
+equipment.cpu_perf,Vista Equipo,Rendimiento del procesador
+equipment.disk_temp_line,Vista Equipo,Temperatura del disco: {temp}
+equipment.freq_row,Vista Equipo,Frecuencia: {freq}
+equipment.gpu_title,Vista Equipo,Tarjeta gráfica y vídeo
+equipment.load_1m_5m,Vista Equipo,Carga (1m/5m): {l1} / {l5}
+equipment.pid_label,Vista Equipo,ID {pid}
+equipment.processes_none_match,Vista Equipo,No hay programas que coincidan con «{query}».
+equipment.processes_now_title,Vista Equipo,Programas en marcha ahora
+equipment.ram_title,Vista Equipo,Memoria del equipo (RAM)
+equipment.ram_used_of_total,Vista Equipo,{used} ocupados de {total}
+equipment.storage_live_title,Vista Equipo,Actividad de discos en tiempo real
+equipment.tech_arch_row,Vista Equipo,Arquitectura: {arch}
+equipment.user_system,Vista Equipo,sistema
+more.app_ubuntu_card,"Vista Más, ajustes y DeX",App Ubuntu
+more.appearance_title,"Vista Más, ajustes y DeX",Aspecto visual del panel
+more.devices_empty,"Vista Más, ajustes y DeX",No hay sesiones guardadas en este momento.
+more.devices_revoked_count,"Vista Más, ajustes y DeX",Se desconectaron {count} dispositivos.
+more.devices_sub,"Vista Más, ajustes y DeX",Equipos verificados por red local Wi-Fi o mediante clave maestra segura
+more.devices_title,"Vista Más, ajustes y DeX",Dispositivos con permiso de acceso
+more.dex_fps_val,"Vista Más, ajustes y DeX",{fps} imágenes/seg
+more.dex_native_badge,"Vista Más, ajustes y DeX",Puente nativo USB
+more.disconnect_btn,"Vista Más, ajustes y DeX",Desconectar
+more.github_official_card,"Vista Más, ajustes y DeX",GitHub oficial
+more.internal_version_row,"Vista Más, ajustes y DeX",Versión interna: {version} · Commit local: {local} · Remoto: {remote}
+more.last_visit_label,"Vista Más, ajustes y DeX",Última visita
+more.local_web_card,"Vista Más, ajustes y DeX",Servidor web local
+more.manual_iframe_title,"Vista Más, ajustes y DeX",Manual Interactivo de Recursos
+more.native_apps_title,"Vista Más, ajustes y DeX",Aplicaciones nativas para tus dispositivos
+more.rename_btn,"Vista Más, ajustes y DeX",Renombrar
+more.save_btn,"Vista Más, ajustes y DeX",Guardar
+more.theme_dark,"Vista Más, ajustes y DeX",Oscuro
+more.theme_light,"Vista Más, ajustes y DeX",Claro
+more.update_now_btn,"Vista Más, ajustes y DeX",Actualizar ahora
+more.updating_btn,"Vista Más, ajustes y DeX",Actualizando...
+network.choose_icon_for,Vista Red y Seguridad,Elegir icono para {name}
+network.close_btn,Vista Red y Seguridad,Cerrar
+network.detailed_conns,Vista Red y Seguridad,Conexiones detalladas
+network.device_fallback_alt,Vista Red y Seguridad,Aparato de red
+network.donut_hint,Vista Red y Seguridad,Pasa el dedo o cursor sobre cada segmento
+network.locations_updated,Vista Red y Seguridad,Ubicaciones actualizadas.
+network.map_destinations_visible,Vista Red y Seguridad,{count} destinos visibles en el mapa mundial
+network.no_banned_ips,Vista Red y Seguridad,No hay direcciones bloqueadas ahora mismo.
+network.no_external_instant,Vista Red y Seguridad,No hay conexiones externas en este instante.
+network.pihole_title,Vista Red y Seguridad,Filtro de anuncios y rastreadores (Pi-hole)
+network.router_devices_title,Vista Red y Seguridad,Aparatos detectados en el router
+network.status_connected,Vista Red y Seguridad,Conectado
+network.status_idle,Vista Red y Seguridad,En reposo
+network.telegram_send_test,Vista Red y Seguridad,Enviar prueba
+network.telegram_title,Vista Red y Seguridad,Avisos por Telegram
+network.unblocked_ok,Vista Red y Seguridad,Acceso restaurado para {ip}.

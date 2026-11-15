@@ -1,6 +1,7 @@
 package com.cminewar.recursoscockpit.data
 
 import android.util.Log
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -38,7 +39,9 @@ class DiscoveryManager(
         Log.i("RecursosCockpit", "Subred local detectada para autodescubrimiento: ${localSubnetBase ?: "ninguna"}")
 
         if (localSubnetBase != null) {
-            onScanningProgress?.invoke("Buscando tu servidor en la red Wi-Fi...")
+            onScanningProgress?.invoke(
+                I18nDictionary.t(apiService.appContext, "native_android.searching_wifi", "Buscando tu servidor en la red Wi-Fi...")
+            )
 
             // Prioridad a direcciones comunes (Gateway .1, .2, .254)
             val priorityCandidates = listOf(
@@ -90,7 +93,9 @@ class DiscoveryManager(
         val wanDomain = securePreferences.wanDomain.trim().trimEnd('/')
         if (wanDomain.isNotEmpty()) {
             val wanCandidate = if (wanDomain.startsWith("http://") || wanDomain.startsWith("https://")) wanDomain else "https://$wanDomain"
-            onScanningProgress?.invoke("Conectando desde fuera de casa de forma segura...")
+            onScanningProgress?.invoke(
+                I18nDictionary.t(apiService.appContext, "native_android.connecting_wan", "Conectando desde fuera de casa de forma segura...")
+            )
             val wanRes = apiService.probeNode(wanCandidate, isQuickScan = false)
             if (wanRes.isRevoked) {
                 securePreferences.isCertRevoked = true

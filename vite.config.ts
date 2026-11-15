@@ -198,6 +198,140 @@ function readAppVersion(): string {
   }
 }
 
+interface ParsedViteDict {
+  meta: {
+    default_locale: string;
+    supported_locales: string[];
+    locale_names: Record<string, string>;
+    source_format: string;
+  };
+  flat: Record<string, Record<string, string>>;
+}
+
+let viteDictCache: { mtime: number; data: ParsedViteDict } | null = null;
+function parseViteCsvRows(text: string, delimiter: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      field += ch;
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+      i++;
+      continue;
+    }
+    if (ch === delimiter) {
+      row.push(field);
+      field = '';
+      i++;
+      continue;
+    }
+    if (ch === '\r' || ch === '\n') {
+      row.push(field);
+      field = '';
+      if (row.some((c) => c.length > 0)) rows.push(row);
+      row = [];
+      if (ch === '\r' && text[i + 1] === '\n') i += 2;
+      else i++;
+      continue;
+    }
+    field += ch;
+    i++;
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    if (row.some((c) => c.length > 0)) rows.push(row);
+  }
+  return rows;
+}
+
+function loadViteDictionary(): ParsedViteDict {
+  const dictPath = path.resolve(__dirname, 'i18n/dictionary.csv');
+  try {
+    const stat = fs.statSync(dictPath);
+    if (viteDictCache && viteDictCache.mtime === stat.mtimeMs) {
+      return viteDictCache.data;
+    }
+    const raw = fs.readFileSync(dictPath, 'utf-8').replace(/^\uFEFF/, '');
+    const firstLine = raw.split(/\r?\n/, 1)[0] || '';
+    const delimiter = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
+    const rows = parseViteCsvRows(raw, delimiter);
+    const metaCols = new Set(['key', 'clave', 'context', 'contexto', 'notes', 'notas', 'comment', 'comentario']);
+    const headers = (rows[0] || []).map((h) => h.trim());
+    const keyIdx = Math.max(0, headers.findIndex((h) => h.toLowerCase() === 'key' || h.toLowerCase() === 'clave'));
+    const langCols = headers
+      .map((h, idx) => ({ code: h, idx }))
+      .filter((x) => x.code && x.idx !== keyIdx && !metaCols.has(x.code.toLowerCase()));
+    const supported = langCols.map((l) => l.code);
+    let defaultLoc = supported[0] || 'es';
+    const localeNames: Record<string, string> = Object.fromEntries(supported.map((c) => [c, c.toUpperCase()]));
+    const flat: Record<string, Record<string, string>> = Object.fromEntries(supported.map((c) => [c, {}]));
+
+    for (let r = 1; r < rows.length; r++) {
+      const k = (rows[r][keyIdx] || '').trim();
+      if (!k || k.startsWith('#')) continue;
+      if (k === '__locale_name__') {
+        for (const l of langCols) {
+          const val = (rows[r][l.idx] || '').trim();
+          if (val) localeNames[l.code] = val;
+        }
+        continue;
+      }
+      if (k === '__default_locale__') {
+        for (const l of langCols) {
+          const val = (rows[r][l.idx] || '').trim().toLowerCase();
+          if (['1', 'true', 'yes', 'si', 'sí', 'default', '*'].includes(val)) {
+            defaultLoc = l.code;
+            break;
+          }
+        }
+        continue;
+      }
+      for (const l of langCols) {
+        const val = rows[r][l.idx];
+        if (val !== undefined && val !== '') flat[l.code][k] = val;
+      }
+    }
+
+    const parsed: ParsedViteDict = {
+      meta: { default_locale: defaultLoc, supported_locales: supported, locale_names: localeNames, source_format: 'csv' },
+      flat,
+    };
+    viteDictCache = { mtime: stat.mtimeMs, data: parsed };
+    return parsed;
+  } catch {
+    return viteDictCache?.data || { meta: { default_locale: 'es', supported_locales: ['es'], locale_names: { es: 'Español' }, source_format: 'csv' }, flat: { es: {} } };
+  }
+}
+
+function translateViteDict(key: string, params?: Record<string, string | number>, lang?: string): string {
+  const dict = loadViteDictionary();
+  const defLoc = dict.meta.default_locale || 'es';
+  const loc = lang && dict.flat[lang] ? lang : defLoc;
+  let val = dict.flat[loc]?.[key] || dict.flat[defLoc]?.[key] || key;
+  if (params) {
+    val = val.replace(/\{([a-zA-Z0-9_]+)\}/g, (m, p) => (params[p] !== undefined ? String(params[p]) : m));
+  }
+  return val;
+}
+
 function getDisplayVersion(pkgVer?: string): string {
   return (pkgVer || readAppVersion()).trim();
 }
@@ -528,7 +662,7 @@ function recordGeoIpWorkerError(source: string, stage: string, target: string, c
     stage: stage || 'ip-api.com',
     target: target || '--',
     code: code || 'ERROR',
-    message: message || 'Error de resolución',
+    message: message || translateViteDict('errors.geoip_default_msg'),
   };
   geoIpWorkerStats.errorsTotal++;
   if (geoIpErrorHistory.length > 0) {
@@ -921,25 +1055,25 @@ async function resolveGeoIpBatchFromIpApi(ipsToResolve: string[]): Promise<Recor
             geoIpWorkerStats.dirtyDisk = true;
           } else {
             geoIpNegativeCache.set(qIp, Date.now());
-            const failMsg = String(item.message || 'IP no resoluble por ip-api.com');
-            recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', qIp, 'GEOIP_FAIL', `Fallo al geolocalizar IP ${qIp}: ${failMsg}`);
+            const failMsg = String(item.message || translateViteDict('errors.geoip_default_msg'));
+            recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', qIp, 'GEOIP_FAIL', translateViteDict('errors.geoip_fail_ip', { ip: qIp, msg: failMsg }));
           }
         }
         for (const reqIp of batchSlice) {
           if (!seenQueries.has(reqIp)) {
             geoIpPendingQueue.delete(reqIp);
             geoIpNegativeCache.set(reqIp, Date.now());
-            recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', reqIp, 'NO_RESPONSE', `Sin respuesta en lote GeoIP para ${reqIp}`);
+            recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', reqIp, 'NO_RESPONSE', translateViteDict('errors.geoip_no_response', { ip: reqIp }));
           }
         }
       } else if (batchResp.rlRemaining === 0) {
-        recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', `Lote (${batchSlice.length} IPs)`, 'HTTP 429', 'Límite de tasa alcanzado en ip-api.com/batch (HTTP 429)');
+        recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', `Batch (${batchSlice.length} IPs)`, 'HTTP 429', translateViteDict('errors.geoip_rate_limit'));
       }
     } else {
-      recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', `Lote (${batchSlice.length} IPs)`, 'NET_ERR', 'Sin respuesta o timeout al conectar con ip-api.com/batch');
+      recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', `Batch (${batchSlice.length} IPs)`, 'NET_ERR', translateViteDict('errors.geoip_timeout'));
     }
   } catch (err) {
-    recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', `Lote (${batchSlice.length} IPs)`, 'NET_ERR', `Excepción en Worker GeoIP: ${err instanceof Error ? err.message : String(err)}`);
+    recordGeoIpWorkerError('GEOIP_WORKER', 'ip-api.com/batch', `Batch (${batchSlice.length} IPs)`, 'NET_ERR', translateViteDict('errors.geoip_worker_exc', { msg: err instanceof Error ? err.message : String(err) }));
   } finally {
     geoIpWorkerStats.status = 'active';
   }
@@ -1130,7 +1264,8 @@ function buildLiveConnectionsMap(localIp: string) {
     const geo = geoIpCache[s.remoteIp];
     let lat = geo?.lat;
     let lng = geo?.lng;
-    let city = geo?.city || (isLan ? 'Enlace Red Interna / Gateway' : 'Resolviendo GeoIP...');
+    const cityKey = geo?.city ? '' : isLan ? 'internal_gateway' : 'resolving_geoip';
+    let city = geo?.city || translateViteDict(`hardware.net.geo.${cityKey}`);
     let country = geo?.country || (isLan ? srvCountry : '');
     const countryCode = geo?.countryCode || (isLan ? serverSelfGeo?.countryCode || '' : '');
     const isp = geo?.org || geo?.isp || (isLan ? 'Subred Local / Tunel de Contenedor' : 'En cola del Worker GeoIP (ip-api.com)');
@@ -1439,19 +1574,20 @@ function sampleRealDisks() {
       const kind: 'local' | 'removable' | 'network' = isNet ? 'network' : isRemovable ? 'removable' : 'local';
       const tran = blk?.tran || '';
       const model = blk?.model || null;
-      const transport = isNet
+      const transport_key = isNet
         ? fstype.includes('nfs')
-          ? 'NAS · NFS'
-          : 'NAS · SMB'
+          ? 'nas_nfs'
+          : 'nas_smb'
         : tran === 'usb'
-          ? 'USB Extraíble'
+          ? 'usb_removable'
           : tran === 'mmc'
-            ? 'Tarjeta SD/MMC'
+            ? 'sd_mmc'
             : tran === 'nvme' || device.includes('nvme')
-              ? 'SSD NVMe'
+              ? 'nvme_ssd'
               : tran === 'sata' || tran === 'ata'
-                ? 'Disco SATA'
-                : 'Disco local';
+                ? 'sata_disk'
+                : 'local_disk';
+      const transport = translateViteDict(`hardware.storage.transport.${transport_key}`);
 
       let poolKey = `${kind}:${blk?.uuid || realDev || mountpoint}:${total}`;
       if (isNet) {
@@ -1465,22 +1601,36 @@ function sampleRealDisks() {
       if (isPrimary) poolPrimaryMount.set(poolKey, mountpoint);
 
       const leaf = path.basename(mountpoint.replace(/\/+$/, '')) || device;
-      const label =
+      const netHost = device.replace(/^\/+/, '').split('/')[0];
+      const label_key =
         mountpoint === '/'
-          ? `Sistema Raíz · ${model || device}`
+          ? 'root_system'
           : isNet
-            ? `${leaf} · NAS ${device.replace(/^\/+/, '').split('/')[0]}`
+            ? 'network_share'
             : model
-              ? `${model} · ${blk?.label || leaf}`
-              : `Volumen ${blk?.label || leaf}`;
+              ? 'named_volume'
+              : 'device_volume';
+      const label_params: Record<string, string> =
+        label_key === 'root_system'
+          ? { name: String(model || device) }
+          : label_key === 'network_share'
+            ? { leaf, host: netHost }
+            : label_key === 'named_volume'
+              ? { model: String(model), name: String(blk?.label || leaf) }
+              : { name: String(blk?.label || leaf) };
+      const label = translateViteDict(`hardware.storage.label.${label_key}`, label_params);
 
       disks.push({
         mountpoint,
         label,
+        label_key,
+        label_params,
         device,
         fstype: fstypeRaw,
+        fstype_key: fstypeRaw ? undefined : 'unformatted',
         kind,
         transport,
+        transport_key,
         model,
         mounted: true,
         is_removable: isRemovable,
@@ -1503,13 +1653,22 @@ function sampleRealDisks() {
       }
       if (!blk.isRemovable && !blk.fstype) continue;
       const kind: 'local' | 'removable' = blk.isRemovable ? 'removable' : 'local';
+      const unmountedTranKey = blk.tran === 'usb' ? 'usb_removable' : blk.tran === 'mmc' ? 'sd_mmc' : 'local_disk';
+      const unmountedLabelKey = blk.model ? 'named_volume' : 'removable_media';
+      const unmountedLabelParams: Record<string, string | number> = blk.model
+        ? { model: String(blk.model), name: String(blk.label || blk.name) }
+        : { name: String(blk.label || blk.name) };
       disks.push({
         mountpoint: blk.path,
-        label: blk.model ? `${blk.model} · ${blk.label || blk.name}` : `Memoria extraíble · ${blk.label || blk.name}`,
+        label: translateViteDict(`hardware.storage.label.${unmountedLabelKey}`, unmountedLabelParams),
+        label_key: unmountedLabelKey,
+        label_params: unmountedLabelParams,
         device: blk.path,
-        fstype: blk.fstype || 'sin formato',
+        fstype: blk.fstype || translateViteDict('hardware.storage.fstype.unformatted'),
+        fstype_key: blk.fstype ? undefined : 'unformatted',
         kind,
-        transport: blk.tran === 'usb' ? 'USB Extraíble' : blk.tran === 'mmc' ? 'Tarjeta SD/MMC' : 'Disco local',
+        transport: translateViteDict(`hardware.storage.transport.${unmountedTranKey}`),
+        transport_key: unmountedTranKey,
         model: blk.model || null,
         mounted: false,
         is_removable: blk.isRemovable,
@@ -2433,6 +2592,21 @@ function realOsTelemetryMiddleware(): Plugin {
           return;
         }
 
+        if (url === '/api/dictionary') {
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.end(JSON.stringify(loadViteDictionary()));
+          return;
+        }
+
+        if (url === '/i18n/dictionary.csv') {
+          const csvFile = path.resolve(__dirname, 'i18n/dictionary.csv');
+          res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.end(fs.existsSync(csvFile) ? fs.readFileSync(csvFile) : 'key,context,es\n');
+          return;
+        }
+
         if (url === '/api/version') {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(getRealVersionPayload(hostHdr)));
@@ -3146,7 +3320,11 @@ function emitStandaloneStaticHtmlPlugin(): Plugin {
 }
 
 export default defineConfig(() => {
+  const canonicalVer = readAppVersion();
   return {
+    define: {
+      __APP_VERSION__: JSON.stringify(canonicalVer),
+    },
     plugins: [realOsTelemetryMiddleware(), react(), tailwindcss(), emitStandaloneStaticHtmlPlugin()],
     resolve: {
       alias: {

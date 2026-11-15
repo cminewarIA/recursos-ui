@@ -14,6 +14,7 @@ import android.provider.Settings
 import android.util.Base64
 import android.util.Log
 import com.cminewar.recursoscockpit.BuildConfig
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,6 +40,8 @@ class ApiService(
     private val context: Context,
     private val securePreferences: SecurePreferences
 ) {
+    val appContext: Context
+        get() = context
 
     private val gson = Gson()
 
@@ -223,7 +226,11 @@ class ApiService(
         val isTvDevice = isTelevisionDevice()
         return NativeDeviceTelemetry(
             clientType = "android_native",
-            clientLabel = if (isTvDevice) "App Nativa Android TV (.apk)" else "App Nativa Android (.apk)",
+            clientLabel = if (isTvDevice) {
+                I18nDictionary.t(context, "native_android.client_label_tv", "App Nativa Android TV (.apk)")
+            } else {
+                I18nDictionary.t(context, "native_android.client_label_mobile", "App Nativa Android (.apk)")
+            },
             accessLevel = "FULL_NATIVE_ACCESS",
             fullAccess = true,
             dexCapable = false,
@@ -240,7 +247,11 @@ class ApiService(
             hardwareSoc = hardwareSoc,
             bootloader = bootloader,
             buildDisplay = buildDisplay,
-            chassisType = if (isTvDevice) "Android TV / Smart TV" else "Android Mobile / Tablet",
+            chassisType = if (isTvDevice) {
+                I18nDictionary.t(context, "native_android.chassis_tv", "Android TV / Smart TV")
+            } else {
+                I18nDictionary.t(context, "native_android.chassis_mobile", "Android Mobile / Tablet")
+            },
             osDistro = osDistro,
             securityPatch = securityPatch,
             kernel = kernel,

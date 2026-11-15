@@ -8,6 +8,7 @@ import {
   Download,
   ExternalLink,
   GitCommit,
+  Languages,
   Laptop,
   Lock,
   Moon,
@@ -29,6 +30,8 @@ import {
 } from '../types/telemetry';
 import { apiFetchJson, detectNativeEnvironment } from '../utils/api';
 import { getDisplayVersionString } from '../utils/formatters';
+import { getCanonicalDisplayVersion, getCanonicalVersion } from '../utils/version';
+import { useI18n } from '../i18n';
 
 type MoreSubTab = 'updates' | 'devices' | 'manual' | 'dex';
 
@@ -61,17 +64,18 @@ export const MoreView: React.FC<MoreViewProps> = ({
   onRefreshMetrics,
   onNotify,
 }) => {
+  const { locale, supportedLocales, localeNames, setLocale, t } = useI18n();
   const { isUbuntuNative, isNativeApp } = detectNativeEnvironment();
   const [subTab, setSubTab] = useState<MoreSubTab>(() => resolveMoreSubTab(initialSubTab) || 'updates');
   const manualIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     try {
-      manualIframeRef.current?.contentWindow?.postMessage({ type: 'RECURSOS_THEME', theme }, '*');
+      manualIframeRef.current?.contentWindow?.postMessage({ type: 'RECURSOS_THEME', theme, locale }, '*');
     } catch {
       // ignore cross-origin frame message errors
     }
-  }, [theme]);
+  }, [theme, locale]);
 
   // Updates state
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(metrics?.version_info ?? null);
@@ -142,7 +146,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
   }, [subTab, loadVersion, loadLogs, loadDevices, loadDex]);
 
   const activeVer = versionInfo || metrics?.version_info;
-  const displayVer = getDisplayVersionString(activeVer?.current_version, activeVer?.display_version);
+  const displayVer = getCanonicalDisplayVersion(activeVer);
   const remoteDisplayVer = activeVer?.remote_display_version || getDisplayVersionString(activeVer?.remote_version);
 
   const handleApplyUpdate = async () => {
@@ -159,7 +163,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
     if (res.data?.output) setUpdateOutput(res.data.output);
     if (res.data?.version_info) setVersionInfo(res.data.version_info);
     if (res.ok && res.data?.success !== false) {
-      onNotify(res.data?.message || 'Sistema comprobado y actualizado correctamente.');
+      onNotify(res.data?.message || t('more.update_checked_ok'));
       onRefreshMetrics();
       if (res.data?.web_synced) {
         setTimeout(() => {
@@ -167,7 +171,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
         }, 900);
       }
     } else {
-      onNotify(res.error || res.data?.message || 'No se pudo completar la actualización automática.', true);
+      onNotify(res.error || res.data?.message || t('more.update_failed'), true);
     }
   };
 
@@ -188,7 +192,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             }
           : prev
       );
-      onNotify(next ? 'Instalación automática desde GitHub activada.' : 'Instalación automática pausada.');
+      onNotify(next ? t('more.auto_on_toast') : t('more.auto_off_toast'));
     }
   };
 
@@ -200,10 +204,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
     });
     if (res.ok) {
       setEditingId(null);
-      onNotify('Nombre guardado.');
+      onNotify(t('more.name_saved'));
       void loadDevices();
     } else {
-      onNotify(res.error || 'No se pudo cambiar el nombre.', true);
+      onNotify(res.error || t('more.name_err'), true);
     }
   };
 
@@ -214,7 +218,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
       body: JSON.stringify({ id: devId }),
     });
     if (res.ok) {
-      onNotify('Dispositivo desconectado.');
+      onNotify(t('more.device_revoked'));
       void loadDevices();
     }
   };
@@ -222,7 +226,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
   const handleRevokeAllOthers = async () => {
     const res = await apiFetchJson<{ revoked_count?: number }>('/api/auth/revoke_all_others', { method: 'POST' });
     if (res.ok) {
-      onNotify(`Se desconectaron ${res.data?.revoked_count ?? 0} dispositivos.`);
+      onNotify(t('more.devices_revoked_count', { count: res.data?.revoked_count ?? 0 }));
       void loadDevices();
     }
   };
@@ -237,10 +241,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
       }
     );
     if (res.ok && res.data?.success) {
-      onNotify(start ? 'Proyección USB iniciada.' : 'Proyección USB detenida.');
+      onNotify(start ? t('more.dex_started') : t('more.dex_stopped'));
       void loadDex();
     } else {
-      onNotify(res.data?.error || res.error || 'No se pudo controlar la proyección USB.', true);
+      onNotify(res.data?.error || res.error || t('more.dex_err'), true);
     }
   };
 
@@ -250,20 +254,20 @@ export const MoreView: React.FC<MoreViewProps> = ({
       <LayoutGroup id="more-subtabs">
         <div className="cockpit-segmented flex items-center gap-1.5 overflow-x-auto p-1.5 no-scrollbar">
           {[
-            { id: 'updates' as const, label: 'Actualizaciones y aspecto', icon: <GitCommit className="h-4 w-4" /> },
-            { id: 'devices' as const, label: 'Dispositivos conectados', icon: <ShieldCheck className="h-4 w-4" /> },
-            { id: 'manual' as const, label: 'Manual interactivo', icon: <BookOpen className="h-4 w-4" /> },
+            { id: 'updates' as const, label: t('more.subtabs.updates'), icon: <GitCommit className="h-4 w-4" /> },
+            { id: 'devices' as const, label: t('more.subtabs.devices'), icon: <ShieldCheck className="h-4 w-4" /> },
+            { id: 'manual' as const, label: t('more.subtabs.manual'), icon: <BookOpen className="h-4 w-4" /> },
             ...(isUbuntuNative
-              ? [{ id: 'dex' as const, label: 'Pantalla móvil USB', icon: <Usb className="h-4 w-4" /> }]
+              ? [{ id: 'dex' as const, label: t('more.subtabs.dex'), icon: <Usb className="h-4 w-4" /> }]
               : []),
-          ].map((t) => {
-            const active = subTab === t.id;
+          ].map((tab) => {
+            const active = subTab === tab.id;
             return (
               <motion.button
                 whileTap={{ scale: 0.97 }}
-                key={t.id}
+                key={tab.id}
                 type="button"
-                onClick={() => setSubTab(t.id)}
+                onClick={() => setSubTab(tab.id)}
                 className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                   active
                     ? 'text-sky-700 dark:text-sky-300'
@@ -272,8 +276,8 @@ export const MoreView: React.FC<MoreViewProps> = ({
               >
                 {active && <MorphPill layoutId="more-subtab-pill" className="rounded-xl" />}
                 <span className="relative z-10 inline-flex items-center gap-2">
-                  {t.icon}
-                  <span>{t.label}</span>
+                  {tab.icon}
+                  <span>{tab.label}</span>
                 </span>
               </motion.button>
             );
@@ -282,18 +286,18 @@ export const MoreView: React.FC<MoreViewProps> = ({
       </LayoutGroup>
 
       <ViewStage tabKey={subTab}>
-      {/* 1. Actualizaciones y aspecto (Selector de Tema Claro/Oscuro integrado aquí) */}
+      {/* 1. Actualizaciones y aspecto (Selector de Tema Claro/Oscuro e Idioma integrado aquí) */}
       {subTab === 'updates' && (
         <div className="space-y-4">
-          {/* Theme Switcher inside GitHub Updater Panel */}
+          {/* Theme & Spreadsheet Dictionary Switcher */}
           <section className="cockpit-bento p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  Aspecto visual del panel
+                  {t('more.appearance_title')}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Cambia al instante entre el diseño claro minimalista y el modo oscuro en web y apps
+                  {t('more.appearance_desc')}
                 </p>
               </div>
               <LayoutGroup id="theme-switcher">
@@ -314,8 +318,47 @@ export const MoreView: React.FC<MoreViewProps> = ({
                         {active && <MorphPill layoutId="theme-switcher-pill" className="rounded-lg" />}
                         <span className="relative z-10 inline-flex items-center gap-2">
                           {mode === 'light' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                          <span>{mode === 'light' ? 'Claro' : 'Oscuro'}</span>
+                          <span>{mode === 'light' ? t('more.theme_light') : t('more.theme_dark')}</span>
                         </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </LayoutGroup>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="inline-flex items-center gap-1.5 font-display text-sm font-semibold text-slate-900 dark:text-white">
+                    <Languages className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                    <span>{t('more.language_label')}</span>
+                  </h3>
+                  <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold">
+                    {t('more.language_columns_count', { count: supportedLocales.length })}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {t('more.language_desc')}
+                </p>
+              </div>
+              <LayoutGroup id="lang-switcher">
+                <div className="cockpit-subtile inline-flex flex-wrap items-center gap-1 p-1 shrink-0">
+                  {supportedLocales.map((loc) => {
+                    const active = locale === loc;
+                    return (
+                      <button
+                        key={loc}
+                        type="button"
+                        onClick={() => setLocale(loc)}
+                        className={`relative inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold transition-colors ${
+                          active
+                            ? 'text-sky-700 dark:text-sky-300'
+                            : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                        }`}
+                      >
+                        {active && <MorphPill layoutId="lang-switcher-pill" className="rounded-lg" />}
+                        <span className="relative z-10">{localeNames[loc] || loc.toUpperCase()}</span>
                       </button>
                     );
                   })}
@@ -330,7 +373,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-                    {isUbuntuNative ? 'Actualización unificada' : 'Actualizaciones desde GitHub'}
+                    {isUbuntuNative ? t('more.updates_native') : t('more.updates_github')}
                   </h2>
                   <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold">
                     v{displayVer}
@@ -340,26 +383,26 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   {activeVer?.update_summary
                     ? activeVer.update_summary
                     : activeVer?.update_available
-                      ? `Hay una versión nueva disponible (v${remoteDisplayVer}).`
+                      ? t('more.new_version_available', { ver: remoteDisplayVer })
                       : activeVer?.ahead_of_remote
-                        ? 'Tienes cambios locales más recientes que el repositorio.'
-                        : 'Tu sistema está al día con la última versión.'}
+                        ? t('more.ahead_of_repo')
+                        : t('more.up_to_date')}
                 </p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {activeVer?.auto_install_status || 'Actualización automática activada'}
+                  {activeVer?.auto_install_status || t('more.auto_enabled_status')}
                 </p>
 
                 {(activeVer?.ubuntu_native_bridge || activeVer?.app_version || activeVer?.server_version) && (
                   <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <div className="cockpit-subtile px-3 py-2.5">
                       <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                        App Ubuntu
+                        {t('more.app_ubuntu_card')}
                       </p>
                       <p className="mt-0.5 font-mono text-xs font-semibold text-slate-900 dark:text-white">
                         v{getDisplayVersionString(activeVer.app_version || activeVer.current_version, activeVer.app_display_version)}
                         {activeVer.app_above_github && (
                           <span className="ml-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                            · sup. GitHub
+                            {t('more.above_github')}
                           </span>
                         )}
                       </p>
@@ -372,18 +415,18 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       }`}
                     >
                       <p className="text-[10px] font-medium uppercase tracking-wider opacity-75">
-                        Servidor web local
+                        {t('more.local_web_card')}
                       </p>
                       <p className="mt-0.5 font-mono text-xs font-semibold">
                         {activeVer.server_reachable === false
-                          ? 'Sin conexión'
+                          ? t('more.no_connection')
                           : `v${getDisplayVersionString(
                               activeVer.server_version || activeVer.current_version,
                               activeVer.server_display_version
                             )}`}
                         {activeVer.server_needs_update && (
                           <span className="ml-1.5 text-[10px] font-medium text-sky-600 dark:text-sky-300">
-                            · actualizable
+                            {t('more.updatable')}
                           </span>
                         )}
                       </p>
@@ -396,10 +439,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       }`}
                     >
                       <p className="text-[10px] font-medium uppercase tracking-wider opacity-75">
-                        GitHub oficial
+                        {t('more.github_official_card')}
                       </p>
                       <p className="mt-0.5 font-mono text-xs font-semibold">
-                        {remoteDisplayVer && remoteDisplayVer !== '0.0.0' ? `v${remoteDisplayVer}` : 'Sin acceso'}
+                        {remoteDisplayVer && remoteDisplayVer !== '0.0.0' ? `v${remoteDisplayVer}` : t('more.no_access')}
                       </p>
                     </div>
                   </div>
@@ -416,7 +459,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       : 'cockpit-subtile text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  {activeVer?.auto_install_enabled ? 'Autoactualización activada' : 'Autoactualización pausada'}
+                  {activeVer?.auto_install_enabled ? t('more.auto_on') : t('more.auto_off')}
                 </button>
                 <button
                   type="button"
@@ -425,7 +468,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   className="cockpit-subtile inline-flex min-h-[44px] items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
-                  <span>Comprobar</span>
+                  <span>{t('more.check_btn')}</span>
                 </button>
                 <button
                   type="button"
@@ -440,8 +483,8 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   <Download className="h-3.5 w-3.5" />
                   <span>
                     {installingUpdate
-                      ? 'Actualizando...'
-                      : activeVer?.update_action_label || 'Actualizar ahora'}
+                      ? t('more.updating_btn')
+                      : activeVer?.update_action_label || t('more.update_now_btn')}
                   </span>
                 </button>
               </div>
@@ -450,7 +493,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             {activeVer?.recent_commits && activeVer.recent_commits.length > 0 && (
               <div className="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800">
                 <p className="mb-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Últimos cambios registrados
+                  {t('more.latest_changes')}
                 </p>
                 <div className="space-y-2">
                   {activeVer.recent_commits.slice(0, 5).map((c, idx) => (
@@ -458,7 +501,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       key={`${c.sha || idx}`}
                       className="flex flex-wrap items-baseline justify-between gap-2 text-xs"
                     >
-                      <span className="text-slate-800 dark:text-slate-200">{c.message || 'Actualización'}</span>
+                      <span className="text-slate-800 dark:text-slate-200">{c.message || t('more.update_fallback')}</span>
                       <span className="font-mono text-[11px] text-slate-400">
                         {c.short_sha || c.sha?.slice(0, 7) || ''} {c.date ? `· ${c.date}` : ''}
                       </span>
@@ -474,15 +517,17 @@ export const MoreView: React.FC<MoreViewProps> = ({
               className="mt-4 inline-flex min-h-[40px] items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             >
               {showTechUpdate ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              <span>Ver detalles técnicos</span>
+              <span>{t('equipment.technical_details')}</span>
             </button>
 
             {showTechUpdate && (
               <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                 <div>
-                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.8.0'} · Commit local:{' '}
-                  {activeVer?.local_commit || activeVer?.local_hash || 'local'} · Remoto:{' '}
-                  {activeVer?.remote_commit || activeVer?.remote_hash || '--'}
+                  {t('more.internal_version_row', {
+                    version: activeVer?.current_version || activeVer?.version || getCanonicalVersion(),
+                    local: activeVer?.local_commit || activeVer?.local_hash || 'local',
+                    remote: activeVer?.remote_commit || activeVer?.remote_hash || '--',
+                  })}
                 </div>
                 {updateOutput && (
                   <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-[11px] dark:bg-slate-800/60">
@@ -491,7 +536,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 )}
                 {sysLogs.length > 0 && (
                   <div className="max-h-40 overflow-y-auto rounded-xl bg-slate-50 p-3 text-[11px] dark:bg-slate-800/60">
-                    <p className="mb-1 font-semibold">Registro de avisos del sistema:</p>
+                    <p className="mb-1 font-semibold">{t('more.system_warnings_title')}</p>
                     {sysLogs.slice(0, 12).map((log, idx) => (
                       <div key={idx} className="truncate">
                         [{log.timestamp || log.time_str || '--'}] {log.unit || log.source || log.category}: {log.message}
@@ -507,10 +552,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
           {!isNativeApp && (
             <section className="cockpit-bento p-5">
               <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                Aplicaciones nativas para tus dispositivos
+                {t('more.native_apps_title')}
               </h2>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Se verifican automáticamente al conectar por Wi-Fi local y funcionan cifradas desde fuera de casa usando el DNS detectado.
+                {t('more.devices_desc')}
               </p>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <a
@@ -522,8 +567,8 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       <Laptop className="h-5 w-5" />
                     </span>
                     <span>
-                      <span className="block">App para ordenador Ubuntu (.deb)</span>
-                      <span className="font-normal text-slate-500 dark:text-slate-400">Conecta, instala nodo o configura</span>
+                      <span className="block">{t('more.ubuntu_app')}</span>
+                      <span className="font-normal text-slate-500 dark:text-slate-400">{t('more.ubuntu_app_sub')}</span>
                     </span>
                   </span>
                   <Download className="h-4 w-4 text-sky-600 dark:text-sky-400" />
@@ -537,8 +582,8 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       <Smartphone className="h-5 w-5" />
                     </span>
                     <span>
-                      <span className="block">App para móvil Android (.apk)</span>
-                      <span className="font-normal text-slate-500 dark:text-slate-400">Conexión directa automática</span>
+                      <span className="block">{t('more.android_app')}</span>
+                      <span className="font-normal text-slate-500 dark:text-slate-400">{t('more.android_app_sub')}</span>
                     </span>
                   </span>
                   <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -555,10 +600,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200/70 dark:border-slate-800">
             <div>
               <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                Dispositivos con permiso de acceso
+                {t('more.devices_title')}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Equipos verificados por red local Wi-Fi o mediante clave maestra segura
+                {t('more.devices_sub')}
               </p>
             </div>
             {devices.length > 1 && (
@@ -567,20 +612,20 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 onClick={handleRevokeAllOthers}
                 className="cockpit-btn-off min-h-[40px] rounded-xl px-3.5 text-xs font-semibold transition-colors"
               >
-                Desconectar los demás
+                {t('more.revoke_others')}
               </button>
             )}
           </div>
 
           {devices.length === 0 ? (
             <p className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-              No hay sesiones guardadas en este momento.
+              {t('more.devices_empty')}
             </p>
           ) : (
             <div className="mt-4 cockpit-auto-grid-cards">
               {devices.map((dev) => {
                 const isOpen = expandedDevId === dev.id;
-                const accessText = dev.full_access ? 'Aplicación nativa verificada' : 'Navegador web verificado';
+                const accessText = dev.full_access ? t('more.native_verified') : t('more.web_verified');
                 return (
                   <div key={dev.id} className="cockpit-subtile p-3.5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -599,13 +644,13 @@ export const MoreView: React.FC<MoreViewProps> = ({
                               className="cockpit-btn-accent inline-flex min-h-[38px] items-center gap-1 rounded-xl px-3 text-xs font-semibold"
                             >
                               <Check className="h-3.5 w-3.5" />
-                              <span>Guardar</span>
+                              <span>{t('more.save_btn')}</span>
                             </button>
                           </div>
                         ) : (
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                              {dev.name} {dev.is_current ? '(Este dispositivo)' : ''}
+                              {dev.name} {dev.is_current ? t('more.this_device') : ''}
                             </p>
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
@@ -617,7 +662,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                           </div>
                         )}
                         <p className="mt-0.5 text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                          {dev.connection_mode || 'LAN'} · {dev.local_ip || dev.last_external_ip || 'Conectado'} · Última visita:{' '}
+                          {dev.connection_mode || 'LAN'} · {dev.local_ip || dev.last_external_ip || t('more.connected_fallback')} · {t('more.last_visit_label')}:{' '}
                           {dev.last_seen || '--'}
                         </p>
                       </div>
@@ -631,7 +676,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                           }}
                           className="min-h-[38px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
-                          Renombrar
+                          {t('more.rename_btn')}
                         </button>
                         {!dev.is_current && (
                           <button
@@ -640,7 +685,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                             className="cockpit-btn-off inline-flex min-h-[38px] items-center gap-1 rounded-xl px-3 text-xs font-semibold transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
-                            <span>Desconectar</span>
+                            <span>{t('more.disconnect_btn')}</span>
                           </button>
                         )}
                         <button
@@ -648,7 +693,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                           onClick={() => setExpandedDevId(isOpen ? null : dev.id)}
                           className="inline-flex min-h-[38px] items-center gap-1 px-2 text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                         >
-                          <span>Ver detalles técnicos</span>
+                          <span>{t('equipment.technical_details')}</span>
                           {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </button>
                       </div>
@@ -681,10 +726,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                Manual web interactivo
+                {t('more.manual_title')}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Diagrama de arquitectura, simuladores de telemetría y seguridad Zero-Trust e inspector de API en vivo
+                {t('more.manual_desc')}
               </p>
             </div>
             <a
@@ -693,7 +738,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
               rel="noopener noreferrer"
               className="cockpit-btn-accent inline-flex min-h-[40px] items-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all"
             >
-              <span>Abrir en pantalla completa</span>
+              <span>{t('more.open_fullscreen')}</span>
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
@@ -701,10 +746,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
             <iframe
               ref={manualIframeRef}
               src="/manual"
-              title="Manual Interactivo de Recursos"
+              title={t('more.manual_iframe_title')}
               onLoad={() => {
                 try {
-                  manualIframeRef.current?.contentWindow?.postMessage({ type: 'RECURSOS_THEME', theme }, '*');
+                  manualIframeRef.current?.contentWindow?.postMessage({ type: 'RECURSOS_THEME', theme, locale }, '*');
                 } catch {
                   // ignore
                 }
@@ -722,7 +767,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             <div className="flex flex-col items-center py-10 text-center">
               <Lock className="h-8 w-8 text-slate-400" />
               <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Esperando dispositivo para conectarse en su versión nativa
+                {t('more.dex_locked_msg')}
               </p>
             </div>
           ) : (
@@ -731,14 +776,14 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                      Pantalla del móvil por USB (Modo Escritorio)
+                      {t('more.dex_title')}
                     </h2>
                     <span className="cockpit-pill-emerald rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
-                      Puente nativo USB
+                      {t('more.dex_native_badge')}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Proyecta y controla tu móvil Android conectado al ordenador por cable USB
+                    {t('more.dex_desc')}
                   </p>
                 </div>
                 <button
@@ -747,32 +792,32 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Buscar cable USB</span>
+                  <span>{t('more.scan_usb')}</span>
                 </button>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs">
                 <label className="block">
-                  <span className="text-slate-500 dark:text-slate-400">Resolución</span>
+                  <span className="text-slate-500 dark:text-slate-400">{t('more.resolution')}</span>
                   <select
                     value={dexResolution}
                     onChange={(e) => setDexResolution(e.target.value)}
                     className="cockpit-subtile mt-1 min-h-[42px] w-full px-3"
                   >
-                    <option value="1920x1080">Full HD (1920×1080)</option>
-                    <option value="2560x1440">2K QHD (2560×1440)</option>
-                    <option value="1280x720">HD (1280×720)</option>
+                    <option value="1920x1080">{t('more.res_fhd')}</option>
+                    <option value="2560x1440">{t('more.res_qhd')}</option>
+                    <option value="1280x720">{t('more.res_hd')}</option>
                   </select>
                 </label>
                 <label className="block">
-                  <span className="text-slate-500 dark:text-slate-400">Fluidez</span>
+                  <span className="text-slate-500 dark:text-slate-400">{t('more.smoothness')}</span>
                   <select
                     value={dexFps}
                     onChange={(e) => setDexFps(Number(e.target.value))}
                     className="cockpit-subtile mt-1 min-h-[42px] w-full px-3"
                   >
-                    <option value={60}>60 imágenes/seg</option>
-                    <option value={30}>30 imágenes/seg</option>
+                    <option value={60}>{t('more.dex_fps_val', { fps: 60 })}</option>
+                    <option value={30}>{t('more.dex_fps_val', { fps: 30 })}</option>
                   </select>
                 </label>
                 <label className="flex items-center gap-2 pt-5 cursor-pointer">
@@ -782,7 +827,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     onChange={(e) => setDexFullscreen(e.target.checked)}
                     className="h-4 w-4 rounded accent-sky-600"
                   />
-                  <span className="text-slate-700 dark:text-slate-300">Abrir a pantalla completa</span>
+                  <span className="text-slate-700 dark:text-slate-300">{t('more.fullscreen_opt')}</span>
                 </label>
               </div>
 
@@ -793,7 +838,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     onClick={() => handleDexAction(false)}
                     className="min-h-[44px] rounded-xl bg-rose-600 px-5 text-xs font-semibold text-white hover:bg-rose-700"
                   >
-                    Detener proyección
+                    {t('more.stop_projection')}
                   </button>
                 ) : (
                   <button
@@ -801,7 +846,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     onClick={() => handleDexAction(true, dexStatus?.devices?.[0]?.serial)}
                     className="cockpit-btn-accent min-h-[44px] rounded-xl px-5 text-xs font-semibold transition-all"
                   >
-                    Iniciar proyección USB
+                    {t('more.start_projection')}
                   </button>
                 )}
               </div>

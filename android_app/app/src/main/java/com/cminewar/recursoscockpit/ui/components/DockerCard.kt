@@ -12,10 +12,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.cminewar.recursoscockpit.theme.*
 
 @Composable
@@ -23,6 +25,7 @@ fun DockerCard(
     dockerActivities: List<Map<String, Any>>?,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val containers = dockerActivities ?: emptyList()
     val runningCount = containers.count { (it["state"] as? String)?.lowercase() == "running" }
 
@@ -45,12 +48,12 @@ fun DockerCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Widgets,
-                        contentDescription = "Docker",
+                        contentDescription = I18nDictionary.t(context, "native_android.tab_docker", "Docker"),
                         tint = NeonBlue,
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = "CONTENEDORES DOCKER",
+                        text = I18nDictionary.t(context, "native_android.card_docker", "CONTENEDORES DOCKER"),
                         color = TextSecondary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
@@ -66,7 +69,12 @@ fun DockerCard(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "$runningCount / ${containers.size} UP",
+                        text = I18nDictionary.t(
+                            context,
+                            "native_android.docker_up_count",
+                            "{running} / {total} UP",
+                            mapOf("running" to runningCount, "total" to containers.size)
+                        ),
                         color = NeonBlue,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -76,14 +84,15 @@ fun DockerCard(
 
             if (containers.isEmpty()) {
                 Text(
-                    text = "No se detectaron contenedores activos",
+                    text = I18nDictionary.t(context, "native_android.no_docker", "No se detectaron contenedores activos"),
                     color = TextSecondary,
                     fontSize = 13.sp
                 )
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     containers.take(5).forEach { container ->
-                        val name = (container["name"] as? String)?.removePrefix("/") ?: "Contenedor"
+                        val name = (container["name"] as? String)?.removePrefix("/")
+                            ?: I18nDictionary.t(context, "native_android.container_fallback", "Contenedor")
                         val state = (container["state"] as? String) ?: "unknown"
                         val isUp = state.lowercase() == "running"
 

@@ -9,15 +9,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cminewar.recursoscockpit.data.NetData
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.cminewar.recursoscockpit.theme.*
 
 @Composable
 fun NetworkCard(net: NetData?, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val rxBytes = net?.rxBytesSec ?: 0.0
     val txBytes = net?.txBytesSec ?: 0.0
 
@@ -46,7 +49,7 @@ fun NetworkCard(net: NetData?, modifier: Modifier = Modifier) {
                     Text(text = "🌐", fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "TRÁFICO DE RED EN VIVO",
+                        text = I18nDictionary.t(context, "native_android.card_network", "TRÁFICO DE RED EN VIVO"),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextSecondary,
@@ -74,7 +77,7 @@ fun NetworkCard(net: NetData?, modifier: Modifier = Modifier) {
                 // Descarga (RX)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "↓ BAJADA (RX)",
+                        text = I18nDictionary.t(context, "native_android.rx_down", "↓ BAJADA (RX)"),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = NeonGreen,
@@ -93,7 +96,7 @@ fun NetworkCard(net: NetData?, modifier: Modifier = Modifier) {
                 // Subida (TX)
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "↑ SUBIDA (TX)",
+                        text = I18nDictionary.t(context, "native_android.tx_up", "↑ SUBIDA (TX)"),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = NeonOrange,

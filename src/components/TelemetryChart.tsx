@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
 import { formatRelativeIndexAge } from '../utils/formatters';
 import { TelemetryMetricKey, ThemeMode } from '../types/telemetry';
+import { useI18n } from '../i18n';
 
 export interface ChartSeries {
   id: string;
@@ -157,11 +158,13 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
   className = '',
   formatLabel,
   formatValue,
-  emptyMessage = 'Recopilando datos en tiempo real...',
+  emptyMessage,
   onExpandClick,
   interactionMode = 'inspect',
   onPanDeltaSteps,
 }) => {
+  const { t } = useI18n();
+  const resolvedEmptyMessage = emptyMessage ?? t('charts.empty_collecting');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const panAnchorXRef = useRef<number | null>(null);
@@ -587,20 +590,23 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
     const fullDateTitle = dateTimestamps[hoverIdx];
     const title = formatLabel
       ? formatLabel(hoverIdx)
-      : fullDateTitle || timestamps[hoverIdx] || `Muestra ${hoverIdx + 1}`;
+      : fullDateTitle || timestamps[hoverIdx] || t('charts.sample_n', { n: hoverIdx + 1 });
     let computedSubtitle: string | undefined;
     if (!formatLabel) {
       if (fullDateTitle) {
-        computedSubtitle = `Muestra ${hoverIdx + 1} de ${sampleCount}`;
+        computedSubtitle = t('charts.sample_of', { n: hoverIdx + 1, total: sampleCount });
       } else if (validEpochRange) {
         const epochIdx = Math.max(0, Math.min(validEpochRange.arr.length - 1, hoverIdx - (sampleCount - validEpochRange.arr.length)));
         const ageSec = Math.max(0, Math.round(validEpochRange.tEnd - validEpochRange.arr[epochIdx]));
-        if (ageSec <= 3) computedSubtitle = 'Ahora';
-        else if (ageSec < 60) computedSubtitle = `Hace ${ageSec} s`;
+        if (ageSec <= 3) computedSubtitle = t('time.now');
+        else if (ageSec < 60) computedSubtitle = t('time.seconds_ago', { seconds: ageSec });
         else {
           const mins = Math.floor(ageSec / 60);
           const remSec = ageSec % 60;
-          computedSubtitle = remSec > 0 ? `Hace ${mins} min ${remSec} s` : `Hace ${mins} min`;
+          computedSubtitle =
+            remSec > 0
+              ? t('time.minutes_seconds_ago', { minutes: mins, seconds: remSec })
+              : t('time.minutes_ago', { minutes: mins });
         }
       } else {
         computedSubtitle = formatRelativeIndexAge(hoverIdx, sampleCount, intervalSec);
@@ -683,7 +689,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
     >
       {sampleCount < 2 ? (
         <div className="flex h-full items-center justify-center text-xs text-slate-400 dark:text-slate-500">
-          {emptyMessage}
+          {resolvedEmptyMessage}
         </div>
       ) : (
         <canvas

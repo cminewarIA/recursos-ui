@@ -77,43 +77,61 @@ except ImportError:
     psutil = None
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
+for _cand_dir in (
+    SCRIPT_DIR,
+    os.path.abspath(os.path.join(SCRIPT_DIR, "..")),
+    "/usr/lib/recursos-cockpit",
+    "/usr/share/recursos-cockpit",
+):
+    if os.path.isdir(_cand_dir) and _cand_dir not in sys.path:
+        sys.path.insert(0, _cand_dir)
 
 from dex_controller import DexController
 
+try:
+    from i18n_catalog import (
+        get_canonical_version as _catalog_get_version,
+        t as _catalog_t,
+        resolve_catalog_base_dir as _catalog_base_dir,
+    )
+    HAS_I18N_CATALOG = True
+except Exception:
+    HAS_I18N_CATALOG = False
+    def _catalog_get_version(*_a, **_kw):
+        return "0.0.0"
+    def _catalog_t(key, locale=None, params=None, fallback=None, base_dir=None):
+        text = fallback if fallback is not None else key
+        if params and isinstance(params, dict):
+            for pk, pv in params.items():
+                text = text.replace("{" + str(pk) + "}", str(pv))
+        return text
+    def _catalog_base_dir(*_a, **_kw):
+        return os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+
+
+def i18n_t(key, params=None, fallback=None, locale=None):
+    base_dir = _catalog_base_dir(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
+    return _catalog_t(key, locale=locale, params=params, fallback=fallback, base_dir=base_dir)
+
 
 def get_app_version():
-    """Lee la versión canónica desde VERSION o package.json sin hardcoding."""
-    candidates = [
+    """Lee la versión canónica desde el único punto de verdad (./VERSION) vía i18n_catalog."""
+    ver = _catalog_get_version(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
+    if ver and ver != "0.0.0":
+        return ver
+    for path in (
         os.path.join(SCRIPT_DIR, "..", "VERSION"),
         os.path.join(SCRIPT_DIR, "VERSION"),
         "/usr/share/recursos-cockpit/VERSION",
         "/usr/lib/recursos-cockpit/VERSION",
         "./VERSION",
-    ]
-    for path in candidates:
+    ):
         if os.path.isfile(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:
-                    ver = f.read().strip()
-                    if ver:
-                        return ver
-            except Exception:
-                pass
-
-    pkg_candidates = [
-        os.path.join(SCRIPT_DIR, "..", "package.json"),
-        "./package.json",
-    ]
-    for pkg_path in pkg_candidates:
-        if os.path.isfile(pkg_path):
-            try:
-                with open(pkg_path, "r", encoding="utf-8") as f:
-                    pkg = json.load(f)
-                    ver = str(pkg.get("version", "")).strip()
-                    if ver:
-                        return ver
+                    v = f.read().strip()
+                    if v:
+                        return v
             except Exception:
                 pass
     return "0.0.0"
@@ -947,6 +965,8 @@ class ServerConnectionManager:
         web_rel_paths = [
             "VERSION",
             "package.json",
+            "i18n_catalog.py",
+            "i18n/dictionary.csv",
             "static/index.html",
             "static/manual.html",
             "docs/index.html",
@@ -1002,10 +1022,10 @@ class ServerConnectionManager:
         """Envía el paquete web compilado de la App Ubuntu a POST /api/system/sync-web en el servidor local."""
         base_url = self._resolve_target_server_url(target_url)
         if not base_url:
-            return False, "No hay ningún servidor accesible en red local o DDNS para sincronizar la web.", None
+            return False, i18n_t("native_ubuntu.no_sync_server"), None
         bundle = self.collect_local_web_bundle(version_override=version_override)
         if "static/index.html" not in bundle["files"]:
-            return False, "No se encontró static/index.html en la instalación de la App Ubuntu.", None
+            return False, i18n_t("native_ubuntu.no_index_html"), None
 
         payload_bytes = json.dumps(
             {
@@ -1088,65 +1108,46 @@ class ServerConnectionManager:
 
         if github_above_app and server_needs_update:
             update_mode = "github_deb_and_server"
-            update_action_label = f"Actualizar app y servidor a v{gh_disp}"
-            update_summary = (
-                f"GitHub (v{gh_disp}) supera a App Ubuntu (v{app_disp}) y Servidor web local (v{srv_disp}). "
-                f"Pulsa para actualizar ambos en un clic."
-            )
+            update_action_label = i18n_t("native_ubuntu.update_all_btn", {"ver": gh_disp})
+            update_summary = i18n_t("native_ubuntu.summary_gh_all", {"gh": gh_disp, "app": app_disp, "srv": srv_disp})
         elif github_above_app:
             update_mode = "github_deb"
-            update_action_label = f"Actualizar app a v{gh_disp}"
-            update_summary = (
-                f"Nueva versión disponible en GitHub: v{gh_disp} (App Ubuntu actual: v{app_disp}). "
-                f"Pulsa para actualizar sin desinstalar."
-            )
+            update_action_label = i18n_t("native_ubuntu.update_app_btn", {"ver": gh_disp})
+            update_summary = i18n_t("native_ubuntu.summary_gh_app", {"gh": gh_disp, "app": app_disp})
         elif app_above_server and app_above_github:
             update_mode = "sync_app_to_server_ahead_of_github"
-            update_action_label = f"Actualizar web local a v{app_disp}"
-            update_summary = (
-                f"La App Ubuntu (v{app_disp}) es superior a GitHub (v{gh_disp}) y al Servidor web local (v{srv_disp}). "
-                f"Pulsa para actualizar la web local al instante."
-            )
+            update_action_label = i18n_t("native_ubuntu.update_web_btn", {"ver": app_disp})
+            update_summary = i18n_t("native_ubuntu.summary_app_srv_gh", {"app": app_disp, "gh": gh_disp, "srv": srv_disp})
         elif app_above_server:
             update_mode = "sync_app_to_server"
-            update_action_label = f"Actualizar web local a v{app_disp}"
-            update_summary = (
-                f"La App Ubuntu (v{app_disp}) es superior al Servidor web local (v{srv_disp}). "
-                f"Pulsa para actualizar la web local en un clic."
-            )
+            update_action_label = i18n_t("native_ubuntu.update_web_btn", {"ver": app_disp})
+            update_summary = i18n_t("native_ubuntu.summary_app_srv", {"app": app_disp, "srv": srv_disp})
         elif github_above_server:
             update_mode = "github_to_server"
-            update_action_label = f"Actualizar servidor web a v{gh_disp}"
-            update_summary = (
-                f"GitHub (v{gh_disp}) es superior al Servidor web local (v{srv_disp}). "
-                f"Pulsa para actualizar el servidor web local."
-            )
+            update_action_label = i18n_t("native_ubuntu.update_web_github_btn", {"ver": gh_disp})
+            update_summary = i18n_t("native_ubuntu.summary_gh_srv", {"gh": gh_disp, "srv": srv_disp})
         elif app_above_github:
             update_mode = "app_ahead_of_github"
-            update_action_label = f"Sincronizar web local (v{app_disp})" if server_reachable else f"Versión v{app_disp} al día"
+            update_action_label = (
+                i18n_t("native_ubuntu.sync_local_web_btn", {"ver": app_disp})
+                if server_reachable
+                else i18n_t("native_ubuntu.version_uptodate", {"ver": app_disp})
+            )
             if server_reachable:
-                update_summary = (
-                    f"App Ubuntu y Servidor web local están en v{app_disp} (por delante de GitHub v{gh_disp})."
-                )
+                update_summary = i18n_t("native_ubuntu.summary_app_ahead_srv", {"app": app_disp, "gh": gh_disp})
             else:
-                update_summary = (
-                    f"App Ubuntu v{app_disp} supera a la versión publicada en GitHub (v{gh_disp})."
-                )
+                update_summary = i18n_t("native_ubuntu.summary_app_ahead", {"app": app_disp, "gh": gh_disp})
         elif gh_ver:
             update_mode = "up_to_date"
-            update_action_label = "Actualizar / Reinstalar"
+            update_action_label = i18n_t("native_ubuntu.update_reinstall_btn")
             if server_reachable:
-                update_summary = (
-                    f"App Ubuntu, Servidor web local y GitHub sincronizados en v{gh_disp}."
-                )
+                update_summary = i18n_t("native_ubuntu.summary_synced_all", {"gh": gh_disp})
             else:
-                update_summary = f"App Ubuntu y GitHub al día en v{gh_disp}."
+                update_summary = i18n_t("native_ubuntu.summary_synced_pair", {"gh": gh_disp})
         else:
             update_mode = "offline_check"
-            update_action_label = "Sincronizar / Reintentar"
-            update_summary = (
-                "No se pudo consultar GitHub ahora. Puedes sincronizar la web local si hay un servidor activo."
-            )
+            update_action_label = i18n_t("native_ubuntu.sync_retry_btn")
+            update_summary = i18n_t("native_ubuntu.summary_offline")
 
         return {
             "local_version": app_ver,
@@ -1318,13 +1319,13 @@ class ServerConnectionManager:
                     if expected:
                         actual = hashlib.sha256(deb_bytes).hexdigest().lower()
                         if actual != expected:
-                            return False, "Error de verificación SHA-256 en el paquete descargado de GitHub.", ""
+                            return False, i18n_t("native_ubuntu.sha_error"), ""
                 except Exception:
                     pass
 
             check_p = subprocess.run(["dpkg-deb", "--info", tmp_deb], capture_output=True, text=True, timeout=5)
             if check_p.returncode != 0:
-                return False, "El paquete .deb descargado está corrupto o incompleto.", ""
+                return False, i18n_t("native_ubuntu.deb_corrupt"), ""
 
             runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
             helper_script = "/tmp/recursos-cockpit-apply-update.sh"
@@ -1344,11 +1345,11 @@ class ServerConnectionManager:
                 pass
             if inst.returncode == 0:
                 new_ver = self.get_installed_deb_version() or info.get("github_version") or get_app_version()
-                return True, f"app Ubuntu v{get_display_version(new_ver)}", new_ver
+                return True, i18n_t("native_ubuntu.deb_updated_part", {"ver": get_display_version(new_ver)}), new_ver
             err_detail = (inst.stderr or inst.stdout or "").strip()
-            return False, f"No se pudo completar la instalación de actualización: {err_detail[:180]}", ""
+            return False, i18n_t("native_ubuntu.deb_install_fail", {"err": err_detail[:180]}), ""
         except Exception as e:
-            return False, f"Error descargando actualización desde GitHub: {e}", ""
+            return False, i18n_t("native_ubuntu.download_error", {"error": e}), ""
 
     def perform_unified_update(self, gh_info=None, target_url=None, relaunch_on_deb=True):
         """
@@ -1413,7 +1414,7 @@ class ServerConnectionManager:
                 )
                 if sync_ok:
                     web_synced = True
-                    updated_parts.append(f"web local v{get_display_version(sync_ver_override or app_ver)}")
+                    updated_parts.append(i18n_t("native_ubuntu.web_updated_part", {"ver": get_display_version(sync_ver_override or app_ver)}))
                     logs.append(f"[✓] {sync_msg}")
                 else:
                     logs.append(f"[!] Aviso en sincronización directa (/api/system/sync-web): {sync_msg}")
@@ -1430,7 +1431,7 @@ class ServerConnectionManager:
                                 r_obj = json.loads(r_srv.read().decode("utf-8"))
                                 if r_obj.get("success"):
                                     web_synced = True
-                                    updated_parts.append("servidor local (GitHub)")
+                                    updated_parts.append(i18n_t("native_ubuntu.srv_github_part"))
                                     logs.append(f"[✓] Servidor actualizado desde GitHub: {r_obj.get('message', 'OK')}")
                         except Exception as e_srv:
                             logs.append(f"[-] Fallback /api/system/update falló: {e_srv}")
@@ -1484,14 +1485,14 @@ class ServerConnectionManager:
                     )
                     if sync_ok:
                         web_synced = True
-                        updated_parts.append(f"web local v{get_display_version(app_ver)}")
+                        updated_parts.append(i18n_t("native_ubuntu.web_updated_part", {"ver": get_display_version(app_ver)}))
                         logs.append(f"[✓] {sync_msg}")
                     else:
                         return False, sync_msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
                 else:
-                    msg = (
-                        f"La App Ubuntu está en v{get_display_version(app_ver)} "
-                        f"(por encima de GitHub v{get_display_version(gh_ver)}). Conecta el servidor local para sincronizar la web."
+                    msg = i18n_t(
+                        "native_ubuntu.app_ahead_connect_srv",
+                        {"app": get_display_version(app_ver), "gh": get_display_version(gh_ver)},
                     )
                     logs.append(f"[i] {msg}")
                     new_info = self.check_github_app_update(target_url=srv_url, refresh_server=True)
@@ -1502,10 +1503,10 @@ class ServerConnectionManager:
                 sync_ok, sync_msg, _ = self.sync_web_bundle_to_server(target_url=srv_url, force=True, version_override=app_ver)
                 if sync_ok:
                     web_synced = True
-                    updated_parts.append(f"web local v{get_display_version(app_ver)}")
+                    updated_parts.append(i18n_t("native_ubuntu.web_updated_part", {"ver": get_display_version(app_ver)}))
                     logs.append(f"[✓] {sync_msg}")
                 else:
-                    msg = f"Todo el ecosistema ya está en la última versión (v{get_display_version(app_ver)})."
+                    msg = i18n_t("native_ubuntu.ecosystem_uptodate", {"ver": get_display_version(app_ver)})
                     logs.append(f"[✓] {msg}")
                     new_info = self.check_github_app_update(target_url=srv_url, refresh_server=True)
                     return True, msg, new_info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
@@ -1518,12 +1519,12 @@ class ServerConnectionManager:
                 else:
                     return False, deb_msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
             else:
-                msg = f"App Ubuntu en v{get_display_version(app_ver)} (sin conexión a GitHub ni cambios pendientes en servidor)."
+                msg = i18n_t("native_ubuntu.app_offline_uptodate", {"ver": get_display_version(app_ver)})
                 logs.append(f"[i] {msg}")
                 return True, msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
 
         new_info = self.check_github_app_update(target_url=srv_url, refresh_server=True)
-        final_msg = f"Actualización completada ({', '.join(updated_parts)})."
+        final_msg = i18n_t("native_ubuntu.update_done", {"parts": ", ".join(updated_parts)})
         return True, final_msg, new_info, {
             "deb_installed": deb_installed,
             "web_synced": web_synced,
@@ -2554,7 +2555,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         disp_ver = get_display_version()
         super().__init__(
             application=app,
-            title=f"Recursos v{disp_ver}",
+            title=i18n_t("native_ubuntu.win_title", {"ver": disp_ver}),
         )
         self.set_default_size(1280, 820)
         self.set_position(Gtk.WindowPosition.CENTER)
@@ -2592,9 +2593,9 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         GLib.timeout_add(3000, self._refresh_connection_badge)
 
     def _connect_and_open_webview(self, target_view="inicio"):
-        self.lbl_conn_status.set_text("Buscando nodo...")
+        self.lbl_conn_status.set_text(i18n_t("native_ubuntu.searching_node"))
         if hasattr(self, "lbl_home_status"):
-            self.lbl_home_status.set_text("Buscando tu servidor en el Wi-Fi local y mediante DNS externo detectado...")
+            self.lbl_home_status.set_text(i18n_t("native_ubuntu.searching_node_desc"))
 
         def worker():
             self.conn_mgr.discover_server()
@@ -2702,34 +2703,34 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         if hasattr(hb, "set_decoration_layout"):
             hb.set_decoration_layout(":minimize,maximize,close")
         disp_ver = get_display_version()
-        hb.props.title = "Recursos"
-        hb.props.subtitle = f"v{disp_ver} · Aplicación Nativa Ubuntu"
+        hb.props.title = i18n_t("app.brand")
+        hb.props.subtitle = i18n_t("native_ubuntu.subtitle", {"ver": disp_ver})
 
-        self.btn_back_home = Gtk.Button(label="Menú principal")
+        self.btn_back_home = Gtk.Button(label=i18n_t("native_ubuntu.main_menu"))
         self.btn_back_home.get_style_context().add_class("btn-nav")
-        self.btn_back_home.set_tooltip_text("Volver a las tres opciones de inicio")
+        self.btn_back_home.set_tooltip_text(i18n_t("native_ubuntu.main_menu_tip"))
         self.btn_back_home.connect("clicked", lambda *_: self._show_launcher_view("home"))
         hb.pack_start(self.btn_back_home)
 
-        self.lbl_conn_status = Gtk.Label(label="Listo para conectar")
+        self.lbl_conn_status = Gtk.Label(label=i18n_t("native_ubuntu.ready_connect"))
         self.lbl_conn_status.get_style_context().add_class("badge-local")
         hb.pack_start(self.lbl_conn_status)
 
-        btn_dex = Gtk.Button(label="Pantalla móvil USB")
+        btn_dex = Gtk.Button(label=i18n_t("native_ubuntu.usb_phone_screen"))
         btn_dex.get_style_context().add_class("btn-dex")
-        btn_dex.set_tooltip_text("Abrir control de proyección USB")
+        btn_dex.set_tooltip_text(i18n_t("native_ubuntu.usb_phone_screen_tip"))
         btn_dex.connect("clicked", lambda *_: self._connect_and_open_webview(target_view="dex"))
         hb.pack_start(btn_dex)
 
         btn_about = Gtk.Button.new_from_icon_name("help-about-symbolic", Gtk.IconSize.BUTTON)
         btn_about.get_style_context().add_class("btn-nav")
-        btn_about.set_tooltip_text(f"Acerca de Recursos (v{disp_ver})")
+        btn_about.set_tooltip_text(i18n_t("native_ubuntu.about_tip", {"ver": disp_ver}))
         btn_about.connect("clicked", self._show_about_dialog)
         hb.pack_end(btn_about)
 
-        btn_fs = Gtk.Button(label="Pantalla completa")
+        btn_fs = Gtk.Button(label=i18n_t("native_ubuntu.fullscreen"))
         btn_fs.get_style_context().add_class("btn-nav")
-        btn_fs.set_tooltip_text("Alternar pantalla completa (F11)")
+        btn_fs.set_tooltip_text(i18n_t("native_ubuntu.fullscreen_tip"))
         btn_fs.connect("clicked", lambda *_: self._toggle_fullscreen())
         hb.pack_end(btn_fs)
 
@@ -2764,12 +2765,9 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
     def _show_about_dialog(self, _widget):
         about = Gtk.AboutDialog(transient_for=self, modal=True)
-        about.set_program_name("Recursos")
+        about.set_program_name(i18n_t("app.brand"))
         about.set_version(f"v{get_display_version()}")
-        about.set_comments(
-            "Aplicación nativa de Ubuntu con autodetección en red local, conexión cifrada por DNS detectado, "
-            "instalador de nodo local y control USB para móvil."
-        )
+        about.set_comments(i18n_t("native_ubuntu.about_comments"))
         about.set_website("https://github.com/cminewarIA/recursos-ui")
         about.set_website_label("GitHub cminewarIA/recursos-ui")
         about.set_authors(["cminewarIA"])
@@ -2819,9 +2817,9 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
                 brand_box.pack_start(img, False, False, 0)
             except Exception:
                 pass
-        title_lbl = Gtk.Label(label=f"Recursos · v{get_display_version()}")
+        title_lbl = Gtk.Label(label=i18n_t("native_ubuntu.title_banner", {"ver": get_display_version()}))
         title_lbl.get_style_context().add_class("launcher-title")
-        sub_lbl = Gtk.Label(label="Elige cómo quieres utilizar tu equipo ahora")
+        sub_lbl = Gtk.Label(label=i18n_t("native_ubuntu.choose_mode"))
         sub_lbl.get_style_context().add_class("launcher-subtitle")
         brand_box.pack_start(title_lbl, False, False, 0)
         brand_box.pack_start(sub_lbl, False, False, 0)
@@ -2836,17 +2834,17 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         card1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         card1.get_style_context().add_class("launcher-card")
         c1_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        c1_t = Gtk.Label(label="1. Conectar con el nodo", xalign=0)
+        c1_t = Gtk.Label(label=i18n_t("native_ubuntu.opt1_title"), xalign=0)
         c1_t.set_attributes(None)
         c1_d = Gtk.Label(
-            label="Escanea tu Wi-Fi local automáticamente o conecta desde fuera con el dominio DNS detectado y guardado.",
+            label=i18n_t("native_ubuntu.opt1_desc"),
             xalign=0,
         )
         c1_d.set_line_wrap(True)
         c1_d.get_style_context().add_class("launcher-subtitle")
         c1_text.pack_start(c1_t, False, False, 0)
         c1_text.pack_start(c1_d, False, False, 0)
-        btn_opt1 = Gtk.Button(label="Conectar ahora")
+        btn_opt1 = Gtk.Button(label=i18n_t("native_ubuntu.opt1_btn"))
         btn_opt1.get_style_context().add_class("btn-primary")
         btn_opt1.set_valign(Gtk.Align.CENTER)
         btn_opt1.connect("clicked", lambda *_: self._connect_and_open_webview("inicio"))
@@ -2859,15 +2857,15 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         card2.get_style_context().add_class("launcher-card")
         c2_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         c2_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        c2_t = Gtk.Label(label="2. Nodo local y aplicación en este equipo", xalign=0)
+        c2_t = Gtk.Label(label=i18n_t("native_ubuntu.opt2_title"), xalign=0)
         self.lbl_node_info = Gtk.Label(
-            label="Comprobando instalación y nodo servidor en este ordenador...",
+            label=i18n_t("native_ubuntu.checking_local"),
             xalign=0,
         )
         self.lbl_node_info.set_line_wrap(True)
         self.lbl_node_info.get_style_context().add_class("launcher-subtitle")
         self.lbl_github_info = Gtk.Label(
-            label="Comprobando versión publicada en GitHub...",
+            label=i18n_t("native_ubuntu.checking_github"),
             xalign=0,
         )
         self.lbl_github_info.set_line_wrap(True)
@@ -2878,10 +2876,10 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
         c2_btns = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         c2_btns.set_valign(Gtk.Align.CENTER)
-        self.btn_opt2 = Gtk.Button(label="Instalar nodo local")
+        self.btn_opt2 = Gtk.Button(label=i18n_t("native_ubuntu.install_node"))
         self.btn_opt2.get_style_context().add_class("btn-nav")
         self.btn_opt2.connect("clicked", self._on_install_local_node_clicked)
-        self.btn_opt2_update = Gtk.Button(label="Actualizar desde GitHub")
+        self.btn_opt2_update = Gtk.Button(label=i18n_t("native_ubuntu.update_github"))
         self.btn_opt2_update.get_style_context().add_class("btn-nav")
         self.btn_opt2_update.connect("clicked", self._on_update_from_github_clicked)
         c2_btns.pack_start(self.btn_opt2, False, False, 0)
@@ -2896,17 +2894,17 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         card3 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         card3.get_style_context().add_class("launcher-card")
         c3_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        c3_t = Gtk.Label(label="3. Configuraciones de conexión", xalign=0)
+        c3_t = Gtk.Label(label=i18n_t("native_ubuntu.opt3_title"), xalign=0)
         c3_header.pack_start(c3_t, True, True, 0)
-        btn_forget = Gtk.Button(label="Olvidar conexión")
+        btn_forget = Gtk.Button(label=i18n_t("native_ubuntu.forget_conn"))
         btn_forget.get_style_context().add_class("btn-nav")
         btn_forget.connect("clicked", self._on_forget_config_clicked)
         c3_header.pack_end(btn_forget, False, False, 0)
         card3.pack_start(c3_header, False, False, 0)
 
-        self.lbl_cfg_lan = Gtk.Label(label="IP en red local (LAN): sin detectar", xalign=0)
-        self.lbl_cfg_dns = Gtk.Label(label="Dominio externo detectado (DNS): sin detectar", xalign=0)
-        self.lbl_cfg_cert = Gtk.Label(label="Certificado cifrado del dispositivo: pendiente", xalign=0)
+        self.lbl_cfg_lan = Gtk.Label(label=i18n_t("native_ubuntu.lan_pending"), xalign=0)
+        self.lbl_cfg_dns = Gtk.Label(label=i18n_t("native_ubuntu.dns_pending"), xalign=0)
+        self.lbl_cfg_cert = Gtk.Label(label=i18n_t("native_ubuntu.cert_pending"), xalign=0)
         for lbl in (self.lbl_cfg_lan, self.lbl_cfg_dns, self.lbl_cfg_cert):
             lbl.get_style_context().add_class("launcher-subtitle")
             lbl.set_selectable(True)
@@ -2955,10 +2953,9 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             box.set_valign(Gtk.Align.CENTER)
             box.set_halign(Gtk.Align.CENTER)
             lbl = Gtk.Label(
-                label=(
-                    f"Recursos v{get_display_version()}\n"
-                    f"Interfaz lista en: {target_uri}\n"
-                    "Instala gir1.2-webkit2-4.1 para ver el panel integrado."
+                label=i18n_t(
+                    "native_ubuntu.webkit_missing",
+                    {"ver": get_display_version(), "uri": target_uri},
                 )
             )
             box.pack_start(lbl, False, False, 0)
@@ -2981,22 +2978,31 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         app_installed = bool(st.get("app_installed_deb") or st.get("installed"))
 
         if st["installed"]:
-            state_txt = "activo" if st["running"] else "instalado"
-            self.lbl_node_info.set_text(
-                f"Nodo local ya {state_txt}. Conecta en tu Wi-Fi con: {st['lan_ip']} · Puerto {st['port']}"
+            state_txt = (
+                i18n_t("native_ubuntu.local_state_active")
+                if st["running"]
+                else i18n_t("native_ubuntu.local_state_installed")
             )
-            self.btn_opt2.set_label("Conectar al nodo local" if st["running"] else "Iniciar nodo local")
+            self.lbl_node_info.set_text(
+                i18n_t(
+                    "native_ubuntu.node_info_running",
+                    {"state": state_txt, "ip": st["lan_ip"], "port": st["port"]},
+                )
+            )
+            self.btn_opt2.set_label(
+                i18n_t("native_ubuntu.connect_local_node")
+                if st["running"]
+                else i18n_t("native_ubuntu.start_local_node")
+            )
         elif st.get("app_installed_deb"):
             inst_ver = get_display_version(st.get("installed_deb_version") or get_app_version())
             self.lbl_node_info.set_text(
-                f"Aplicación ya instalada en Ubuntu (v{inst_ver}). También puedes instalar el nodo servidor aquí si lo deseas."
+                i18n_t("native_ubuntu.node_info_deb", {"ver": inst_ver})
             )
-            self.btn_opt2.set_label("Instalar nodo local")
+            self.btn_opt2.set_label(i18n_t("native_ubuntu.install_node"))
         else:
-            self.lbl_node_info.set_text(
-                "No hay ningún nodo instalado en este equipo. Puedes instalarlo para gestionar este ordenador desde la red."
-            )
-            self.btn_opt2.set_label("Instalar nodo local")
+            self.lbl_node_info.set_text(i18n_t("native_ubuntu.node_info_none"))
+            self.btn_opt2.set_label(i18n_t("native_ubuntu.install_node"))
 
         if hasattr(self, "lbl_github_info") and hasattr(self, "btn_opt2_update"):
             has_server_gap = bool(gh and gh.get("server_needs_update"))
@@ -3005,41 +3011,56 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             ctx.remove_class("btn-primary")
             ctx.remove_class("btn-nav")
             if gh and gh.get("effective_update_available"):
-                summary = gh.get("update_summary") or f"Actualización disponible a v{gh.get('target_version')}."
-                btn_lbl = gh.get("update_action_label") or f"Actualizar a v{gh.get('target_version')}"
+                summary = gh.get("update_summary") or i18n_t(
+                    "native_ubuntu.unified_update_summary", {"ver": gh.get("target_version")}
+                )
+                btn_lbl = gh.get("update_action_label") or i18n_t(
+                    "native_ubuntu.update_app_btn", {"ver": gh.get("target_version")}
+                )
                 self.lbl_github_info.set_text(summary)
                 self.btn_opt2_update.set_label(btn_lbl)
                 ctx.add_class("btn-primary")
             elif gh and gh.get("app_above_github"):
-                srv_note = f" · Servidor web: v{gh.get('server_display_version')}" if gh.get("server_reachable") else ""
+                srv_note = (
+                    i18n_t("native_ubuntu.app_ahead_srv_note", {"ver": gh.get("server_display_version")})
+                    if gh.get("server_reachable")
+                    else ""
+                )
                 self.lbl_github_info.set_text(
-                    f"App Ubuntu v{gh.get('app_display_version')} (superior a GitHub v{gh.get('github_display_version')}{srv_note})."
+                    i18n_t(
+                        "native_ubuntu.app_ahead_info",
+                        {
+                            "app": gh.get("app_display_version"),
+                            "gh": gh.get("github_display_version"),
+                            "srv_note": srv_note,
+                        },
+                    )
                 )
                 self.btn_opt2_update.set_label(
-                    gh.get("update_action_label") or "Sincronizar web local"
+                    gh.get("update_action_label") or i18n_t("native_ubuntu.sync_local_web_short")
                 )
                 ctx.add_class("btn-nav")
             elif gh and gh.get("github_version"):
                 self.lbl_github_info.set_text(
                     gh.get("update_summary")
-                    or f"GitHub al día (v{gh.get('github_display_version')}). Puedes reinstalar o sincronizar cuando quieras."
+                    or i18n_t("native_ubuntu.github_ahead_msg", {"ver": gh.get("github_display_version")})
                 )
-                self.btn_opt2_update.set_label(gh.get("update_action_label") or "Actualizar / Reinstalar")
+                self.btn_opt2_update.set_label(
+                    gh.get("update_action_label") or i18n_t("native_ubuntu.update_reinstall_btn")
+                )
                 ctx.add_class("btn-nav")
             else:
-                self.lbl_github_info.set_text("Actualización unificada de App Ubuntu y web local disponible.")
-                self.btn_opt2_update.set_label("Comprobar y actualizar")
+                self.lbl_github_info.set_text(i18n_t("native_ubuntu.unified_update_avail"))
+                self.btn_opt2_update.set_label(i18n_t("native_ubuntu.check_and_update"))
                 ctx.add_class("btn-nav")
         return False
 
     def _on_update_from_github_clicked(self, _widget):
         if hasattr(self, "btn_opt2_update"):
             self.btn_opt2_update.set_sensitive(False)
-            self.btn_opt2_update.set_label("Aplicando actualización...")
+            self.btn_opt2_update.set_label(i18n_t("native_ubuntu.updating_btn"))
         if hasattr(self, "lbl_github_info"):
-            self.lbl_github_info.set_text(
-                "Comparando App Ubuntu, Servidor web local y GitHub para aplicar la actualización en un clic..."
-            )
+            self.lbl_github_info.set_text(i18n_t("native_ubuntu.updating_desc"))
 
         def worker():
             ok, msg, gh, flags = self.conn_mgr.perform_unified_update(relaunch_on_deb=False)
@@ -3079,21 +3100,33 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             self._refresh_config_labels()
             if isinstance(flags, dict) and flags.get("deb_installed") and os.environ.get("DISPLAY"):
                 if hasattr(self, "lbl_home_status"):
-                    self.lbl_home_status.set_text(f"{msg} Reiniciando aplicación...")
+                    self.lbl_home_status.set_text(i18n_t("native_ubuntu.restarting_suffix", {"msg": msg}))
                 GLib.timeout_add(450, self._reexec_after_update)
         return False
 
     def _refresh_config_labels(self):
-        lan_txt = f"{self.conn_mgr.saved_host}:{self.conn_mgr.node_port}" if self.conn_mgr.saved_host else "Pendiente de conexión en red local"
-        dns_txt = self.conn_mgr.wan_domain if self.conn_mgr.wan_domain else "Se guardará automáticamente al conectar por primera vez"
-        cert_txt = (
-            "Verificado y cifrado correctamente"
-            if self.conn_mgr.device_token and not self.conn_mgr.is_revoked
-            else ("Revocado (vuelve a conectar en red local)" if self.conn_mgr.is_revoked else "Se verificará al conectar en LAN")
+        lan_txt = (
+            f"{self.conn_mgr.saved_host}:{self.conn_mgr.node_port}"
+            if self.conn_mgr.saved_host
+            else i18n_t("native_ubuntu.lan_wait")
         )
-        self.lbl_cfg_lan.set_text(f"Conexión en red local (LAN): {lan_txt}")
-        self.lbl_cfg_dns.set_text(f"Dominio externo detectado (DNS): {dns_txt}")
-        self.lbl_cfg_cert.set_text(f"Certificado de seguridad: {cert_txt}")
+        dns_txt = (
+            self.conn_mgr.wan_domain
+            if self.conn_mgr.wan_domain
+            else i18n_t("native_ubuntu.dns_auto")
+        )
+        cert_txt = (
+            i18n_t("native_ubuntu.cert_ok")
+            if self.conn_mgr.device_token and not self.conn_mgr.is_revoked
+            else (
+                i18n_t("native_ubuntu.cert_revoked")
+                if self.conn_mgr.is_revoked
+                else i18n_t("native_ubuntu.cert_verify_lan")
+            )
+        )
+        self.lbl_cfg_lan.set_text(i18n_t("native_ubuntu.lan_prefix", {"value": lan_txt}))
+        self.lbl_cfg_dns.set_text(i18n_t("native_ubuntu.dns_prefix", {"value": dns_txt}))
+        self.lbl_cfg_cert.set_text(i18n_t("native_ubuntu.cert_prefix", {"value": cert_txt}))
         return False
 
     def _on_install_local_node_clicked(self, _widget):
@@ -3103,7 +3136,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             self.conn_mgr._save_config()
             self._connect_and_open_webview("inicio")
             return
-        self.lbl_node_info.set_text("Instalando y activando nodo local...")
+        self.lbl_node_info.set_text(i18n_t("native_ubuntu.installing_node"))
 
         def worker():
             ok, msg, new_st = self.conn_mgr.install_or_enable_local_node()
@@ -3120,7 +3153,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
     def _on_forget_config_clicked(self, _widget):
         self.conn_mgr.clear_saved_node()
-        self.lbl_home_status.set_text("Se han borrado los datos guardados del nodo.")
+        self.lbl_home_status.set_text(i18n_t("native_ubuntu.forgotten_msg"))
         self._refresh_config_labels()
         self._refresh_connection_badge()
 
@@ -3135,19 +3168,19 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
         if mode == "LAN":
             ctx.add_class("badge-lan")
-            self.lbl_conn_status.set_text(f"Red local ({self.conn_mgr.saved_host})")
+            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.red_local", {"host": self.conn_mgr.saved_host}))
         elif mode == "WAN":
             ctx.add_class("badge-wan")
-            self.lbl_conn_status.set_text(f"Externa ({self.conn_mgr.wan_domain or 'DNS'})")
+            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.external_conn", {"domain": self.conn_mgr.wan_domain or "DNS"}))
         elif mode == "REVOKED":
             ctx.add_class("badge-revoked")
-            self.lbl_conn_status.set_text("Acceso revocado")
+            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.access_revoked"))
         elif mode == "LOCAL":
             ctx.add_class("badge-local")
-            self.lbl_conn_status.set_text("Sin nodo remoto")
+            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.no_remote_node"))
         else:
             ctx.add_class("badge-local")
-            self.lbl_conn_status.set_text("Listo para conectar")
+            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.ready_connect"))
         return True
 
     def _on_key_press(self, _widget, event):
@@ -3225,13 +3258,13 @@ def main():
 
     if not HAS_GTK:
         print(
-            "Error: python3-gi / gir1.2-gtk-3.0 no está instalado en este entorno.",
+            i18n_t("native_ubuntu.gtk_missing"),
             file=sys.stderr,
         )
         sys.exit(1)
 
     GLib.set_prgname("recursos-cockpit")
-    GLib.set_application_name("Recursos Cockpit")
+    GLib.set_application_name(i18n_t("app.brand"))
     app = RecursosNativeApp(start_in_dex=args.dex)
     sys.exit(app.run([sys.argv[0]]))
 

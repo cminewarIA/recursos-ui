@@ -1,3 +1,5 @@
+import { getActiveLocale, translateStatic } from '../i18n';
+
 const TOKEN_STORAGE_KEY = 'recursos_device_token';
 
 export function getStoredToken(): string {
@@ -66,6 +68,7 @@ export function buildApiHeaders(extra?: HeadersInit): Headers {
   } else {
     headers.set('X-Recursos-Env', 'web');
   }
+  headers.set('X-Recursos-Lang', getActiveLocale());
   return headers;
 }
 
@@ -98,7 +101,7 @@ export async function apiFetchJson<T = Record<string, unknown>>(
       ok: false,
       status: 0,
       data: null,
-      error: err instanceof Error ? err.message : 'Sin conexión con el servidor',
+      error: err instanceof Error ? err.message : translateStatic('errors.no_server_conn'),
     };
   }
 }

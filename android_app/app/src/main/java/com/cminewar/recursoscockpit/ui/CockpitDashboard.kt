@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cminewar.recursoscockpit.BuildConfig
@@ -290,14 +291,14 @@ fun CockpitDashboard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = when (connectionMode) {
-                                ConnectionMode.CONNECTED_LAN -> "Red local"
-                                ConnectionMode.CONNECTED_WAN -> "Externa segura"
-                                ConnectionMode.REVOKED -> "Acceso bloqueado"
-                                ConnectionMode.SCANNING_LAN -> "Buscando..."
-                                ConnectionMode.CONNECTING -> "Conectando..."
-                                ConnectionMode.DISCONNECTED -> "Desconectado"
-                                ConnectionMode.ERROR -> "Sin conexión"
-                                else -> "Conectando..."
+                                ConnectionMode.CONNECTED_LAN -> I18nDictionary.t(context, "native_android.red_local", "Red local")
+                                ConnectionMode.CONNECTED_WAN -> I18nDictionary.t(context, "native_android.wan_secure", "Externa segura")
+                                ConnectionMode.REVOKED -> I18nDictionary.t(context, "native_android.access_blocked", "Acceso bloqueado")
+                                ConnectionMode.SCANNING_LAN -> I18nDictionary.t(context, "native_android.searching", "Buscando...")
+                                ConnectionMode.CONNECTING -> I18nDictionary.t(context, "native_android.connecting", "Conectando...")
+                                ConnectionMode.DISCONNECTED -> I18nDictionary.t(context, "native_android.disconnected", "Desconectado")
+                                ConnectionMode.ERROR -> I18nDictionary.t(context, "native_android.no_connection", "Sin conexión")
+                                else -> I18nDictionary.t(context, "native_android.connecting", "Conectando...")
                             },
                             color = statusColor,
                             fontSize = 12.sp,
@@ -360,7 +361,7 @@ fun CockpitDashboard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "Volver a conectar",
+                                contentDescription = I18nDictionary.t(context, "native_android.reconnect_aria", "Volver a conectar"),
                                 tint = if (isDark) NeonSky else NeonBlue,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -502,7 +503,7 @@ fun CockpitDashboard(
                         CircularProgressIndicator(color = if (isDark) NeonSky else NeonBlue, strokeWidth = 3.dp)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Panel del Servidor",
+                            text = I18nDictionary.t(context, "native_android.server_panel", "Panel del Servidor"),
                             color = paletteTextPrimary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
@@ -542,13 +543,17 @@ fun CockpitDashboard(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Acceso desautorizado",
+                                text = I18nDictionary.t(context, "native_android.revoked_title", "Acceso desautorizado"),
                                 color = NeonRed,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             )
                             Text(
-                                text = "Este dispositivo fue desconectado desde el servidor. Conéctate a tu red Wi-Fi de casa y pulsa Reconectar.",
+                                text = I18nDictionary.t(
+                                    context,
+                                    "native_android.revoked_desc",
+                                    "Este dispositivo fue desconectado desde el servidor. Conéctate a tu red Wi-Fi de casa y pulsa Reconectar."
+                                ),
                                 color = paletteTextPrimary,
                                 fontSize = 12.sp
                             )
@@ -569,7 +574,7 @@ fun CockpitDashboard(
                                 .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Text(
-                                text = "Reconectar",
+                                text = I18nDictionary.t(context, "native_android.reconnect", "Reconectar"),
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold

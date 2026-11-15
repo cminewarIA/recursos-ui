@@ -13,15 +13,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cminewar.recursoscockpit.data.RamData
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.cminewar.recursoscockpit.theme.*
 
 @Composable
 fun MemoryCard(ram: RamData?, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val usage = ram?.percent ?: 0f
     val animatedProgress by animateFloatAsState(targetValue = usage / 100f, label = "ramProgress")
 
@@ -45,7 +48,7 @@ fun MemoryCard(ram: RamData?, modifier: Modifier = Modifier) {
                     Text(text = "💾", fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "MEMORIA RAM",
+                        text = I18nDictionary.t(context, "native_android.card_ram", "MEMORIA RAM"),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextSecondary,
@@ -62,7 +65,7 @@ fun MemoryCard(ram: RamData?, modifier: Modifier = Modifier) {
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = "ZRAM ACTIVA",
+                            text = I18nDictionary.t(context, "native_android.zram_active", "ZRAM ACTIVA"),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = NeonPurple
@@ -96,7 +99,12 @@ fun MemoryCard(ram: RamData?, modifier: Modifier = Modifier) {
                     )
                     ram?.swapPercent?.let { swap ->
                         Text(
-                            text = "Swap: ${String.format("%.0f", swap)}%",
+                            text = I18nDictionary.t(
+                                context,
+                                "native_android.swap_pct",
+                                "Swap: {pct}%",
+                                mapOf("pct" to String.format("%.0f", swap))
+                            ),
                             fontSize = 11.sp,
                             color = TextSecondary
                         )

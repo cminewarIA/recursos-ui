@@ -15,6 +15,7 @@ import {
 import { AccordionBody, COCKPIT_EASE, MorphPill, ViewStage } from './MotionPrimitives';
 import { DockerActivity, MetricsPayload, SystemdService } from '../types/telemetry';
 import { formatBytes, formatSpeed } from '../utils/formatters';
+import { formatSystemdState, useI18n } from '../i18n';
 
 type AppsSubTab = 'services' | 'media';
 
@@ -81,9 +82,11 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
   const torrentStats = metrics?.torrent_stats;
   const emby = metrics?.emby;
 
+  const { t, locale } = useI18n();
+
   const subTabs: Array<{ id: AppsSubTab; label: string; icon: React.ReactNode }> = [
-    { id: 'services', label: 'Aplicaciones y servicios', icon: <Box className="h-4 w-4" /> },
-    { id: 'media', label: 'Descargas y multimedia', icon: <Film className="h-4 w-4" /> },
+    { id: 'services', label: t('apps.subtabs.services'), icon: <Box className="h-4 w-4" /> },
+    { id: 'media', label: t('apps.subtabs.media'), icon: <Film className="h-4 w-4" /> },
   ];
 
   return (
@@ -91,28 +94,28 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <LayoutGroup id="apps-subtabs">
           <div className="cockpit-segmented flex items-center gap-1.5 p-1.5">
-            {subTabs.map((t) => {
-              const active = subTab === t.id;
-              return (
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  key={t.id}
-                  type="button"
-                  onClick={() => setSubTab(t.id)}
-                  className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
-                    active
-                      ? 'text-sky-700 dark:text-sky-300'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-                  }`}
-                >
-                  {active && <MorphPill layoutId="apps-subtab-pill" className="rounded-xl" />}
-                  <span className="relative z-10 inline-flex items-center gap-2">
-                    {t.icon}
-                    <span>{t.label}</span>
-                  </span>
-                </motion.button>
-              );
-            })}
+          {subTabs.map((tab) => {
+            const active = subTab === tab.id;
+            return (
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                key={tab.id}
+                type="button"
+                onClick={() => setSubTab(tab.id)}
+                className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+                  active
+                    ? 'text-sky-700 dark:text-sky-300'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                }`}
+              >
+                {active && <MorphPill layoutId="apps-subtab-pill" className="rounded-xl" />}
+                <span className="relative z-10 inline-flex items-center gap-2">
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                </span>
+              </motion.button>
+            );
+          })}
           </div>
         </LayoutGroup>
 
@@ -123,7 +126,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filtrar aplicación o servicio..."
+              placeholder={t('apps.filter_placeholder')}
               className="cockpit-subtile min-h-[44px] pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
             />
           </div>
@@ -139,17 +142,17 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
             <div className="mb-4 flex items-center justify-between gap-2">
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  Aplicaciones instaladas (Contenedores)
+                  {t('apps.installed_apps')}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {containers.length} aplicaciones detectadas en el servidor
+                  {t('apps.apps_detected', { count: containers.length })}
                 </p>
               </div>
             </div>
 
             {containers.length === 0 ? (
               <p className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                No se detectaron contenedores activos en este entorno.
+                {t('apps.containers_empty')}
               </p>
             ) : (
               <div className="cockpit-auto-grid-cards">
@@ -168,11 +171,14 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                                 running ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
                               }`}
                             >
-                              {running ? 'En funcionamiento' : 'Detenida'}
+                              {running ? t('apps.container_running') : t('apps.container_stopped')}
                             </span>
                           </div>
                           <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                            Procesador: {toNum(c.cpu_val ?? c.cpu_percent).toFixed(1)} % · Memoria: {c.mem_usage || `${toNum(c.mem_pct_val ?? c.mem_percent).toFixed(1)} %`}
+                            {t('apps.container_metrics', {
+  cpu: toNum(c.cpu_val ?? c.cpu_percent).toFixed(1),
+  mem: c.mem_usage || `${toNum(c.mem_pct_val ?? c.mem_percent).toFixed(1)} %`,
+})}
                           </p>
                         </div>
 
@@ -185,7 +191,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                               className="cockpit-btn-wol inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
                             >
                               <Play className="h-3.5 w-3.5" />
-                              <span>Iniciar</span>
+                              <span>{t('apps.start')}</span>
                             </button>
                           ) : (
                             <>
@@ -196,7 +202,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                                 className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                               >
                                 <RotateCw className="h-3.5 w-3.5" />
-                                <span>Reiniciar</span>
+                                <span>{t('apps.restart')}</span>
                               </button>
                               <button
                                 type="button"
@@ -205,7 +211,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                                 className="cockpit-btn-off inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
                               >
                                 <Square className="h-3.5 w-3.5" />
-                                <span>Detener</span>
+                                <span>{t('apps.stop')}</span>
                               </button>
                             </>
                           )}
@@ -216,7 +222,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                             }
                             className="inline-flex min-h-[38px] items-center gap-1 px-2 text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                           >
-                            <span>Detalles</span>
+                            <span>{t('apps.details')}</span>
                             {techOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                           </button>
                         </div>
@@ -224,9 +230,9 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
 
                       {techOpen && (
                         <div className="mt-2.5 rounded-xl border border-slate-200/70 bg-white/80 p-2.5 text-xs font-mono text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
-                          <div className="truncate">Imagen: {c.image || '--'}</div>
-                          <div>Red: {c.net_io || '--'} · Disco: {c.block_io || '--'}</div>
-                          <div>Estado exacto: {c.status || c.state || '--'}</div>
+                          <div className="truncate">{t('apps.image_label', { image: c.image || '--' })}</div>
+                          <div>{t('apps.container_io', { net: c.net_io || '--', disk: c.block_io || '--' })}</div>
+                          <div>{t('apps.exact_state_label', { state: c.status || c.state || '--' })}</div>
                         </div>
                       )}
                     </div>
@@ -242,25 +248,27 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
               <ServerCog className="h-4 w-4 text-slate-500" />
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  Servicios de fondo del servidor
+                  {t('apps.systemd_title')}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Tareas internas de Ubuntu que mantienen el sistema activo
+                  {t('apps.systemd_sub')}
                 </p>
               </div>
             </div>
 
             {systemdServices.length === 0 ? (
               <p className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-                No hay servicios internos filtrados en este momento.
+                {t('apps.systemd_empty')}
               </p>
             ) : (
               <div className="cockpit-auto-grid-cards">
                 {systemdServices.slice(0, 30).map((s) => {
                   const unitTarget = s.unit || s.name;
                   const active = s.active === true || (s.active_state || s.state || '').toLowerCase() === 'active';
-                  const stateLabel = s.active_state || s.state || 'Inactivo';
-                  const roleDesc = s.description || s.role;
+                  const stateLabel = formatSystemdState(s.active_state || s.state, locale);
+                  const roleDesc = s.role_key
+  ? t(`hardware.systemd.role.${s.role_key}`, undefined, s.description || s.role || '')
+  : (s.description || s.role);
                   const busy = actionPendingTarget === unitTarget;
                   return (
                     <div
@@ -277,7 +285,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                               active ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
                             }`}
                           >
-                            {active ? 'Activo' : stateLabel}
+                            {active ? t('hardware.systemd.state.active') : stateLabel}
                           </span>
                         </div>
                         {roleDesc && (
@@ -293,7 +301,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                           className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
                           <RotateCw className="h-3.5 w-3.5" />
-                          <span>Reiniciar</span>
+                          <span>{t('apps.restart')}</span>
                         </button>
                       </div>
                     </div>
@@ -312,12 +320,15 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
             <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  Cine y multimedia en casa
+                  {t('apps.media_title')}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {(emby?.online ?? emby?.available)
-                    ? `${emby?.server_name || 'Emby'} · ${emby?.active_streams || 0} reproducciones en curso`
-                    : 'Sin servidor multimedia activo ahora mismo'}
+                    ? t('apps.emby_streams', {
+                        name: emby?.server_name || 'Emby',
+                        count: emby?.active_streams || 0,
+                      })
+                    : t('apps.emby_unavailable')}
                 </p>
               </div>
             </div>
@@ -328,19 +339,19 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                   <p className="font-mono text-sm font-bold tabular-nums">
                     {emby?.movies_count ?? emby?.library_counts?.['Películas'] ?? 0}
                   </p>
-                  <p className="text-[11px] opacity-85">Películas</p>
+                  <p className="text-[11px] opacity-85">{t('apps.movies')}</p>
                 </div>
                 <div className="cockpit-pill-emerald rounded-xl px-2 py-2.5">
                   <p className="font-mono text-sm font-bold tabular-nums">
                     {emby?.series_count ?? emby?.library_counts?.['Series'] ?? 0}
                   </p>
-                  <p className="text-[11px] opacity-85">Series</p>
+                  <p className="text-[11px] opacity-85">{t('apps.series')}</p>
                 </div>
                 <div className="cockpit-pill-violet rounded-xl px-2 py-2.5">
                   <p className="font-mono text-sm font-bold tabular-nums">
                     {emby?.episodes_count ?? emby?.library_counts?.['Episodios'] ?? 0}
                   </p>
-                  <p className="text-[11px] opacity-85">Episodios</p>
+                  <p className="text-[11px] opacity-85">{t('apps.episodes')}</p>
                 </div>
               </div>
             ) : null}
@@ -351,15 +362,15 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                   <div key={i} className="py-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {sess.series_name ? `${sess.series_name} — ${sess.item_name}` : sess.item_name || 'Reproduciendo'}
+                        {sess.series_name ? `${sess.series_name} — ${sess.item_name}` : sess.item_name || t('apps.now_playing')}
                       </p>
                       <span className="font-mono text-xs tabular-nums text-slate-500">
                         {Math.round(sess.progress_percent ?? 0)} %
                       </span>
                     </div>
                     <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                      {sess.user || 'Usuario'} · {sess.device || sess.client || 'Pantalla'} ·{' '}
-                      {sess.is_paused ? 'En pausa' : 'Viendo ahora'}
+                      {sess.user || t('apps.user_fallback')} · {sess.device || sess.client || t('apps.screen_fallback')} ·{' '}
+                      {sess.is_paused ? t('hardware.media.emby_state.paused') : t('hardware.media.emby_state.playing')}
                     </p>
                   </div>
                 ))}
@@ -373,7 +384,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                     </span>
                     {item.type && (
                       <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {item.type === 'Movie' ? 'Película' : item.type === 'Episode' ? 'Episodio' : item.type}
+                        {item.type ? t(`hardware.media.emby_type.${item.type}`, undefined, item.type) : ''}
                       </span>
                     )}
                   </div>
@@ -381,7 +392,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
               </div>
             ) : (
               <p className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                Nadie está reproduciendo películas o series en este instante.
+                {t('apps.nobody_watching')}
               </p>
             )}
           </section>
@@ -391,10 +402,13 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
             <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  Gestor de descargas
+                  {t('apps.downloads_title')}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                  Bajada: {formatSpeed(torrentStats?.dl_info_speed)} · Subida: {formatSpeed(torrentStats?.up_info_speed)}
+                  {t('apps.dl_speeds', {
+  dl: formatSpeed(torrentStats?.dl_info_speed),
+  up: formatSpeed(torrentStats?.up_info_speed),
+})}
                 </p>
               </div>
               <Download className="h-4 w-4 text-sky-600 dark:text-sky-400" />
@@ -402,7 +416,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
 
             {torrents.length === 0 ? (
               <p className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                No hay descargas activas en la cola.
+                {t('apps.downloads_empty')}
               </p>
             ) : (
               <div className="mt-3 space-y-2.5">

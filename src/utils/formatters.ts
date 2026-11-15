@@ -1,3 +1,6 @@
+import { getCanonicalDisplayVersion } from './version';
+import { translateStatic } from '../i18n';
+
 export function formatBytes(bytes: number | undefined | null, decimals = 1): string {
   const b = Number(bytes || 0);
   if (!Number.isFinite(b) || b <= 0) return '0 B';
@@ -24,24 +27,28 @@ export function formatMbRate(mbPerSec: number | undefined | null): string {
 }
 
 export function formatTemp(tempC: number | null | undefined): string {
-  if (tempC === null || tempC === undefined || !Number.isFinite(Number(tempC))) return 'Sin sensor';
-  return `${Number(tempC).toFixed(1).replace('.', ',')} °C`;
+  if (tempC === null || tempC === undefined || !Number.isFinite(Number(tempC))) {
+    return translateStatic('hardware.telemetry.no_sensor');
+  }
+  return `${Number(tempC).toFixed(1).replace('.', ',')} ${translateStatic('units.celsius')}`;
 }
 
 export function formatPct(pct: number | null | undefined, digits = 1): string {
   const val = Number(pct || 0);
-  if (!Number.isFinite(val)) return '0 %';
-  return `${val.toFixed(digits).replace('.', ',')} %`;
+  if (!Number.isFinite(val)) return `0 ${translateStatic('units.percent')}`;
+  return `${val.toFixed(digits).replace('.', ',')} ${translateStatic('units.percent')}`;
 }
 
 export function formatRelativeIndexAge(index: number, totalLength: number, intervalSec = 1.5): string {
   const diffSamples = Math.max(0, totalLength - 1 - index);
   const secs = Math.round(diffSamples * intervalSec);
-  if (secs <= 1) return 'ahora mismo';
-  if (secs < 60) return `hace ${secs} s`;
+  if (secs <= 1) return translateStatic('time.just_now');
+  if (secs < 60) return translateStatic('time.seconds_ago', { seconds: secs });
   const mins = Math.floor(secs / 60);
   const rem = secs % 60;
-  return rem > 0 ? `hace ${mins} min ${rem} s` : `hace ${mins} min`;
+  return rem > 0
+    ? translateStatic('time.minutes_seconds_ago', { minutes: mins, seconds: rem })
+    : translateStatic('time.minutes_ago', { minutes: mins });
 }
 
 export function getHealthTone(pct: number): {
@@ -51,29 +58,29 @@ export function getHealthTone(pct: number): {
 } {
   if (pct >= 88) {
     return {
-      label: 'Carga muy alta',
+      label: translateStatic('health.load_very_high'),
       tone: 'danger',
       textClass: 'text-red-600 dark:text-red-400',
     };
   }
   if (pct >= 70) {
     return {
-      label: 'Carga elevada',
+      label: translateStatic('health.load_elevated'),
       tone: 'warn',
       textClass: 'text-amber-600 dark:text-amber-400',
     };
   }
   return {
-    label: 'Funcionando bien',
+    label: translateStatic('health.working_well'),
     tone: 'ok',
     textClass: 'text-emerald-600 dark:text-emerald-400',
   };
 }
 
 export function getDisplayVersionString(rawVersion?: string, displayVer?: string): string {
-  if (displayVer && displayVer.trim()) return displayVer.trim();
-  if (!rawVersion) return '12.8.0';
-  return rawVersion;
+  return getCanonicalDisplayVersion(
+    rawVersion || displayVer ? { current_version: rawVersion || '', display_version: displayVer } : undefined
+  );
 }
 
 export function normalizeExternalRoute(pathStr: string): 'inicio' | 'equipo' | 'red' | 'programas' | 'mas' {

@@ -39,13 +39,22 @@ cp "$SCRIPT_DIR/debian/prerm" "$PKG_DIR/DEBIAN/prerm"
 cp "$SCRIPT_DIR/debian/postrm" "$PKG_DIR/DEBIAN/postrm"
 chmod 755 "$PKG_DIR/DEBIAN/postinst" "$PKG_DIR/DEBIAN/prerm" "$PKG_DIR/DEBIAN/postrm"
 
-# Ajustar versión y Replaces dinámico en DEBIAN/control
+# Ajustar versión, Replaces y Description dinámico en DEBIAN/control desde ./VERSION
 sed -i "s/^Version:.*/Version: $VERSION/" "$PKG_DIR/DEBIAN/control"
 sed -i "s/^Replaces:.*/Replaces: $PKG_NAME (<< $VERSION)/" "$PKG_DIR/DEBIAN/control"
+sed -i "s/^Description:.*/Description: Recursos Cockpit (v$VERSION) - Panel Unificado y Control DeX/" "$PKG_DIR/DEBIAN/control"
 
-# 2. Copiar archivos de la aplicación, motor HTML5 unificado compilado y versión canónica
+# 2. Copiar archivos de la aplicación, diccionario CSV, catálogo i18n, motor HTML5 unificado y VERSION
 cp "$PROJECT_ROOT/desktop_app/recursos_app.py" "$PKG_DIR/usr/lib/$PKG_NAME/recursos_app.py"
 cp "$PROJECT_ROOT/desktop_app/dex_controller.py" "$PKG_DIR/usr/lib/$PKG_NAME/dex_controller.py"
+if [ -f "$PROJECT_ROOT/i18n_catalog.py" ]; then
+    cp "$PROJECT_ROOT/i18n_catalog.py" "$PKG_DIR/usr/lib/$PKG_NAME/i18n_catalog.py"
+fi
+if [ -f "$PROJECT_ROOT/i18n/dictionary.csv" ]; then
+    mkdir -p "$PKG_DIR/usr/lib/$PKG_NAME/i18n"
+    cp "$PROJECT_ROOT/i18n/dictionary.csv" "$PKG_DIR/usr/lib/$PKG_NAME/i18n/dictionary.csv"
+    chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/i18n/dictionary.csv"
+fi
 if [ -f "$PROJECT_ROOT/static/index.html" ]; then
     cp "$PROJECT_ROOT/static/index.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"
 else
@@ -61,6 +70,7 @@ cp "$PROJECT_ROOT/desktop_app/assets/"* "$PKG_DIR/usr/lib/$PKG_NAME/assets/"
 cp "$PROJECT_ROOT/VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/VERSION"
 if [ -f "$PROJECT_ROOT/package.json" ]; then
     cp "$PROJECT_ROOT/package.json" "$PKG_DIR/usr/lib/$PKG_NAME/package.json"
+    sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$PKG_DIR/usr/lib/$PKG_NAME/package.json"
     chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/package.json"
 fi
 chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME"/*.py

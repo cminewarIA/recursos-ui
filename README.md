@@ -4,9 +4,9 @@
   <img src="./docs/assets/hero-banner.svg" alt="Recursos Cockpit - Manual Visual e Interactivo" width="100%" />
 </a>
 
-# Panel de Recursos · Manual Interactivo (`v12.8.0`)
+# Panel de Recursos · Manual Interactivo (`Recursos Cockpit`)
 
-[![Versión](https://img.shields.io/badge/Versi%C3%B3n-v12.8.0-0284C7?style=for-the-badge)](./VERSION)
+[![Versión](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2FcminewarIA%2Frecursos-ui%2Fmain%2FVERSION&search=%5B0-9.%5D%2B&prefix=v&label=Versi%C3%B3n&style=for-the-badge&color=0284C7)](./VERSION)
 [![Manual HTML5 en Vivo](https://img.shields.io/badge/Manual_HTML5-Simuladores_%2B_API_en_Vivo-059669?style=for-the-badge&logo=readthedocs&logoColor=white)](./docs/index.html)
 [![Frontend](https://img.shields.io/badge/Interfaz-React_19_%2B_Tailwind_v4-0EA5E9?style=for-the-badge&logo=react&logoColor=white)](#-cap%C3%ADtulo-1--tour-visual-e-interactivo-por-las-5-pantallas)
 [![Linux](https://img.shields.io/badge/Ubuntu-.deb_WebKit2_%2B_DeX_USB-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)](#-cap%C3%ADtulo-4--manual-de-aplicaciones-nativas-deb--apk-y-dex-usb)
@@ -54,7 +54,7 @@
     </td>
     <td width="33%" valign="top">
       <b>📦 6. Descargas y Despliegue</b><br/>
-      Descarga los instaladores oficiales <code>12.8.0</code>, configura <code>systemd</code> con capacidades POSIX y consulta las diferencias clave de arquitectura.<br/><br/>
+      Descarga los instaladores oficiales publicados desde <a href="./VERSION"><code>./VERSION</code></a> (<code>releases/latest</code>), configura <code>systemd</code> con capacidades POSIX y consulta las diferencias clave de arquitectura.<br/><br/>
       <a href="#-cap%C3%ADtulo-6--descargas-oficiales-e-instalaci%C3%B3n-guiada">Ir al Capítulo 6 →</a>
     </td>
   </tr>
@@ -266,8 +266,8 @@ curl -fsS -H "X-Device-Token: $TOKEN" http://127.0.0.1:8085/api/metrics | jq '{v
 ```json
 {
   "version_info": {
-    "current_version": "12.8.0",
-    "display_version": "12.8.0",
+    "current_version": "<versión de ./VERSION>",
+    "display_version": "<versión de ./VERSION>",
     "local_commit": "HEAD",
     "update_available": false
   },
@@ -304,8 +304,8 @@ curl -fsS http://127.0.0.1:8085/api/version | jq .
 ```
 ```json
 {
-  "current_version": "12.8.0",
-  "display_version": "12.8.0",
+  "current_version": "<versión de ./VERSION>",
+  "display_version": "<versión de ./VERSION>",
   "branch": "main",
   "local_commit": "HEAD",
   "update_available": false
@@ -315,12 +315,22 @@ curl -fsS http://127.0.0.1:8085/api/version | jq .
 </details>
 
 <details>
+<summary><b><code>GET /api/dictionary</code> · <code>/i18n/dictionary.csv</code></b> — Diccionario maestro en formato hoja de cálculo y normalización de hardware</summary>
+
+```bash
+curl -fsS http://127.0.0.1:8085/api/dictionary | jq '{meta, sample_keys: (.flat.es | keys[:5])}'
+```
+Expone en formato JSON y CSV directo el archivo [`./i18n/dictionary.csv`](./i18n/dictionary.csv) con todas las columnas de idioma definidas (actualmente columna `es` = `Español`) y metadatos de locale para React 19, Backend Python, App Ubuntu GTK3 y Android / Android TV.
+
+</details>
+
+<details>
 <summary><b><code>GET /manual</code> · <code>/manual.html</code> · <code>/readme</code></b> — Manual Web Interactivo HTML5 con simuladores</summary>
 
 ```bash
 curl -I http://127.0.0.1:8085/manual
 ```
-Sirve [`static/manual.html`](./static/manual.html) (con respaldo [`docs/index.html`](./docs/index.html)) inyectando `window.__INITIAL_APP_VERSION__ = "12.8.0"`, tanto desde `server.py` como desde el servidor puente nativo `LocalHtmlBridgeServer` de Ubuntu.
+Sirve [`static/manual.html`](./static/manual.html) (con respaldo [`docs/index.html`](./docs/index.html)) inyectando dinámicamente `window.__INITIAL_APP_VERSION__` desde [`./VERSION`](./VERSION), tanto desde `server.py` como desde el servidor puente nativo `LocalHtmlBridgeServer` de Ubuntu.
 
 </details>
 
@@ -377,11 +387,11 @@ curl -fsS -X POST -H "Content-Type: application/json" -H "X-Device-Token: $TOKEN
 
 ## 📦 Capítulo 6 · Descargas Oficiales e Instalación Guiada
 
-| Paquete Oficial | Plataforma | Descarga Directa (`v12.8.0`) | Integridad y Firma |
+| Paquete Oficial | Plataforma | Descarga Directa ([`./VERSION`](./VERSION) / `latest`) | Integridad y Firma |
 | :--- | :--- | :--- | :--- |
-| **🐧 Recursos Cockpit (`.deb`)** | Ubuntu / Debian `amd64` | [**`recursos-cockpit_12.8.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.8.0/recursos-cockpit_12.8.0_amd64.deb) | Firma GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.8.0/SHA256SUMS.txt) |
-| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ &amp; Android TV (Leanback) | [**`recursos-cockpit_12.8.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.8.0/recursos-cockpit_12.8.0.apk) | Keystore Permanente (`v1/v2/v3`) |
-| **⚡ Enlaces `latest`** | Última Release | [`.deb Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) · [`.apk Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Actualización directa sobre versión previa |
+| **🐧 Recursos Cockpit (`.deb`)** | Ubuntu / Debian `amd64` | [**`recursos-cockpit.deb` (`latest`)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) | Firma GPG (`_gpgorigin` + `.asc`) · [`SHA256SUMS.txt`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/SHA256SUMS.txt) |
+| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ &amp; Android TV (Leanback) | [**`recursos-cockpit.apk` (`latest`)**](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Keystore Permanente (`v1/v2/v3`) |
+| **⚡ Releases Oficiales** | Todas las versiones | [`GitHub Releases`](https://github.com/cminewarIA/recursos-ui/releases/latest) | Etiqueta sincronizada con [`./VERSION`](./VERSION) |
 
 <details>
 <summary><b>🛠️ Asistente Paso a Paso · Instalar Apps Nativas o Desplegar el Servidor desde Cero (Zero-Hardcoding)</b></summary>
@@ -392,11 +402,12 @@ curl -fsS -X POST -H "Content-Type: application/json" -H "X-Device-Token: $TOKEN
 # genera la APK firmada y la instala automáticamente en cualquier Android TV de la LAN vía ADB
 bash packaging/install_all.sh
 
-# O paso a paso manualmente:
-sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.8.0_amd64.deb
+# O paso a paso manualmente tomando la versión canónica desde ./VERSION:
+VERSION="$(tr -d ' \r\n' < VERSION)"
+sudo apt-get install --reinstall -y "./dist/recursos-cockpit_${VERSION}_amd64.deb"
 /usr/bin/recursos-cockpit --test-mode
 bash packaging/build_apk.sh
-bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.8.0.apk
+bash packaging/install_tv_apk.sh "./dist/recursos-cockpit_${VERSION}.apk"
 ```
 
 #### Opción B · Desplegar tu propio Servidor en cualquier máquina Linux
@@ -453,10 +464,12 @@ Todo el proyecto se rige por [`./GEMINI.md`](./GEMINI.md) manteniendo [`./VERSIO
 * **`0.0.X` (`PATCH`)**: Optimización interna, corrección de errores, reglas o mejoras documentales.
 
 <details open>
-<summary><b>🔄 Diferencias Clave de la Versión Actual (<code>v12.8.0</code>) frente a Arquitecturas Anteriores</b></summary>
+<summary><b>🔄 Diferencias Clave de la Versión Vigente (<a href="./VERSION"><code>./VERSION</code></a>) frente a Arquitecturas Anteriores</b></summary>
 
-| Ámbito | Arquitectura Anterior | Versión Actual (`v12.8.0`) |
+| Ámbito | Arquitectura Anterior | Versión Vigente ([`./VERSION`](./VERSION)) |
 | :--- | :--- | :--- |
+| **Punto Único de Verdad (`./VERSION`)** | Cadena de versión repetida en `package.json`, componentes React, script Ubuntu, HTML estático, badges y documentación. | **Llamada única e inmutable a [`./VERSION`](./VERSION)**: propagada dinámicamente mediante [`i18n_catalog.py`](./i18n_catalog.py), [`vite.config.ts`](./vite.config.ts), [`src/utils/version.ts`](./src/utils/version.ts), `build.gradle.kts`, `/api/version`, `LocalHtmlBridgeServer`, badges Shields.io dinámicos y el hidratador de `manual.html`. |
+| **Diccionario en Hoja de Cálculo (`./i18n/dictionary.csv`) y Hardware** | Textos en español y etiquetas descriptivas de hardware incrustados en componentes `.tsx`, `.py` y `.kt`. | **Diccionario maestro compatible con Excel / Calc / Google Sheets ([`./i18n/dictionary.csv`](./i18n/dictionary.csv))** marcado con columna base `es` (`Español`, delimitador `;` o `,` con BOM UTF-8 auto-detectado) y normalización semántica de hardware (`transport_key`, `label_key`, `fstype`, `band_key`, `vendor`, `role_key`, procesos GPU y estados Emby/Systemd). Basta añadir una nueva columna de idioma en la hoja de cálculo para que aparezca automáticamente en **Más → Aspecto** sin tocar código. |
 | **Layout Fluido Ancho Completo y Rejilla Paralela Automática** | Contenedor estrecho fijo (`max-w-6xl` = `1152px`) con márgenes laterales inmensos en monitores maximizados y widgets limitados a 2 columnas (`md:grid-cols-2`) o listas verticales largas. | **Contenedor simétrico de ancho completo (`.cockpit-shell`) y sistema de rejillas CSS Grid `auto-fit` (`.cockpit-auto-grid`, `.cockpit-auto-grid-cards`, `.cockpit-cores-grid`) que aprovecha toda la pantalla y distribuye widgets y tarjetas en paralelo automáticamente (`1` col en móvil, `2` en tablet/TV, `3` en portátil, `4` en Full HD `1920px` y más en QHD/Ultrawide) junto con modal de gráfica ampliado (`max-w-6xl`) y mapa GeoIP panorámico.** |
 | **Identidad Visual, Transparencia RGBA y Banner Android TV** | Logotipo pequeño en barra superior dentro de cápsula opaca, iconos Android/Ubuntu con cajas blancas o recorte circular opaco y banner Leanback sin emblema CMineWar. | **Logotipo oficial CMineWar ampliado en la barra superior (`Web`, `Manual` y `Nativa`) con transparencia RGBA real directa sin cajas ni fondos opacos, iconos transparentes nativos en Ubuntu (`.desktop`/`hicolor`/`pixmaps`) y Android (`mipmap` + `drawable/app_logo.png`), y banner Leanback Android TV (`640×360` y `960×540`) transparente con el logotipo oficial y el nombre de la aplicación (`Recursos Cockpit · Panel del Servidor`)**. |
 | **Widgets Independientes de Almacenamiento Plug-and-Play** | Almacenamiento consolidado en un único contenedor ancho (`md:col-span-2`) que mezclaba discos locales, USB y montajes de red. | **Cada unidad física y pool NAS único cuenta con su propio widget `1×1` completo e idéntico en estructura al principal (`%`, L/E reales vía `/proc/diskstats` y `/proc/fs/cifs/Stats`, barra spring y gráfica individual ampliable)**, apareciendo y desapareciendo dinámicamente con `AnimatePresence` al conectar o desconectar discos/memorias USB o montajes NAS sin duplicar capacidad compartida. |

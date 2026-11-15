@@ -34,6 +34,12 @@ import {
   formatTemp,
   getHealthTone,
 } from '../utils/formatters';
+import {
+  formatDiskFstype,
+  formatDiskLabel,
+  formatDiskTransport,
+  useI18n,
+} from '../i18n';
 
 export interface ExpandChartSpec {
   title: string;
@@ -66,6 +72,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onPowerAction,
   actionPendingMac,
 }) => {
+  const { t, locale } = useI18n();
   const [showErrorsDetail, setShowErrorsDetail] = useState(false);
 
   const cpuPct = Number(metrics?.cpu?.usage_percent ?? 0);
@@ -304,23 +311,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   }, [hist]);
 
   const cpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'cpu', metricKey: 'cpu', label: 'Procesador', data: cpuHist, color: '#0284c7', unit: '%' }],
-    [cpuHist]
+    () => [{ id: 'cpu', metricKey: 'cpu', label: t('hardware.cpu.title'), data: cpuHist, color: '#0284c7', unit: '%' }],
+    [cpuHist, t]
   );
   const ramSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'ram', metricKey: 'ram', label: 'Memoria RAM', data: ramHist, color: '#10b981', unit: '%' }],
-    [ramHist]
+    () => [{ id: 'ram', metricKey: 'ram', label: t('hardware.ram.title'), data: ramHist, color: '#10b981', unit: '%' }],
+    [ramHist, t]
   );
   const gpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'gpu', metricKey: 'gpu', label: 'Tarjeta gráfica', data: gpuHist, color: '#7c3aed', unit: '%' }],
-    [gpuHist]
+    () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.title'), data: gpuHist, color: '#7c3aed', unit: '%' }],
+    [gpuHist, t]
   );
   const netSeries: ChartSeries[] = useMemo(
     () => [
-      { id: 'net_rx', metricKey: 'net_rx', label: 'Descarga', data: netRxHist, color: '#0284c7', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
-      { id: 'net_tx', metricKey: 'net_tx', label: 'Subida', data: netTxHist, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
+      { id: 'net_rx', metricKey: 'net_rx', label: t('hardware.net.download'), data: netRxHist, color: '#0284c7', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
+      { id: 'net_tx', metricKey: 'net_tx', label: t('hardware.net.upload'), data: netTxHist, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
     ],
-    [netRxHist, netTxHist]
+    [netRxHist, netTxHist, t]
   );
 
   const cpuTone = getHealthTone(cpuPct);
@@ -353,25 +360,28 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <span className="cockpit-pill-cyan inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
                 <span className="h-1.5 w-1.5 rounded-full bg-sky-500 text-sky-500 cockpit-live-dot cockpit-live-ring" />
-                {metrics?.system?.hostname || 'Servidor doméstico'}
+                {metrics?.system?.hostname || t('overview.default_host')}
               </span>
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Telemetría y control unificado
+                {t('overview.subtitle')}
               </span>
             </div>
             <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-              {overallBusy ? 'El servidor tiene carga alta ahora mismo' : 'Todo funciona con normalidad'}
+              {overallBusy ? t('overview.high_load_banner') : t('overview.all_normal_banner')}
             </h1>
             <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
               <span className="cockpit-subtile inline-flex items-center gap-1.5 px-2.5 py-1 font-mono text-[11px] tabular-nums">
-                Encendido {metrics?.system?.uptime_str || '--'}
+                {t('overview.uptime_badge', { uptime: metrics?.system?.uptime_str || '--' })}
               </span>
               <span className="cockpit-subtile inline-flex items-center gap-1.5 px-2.5 py-1 font-mono text-[11px] tabular-nums">
                 <Wifi className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
-                {onlineWifi.length} aparatos conectados
+                {t('overview.connected_devices_count', { count: onlineWifi.length })}
               </span>
               <span className="cockpit-subtile inline-flex items-center gap-1.5 px-2.5 py-1 font-mono text-[11px] tabular-nums">
-                Internet ↓ {formatSpeed(metrics?.net?.rx_bytes_sec)} / ↑ {formatSpeed(metrics?.net?.tx_bytes_sec)}
+                {t('overview.internet_rate_badge', {
+                  rx: formatSpeed(metrics?.net?.rx_bytes_sec),
+                  tx: formatSpeed(metrics?.net?.tx_bytes_sec),
+                })}
               </span>
             </div>
           </div>
@@ -385,7 +395,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 className="cockpit-pill-amber inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-opacity hover:opacity-90"
               >
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>{totalErrors} {totalErrors === 1 ? 'aviso reciente' : 'avisos recientes'}</span>
+                <span>
+                  {totalErrors} {totalErrors === 1 ? t('time.recent_notice') : t('time.recent_notices')}
+                </span>
                 {showErrorsDetail ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </motion.button>
             ) : (
@@ -397,7 +409,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 className="cockpit-btn-accent inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap"
               >
                 <Activity className="h-4 w-4 shrink-0" />
-                <span>Ver equipo al detalle</span>
+                <span>{t('overview.see_equipment_detail')}</span>
               </motion.button>
             )}
           </div>
@@ -406,15 +418,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <AccordionBody open={showErrorsDetail}>
           <div className="mt-4 border-t border-slate-200/80 pt-4 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                Se han registrado {totalErrors} avisos en los servicios del servidor o en la geolocalización de red.
-              </span>
+              <span>{t('overview.errors_banner', { count: totalErrors })}</span>
               <button
                 type="button"
                 onClick={() => onNavigate('mas', 'logs')}
                 className="font-semibold text-sky-600 hover:underline dark:text-sky-400"
               >
-                Abrir registro completo
+                {t('overview.open_full_log')}
               </button>
             </div>
           </div>
@@ -422,7 +432,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </motion.section>
 
       {/* Primary & Independent Real-Time Telemetry Widgets: Responsive Auto-Fit Multi-Column Grid */}
-      <section aria-label="Panel de rendimiento en tiempo real" className="cockpit-auto-grid">
+      <section aria-label={t('overview.perf_grid_aria')} className="cockpit-auto-grid">
         {/* 1. Procesador (CPU) */}
         <motion.article
           initial={{ opacity: 0, y: 16, scale: 0.985 }}
@@ -438,7 +448,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <span className="cockpit-pill-cyan inline-flex h-6 w-6 items-center justify-center rounded-lg">
                     <Cpu className="h-3.5 w-3.5" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">Procesador</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">{t('hardware.cpu.title')}</span>
                   <span aria-hidden="true">·</span>
                   <span className={cpuTone.textClass}>{cpuTone.label}</span>
                 </div>
@@ -454,17 +464,20 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   </span>
                 </div>
                 <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
-                  {metrics?.cpu?.model || 'Procesador principal'} ({metrics?.cpu?.logical_cores || 0} núcleos)
+                  {t('hardware.cpu.cores_summary', {
+                    model: metrics?.cpu?.model || t('hardware.cpu.main_fallback'),
+                    cores: metrics?.cpu?.logical_cores || 0,
+                  })}
                 </p>
               </div>
               <motion.button
                 whileTap={{ scale: 0.92 }}
                 type="button"
-                aria-label="Ampliar gráfica de procesador"
+                aria-label={t('hardware.cpu.expand_aria')}
                 onClick={() =>
                   onExpandChart({
-                    title: 'Uso del procesador en tiempo real',
-                    subtitle: metrics?.cpu?.model || 'Procesador principal',
+                    title: t('hardware.cpu.chart_live_title'),
+                    subtitle: metrics?.cpu?.model || t('hardware.cpu.main_fallback'),
                     series: cpuSeries,
                     timestamps,
                     epochTs,
@@ -501,8 +514,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               theme={theme}
               onExpandClick={() =>
                 onExpandChart({
-                  title: 'Uso del procesador en tiempo real',
-                  subtitle: metrics?.cpu?.model || 'Procesador principal',
+                  title: t('hardware.cpu.chart_live_title'),
+                  subtitle: metrics?.cpu?.model || t('hardware.cpu.main_fallback'),
                   series: cpuSeries,
                   timestamps,
                   epochTs,
@@ -530,7 +543,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <span className="cockpit-pill-emerald inline-flex h-6 w-6 items-center justify-center rounded-lg">
                     <MemoryStick className="h-3.5 w-3.5" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">Memoria RAM</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">{t('hardware.ram.title')}</span>
                   <span aria-hidden="true">·</span>
                   <span className={ramTone.textClass}>{ramTone.label}</span>
                 </div>
@@ -546,17 +559,20 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   </span>
                 </div>
                 <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  Libre y lista: {formatBytes(metrics?.ram?.available_bytes)}
+                  {t('overview.ram_free_ready', { avail: formatBytes(metrics?.ram?.available_bytes) })}
                 </p>
               </div>
               <motion.button
                 whileTap={{ scale: 0.92 }}
                 type="button"
-                aria-label="Ampliar gráfica de memoria"
+                aria-label={t('hardware.ram.expand_aria')}
                 onClick={() =>
                   onExpandChart({
-                    title: 'Uso de memoria RAM en tiempo real',
-                    subtitle: `${formatBytes(ramUsed)} usados de ${formatBytes(ramTotal)}`,
+                    title: t('hardware.ram.chart_live_title'),
+                    subtitle: t('hardware.ram.used_of_total', {
+                      used: formatBytes(ramUsed),
+                      total: formatBytes(ramTotal),
+                    }),
                     series: ramSeries,
                     timestamps,
                     epochTs,
@@ -592,8 +608,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               theme={theme}
               onExpandClick={() =>
                 onExpandChart({
-                  title: 'Uso de memoria RAM en tiempo real',
-                  subtitle: `${formatBytes(ramUsed)} usados de ${formatBytes(ramTotal)}`,
+                  title: t('hardware.ram.chart_live_title'),
+                  subtitle: t('hardware.ram.used_of_total', {
+                    used: formatBytes(ramUsed),
+                    total: formatBytes(ramTotal),
+                  }),
                   series: ramSeries,
                   timestamps,
                   epochTs,
@@ -621,10 +640,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <span className="cockpit-pill-violet inline-flex h-6 w-6 items-center justify-center rounded-lg">
                     <Monitor className="h-3.5 w-3.5" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">Tarjeta gráfica</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">{t('hardware.gpu.title')}</span>
                   <span aria-hidden="true">·</span>
                   <span className={gpuAvail ? gpuTone.textClass : 'text-slate-500 dark:text-slate-400'}>
-                    {gpuAvail ? gpuTone.label : 'En reposo'}
+                    {gpuAvail ? gpuTone.label : t('hardware.gpu.idle')}
                   </span>
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
@@ -635,23 +654,27 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white"
                   />
                   <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
-                    {gpuAvail ? formatTemp(gpuTemp) : 'Integrada'}
+                    {gpuAvail ? formatTemp(gpuTemp) : t('hardware.gpu.integrated_label')}
                   </span>
                 </div>
                 <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
                   {gpuAvail
-                    ? `${metrics?.gpu?.name || 'Gráfica'}${gpuVramTotal > 0 ? ` · ${gpuVramUsed} / ${gpuVramTotal} MB vídeo` : ''}`
-                    : 'Vídeo integrado sin carga multimedia'}
+                    ? `${metrics?.gpu?.name || t('hardware.gpu.short_title')}${
+                        gpuVramTotal > 0
+                          ? t('hardware.gpu.vram_suffix', { used: gpuVramUsed, total: gpuVramTotal })
+                          : ''
+                      }`
+                    : t('hardware.gpu.integrated_no_media')}
                 </p>
               </div>
               <motion.button
                 whileTap={{ scale: 0.92 }}
                 type="button"
-                aria-label="Ampliar gráfica de tarjeta gráfica"
+                aria-label={t('hardware.gpu.expand_aria')}
                 onClick={() =>
                   onExpandChart({
-                    title: 'Actividad de tarjeta gráfica en tiempo real',
-                    subtitle: metrics?.gpu?.name || 'Gráfica del sistema',
+                    title: t('hardware.gpu.chart_live_title'),
+                    subtitle: metrics?.gpu?.name || t('hardware.gpu.system_fallback'),
                     series: gpuSeries,
                     timestamps,
                     epochTs,
@@ -687,8 +710,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               theme={theme}
               onExpandClick={() =>
                 onExpandChart({
-                  title: 'Actividad de tarjeta gráfica en tiempo real',
-                  subtitle: metrics?.gpu?.name || 'Gráfica del sistema',
+                  title: t('hardware.gpu.chart_live_title'),
+                  subtitle: metrics?.gpu?.name || t('hardware.gpu.system_fallback'),
                   series: gpuSeries,
                   timestamps,
                   epochTs,
@@ -716,10 +739,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <span className="cockpit-pill-cyan inline-flex h-6 w-6 items-center justify-center rounded-lg">
                     <ArrowDownUp className="h-3.5 w-3.5" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">Red e Internet</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">{t('hardware.net.title')}</span>
                   <span aria-hidden="true">·</span>
                   <span className="text-emerald-600 dark:text-emerald-400">
-                    {activeInterfaces.length > 0 ? `${activeInterfaces.length} enlace${activeInterfaces.length === 1 ? '' : 's'} activo${activeInterfaces.length === 1 ? '' : 's'}` : 'Activa'}
+                    {activeInterfaces.length > 0
+                      ? activeInterfaces.length === 1
+                        ? t('hardware.net.active_link_single', { count: activeInterfaces.length })
+                        : t('hardware.net.active_link_plural', { count: activeInterfaces.length })
+                      : t('hardware.net.active')}
                   </span>
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
@@ -732,16 +759,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                   <span className="font-mono tabular-nums">
-                    {metrics?.net?.local_ip || activeInterfaces[0]?.ip || 'LAN'}
+                    {metrics?.net?.local_ip || activeInterfaces[0]?.ip || t('hardware.net.lan_tag')}
                     {activeInterfaces[0]?.name ? ` (${activeInterfaces.map((n) => n.name).slice(0, 2).join(', ')})` : ''}
                   </span>
                   <span aria-hidden="true">·</span>
                   <span className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-sky-600" /> Descarga
+                      <span className="h-2 w-2 rounded-full bg-sky-600" /> {t('hardware.net.download')}
                     </span>
                     <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" /> Subida
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" /> {t('hardware.net.upload')}
                     </span>
                   </span>
                 </div>
@@ -749,11 +776,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <motion.button
                 whileTap={{ scale: 0.92 }}
                 type="button"
-                aria-label="Ampliar gráfica de red"
+                aria-label={t('hardware.net.expand_aria')}
                 onClick={() =>
                   onExpandChart({
-                    title: 'Tráfico de red global e historial completo',
-                    subtitle: `${metrics?.net?.local_ip || 'Interfaz principal'} · ↓ ${formatSpeed(netRxBytes)} · ↑ ${formatSpeed(netTxBytes)}`,
+                    title: t('hardware.net.chart_live_title'),
+                    subtitle: `${metrics?.net?.local_ip || t('hardware.net.main_iface')} · ↓ ${formatSpeed(netRxBytes)} · ↑ ${formatSpeed(netTxBytes)}`,
                     series: netSeries,
                     timestamps,
                     epochTs,
@@ -787,11 +814,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               height={160}
               leftUnit="MB/s"
               theme={theme}
-              emptyMessage="Registrando tráfico de red..."
+              emptyMessage={t('hardware.net.recording_traffic')}
               onExpandClick={() =>
                 onExpandChart({
-                  title: 'Tráfico de red global e historial completo',
-                  subtitle: `${metrics?.net?.local_ip || 'Interfaz principal'} · ↓ ${formatSpeed(netRxBytes)} · ↑ ${formatSpeed(netTxBytes)}`,
+                  title: t('hardware.net.chart_live_title'),
+                  subtitle: `${metrics?.net?.local_ip || t('hardware.net.main_iface')} · ↓ ${formatSpeed(netRxBytes)} · ↑ ${formatSpeed(netTxBytes)}`,
                   series: netSeries,
                   timestamps,
                   epochTs,
@@ -840,20 +867,21 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   : devStr
               : '';
             const sharedLabels = (d.shared_labels || []).filter(Boolean);
+            const resolvedDiskLabel = formatDiskLabel(d, locale);
+            const resolvedTransport = formatDiskTransport(d, locale);
+            const resolvedFstype = formatDiskFstype(d, locale);
             const widgetTitle =
               d.mountpoint === '/'
-                ? 'Disco Sistema (/)'
+                ? t('hardware.storage.label.disk_system')
                 : isNet
-                  ? `NAS ${netHost || d.mountpoint}`
-                  : isRem
-                    ? d.label || 'Memoria extraíble USB'
-                    : d.label || d.mountpoint;
+                  ? t('hardware.storage.label.nas_host', { host: netHost || d.mountpoint })
+                  : resolvedDiskLabel;
             const statusText = !isMounted
-              ? 'Sin montar'
+              ? t('hardware.storage.unmounted')
               : isNet && sharedLabels.length > 1
-                ? `${sharedLabels.length} carpetas`
+                ? t('hardware.storage.folders_count', { count: sharedLabels.length })
                 : isRem
-                  ? 'Extraíble'
+                  ? t('hardware.storage.removable_badge')
                   : tone.label;
             const statusClass = !isMounted
               ? 'text-violet-600 dark:text-violet-400'
@@ -897,7 +925,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {
                 id: 'disk_r',
                 metricKey: 'disk_r',
-                label: 'Lectura',
+                label: t('hardware.storage.read'),
                 data: diskReadPoints,
                 color: readColor,
                 unit: 'MB/s',
@@ -907,7 +935,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {
                 id: 'disk_w',
                 metricKey: 'disk_w',
-                label: 'Escritura',
+                label: t('hardware.storage.write'),
                 data: diskWritePoints,
                 color: writeColor,
                 unit: 'MB/s',
@@ -917,8 +945,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             ];
 
             const subtitleText = isNet && sharedLabels.length > 0
-              ? `${sharedLabels.join(' · ')}${d.transport ? ` · ${d.transport}` : ''}`
-              : `${d.mountpoint}${d.transport ? ` · ${d.transport}` : ''}${d.fstype ? ` · ${d.fstype.toUpperCase()}` : ''}`;
+              ? `${sharedLabels.join(' · ')}${resolvedTransport ? ` · ${resolvedTransport}` : ''}`
+              : `${d.mountpoint}${resolvedTransport ? ` · ${resolvedTransport}` : ''}${resolvedFstype ? ` · ${resolvedFstype}` : ''}`;
 
             return (
               <motion.article
@@ -967,7 +995,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         <span className={`${pillClass} rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums`}>
                           {isMounted
                             ? `${formatBytes(d.used_bytes)} / ${formatBytes(d.total_bytes)}`
-                            : d.transport || 'Conectada'}
+                            : resolvedTransport || t('hardware.storage.connected_badge')}
                         </span>
                         {d.temp_c !== null && d.temp_c !== undefined && (
                           <span className="cockpit-pill-amber rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
@@ -982,7 +1010,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         </span>
                         <span aria-hidden="true" className="shrink-0">·</span>
                         <span className="shrink-0 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
-                          L {formatMbRate(readMb)} · E {formatMbRate(writeMb)}
+                          {t('hardware.storage.read_short')} {formatMbRate(readMb)} · {t('hardware.storage.write_short')} {formatMbRate(writeMb)}
                         </span>
                       </div>
                     </div>
@@ -990,13 +1018,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     <motion.button
                       whileTap={{ scale: 0.92 }}
                       type="button"
-                      aria-label={`Ampliar gráfica de ${widgetTitle}`}
+                      aria-label={t('hardware.storage.expand_aria', { name: widgetTitle })}
                       onClick={() =>
                         onExpandChart({
-                          title: `${widgetTitle} · Actividad y capacidad`,
+                          title: t('hardware.storage.activity_capacity', { name: widgetTitle }),
                           subtitle: isMounted
-                            ? `${formatBytes(d.free_bytes)} libres de ${formatBytes(d.total_bytes)} (${d.mountpoint})`
-                            : `Dispositivo detectado: ${d.device || d.mountpoint}`,
+                            ? t('hardware.storage.free_of_total_mount', {
+                                free: formatBytes(d.free_bytes),
+                                total: formatBytes(d.total_bytes),
+                                mount: d.mountpoint,
+                              })
+                            : t('hardware.storage.detected_device', { dev: d.device || d.mountpoint }),
                           series: diskSeries,
                           timestamps: diskTimestamps,
                           epochTs: diskEpochTs,
@@ -1032,10 +1064,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     theme={theme}
                     onExpandClick={() =>
                       onExpandChart({
-                        title: `${widgetTitle} · Actividad y capacidad`,
+                        title: t('hardware.storage.activity_capacity', { name: widgetTitle }),
                         subtitle: isMounted
-                          ? `${formatBytes(d.free_bytes)} libres de ${formatBytes(d.total_bytes)} (${d.mountpoint})`
-                          : `Dispositivo detectado: ${d.device || d.mountpoint}`,
+                          ? t('hardware.storage.free_of_total_mount', {
+                              free: formatBytes(d.free_bytes),
+                              total: formatBytes(d.total_bytes),
+                              mount: d.mountpoint,
+                            })
+                          : t('hardware.storage.detected_device', { dev: d.device || d.mountpoint }),
                         series: diskSeries,
                         timestamps: diskTimestamps,
                         epochTs: diskEpochTs,
@@ -1062,10 +1098,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
           <div>
             <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-              Aparatos de tu red doméstica
+              {t('overview.home_devices_title')}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Enciende o apaga equipos compatibles directamente desde aquí
+              {t('overview.home_devices_sub')}
             </p>
           </div>
           <motion.button
@@ -1074,13 +1110,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             onClick={() => onNavigate('red')}
             className="cockpit-subtile min-h-[40px] px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-sky-300 whitespace-nowrap"
           >
-            Ver todos ({metrics?.wifi_clients?.length ?? 0})
+            {t('overview.view_all')} ({metrics?.wifi_clients?.length ?? 0})
           </motion.button>
         </div>
 
         {controllableClients.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-            No se detectaron otros aparatos en tu red en este instante. Pulsa en «Ver todos» para revisar la red.
+            {t('overview.home_devices_empty')}
           </div>
         ) : (
           <div className="mt-4 cockpit-auto-grid-cards">
@@ -1088,7 +1124,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               const isOnline = client.online !== false && client.is_online !== false;
               const mac = client.mac || `idx-${idx}`;
               const pending = actionPendingMac === mac;
-              const label = client.name || client.hostname || client.ip || 'Dispositivo de red';
+              const label = client.name || client.hostname || client.ip || t('overview.device_fallback');
 
               return (
                 <motion.div
@@ -1119,7 +1155,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         />
                       </div>
                       <p className="truncate text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                        {isOnline ? 'Conectado ahora' : 'Apagado o en espera'}
+                        {isOnline ? t('overview.online_now') : t('overview.offline_wait')}
                         {client.ip ? ` · ${client.ip}` : ''}
                       </p>
                     </div>
@@ -1131,22 +1167,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       type="button"
                       disabled={pending || !client.mac}
                       onClick={() => onPowerAction('wake', client)}
-                      title="Enviar señal de encendido (Wake-on-LAN)"
+                      title={t('overview.wake_title')}
                       className="cockpit-btn-wol inline-flex min-h-[42px] items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-45 whitespace-nowrap"
                     >
                       <Power className="h-3.5 w-3.5 shrink-0" />
-                      <span>Encender</span>
+                      <span>{t('overview.wake_btn')}</span>
                     </motion.button>
                     <motion.button
                       whileTap={{ scale: 0.94 }}
                       type="button"
                       disabled={pending || (!client.ip && !client.mac)}
                       onClick={() => onPowerAction('shutdown', client)}
-                      title="Enviar señal de apagado o suspensión por red"
+                      title={t('overview.sleep_title')}
                       className="cockpit-btn-off inline-flex min-h-[42px] items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-45 whitespace-nowrap"
                     >
                       <PowerOff className="h-3.5 w-3.5 shrink-0" />
-                      <span>Apagar</span>
+                      <span>{t('overview.sleep_btn')}</span>
                     </motion.button>
                   </div>
                 </motion.div>

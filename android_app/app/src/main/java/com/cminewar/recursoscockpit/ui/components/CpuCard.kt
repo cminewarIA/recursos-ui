@@ -13,15 +13,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cminewar.recursoscockpit.data.CpuData
+import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.cminewar.recursoscockpit.theme.*
 
 @Composable
 fun CpuCard(cpu: CpuData?, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val usage = cpu?.usagePercent ?: 0f
     val animatedProgress by animateFloatAsState(targetValue = usage / 100f, label = "cpuProgress")
 
@@ -48,7 +51,7 @@ fun CpuCard(cpu: CpuData?, modifier: Modifier = Modifier) {
                     Text(text = "🧠", fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "CPU TELEMETRÍA",
+                        text = I18nDictionary.t(context, "native_android.card_cpu", "CPU TELEMETRÍA"),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextSecondary,
@@ -92,7 +95,12 @@ fun CpuCard(cpu: CpuData?, modifier: Modifier = Modifier) {
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "${cpu?.logicalCores ?: 0} Núcleos",
+                        text = I18nDictionary.t(
+                            context,
+                            "native_android.cores_count",
+                            "{count} Núcleos",
+                            mapOf("count" to (cpu?.logicalCores ?: 0))
+                        ),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = TextSecondary
