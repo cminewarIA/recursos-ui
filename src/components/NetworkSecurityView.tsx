@@ -429,7 +429,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       {subTab === 'home' && (
         <div className="space-y-5">
           {/* Network Interfaces with 20m Sparkline + Tooltip */}
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <section className="cockpit-auto-grid">
             {interfaces.map((nic) => {
               const hist2h = nic.history_2h ?? [];
               const rxData = hist2h.map((b) => Math.round((b.rx / (1024 * 1024)) * 100) / 100);
@@ -530,7 +530,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 No se encontraron dispositivos con ese nombre o dirección.
               </p>
             ) : (
-              <div className="mt-4 space-y-2.5">
+              <div className="mt-4 cockpit-auto-grid-cards">
                 {wifiClients.map((client, idx) => {
                   const isOnline = client.online !== false && client.is_online !== false;
                   const mac = client.mac || `c-${idx}`;
@@ -635,8 +635,8 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       {/* 2. Mapa de conexiones */}
       {subTab === 'map' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="cockpit-bento lg:col-span-2 overflow-hidden">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+            <div className="cockpit-bento lg:col-span-8 xl:col-span-9 overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 px-5 py-3.5 dark:border-slate-800">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -669,11 +669,11 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   <span>Actualizar</span>
                 </button>
               </div>
-              <div ref={mapContainerRef} className="h-[340px] w-full bg-slate-100 dark:bg-slate-900" />
+              <div ref={mapContainerRef} className="h-[340px] lg:h-[420px] xl:h-[460px] w-full bg-slate-100 dark:bg-slate-900" />
             </div>
 
             {/* Service Breakdown Donut with interactive tooltip */}
-            <div className="cockpit-bento p-5">
+            <div className="cockpit-bento lg:col-span-4 xl:col-span-3 p-5">
               <h3 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                 Servicios más usados
               </h3>
@@ -760,7 +760,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             <h3 className="font-display text-base font-semibold text-slate-900 dark:text-white pb-3 border-b border-slate-200/70 dark:border-slate-800">
               Conexiones detalladas
             </h3>
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 cockpit-auto-grid-cards">
               {geoConnections.slice(0, 25).map((c, idx) => {
                 const remoteIp = c.remote_ip || c.ip || '';
                 return (

@@ -480,7 +480,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             {showTechUpdate && (
               <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                 <div>
-                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.7.2'} · Commit local:{' '}
+                  Versión interna: {activeVer?.current_version || activeVer?.version || (typeof window !== 'undefined' ? window.__INITIAL_APP_VERSION__ : undefined) || '12.8.0'} · Commit local:{' '}
                   {activeVer?.local_commit || activeVer?.local_hash || 'local'} · Remoto:{' '}
                   {activeVer?.remote_commit || activeVer?.remote_hash || '--'}
                 </div>
@@ -577,7 +577,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
               No hay sesiones guardadas en este momento.
             </p>
           ) : (
-            <div className="mt-4 space-y-2.5">
+            <div className="mt-4 cockpit-auto-grid-cards">
               {devices.map((dev) => {
                 const isOpen = expandedDevId === dev.id;
                 const accessText = dev.full_access ? 'Aplicación nativa verificada' : 'Navegador web verificado';
@@ -709,7 +709,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   // ignore
                 }
               }}
-              className="h-[74vh] w-full bg-white dark:bg-[#020617]"
+              className="h-[74vh] min-h-[540px] w-full bg-white dark:bg-[#020617]"
             />
           </div>
         </section>

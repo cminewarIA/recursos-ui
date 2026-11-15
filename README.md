@@ -4,9 +4,9 @@
   <img src="./docs/assets/hero-banner.svg" alt="Recursos Cockpit - Manual Visual e Interactivo" width="100%" />
 </a>
 
-# Panel de Recursos · Manual Interactivo (`v12.7.2`)
+# Panel de Recursos · Manual Interactivo (`v12.8.0`)
 
-[![Versión](https://img.shields.io/badge/Versi%C3%B3n-v12.7.2-0284C7?style=for-the-badge)](./VERSION)
+[![Versión](https://img.shields.io/badge/Versi%C3%B3n-v12.8.0-0284C7?style=for-the-badge)](./VERSION)
 [![Manual HTML5 en Vivo](https://img.shields.io/badge/Manual_HTML5-Simuladores_%2B_API_en_Vivo-059669?style=for-the-badge&logo=readthedocs&logoColor=white)](./docs/index.html)
 [![Frontend](https://img.shields.io/badge/Interfaz-React_19_%2B_Tailwind_v4-0EA5E9?style=for-the-badge&logo=react&logoColor=white)](#-cap%C3%ADtulo-1--tour-visual-e-interactivo-por-las-5-pantallas)
 [![Linux](https://img.shields.io/badge/Ubuntu-.deb_WebKit2_%2B_DeX_USB-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)](#-cap%C3%ADtulo-4--manual-de-aplicaciones-nativas-deb--apk-y-dex-usb)
@@ -54,7 +54,7 @@
     </td>
     <td width="33%" valign="top">
       <b>📦 6. Descargas y Despliegue</b><br/>
-      Descarga los instaladores oficiales <code>12.7.2</code>, configura <code>systemd</code> con capacidades POSIX y consulta las diferencias clave de arquitectura.<br/><br/>
+      Descarga los instaladores oficiales <code>12.8.0</code>, configura <code>systemd</code> con capacidades POSIX y consulta las diferencias clave de arquitectura.<br/><br/>
       <a href="#-cap%C3%ADtulo-6--descargas-oficiales-e-instalaci%C3%B3n-guiada">Ir al Capítulo 6 →</a>
     </td>
   </tr>
@@ -71,13 +71,13 @@
 
 <img src="./docs/assets/cockpit-ui-preview.svg" alt="Vista general interactiva de la interfaz Recursos Cockpit" width="100%" />
 
-Toda la plataforma se organiza en **5 vistas simétricas** conectadas por una barra inferior táctil fija. Su diseño se adapta automáticamente a cualquier ventana o resolución mediante `ResizeObserver`, manteniendo la información cotidiana al frente y los detalles avanzados de ingeniería ordenados en desplegables (*Ver detalles técnicos*).
+Toda la plataforma se organiza en **5 vistas simétricas** conectadas por una barra inferior táctil fija. Su diseño de ancho completo (`.cockpit-shell`) aprovecha toda la pantalla en monitores medianos, grandes o ultrawide sin márgenes desperdiciados, adaptando automáticamente el número de widgets y tarjetas en paralelo (`.cockpit-auto-grid` y `.cockpit-auto-grid-cards`) mediante CSS Grid fluido y `ResizeObserver`, manteniendo la información cotidiana al frente y los detalles avanzados de ingeniería ordenados en desplegables (*Ver detalles técnicos*).
 
 <details open>
 <summary><b>🟢 Vista 1 · <code>/inicio</code> — Tablero Principal, Almacenamiento Independiente y Control de Equipos</b> <i>(Desplegado por defecto · Pulsa otras vistas para explorar)</i></summary>
 
 1. **Barra de Estado, Emblema Transparente y Tema**: Presenta el logotipo oficial **CMineWar** ampliado y con transparencia RGBA real directa sobre el cristal Liquid Glass (sin fondo opaco ni recorte circular), el modo de conexión (`LAN` directa o `WAN` cifrada TLS), transiciones animadas a `60 FPS` (`MorphPill`, `ViewStage`, valores tabulares animados) unificadas en las 4 interfaces (Web, Ubuntu GTK 3, Android Compose y Manual) y el botón para alternar entre diseño **Claro Minimalista** y **Modo Oscuro** (`recursos_theme`).
-2. **Tarjetas KPI y Widgets Independientes en Vivo (`2×2 + Unidades 1×1`)**: Cuadrícula principal simétrica con gráficas HiDPI simultáneas de **5 minutos** para **Procesador (CPU)**, **Memoria RAM + ZRAM**, **GPU / Gráficos**, **Red e Internet** (bajada/subida con techo dinámico al pico máximo de 5 min) y **cada unidad de almacenamiento por separado** (discos internos NVMe/SATA, memorias extraíbles USB/SD y pool NAS deduplicado por `pool_key` sin multiplicar capacidad compartida) apareciendo y desapareciendo dinámicamente como widgets independientes `1×1`.
+2. **Tarjetas KPI y Widgets Independientes en Paralelo Automático (`auto-fit`)**: Rejilla fluida simétrica (`1` columna en móvil, `2` en tablet/TV, `3` en portátil, `4` en monitores Full HD y más en QHD/Ultrawide) con gráficas HiDPI simultáneas de **5 minutos** para **Procesador (CPU)**, **Memoria RAM + ZRAM**, **GPU / Gráficos**, **Red e Internet** (bajada/subida con techo dinámico al pico máximo de 5 min) y **cada unidad de almacenamiento por separado** (discos internos NVMe/SATA, memorias extraíbles USB/SD y pool NAS deduplicado por `pool_key` sin multiplicar capacidad compartida) apareciendo y desapareciendo dinámicamente como widgets independientes completos.
 3. **Gráficas HiDPI de 5 Minutos en Inicio con Curvas Limpias y Escalas X/Y**: Todas las gráficas de `/inicio` muestran los últimos **5 minutos** en cubetas de `5s` que preservan picos reales mediante interpolación monótona Fritsch–Carlson; mantienen la **curva fluida sin saturación de puntos**, mostrando el marcador vivo al final y el punto exacto de muestreo al inspeccionar **siempre encima de la línea**, con ejes X/Y visibles y la **Pantalla de Inspección Táctil** para ampliar o retroceder (`En vivo · 5 min`, `20 min`, `1 h`, `6 h`, `24 h`, `Todo`) por todo `recursos_history.db`.
 4. **Encendido y Apagado Simétrico de Equipos**: Junto a cada equipo detectado dinámicamente en la LAN dispones de dos botones simétricos:
    - **`Encender`**: envía paquetes mágicos **Wake-on-LAN (WoL)** a todas las subredes activas.
@@ -266,8 +266,8 @@ curl -fsS -H "X-Device-Token: $TOKEN" http://127.0.0.1:8085/api/metrics | jq '{v
 ```json
 {
   "version_info": {
-    "current_version": "12.7.2",
-    "display_version": "12.7.2",
+    "current_version": "12.8.0",
+    "display_version": "12.8.0",
     "local_commit": "HEAD",
     "update_available": false
   },
@@ -304,8 +304,8 @@ curl -fsS http://127.0.0.1:8085/api/version | jq .
 ```
 ```json
 {
-  "current_version": "12.7.2",
-  "display_version": "12.7.2",
+  "current_version": "12.8.0",
+  "display_version": "12.8.0",
   "branch": "main",
   "local_commit": "HEAD",
   "update_available": false
@@ -320,7 +320,7 @@ curl -fsS http://127.0.0.1:8085/api/version | jq .
 ```bash
 curl -I http://127.0.0.1:8085/manual
 ```
-Sirve [`static/manual.html`](./static/manual.html) (con respaldo [`docs/index.html`](./docs/index.html)) inyectando `window.__INITIAL_APP_VERSION__ = "12.7.2"`, tanto desde `server.py` como desde el servidor puente nativo `LocalHtmlBridgeServer` de Ubuntu.
+Sirve [`static/manual.html`](./static/manual.html) (con respaldo [`docs/index.html`](./docs/index.html)) inyectando `window.__INITIAL_APP_VERSION__ = "12.8.0"`, tanto desde `server.py` como desde el servidor puente nativo `LocalHtmlBridgeServer` de Ubuntu.
 
 </details>
 
@@ -377,10 +377,10 @@ curl -fsS -X POST -H "Content-Type: application/json" -H "X-Device-Token: $TOKEN
 
 ## 📦 Capítulo 6 · Descargas Oficiales e Instalación Guiada
 
-| Paquete Oficial | Plataforma | Descarga Directa (`v12.7.2`) | Integridad y Firma |
+| Paquete Oficial | Plataforma | Descarga Directa (`v12.8.0`) | Integridad y Firma |
 | :--- | :--- | :--- | :--- |
-| **🐧 Recursos Cockpit (`.deb`)** | Ubuntu / Debian `amd64` | [**`recursos-cockpit_12.7.2_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.7.2/recursos-cockpit_12.7.2_amd64.deb) | Firma GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.7.2/SHA256SUMS.txt) |
-| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ &amp; Android TV (Leanback) | [**`recursos-cockpit_12.7.2.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.7.2/recursos-cockpit_12.7.2.apk) | Keystore Permanente (`v1/v2/v3`) |
+| **🐧 Recursos Cockpit (`.deb`)** | Ubuntu / Debian `amd64` | [**`recursos-cockpit_12.8.0_amd64.deb`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.8.0/recursos-cockpit_12.8.0_amd64.deb) | Firma GPG (`_gpgorigin` + `.asc`) · [SHA256SUMS.txt](https://github.com/cminewarIA/recursos-ui/releases/download/v12.8.0/SHA256SUMS.txt) |
+| **🤖 Recursos Cockpit (`.apk`)** | Android 8.0+ &amp; Android TV (Leanback) | [**`recursos-cockpit_12.8.0.apk`**](https://github.com/cminewarIA/recursos-ui/releases/download/v12.8.0/recursos-cockpit_12.8.0.apk) | Keystore Permanente (`v1/v2/v3`) |
 | **⚡ Enlaces `latest`** | Última Release | [`.deb Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb) · [`.apk Latest`](https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk) | Actualización directa sobre versión previa |
 
 <details>
@@ -393,10 +393,10 @@ curl -fsS -X POST -H "Content-Type: application/json" -H "X-Device-Token: $TOKEN
 bash packaging/install_all.sh
 
 # O paso a paso manualmente:
-sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.7.2_amd64.deb
+sudo apt-get install --reinstall -y ./dist/recursos-cockpit_12.8.0_amd64.deb
 /usr/bin/recursos-cockpit --test-mode
 bash packaging/build_apk.sh
-bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.7.2.apk
+bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_12.8.0.apk
 ```
 
 #### Opción B · Desplegar tu propio Servidor en cualquier máquina Linux
@@ -453,10 +453,11 @@ Todo el proyecto se rige por [`./GEMINI.md`](./GEMINI.md) manteniendo [`./VERSIO
 * **`0.0.X` (`PATCH`)**: Optimización interna, corrección de errores, reglas o mejoras documentales.
 
 <details open>
-<summary><b>🔄 Diferencias Clave de la Versión Actual (<code>v12.7.2</code>) frente a Arquitecturas Anteriores</b></summary>
+<summary><b>🔄 Diferencias Clave de la Versión Actual (<code>v12.8.0</code>) frente a Arquitecturas Anteriores</b></summary>
 
-| Ámbito | Arquitectura Anterior | Versión Actual (`v12.7.2`) |
+| Ámbito | Arquitectura Anterior | Versión Actual (`v12.8.0`) |
 | :--- | :--- | :--- |
+| **Layout Fluido Ancho Completo y Rejilla Paralela Automática** | Contenedor estrecho fijo (`max-w-6xl` = `1152px`) con márgenes laterales inmensos en monitores maximizados y widgets limitados a 2 columnas (`md:grid-cols-2`) o listas verticales largas. | **Contenedor simétrico de ancho completo (`.cockpit-shell`) y sistema de rejillas CSS Grid `auto-fit` (`.cockpit-auto-grid`, `.cockpit-auto-grid-cards`, `.cockpit-cores-grid`) que aprovecha toda la pantalla y distribuye widgets y tarjetas en paralelo automáticamente (`1` col en móvil, `2` en tablet/TV, `3` en portátil, `4` en Full HD `1920px` y más en QHD/Ultrawide) junto con modal de gráfica ampliado (`max-w-6xl`) y mapa GeoIP panorámico.** |
 | **Identidad Visual, Transparencia RGBA y Banner Android TV** | Logotipo pequeño en barra superior dentro de cápsula opaca, iconos Android/Ubuntu con cajas blancas o recorte circular opaco y banner Leanback sin emblema CMineWar. | **Logotipo oficial CMineWar ampliado en la barra superior (`Web`, `Manual` y `Nativa`) con transparencia RGBA real directa sin cajas ni fondos opacos, iconos transparentes nativos en Ubuntu (`.desktop`/`hicolor`/`pixmaps`) y Android (`mipmap` + `drawable/app_logo.png`), y banner Leanback Android TV (`640×360` y `960×540`) transparente con el logotipo oficial y el nombre de la aplicación (`Recursos Cockpit · Panel del Servidor`)**. |
 | **Widgets Independientes de Almacenamiento Plug-and-Play** | Almacenamiento consolidado en un único contenedor ancho (`md:col-span-2`) que mezclaba discos locales, USB y montajes de red. | **Cada unidad física y pool NAS único cuenta con su propio widget `1×1` completo e idéntico en estructura al principal (`%`, L/E reales vía `/proc/diskstats` y `/proc/fs/cifs/Stats`, barra spring y gráfica individual ampliable)**, apareciendo y desapareciendo dinámicamente con `AnimatePresence` al conectar o desconectar discos/memorias USB o montajes NAS sin duplicar capacidad compartida. |
 | **Paquetes Mágicos Wake-on-LAN y Sleep-on-LAN Multivía** | El envío WoL retornaba éxito sin verificar sockets, saturaba interfaces virtuales Docker y ocultaba dispositivos LAN offline cuando expiraba la tabla ARP. | **Transmisión multivía verificada (`udp_broadcast` vinculado a cada NIC física real excluyendo Docker/túneles, `udp_unicast`, trama `L2 0x0842`, `wakeonlan` filtrado y refuerzo SSH `ether-wake` en el router)** con propagación real de errores HTTP (`400`/`500`) y **retención de equipos LAN recientes vía Pi-hole (24 h)** incluso tras expirar ARP. |

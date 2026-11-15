@@ -445,6 +445,55 @@
     border-color: rgba(239, 68, 68, 0.55);
     color: #fca5a5;
   }
+
+  /* Contenedor fluido de ancho completo alineado entre barra superior y contenido */
+  .cockpit-shell {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: clamp(0.75rem, 1.8vw, 2.25rem);
+    padding-right: clamp(0.75rem, 1.8vw, 2.25rem);
+  }
+  [data-tv="true"] .cockpit-shell {
+    padding-left: max(1.5rem, 2.5vw);
+    padding-right: max(1.5rem, 2.5vw);
+  }
+
+  /* Rejilla automática multi-columna para widgets con gráficas */
+  .cockpit-auto-grid {
+    --cockpit-grid-min: 315px;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cockpit-grid-min)), 1fr));
+    align-items: stretch;
+  }
+  @media (min-width: 1024px) {
+    .cockpit-auto-grid {
+      --cockpit-grid-min: 360px;
+      gap: 1.125rem;
+    }
+  }
+
+  /* Rejilla automática multi-columna para tarjetas compactas de red, contenedores y dispositivos */
+  .cockpit-auto-grid-cards {
+    --cockpit-card-min: 340px;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cockpit-card-min)), 1fr));
+    align-items: stretch;
+  }
+  @media (min-width: 1280px) {
+    .cockpit-auto-grid-cards {
+      --cockpit-card-min: 390px;
+    }
+  }
+
+  /* Rejilla fluida para núcleos CPU */
+  .cockpit-cores-grid {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar {

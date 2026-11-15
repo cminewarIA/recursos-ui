@@ -152,38 +152,37 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                 No se detectaron contenedores activos en este entorno.
               </p>
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="cockpit-auto-grid-cards">
                 {containers.map((c) => {
                   const running = (c.state || '').toLowerCase() === 'running';
                   const busy = actionPendingTarget === c.name;
                   const techOpen = Boolean(showTechIds[c.id || c.name]);
                   return (
-                    <div key={c.id || c.name} className="py-3.5">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div key={c.id || c.name} className="cockpit-subtile flex flex-col justify-between p-3.5">
+                      <div className="flex flex-col gap-3">
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between gap-2">
                             <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{c.name}</p>
-                            <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">·</span>
                             <span
-                              className={`text-xs font-medium ${
+                              className={`shrink-0 text-xs font-medium ${
                                 running ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
                               }`}
                             >
                               {running ? 'En funcionamiento' : 'Detenida'}
                             </span>
                           </div>
-                          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+                          <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
                             Procesador: {toNum(c.cpu_val ?? c.cpu_percent).toFixed(1)} % · Memoria: {c.mem_usage || `${toNum(c.mem_pct_val ?? c.mem_percent).toFixed(1)} %`}
                           </p>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <div className="flex flex-wrap items-center gap-2">
                           {!running ? (
                             <button
                               type="button"
                               disabled={busy}
                               onClick={() => onServiceAction('docker', c.name, 'start')}
-                              className="cockpit-btn-wol inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
+                              className="cockpit-btn-wol inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
                             >
                               <Play className="h-3.5 w-3.5" />
                               <span>Iniciar</span>
@@ -194,7 +193,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => onServiceAction('docker', c.name, 'restart')}
-                                className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                               >
                                 <RotateCw className="h-3.5 w-3.5" />
                                 <span>Reiniciar</span>
@@ -203,7 +202,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => onServiceAction('docker', c.name, 'stop')}
-                                className="cockpit-btn-off inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
+                                className="cockpit-btn-off inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
                               >
                                 <Square className="h-3.5 w-3.5" />
                                 <span>Detener</span>
@@ -215,7 +214,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                             onClick={() =>
                               setShowTechIds((prev) => ({ ...prev, [c.id || c.name]: !prev[c.id || c.name] }))
                             }
-                            className="inline-flex min-h-[40px] items-center gap-1 px-2 text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                            className="inline-flex min-h-[38px] items-center gap-1 px-2 text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                           >
                             <span>Detalles</span>
                             {techOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -224,8 +223,8 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                       </div>
 
                       {techOpen && (
-                        <div className="cockpit-subtile mt-2 p-3 text-xs font-mono text-slate-600 dark:text-slate-300">
-                          <div>Imagen: {c.image || '--'}</div>
+                        <div className="mt-2.5 rounded-xl border border-slate-200/70 bg-white/80 p-2.5 text-xs font-mono text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                          <div className="truncate">Imagen: {c.image || '--'}</div>
                           <div>Red: {c.net_io || '--'} · Disco: {c.block_io || '--'}</div>
                           <div>Estado exacto: {c.status || c.state || '--'}</div>
                         </div>
@@ -256,7 +255,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                 No hay servicios internos filtrados en este momento.
               </p>
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="cockpit-auto-grid-cards">
                 {systemdServices.slice(0, 30).map((s) => {
                   const unitTarget = s.unit || s.name;
                   const active = s.active === true || (s.active_state || s.state || '').toLowerCase() === 'active';
@@ -266,16 +265,15 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                   return (
                     <div
                       key={unitTarget}
-                      className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      className="cockpit-subtile flex flex-col justify-between gap-2.5 p-3.5"
                     >
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between gap-2">
                           <span className="truncate text-sm font-medium text-slate-900 dark:text-white">
                             {s.name}
                           </span>
-                          <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">·</span>
                           <span
-                            className={`text-xs font-medium ${
+                            className={`shrink-0 text-xs font-medium ${
                               active ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
                             }`}
                           >
@@ -283,16 +281,16 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                           </span>
                         </div>
                         {roleDesc && (
-                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{roleDesc}</p>
+                          <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{roleDesc}</p>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center justify-end gap-2 shrink-0">
                         <button
                           type="button"
                           disabled={busy}
                           onClick={() => onServiceAction('systemd', unitTarget, 'restart')}
-                          className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
                           <RotateCw className="h-3.5 w-3.5" />
                           <span>Reiniciar</span>

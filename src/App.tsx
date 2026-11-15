@@ -222,7 +222,7 @@ export function App() {
           ? 'android_native'
           : 'web_browser',
       full_access: env.isNativeApp,
-      app_version: window.__INITIAL_APP_VERSION__ || '12.7.2',
+      app_version: window.__INITIAL_APP_VERSION__ || '12.8.0',
       screen_width: window.screen?.width,
       screen_height: window.screen?.height,
     };
@@ -330,7 +330,7 @@ export function App() {
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.42, ease: COCKPIT_EASE }}
-          className="mx-auto max-w-6xl px-3 pt-3 sm:px-6 md:sticky md:top-3 md:z-30"
+          className="cockpit-shell pt-3 md:sticky md:top-3 md:z-30"
         >
           <header className="cockpit-topbar">
             <div className="flex min-h-[68px] items-center justify-between gap-3 px-3.5 py-1.5 sm:min-h-[76px] sm:px-5">
@@ -450,7 +450,7 @@ export function App() {
         </motion.div>
 
         {/* Main Content Container */}
-        <main className="mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-5">
+        <main className="cockpit-shell py-4 sm:py-5">
           <AnimatePresence>
             {connError && (
               <motion.div
@@ -465,7 +465,7 @@ export function App() {
           </AnimatePresence>
 
           {loading && !metrics ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="cockpit-auto-grid">
               {[0, 1, 2, 3].map((k) => (
                 <div
                   key={k}

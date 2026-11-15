@@ -421,8 +421,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </AccordionBody>
       </motion.section>
 
-      {/* Primary 4 Real-Time Telemetry Widgets: CPU, RAM, GPU, Almacenamiento (cockpit-ui-preview.svg) */}
-      <section aria-label="Panel de rendimiento en tiempo real" className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {/* Primary & Independent Real-Time Telemetry Widgets: Responsive Auto-Fit Multi-Column Grid */}
+      <section aria-label="Panel de rendimiento en tiempo real" className="cockpit-auto-grid">
         {/* 1. Procesador (CPU) */}
         <motion.article
           initial={{ opacity: 0, y: 16, scale: 0.985 }}
@@ -453,7 +453,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     {formatTemp(cpuTemp)}
                   </span>
                 </div>
-                <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400 max-w-[290px]">
+                <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
                   {metrics?.cpu?.model || 'Procesador principal'} ({metrics?.cpu?.logical_cores || 0} núcleos)
                 </p>
               </div>
@@ -638,7 +638,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     {gpuAvail ? formatTemp(gpuTemp) : 'Integrada'}
                   </span>
                 </div>
-                <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400 max-w-[290px]">
+                <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
                   {gpuAvail
                     ? `${metrics?.gpu?.name || 'Gráfica'}${gpuVramTotal > 0 ? ` · ${gpuVramUsed} / ${gpuVramTotal} MB vídeo` : ''}`
                     : 'Vídeo integrado sin carga multimedia'}
@@ -976,12 +976,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         )}
                       </div>
 
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                        <span className="truncate max-w-[260px]" title={subtitleText}>
+                      <div className="mt-1.5 flex items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="min-w-0 truncate" title={subtitleText}>
                           {subtitleText}
                         </span>
-                        <span aria-hidden="true">·</span>
-                        <span className="font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
+                        <span aria-hidden="true" className="shrink-0">·</span>
+                        <span className="shrink-0 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
                           L {formatMbRate(readMb)} · E {formatMbRate(writeMb)}
                         </span>
                       </div>
@@ -1083,7 +1083,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             No se detectaron otros aparatos en tu red en este instante. Pulsa en «Ver todos» para revisar la red.
           </div>
         ) : (
-          <div className="mt-4 space-y-2.5">
+          <div className="mt-4 cockpit-auto-grid-cards">
             {controllableClients.map((client, idx) => {
               const isOnline = client.online !== false && client.is_online !== false;
               const mac = client.mac || `idx-${idx}`;
@@ -1093,11 +1093,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               return (
                 <motion.div
                   key={`${mac}-${client.ip || idx}`}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: 0.04 * idx, ease: COCKPIT_EASE }}
-                  whileHover={{ scale: 1.004 }}
-                  className="cockpit-subtile flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between"
+                  whileHover={{ scale: 1.006 }}
+                  className="cockpit-subtile flex flex-col justify-between gap-3 p-3.5"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div

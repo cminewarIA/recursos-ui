@@ -454,7 +454,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={COCKPIT_SPRING}
-        className="cockpit-bento w-full max-w-4xl max-h-[94vh] overflow-y-auto p-4 sm:p-5 shadow-2xl"
+        className="cockpit-bento w-full max-w-6xl max-h-[94vh] overflow-y-auto p-4 sm:p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera */}

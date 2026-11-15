@@ -72,7 +72,7 @@ export function getHealthTone(pct: number): {
 
 export function getDisplayVersionString(rawVersion?: string, displayVer?: string): string {
   if (displayVer && displayVer.trim()) return displayVer.trim();
-  if (!rawVersion) return '12.7.2';
+  if (!rawVersion) return '12.8.0';
   return rawVersion;
 }
 
