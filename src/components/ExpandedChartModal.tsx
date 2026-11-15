@@ -14,7 +14,8 @@ import {
 import { COCKPIT_SPRING, MorphPill } from './MotionPrimitives';
 import { ChartSeries, TelemetryChart } from './TelemetryChart';
 import { ExpandChartSpec } from './OverviewView';
-import { HistorySeries, MetricsPayload, TelemetryHistoryResponse, ThemeMode } from '../types/telemetry';
+import { ResourceProcessesPanel } from './ResourceProcessesPanel';
+import { GpuHistorySample, HistorySeries, MetricsPayload, TelemetryHistoryResponse, ThemeMode } from '../types/telemetry';
 import { apiFetchJson } from '../utils/api';
 import { useI18n } from '../i18n';
 
@@ -37,6 +38,24 @@ const WINDOW_PRESETS: Array<{ key: HistoryPresetKey; labelKey: string; sec?: num
   { key: '86400', labelKey: 'charts.presets.86400', sec: 86400 },
   { key: 'all', labelKey: 'charts.presets.all' },
 ];
+
+const GPU_SUB_PRESETS: Array<{ key: HistoryPresetKey; labelKey: string; sec?: number }> = [
+  { key: 'live', labelKey: 'charts.presets.live' },
+  { key: '1200', labelKey: 'charts.presets.gpu_20m', sec: 1200 },
+];
+
+const GPU_SUB_HISTORY_FIELD_MAP: Record<string, keyof Omit<GpuHistorySample, 't'>> = {
+  gpu_vram_pct: 'vram_pct',
+  gpu_mem_ctrl: 'mem_util',
+  gpu_enc: 'enc',
+  gpu_dec: 'dec',
+  gpu_power: 'power',
+  gpu_temp: 'temp',
+  gpu_clk_gfx: 'clock_gfx',
+  gpu_clk_mem: 'clock_mem',
+  gpu_pcie_rx: 'pcie_rx',
+  gpu_pcie_tx: 'pcie_tx',
+};
 
 function formatEpochDateTime(ts: number | null | undefined, locale = 'es'): string {
   if (!ts || !Number.isFinite(ts)) return '--';
@@ -258,6 +277,15 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     return matched?.io_history ?? null;
   }, [spec.chartKind, spec.diskMountpoint, liveMetrics?.disks]);
 
+  const liveGpuHist = useMemo(() => {
+    if (spec.chartKind !== 'gpu' || !spec.gpuSubmetric) return null;
+    return liveMetrics?.gpu?.history ?? null;
+  }, [spec.chartKind, spec.gpuSubmetric, liveMetrics?.gpu?.history]);
+
+  const hasGpuSubHist = Boolean(
+    spec.chartKind === 'gpu' && spec.gpuSubmetric && liveGpuHist && liveGpuHist.length > 0
+  );
+
   const liveSliceWindow = useMemo(() => {
     const filterByEpoch = (rawEpoch: number[], spanSec: number): number => {
       if (rawEpoch.length < 2) return 0;
@@ -304,8 +332,26 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
           return s;
         });
       }
+      if (hasGpuSubHist && liveGpuHist) {
+        const startIdx = liveSliceWindow.filterByEpoch(
+          liveGpuHist.map((b) => Math.round(b.t / 1000)),
+          LIVE_WINDOW_SECONDS
+        );
+        const sliced = liveGpuHist.slice(startIdx);
+        return spec.series.map((s) => {
+          const field = GPU_SUB_HISTORY_FIELD_MAP[s.id];
+          if (!field) return s;
+          return {
+            ...s,
+            data: sliced.map((b) => {
+              const v = b[field];
+              return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+            }),
+          };
+        });
+      }
       const liveHist = liveMetrics?.history;
-      if (liveHist && (spec.chartKind !== 'net' || !spec.nicName)) {
+      if (liveHist && (spec.chartKind !== 'net' || !spec.nicName) && !spec.gpuSubmetric) {
         const startIdx = liveSliceWindow.filterByEpoch(liveHist.epoch_ts ?? [], LIVE_WINDOW_SECONDS);
         return spec.series.map((s) => {
           if (s.metricKey && Array.isArray(liveHist[s.metricKey])) {
@@ -315,6 +361,20 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         });
       }
       return spec.series;
+    }
+
+    if (preset === '1200' && cursorEndTs === null && hasGpuSubHist && liveGpuHist) {
+      return spec.series.map((s) => {
+        const field = GPU_SUB_HISTORY_FIELD_MAP[s.id];
+        if (!field) return s;
+        return {
+          ...s,
+          data: liveGpuHist.map((b) => {
+            const v = b[field];
+            return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+          }),
+        };
+      });
     }
 
     if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) {
@@ -337,7 +397,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       return s;
     });
-  }, [preset, cursorEndTs, liveMetrics?.history, liveNicHist, liveDiskHist, spec.chartKind, spec.nicName, spec.series, historyData, liveSliceWindow]);
+  }, [preset, cursorEndTs, liveMetrics?.history, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.series, historyData, liveSliceWindow]);
 
   const resolvedTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
@@ -349,23 +409,31 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         const startIdx = liveSliceWindow.filterByEpoch(liveDiskHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
         return liveDiskHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
       }
-      if ((spec.chartKind !== 'net' || !spec.nicName) && liveMetrics?.history?.timestamps?.length) {
+      if (hasGpuSubHist && liveGpuHist) {
+        const startIdx = liveSliceWindow.filterByEpoch(liveGpuHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
+        return liveGpuHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
+      }
+      if ((spec.chartKind !== 'net' || !spec.nicName) && !spec.gpuSubmetric && liveMetrics?.history?.timestamps?.length) {
         const startIdx = liveSliceWindow.filterByEpoch(liveMetrics?.history?.epoch_ts ?? [], LIVE_WINDOW_SECONDS);
         return liveMetrics.history.timestamps.slice(startIdx);
       }
       return spec.timestamps;
     }
+    if (preset === '1200' && cursorEndTs === null && hasGpuSubHist && liveGpuHist) {
+      return liveGpuHist.map((b) => new Date(b.t).toLocaleTimeString(locale));
+    }
     if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) {
       return liveDiskHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
     }
     return historyData?.series?.timestamps ?? [];
-  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.timestamps, liveNicHist, liveDiskHist, liveMetrics?.history?.timestamps, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
+  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.timestamps, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, locale, liveMetrics?.history?.timestamps, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
 
   const resolvedDateTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) return undefined;
+    if (preset === '1200' && cursorEndTs === null && hasGpuSubHist) return undefined;
     if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) return undefined;
     return historyData?.series?.date_timestamps;
-  }, [preset, cursorEndTs, spec.chartKind, liveDiskHist, historyData]);
+  }, [preset, cursorEndTs, spec.chartKind, hasGpuSubHist, liveDiskHist, historyData]);
 
   const resolvedEpochTs = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
@@ -377,17 +445,24 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         const epochs = liveDiskHist.map((b) => Math.round(b.t / 1000));
         return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
       }
-      if ((spec.chartKind !== 'net' || !spec.nicName) && liveMetrics?.history?.epoch_ts?.length) {
+      if (hasGpuSubHist && liveGpuHist) {
+        const epochs = liveGpuHist.map((b) => Math.round(b.t / 1000));
+        return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
+      }
+      if ((spec.chartKind !== 'net' || !spec.nicName) && !spec.gpuSubmetric && liveMetrics?.history?.epoch_ts?.length) {
         const epochs = liveMetrics.history.epoch_ts;
         return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
       }
       return spec.epochTs;
     }
+    if (preset === '1200' && cursorEndTs === null && hasGpuSubHist && liveGpuHist) {
+      return liveGpuHist.map((b) => Math.round(b.t / 1000));
+    }
     if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) {
       return liveDiskHist.map((b) => Math.round(b.t / 1000));
     }
     return historyData?.series?.epoch_ts;
-  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.epochTs, liveNicHist, liveDiskHist, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
+  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.epochTs, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
 
   // Para velocidades/flujos delegamos en TelemetryChart el autoajuste exacto al pico visible en la ventana
   const dynamicMaxLeft = useMemo(() => {
@@ -502,11 +577,11 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         </div>
 
         {/* Barra simétrica de ventanas temporales y modo táctil */}
-        {hasMetricKeys && (
+        {(hasMetricKeys || hasGpuSubHist) && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <LayoutGroup id="expanded-presets">
               <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('charts.window_aria')}>
-                {WINDOW_PRESETS.map((p) => {
+                {(hasMetricKeys ? WINDOW_PRESETS : GPU_SUB_PRESETS).map((p) => {
                   const active = preset === p.key;
                   return (
                     <button
@@ -527,34 +602,36 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
               </div>
             </LayoutGroup>
 
-            <div className="flex items-center gap-1.5" role="group" aria-label={t('charts.touch_mode_aria')}>
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                type="button"
-                onClick={() => setInteractionMode('inspect')}
-                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-                  interactionMode === 'inspect'
-                    ? 'cockpit-btn-accent'
-                    : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-                }`}
-              >
-                <Crosshair className="h-3.5 w-3.5" />
-                <span>{t('charts.inspect')}</span>
-              </motion.button>
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                type="button"
-                onClick={() => setInteractionMode('pan')}
-                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-                  interactionMode === 'pan'
-                    ? 'cockpit-btn-accent'
-                    : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-                }`}
-              >
-                <MoveHorizontal className="h-3.5 w-3.5" />
-                <span>{t('charts.pan_time')}</span>
-              </motion.button>
-            </div>
+            {hasMetricKeys && (
+              <div className="flex items-center gap-1.5" role="group" aria-label={t('charts.touch_mode_aria')}>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  type="button"
+                  onClick={() => setInteractionMode('inspect')}
+                  className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                    interactionMode === 'inspect'
+                      ? 'cockpit-btn-accent'
+                      : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <Crosshair className="h-3.5 w-3.5" />
+                  <span>{t('charts.inspect')}</span>
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  type="button"
+                  onClick={() => setInteractionMode('pan')}
+                  className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                    interactionMode === 'pan'
+                      ? 'cockpit-btn-accent'
+                      : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <MoveHorizontal className="h-3.5 w-3.5" />
+                  <span>{t('charts.pan_time')}</span>
+                </motion.button>
+              </div>
+            )}
           </div>
         )}
 
@@ -580,17 +657,17 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
           />
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
             <span>
-              {isLiveNow
+              {isLiveNow || !historyData?.window_start_ts
                 ? t('charts.window_start', { time: resolvedTimestamps[0] || '--' })
-                : t('charts.from_time', { time: formatEpochDateTime(historyData?.window_start_ts, locale) })}
+                : t('charts.from_time', { time: formatEpochDateTime(historyData.window_start_ts, locale) })}
             </span>
             <span className="text-center text-slate-400 dark:text-slate-500">
               {interactionMode === 'pan' ? t('charts.pan_help_drag') : t('charts.pan_help_hover')}
             </span>
             <span>
-              {isLiveNow
+              {isLiveNow || !historyData?.window_end_ts
                 ? t('time.last_sample', { time: resolvedTimestamps[resolvedTimestamps.length - 1] || '--' })
-                : t('charts.until_time', { time: formatEpochDateTime(historyData?.window_end_ts, locale) })}
+                : t('charts.until_time', { time: formatEpochDateTime(historyData.window_end_ts, locale) })}
             </span>
           </div>
         </div>
@@ -711,6 +788,11 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
               </div>
             ))}
           </div>
+        )}
+
+        {/* Procesos activos consumidores del recurso inspeccionado */}
+        {spec.chartKind && (
+          <ResourceProcessesPanel kind={spec.chartKind} metrics={liveMetrics} compact />
         )}
       </motion.div>
     </motion.div>

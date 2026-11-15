@@ -675,3 +675,65 @@ network.status_idle,Vista Red y Seguridad,En reposo
 network.telegram_send_test,Vista Red y Seguridad,Enviar prueba
 network.telegram_title,Vista Red y Seguridad,Avisos por Telegram
 network.unblocked_ok,Vista Red y Seguridad,Acceso restaurado para {ip}.
+equipment.active_procs.cpu_title,Procesos activos por recurso,Procesos que están consumiendo procesador
+equipment.active_procs.ram_title,Procesos activos por recurso,Procesos que están consumiendo memoria
+equipment.active_procs.gpu_title,Procesos activos por recurso,Procesos que están consumiendo tarjeta gráfica
+equipment.active_procs.storage_title,Procesos activos por recurso,Procesos que están consumiendo almacenamiento
+equipment.active_procs.net_title,Procesos activos por recurso,Procesos con actividad en red
+equipment.active_procs.subtitle_cpu,Procesos activos por recurso,Porcentaje del procesador y núcleos o hilos en ejecución
+equipment.active_procs.subtitle_ram,Procesos activos por recurso,Porcentaje de memoria RAM y volumen privado asignado
+equipment.active_procs.subtitle_gpu,Procesos activos por recurso,Porcentaje de gráfica/VRAM y memoria de vídeo reservada
+equipment.active_procs.subtitle_storage,Procesos activos por recurso,Porcentaje de actividad de disco y tasa de lectura o escritura
+equipment.active_procs.subtitle_net,Procesos activos por recurso,Porcentaje de conexiones activas y puertos por proceso
+equipment.active_procs.count_badge,Procesos activos por recurso,{count} activos
+equipment.active_procs.empty_cpu,Procesos activos por recurso,Sin procesos con consumo apreciable de procesador ahora mismo.
+equipment.active_procs.empty_ram,Procesos activos por recurso,Sin procesos con consumo apreciable de memoria ahora mismo.
+equipment.active_procs.empty_gpu,Procesos activos por recurso,Ningún proceso está ocupando la tarjeta gráfica en este instante.
+equipment.active_procs.empty_storage,Procesos activos por recurso,Sin procesos con lectura o escritura activa en disco en este momento.
+equipment.active_procs.empty_net,Procesos activos por recurso,Sin procesos con conexiones de red detectables ahora mismo.
+equipment.active_procs.show_more,Procesos activos por recurso,Ver más ({count})
+equipment.active_procs.show_less,Procesos activos por recurso,Mostrar solo top {count}
+equipment.active_procs.open_full_table,Procesos activos por recurso,Ver tabla completa
+equipment.active_procs.col_consume,Procesos activos por recurso,Consumo
+equipment.active_procs.col_share,Procesos activos por recurso,Porcentaje
+equipment.active_procs.cpu_consume_val,Procesos activos por recurso,{cores} núcl. · {threads} hilos ({raw}% hilo)
+equipment.active_procs.cpu_consume_short,Procesos activos por recurso,{threads} hilos · {raw}% hilo
+equipment.active_procs.ram_shared_note,Procesos activos por recurso,comp. {shared}
+equipment.active_procs.gpu_consume_full,Procesos activos por recurso,{vram} · Cómputo {gpu}%
+equipment.active_procs.gpu_vram_only,Procesos activos por recurso,{vram} VRAM
+equipment.active_procs.storage_accumulated,Procesos activos por recurso,Acum. L {read} · E {write}
+equipment.active_procs.net_consume_val,Procesos activos por recurso,{est} est. · {total} sockets
+equipment.active_procs.gpu_type_cg,Procesos activos por recurso,Cómputo + Gráfico
+equipment.active_procs.gpu_type_c,Procesos activos por recurso,Cómputo
+equipment.active_procs.gpu_type_g,Procesos activos por recurso,Gráfico
+hardware.gpu.sensors_bar_label,Multi-gráfica dinámica GPU,Gráficas de GPU según sensores disponibles
+hardware.gpu.sensors_active_count,Multi-gráfica dinámica GPU,{active} / {total} activas
+hardware.gpu.sensor_unavailable,Multi-gráfica dinámica GPU,No disponible en esta GPU
+hardware.gpu.graph_compute_title,Multi-gráfica dinámica GPU,Uso 3D / Cómputo (Núcleo)
+hardware.gpu.graph_compute_sub,Multi-gráfica dinámica GPU,Carga de sombreado y cómputo general del chip gráfico
+hardware.gpu.graph_vram_title,Multi-gráfica dinámica GPU,Memoria de Vídeo (VRAM y Controlador)
+hardware.gpu.graph_vram_sub,Multi-gráfica dinámica GPU,Ocupación {used} / {total} MB · Controlador {ctrl}%
+hardware.gpu.graph_vram_only_sub,Multi-gráfica dinámica GPU,Ocupación de memoria de vídeo dedicada {used} / {total} MB
+hardware.gpu.graph_video_title,Multi-gráfica dinámica GPU,Codificador y Decodificador de Vídeo
+hardware.gpu.graph_video_sub,Multi-gráfica dinámica GPU,Codificador {enc}% · Decodificador {dec}%
+hardware.gpu.graph_power_temp_title,Multi-gráfica dinámica GPU,Consumo Eléctrico y Temperatura
+hardware.gpu.graph_power_temp_sub,Multi-gráfica dinámica GPU,Potencia {power} (límite {limit}) · Térmica {temp}
+hardware.gpu.graph_clocks_title,Multi-gráfica dinámica GPU,Relojes de Frecuencia (Núcleo / Memoria)
+hardware.gpu.graph_clocks_sub,Multi-gráfica dinámica GPU,Núcleo {gfx} MHz (máx. {gfxMax}) · VRAM {mem} MHz
+hardware.gpu.graph_pcie_title,Multi-gráfica dinámica GPU,Transferencia por Bus PCIe
+hardware.gpu.graph_pcie_sub,Multi-gráfica dinámica GPU,PCIe Gen {gen} x{width} · RX {rx} · TX {tx}
+hardware.gpu.series_compute,Multi-gráfica dinámica GPU,Motor 3D / Cómputo
+hardware.gpu.series_vram_pct,Multi-gráfica dinámica GPU,VRAM ocupada
+hardware.gpu.series_mem_ctrl,Multi-gráfica dinámica GPU,Controlador de memoria
+hardware.gpu.series_encoder,Multi-gráfica dinámica GPU,Codificador de vídeo
+hardware.gpu.series_decoder,Multi-gráfica dinámica GPU,Decodificador de vídeo
+hardware.gpu.series_power,Multi-gráfica dinámica GPU,Consumo eléctrico
+hardware.gpu.series_temp,Multi-gráfica dinámica GPU,Temperatura GPU
+hardware.gpu.series_clock_gfx,Multi-gráfica dinámica GPU,Reloj núcleo
+hardware.gpu.series_clock_mem,Multi-gráfica dinámica GPU,Reloj memoria
+hardware.gpu.series_pcie_rx,Multi-gráfica dinámica GPU,PCIe entrada (RX)
+hardware.gpu.series_pcie_tx,Multi-gráfica dinámica GPU,PCIe salida (TX)
+hardware.gpu.no_active_graphs,Multi-gráfica dinámica GPU,Activa al menos una gráfica disponible arriba para visualizarla.
+hardware.gpu.bar1_badge,Multi-gráfica dinámica GPU,BAR1 {used}/{total} MB
+hardware.gpu.cuda_badge,Multi-gráfica dinámica GPU,CUDA {cuda}
+charts.presets.gpu_20m,Gráficas e historial completo,20 min

@@ -51,6 +51,7 @@ export interface ExpandChartSpec {
   maxLeft?: number;
   maxRight?: number;
   chartKind?: 'cpu' | 'ram' | 'gpu' | 'storage' | 'net';
+  gpuSubmetric?: 'compute' | 'vram' | 'video' | 'power_temp' | 'clocks' | 'pcie';
   nicName?: string;
   diskMountpoint?: string;
 }

@@ -1729,6 +1729,7 @@ function sampleRealDiskIo() {
 }
 
 const prevProcCpuTicks = new Map<number, { ticks: number; ts: number }>();
+const prevProcIoBytes = new Map<number, { r: number; w: number; ts: number }>();
 
 function sampleRealProcesses() {
   const now = Date.now();
@@ -1736,7 +1737,9 @@ function sampleRealProcesses() {
     return cachedProcesses.data;
   }
   try {
-    const out = execSync('ps -eo pid,user,pcpu,rss,comm --sort=-pcpu,-rss | head -n 45', { timeout: 1500 }).toString();
+    const out = execSync('ps -eo pid,user,pcpu,rss,nlwp,comm --sort=-pcpu,-rss | head -n 55', { timeout: 1500 }).toString();
+    const totalCores = Math.max(1, os.cpus().length || 1);
+    const totalMemMb = Math.max(1, os.totalmem() / (1024 * 1024));
     const seenPids = new Set<number>();
     const procs = out
       .split('\n')
@@ -1749,8 +1752,13 @@ function sampleRealProcesses() {
         const user = parts[1] || 'root';
         let cpu = parseFloat(parts[2]) || 0;
         const rssKb = parseInt(parts[3], 10) || 0;
-        const name = parts.slice(4).join(' ') || 'process';
+        const numThreads = parseInt(parts[4], 10) || 1;
+        const name = parts.slice(5).join(' ') || 'process';
         const memMb = Math.round((rssKb / 1024) * 10) / 10;
+        let ioReadBps = 0;
+        let ioWriteBps = 0;
+        let ioReadTot = 0;
+        let ioWriteTot = 0;
 
         if (pid > 0) {
           seenPids.add(pid);
@@ -1768,7 +1776,7 @@ function sampleRealProcesses() {
                 const dTicks = Math.max(0, totalTicks - prev.ticks);
                 const instCpu = Math.round((dTicks / dtSec) * 10) / 10;
                 if (instCpu > 0 || cpu === 0) {
-                  cpu = Math.min(100, Math.max(instCpu, cpu));
+                  cpu = Math.max(instCpu, cpu);
                 }
               }
               prevProcCpuTicks.set(pid, { ticks: totalTicks, ts: now });
@@ -1776,23 +1784,68 @@ function sampleRealProcesses() {
           } catch {
             // Process may have exited
           }
+          try {
+            const ioRaw = fs.readFileSync(`/proc/${pid}/io`, 'utf-8');
+            for (const ln of ioRaw.split('\n')) {
+              if (ln.startsWith('read_bytes:')) ioReadTot = parseInt(ln.split(':')[1].trim(), 10) || 0;
+              else if (ln.startsWith('write_bytes:')) ioWriteTot = parseInt(ln.split(':')[1].trim(), 10) || 0;
+            }
+            const prevIo = prevProcIoBytes.get(pid);
+            if (prevIo && now - prevIo.ts >= 300) {
+              const dtSec = (now - prevIo.ts) / 1000;
+              ioReadBps = Math.round(Math.max(0, (ioReadTot - prevIo.r) / dtSec));
+              ioWriteBps = Math.round(Math.max(0, (ioWriteTot - prevIo.w) / dtSec));
+            }
+            prevProcIoBytes.set(pid, { r: ioReadTot, w: ioWriteTot, ts: now });
+          } catch {
+            // Protected proc io
+          }
         }
 
+        const cpuNorm = Math.round(Math.min(100, cpu / totalCores) * 10) / 10;
+        const ioTotalBps = ioReadBps + ioWriteBps;
         return {
           pid,
           name,
           user,
-          cpu_percent: cpu,
+          cpu_percent: Math.round(cpu * 10) / 10,
+          cpu_norm_percent: cpuNorm === 0 && cpu >= 0.4 ? 0.1 : cpuNorm,
+          cpu_cores_used: Math.round((cpu / 100) * 100) / 100,
+          num_threads: numThreads,
           mem_mb: memMb,
           priv_mb: memMb,
           shared_mb: 0,
+          mem_percent: Math.round((memMb / totalMemMb) * 1000) / 10,
+          io_read_bps: ioReadBps,
+          io_write_bps: ioWriteBps,
+          io_total_bps: ioTotalBps,
+          io_percent: 0,
+          io_read_total_bytes: ioReadTot,
+          io_write_total_bytes: ioWriteTot,
+          net_connections: 0,
+          net_established: 0,
+          net_percent: 0,
+          net_ports: '',
           vram_mb: 0,
+          vram_percent: 0,
           status: 'running',
         };
       });
 
     for (const k of prevProcCpuTicks.keys()) {
       if (!seenPids.has(k)) prevProcCpuTicks.delete(k);
+    }
+    for (const k of prevProcIoBytes.keys()) {
+      if (!seenPids.has(k)) prevProcIoBytes.delete(k);
+    }
+
+    const totalIoBps = procs.reduce((acc, p) => acc + p.io_total_bps, 0);
+    if (totalIoBps > 0) {
+      for (const p of procs) {
+        if (p.io_total_bps > 0) {
+          p.io_percent = Math.round(Math.min(100, (p.io_total_bps / totalIoBps) * 1000) / 10);
+        }
+      }
     }
 
     procs.sort((a, b) => (b.cpu_percent - a.cpu_percent) || (b.priv_mb - a.priv_mb));

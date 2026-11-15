@@ -13,10 +13,11 @@ import {
 } from 'lucide-react';
 import { AccordionBody, AnimatedMetricValue, MorphPill, ViewStage } from './MotionPrimitives';
 import { ExpandChartSpec } from './OverviewView';
+import { ResourceProcessesPanel } from './ResourceProcessesPanel';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
 import { MetricsPayload, SystemProcess, ThemeMode } from '../types/telemetry';
-import { formatBytes, formatMbRate, formatPct, formatTemp } from '../utils/formatters';
+import { formatBytes, formatMbRate, formatPct, formatSpeed, formatTemp } from '../utils/formatters';
 import { formatDiskFstype, formatDiskLabel, formatDiskTransport, useI18n } from '../i18n';
 
 type EquipmentSubTab = 'cpu' | 'ram' | 'gpu' | 'storage' | 'processes';
@@ -51,7 +52,8 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
   const [subTab, setSubTab] = useState<EquipmentSubTab>(() => resolveEquipmentSubTab(initialSubTab) || 'cpu');
   const [showTech, setShowTech] = useState(false);
   const [procQuery, setProcQuery] = useState('');
-  const [procSort, setProcSort] = useState<'cpu' | 'mem' | 'vram'>('cpu');
+  const [procSort, setProcSort] = useState<'cpu' | 'mem' | 'vram' | 'io'>('cpu');
+  const [disabledGpuGraphs, setDisabledGpuGraphs] = useState<Record<string, boolean>>({});
   const [coreTooltip, setCoreTooltip] = useState<FloatingTooltipData | null>(null);
 
   useEffect(() => {
@@ -76,9 +78,308 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     [hist?.ram, hist?.ram_total, t]
   );
   const gpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.title'), data: hist?.gpu ?? [], color: '#7c3aed', unit: '%' }],
+    () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.series_compute'), data: hist?.gpu ?? [], color: '#7c3aed', unit: '%' }],
     [hist?.gpu, t]
   );
+
+  // Sub-gráficas de GPU dinámicamente activadas/desactivadas según capacidades reales de la tarjeta
+  const gpuSubgraphs = useMemo(() => {
+    const gpu = metrics?.gpu;
+    const avail = Boolean(gpu?.available);
+    const caps = gpu?.capabilities ?? {};
+    const rawGpuHist = gpu?.history ?? [];
+
+    // Recortar a últimos 5 min para vista en vivo coherente con Inicio
+    let sliceStart = 0;
+    if (rawGpuHist.length >= 2) {
+      const latestMs = Number(rawGpuHist[rawGpuHist.length - 1]?.t || 0);
+      if (latestMs > 0) {
+        const cutoffMs = latestMs - 300 * 1000;
+        const idx = rawGpuHist.findIndex((b) => Number(b.t) >= cutoffMs);
+        sliceStart = idx >= 0 ? Math.min(idx, Math.max(0, rawGpuHist.length - 2)) : Math.max(0, rawGpuHist.length - 2);
+      }
+    }
+    const gHist = rawGpuHist.slice(sliceStart);
+    const gTimestamps = gHist.length >= 2 ? gHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES')) : timestamps;
+    const gEpochTs = gHist.length >= 2 ? gHist.map((b) => Math.round(b.t / 1000)) : epochTs;
+
+    const pickNumeric = (vals: Array<number | null | undefined>, fallbackHist?: number[]): number[] => {
+      if (vals.length >= 2 && vals.some((v) => v !== null && v !== undefined)) {
+        return vals.map((v) => (v !== null && v !== undefined && Number.isFinite(Number(v)) ? Number(v) : 0));
+      }
+      if (fallbackHist && fallbackHist.length >= 2) return fallbackHist;
+      const single = vals.find((v) => v !== null && v !== undefined);
+      if (single !== undefined && single !== null) return [Number(single), Number(single)];
+      return [];
+    };
+
+    const hasCompute = avail && (caps.compute ?? gpu?.gpu_util_percent !== undefined);
+    const hasVram = avail && ((caps.vram ?? Number(gpu?.vram_total_mb || 0) > 0) || Boolean(caps.mem_ctrl));
+    const hasMemCtrl = avail && (caps.mem_ctrl ?? (gpu?.mem_util_percent !== null && gpu?.mem_util_percent !== undefined));
+    const hasEncoder = avail && (caps.encoder ?? (gpu?.encoder_util_percent !== null && gpu?.encoder_util_percent !== undefined));
+    const hasDecoder = avail && (caps.decoder ?? (gpu?.decoder_util_percent !== null && gpu?.decoder_util_percent !== undefined));
+    const hasVideo = hasEncoder || hasDecoder;
+    const hasPower = avail && (caps.power ?? (gpu?.power_watts !== null && gpu?.power_watts !== undefined));
+    const hasTemp = avail && (caps.temp ?? (gpu?.temp_c !== null && gpu?.temp_c !== undefined));
+    const hasPowerTemp = hasPower || hasTemp;
+    const hasClocks = avail && (caps.clocks ?? (gpu?.clock_graphics_mhz !== null && gpu?.clock_graphics_mhz !== undefined));
+    const hasPcie = avail && (caps.pcie ?? (gpu?.pcie_rx_kbps !== null && gpu?.pcie_rx_kbps !== undefined));
+
+    const cards: Array<{
+      id: 'compute' | 'vram' | 'video' | 'power_temp' | 'clocks' | 'pcie';
+      title: string;
+      subtitle: string;
+      headline: string;
+      available: boolean;
+      leftUnit: string;
+      maxLeft?: number;
+      maxRight?: number;
+      timestamps: string[];
+      epochTs: number[];
+      series: ChartSeries[];
+      useMainGpuHistory?: boolean;
+    }> = [];
+
+    // 1. Uso 3D / Cómputo
+    cards.push({
+      id: 'compute',
+      title: t('hardware.gpu.graph_compute_title'),
+      subtitle: t('hardware.gpu.graph_compute_sub'),
+      headline: formatPct(gpu?.gpu_util_percent ?? 0),
+      available: hasCompute,
+      leftUnit: '%',
+      maxLeft: 100,
+      timestamps: gHist.length >= 2 ? gTimestamps : timestamps,
+      epochTs: gHist.length >= 2 ? gEpochTs : epochTs,
+      useMainGpuHistory: true,
+      series: [
+        {
+          id: 'gpu_compute',
+          metricKey: 'gpu',
+          label: t('hardware.gpu.series_compute'),
+          data: pickNumeric(
+            gHist.map((b) => b.util),
+            hist?.gpu ?? [Number(gpu?.gpu_util_percent ?? 0), Number(gpu?.gpu_util_percent ?? 0)]
+          ),
+          color: '#7c3aed',
+          unit: '%',
+          decimals: 1,
+        },
+      ],
+    });
+
+    // 2. Memoria VRAM y Controlador
+    const vramSeriesList: ChartSeries[] = [];
+    if (caps.vram ?? Number(gpu?.vram_total_mb || 0) > 0) {
+      vramSeriesList.push({
+        id: 'gpu_vram_pct',
+        label: t('hardware.gpu.series_vram_pct'),
+        data: pickNumeric(gHist.map((b) => b.vram_pct), [Number(gpu?.vram_percent ?? 0), Number(gpu?.vram_percent ?? 0)]),
+        color: '#0284c7',
+        unit: '%',
+        decimals: 1,
+      });
+    }
+    if (hasMemCtrl) {
+      vramSeriesList.push({
+        id: 'gpu_mem_ctrl',
+        label: t('hardware.gpu.series_mem_ctrl'),
+        data: pickNumeric(gHist.map((b) => b.mem_util), [Number(gpu?.mem_util_percent ?? 0), Number(gpu?.mem_util_percent ?? 0)]),
+        color: '#06b6d4',
+        unit: '%',
+        decimals: 1,
+        fillAlpha: 0,
+        dashed: true,
+      });
+    }
+    cards.push({
+      id: 'vram',
+      title: t('hardware.gpu.graph_vram_title'),
+      subtitle: hasMemCtrl
+        ? t('hardware.gpu.graph_vram_sub', {
+            used: gpu?.vram_used_mb ?? 0,
+            total: gpu?.vram_total_mb ?? 0,
+            ctrl: gpu?.mem_util_percent ?? 0,
+          })
+        : t('hardware.gpu.graph_vram_only_sub', {
+            used: gpu?.vram_used_mb ?? 0,
+            total: gpu?.vram_total_mb ?? 0,
+          }),
+      headline: formatPct(gpu?.vram_percent ?? 0),
+      available: hasVram && vramSeriesList.length > 0,
+      leftUnit: '%',
+      maxLeft: 100,
+      timestamps: gTimestamps,
+      epochTs: gEpochTs,
+      series: vramSeriesList,
+    });
+
+    // 3. Codificador y Decodificador de Vídeo
+    const videoSeriesList: ChartSeries[] = [];
+    if (hasEncoder) {
+      videoSeriesList.push({
+        id: 'gpu_enc',
+        label: t('hardware.gpu.series_encoder'),
+        data: pickNumeric(gHist.map((b) => b.enc), [Number(gpu?.encoder_util_percent ?? 0), Number(gpu?.encoder_util_percent ?? 0)]),
+        color: '#10b981',
+        unit: '%',
+        decimals: 1,
+      });
+    }
+    if (hasDecoder) {
+      videoSeriesList.push({
+        id: 'gpu_dec',
+        label: t('hardware.gpu.series_decoder'),
+        data: pickNumeric(gHist.map((b) => b.dec), [Number(gpu?.decoder_util_percent ?? 0), Number(gpu?.decoder_util_percent ?? 0)]),
+        color: '#f59e0b',
+        unit: '%',
+        decimals: 1,
+      });
+    }
+    cards.push({
+      id: 'video',
+      title: t('hardware.gpu.graph_video_title'),
+      subtitle: t('hardware.gpu.graph_video_sub', {
+        enc: gpu?.encoder_util_percent ?? '--',
+        dec: gpu?.decoder_util_percent ?? '--',
+      }),
+      headline: `${gpu?.encoder_util_percent ?? 0}% / ${gpu?.decoder_util_percent ?? 0}%`,
+      available: hasVideo && videoSeriesList.length > 0,
+      leftUnit: '%',
+      maxLeft: 100,
+      timestamps: gTimestamps,
+      epochTs: gEpochTs,
+      series: videoSeriesList,
+    });
+
+    // 4. Consumo Eléctrico y Temperatura
+    const powerTempSeries: ChartSeries[] = [];
+    if (hasPower) {
+      powerTempSeries.push({
+        id: 'gpu_power',
+        label: t('hardware.gpu.series_power'),
+        data: pickNumeric(gHist.map((b) => b.power), [Number(gpu?.power_watts ?? 0), Number(gpu?.power_watts ?? 0)]),
+        color: '#ea580c',
+        unit: 'W',
+        decimals: 1,
+        axis: 'left',
+      });
+    }
+    if (hasTemp) {
+      powerTempSeries.push({
+        id: 'gpu_temp',
+        label: t('hardware.gpu.series_temp'),
+        data: pickNumeric(gHist.map((b) => b.temp), [Number(gpu?.temp_c ?? 0), Number(gpu?.temp_c ?? 0)]),
+        color: '#ef4444',
+        unit: '°C',
+        decimals: 0,
+        axis: hasPower ? 'right' : 'left',
+        dashed: hasPower,
+        fillAlpha: hasPower ? 0 : 0.14,
+      });
+    }
+    cards.push({
+      id: 'power_temp',
+      title: t('hardware.gpu.graph_power_temp_title'),
+      subtitle: t('hardware.gpu.graph_power_temp_sub', {
+        power: gpu?.power_watts !== null && gpu?.power_watts !== undefined ? `${gpu.power_watts} W` : '--',
+        limit: gpu?.power_limit_watts ? `${gpu.power_limit_watts} W` : '--',
+        temp: formatTemp(gpu?.temp_c),
+      }),
+      headline:
+        gpu?.power_watts !== null && gpu?.power_watts !== undefined
+          ? `${gpu.power_watts} W`
+          : formatTemp(gpu?.temp_c),
+      available: hasPowerTemp && powerTempSeries.length > 0,
+      leftUnit: hasPower ? 'W' : '°C',
+      maxRight: hasPower && hasTemp ? 105 : undefined,
+      timestamps: gTimestamps,
+      epochTs: gEpochTs,
+      series: powerTempSeries,
+    });
+
+    // 5. Relojes de Frecuencia (Núcleo / Memoria)
+    const clockSeries: ChartSeries[] = [];
+    if (gpu?.clock_graphics_mhz !== null && gpu?.clock_graphics_mhz !== undefined) {
+      clockSeries.push({
+        id: 'gpu_clk_gfx',
+        label: t('hardware.gpu.series_clock_gfx'),
+        data: pickNumeric(gHist.map((b) => b.clock_gfx), [Number(gpu.clock_graphics_mhz), Number(gpu.clock_graphics_mhz)]),
+        color: '#0284c7',
+        unit: 'MHz',
+        decimals: 0,
+      });
+    }
+    if (gpu?.clock_mem_mhz !== null && gpu?.clock_mem_mhz !== undefined) {
+      clockSeries.push({
+        id: 'gpu_clk_mem',
+        label: t('hardware.gpu.series_clock_mem'),
+        data: pickNumeric(gHist.map((b) => b.clock_mem), [Number(gpu.clock_mem_mhz), Number(gpu.clock_mem_mhz)]),
+        color: '#a855f7',
+        unit: 'MHz',
+        decimals: 0,
+        fillAlpha: 0,
+        dashed: true,
+      });
+    }
+    cards.push({
+      id: 'clocks',
+      title: t('hardware.gpu.graph_clocks_title'),
+      subtitle: t('hardware.gpu.graph_clocks_sub', {
+        gfx: gpu?.clock_graphics_mhz ?? '--',
+        gfxMax: gpu?.clock_max_graphics_mhz ?? '--',
+        mem: gpu?.clock_mem_mhz ?? '--',
+      }),
+      headline: gpu?.clock_graphics_mhz ? `${gpu.clock_graphics_mhz} MHz` : '--',
+      available: hasClocks && clockSeries.length > 0,
+      leftUnit: 'MHz',
+      timestamps: gTimestamps,
+      epochTs: gEpochTs,
+      series: clockSeries,
+    });
+
+    // 6. Enlace PCIe RX / TX
+    const pcieRxMb = gpu?.pcie_rx_kbps !== null && gpu?.pcie_rx_kbps !== undefined ? gpu.pcie_rx_kbps / 1024 : 0;
+    const pcieTxMb = gpu?.pcie_tx_kbps !== null && gpu?.pcie_tx_kbps !== undefined ? gpu.pcie_tx_kbps / 1024 : 0;
+    cards.push({
+      id: 'pcie',
+      title: t('hardware.gpu.graph_pcie_title'),
+      subtitle: t('hardware.gpu.graph_pcie_sub', {
+        gen: gpu?.pcie_gen ?? '--',
+        width: gpu?.pcie_width ?? '--',
+        rx: formatMbRate(pcieRxMb),
+        tx: formatMbRate(pcieTxMb),
+      }),
+      headline: formatMbRate(pcieRxMb + pcieTxMb),
+      available: hasPcie,
+      leftUnit: 'MB/s',
+      timestamps: gTimestamps,
+      epochTs: gEpochTs,
+      series: hasPcie
+        ? [
+            {
+              id: 'gpu_pcie_rx',
+              label: t('hardware.gpu.series_pcie_rx'),
+              data: pickNumeric(gHist.map((b) => b.pcie_rx), [pcieRxMb, pcieRxMb]),
+              color: '#0284c7',
+              unit: 'MB/s',
+              decimals: 2,
+            },
+            {
+              id: 'gpu_pcie_tx',
+              label: t('hardware.gpu.series_pcie_tx'),
+              data: pickNumeric(gHist.map((b) => b.pcie_tx), [pcieTxMb, pcieTxMb]),
+              color: '#10b981',
+              unit: 'MB/s',
+              decimals: 2,
+              fillAlpha: 0.08,
+            },
+          ]
+        : [],
+    });
+
+    return cards;
+  }, [metrics?.gpu, hist?.gpu, timestamps, epochTs, t]);
 
   const disks = useMemo(() => metrics?.disks ?? [], [metrics?.disks]);
   const diskReadHist = hist?.disk_r ?? [];
@@ -107,6 +408,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     filtered.sort((a, b) => {
       if (procSort === 'mem') return Number(b.priv_mb || b.mem_mb || 0) - Number(a.priv_mb || a.mem_mb || 0);
       if (procSort === 'vram') return Number(b.vram_mb || 0) - Number(a.vram_mb || 0);
+      if (procSort === 'io') return Number(b.io_total_bps || 0) - Number(a.io_total_bps || 0);
       return Number(b.cpu_percent || 0) - Number(a.cpu_percent || 0);
     });
     return filtered.slice(0, 60);
@@ -286,12 +588,18 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               </div>
             </AccordionBody>
           </div>
+          <ResourceProcessesPanel
+            kind="cpu"
+            metrics={metrics}
+            onViewAllProcesses={() => setSubTab('processes')}
+          />
           <FloatingTooltip data={coreTooltip} />
         </div>
       )}
 
       {/* Subview: RAM */}
       {subTab === 'ram' && (
+        <div className="space-y-4">
         <div className="cockpit-bento p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div>
@@ -385,108 +693,236 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
             </div>
           </div>
         </div>
+        <ResourceProcessesPanel
+          kind="ram"
+          metrics={metrics}
+          onViewAllProcesses={() => setSubTab('processes')}
+        />
+        </div>
       )}
 
       {/* Subview: GPU */}
-      {subTab === 'gpu' && (
-        <div className="cockpit-bento p-5">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <div>
-              <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-                {t('equipment.gpu_title')}
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {metrics?.gpu?.available ? metrics.gpu.name || t('hardware.gpu.detected_fallback') : t('hardware.gpu.no_dedicated')}
-              </p>
+      {subTab === 'gpu' && (() => {
+        const availableCount = gpuSubgraphs.filter((g) => g.available).length;
+        const activeGraphs = gpuSubgraphs.filter((g) => g.available && !disabledGpuGraphs[g.id]);
+        const toggleGpuGraph = (id: string) => {
+          setDisabledGpuGraphs((prev) => ({ ...prev, [id]: !prev[id] }));
+        };
+        return (
+          <div className="space-y-4">
+            <div className="cockpit-bento p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <div>
+                  <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
+                    {t('equipment.gpu_title')}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {metrics?.gpu?.available ? metrics.gpu.name || t('hardware.gpu.detected_fallback') : t('hardware.gpu.no_dedicated')}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
+                    {formatPct(metrics?.gpu?.gpu_util_percent)}
+                  </span>
+                  <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
+                    {formatTemp(metrics?.gpu?.temp_c)}
+                  </span>
+                  {metrics?.gpu?.cuda && (
+                    <span className="cockpit-subtile rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                      {t('hardware.gpu.cuda_badge', { cuda: metrics.gpu.cuda })}
+                    </span>
+                  )}
+                  {metrics?.gpu?.bar1_total_mb ? (
+                    <span className="cockpit-subtile rounded-full px-2.5 py-0.5 font-mono text-[11px] text-slate-600 dark:text-slate-300 tabular-nums">
+                      {t('hardware.gpu.bar1_badge', {
+                        used: metrics.gpu.bar1_used_mb ?? 0,
+                        total: metrics.gpu.bar1_total_mb,
+                      })}
+                    </span>
+                  ) : null}
+                  {onExpandChart && (
+                    <button
+                      type="button"
+                      aria-label={t('hardware.gpu.inspect_aria')}
+                      onClick={() =>
+                        onExpandChart({
+                          title: t('hardware.gpu.chart_full_title'),
+                          subtitle: metrics?.gpu?.name || t('hardware.gpu.system_fallback'),
+                          series: gpuSeries,
+                          timestamps,
+                          epochTs,
+                          leftUnit: '%',
+                          maxLeft: 100,
+                          chartKind: 'gpu',
+                        })
+                      }
+                      className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-violet-300"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Resumen de sensores */}
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-xs dark:border-slate-800 sm:grid-cols-4">
+                <div>
+                  <span className="text-slate-500 dark:text-slate-400">{t('hardware.gpu.vram_label')}</span>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
+                    {metrics?.gpu?.vram_used_mb ?? 0} / {metrics?.gpu?.vram_total_mb ?? 0} MB
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-500 dark:text-slate-400">{t('hardware.gpu.power_draw')}</span>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
+                    {metrics?.gpu?.power_watts !== null && metrics?.gpu?.power_watts !== undefined
+                      ? `${metrics.gpu.power_watts} W`
+                      : '--'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-500 dark:text-slate-400">{t('hardware.gpu.fan')}</span>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
+                    {metrics?.gpu?.fan_percent !== null && metrics?.gpu?.fan_percent !== undefined
+                      ? `${metrics.gpu.fan_percent} %`
+                      : t('hardware.gpu.fan_auto')}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-500 dark:text-slate-400">{t('hardware.gpu.driver')}</span>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums truncate">
+                    {metrics?.gpu?.driver || '--'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Barra dinámica de sub-gráficas activadas/desactivadas según hardware */}
+              <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {t('hardware.gpu.sensors_bar_label')}
+                  </span>
+                  <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                    {t('hardware.gpu.sensors_active_count', {
+                      active: activeGraphs.length,
+                      total: availableCount,
+                    })}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {gpuSubgraphs.map((g) => {
+                    const isEnabled = g.available && !disabledGpuGraphs[g.id];
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        disabled={!g.available}
+                        onClick={() => g.available && toggleGpuGraph(g.id)}
+                        title={!g.available ? t('hardware.gpu.sensor_unavailable') : g.subtitle}
+                        className={`inline-flex min-h-[36px] items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                          !g.available
+                            ? 'cockpit-subtile cursor-not-allowed opacity-45 text-slate-400 dark:text-slate-500'
+                            : isEnabled
+                              ? 'cockpit-pill-violet ring-1 ring-violet-400/50 dark:ring-violet-500/40'
+                              : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            !g.available
+                              ? 'bg-slate-400/50'
+                              : isEnabled
+                                ? 'bg-violet-500 cockpit-live-dot'
+                                : 'bg-slate-400'
+                          }`}
+                        />
+                        <span>{g.title}</span>
+                        {!g.available && (
+                          <span className="font-normal text-[10px] opacity-80">
+                            ({t('hardware.gpu.sensor_unavailable')})
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2.5">
-              <span className="font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
-                {formatPct(metrics?.gpu?.gpu_util_percent)}
-              </span>
-              <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
-                {formatTemp(metrics?.gpu?.temp_c)}
-              </span>
-              {onExpandChart && (
-                <button
-                  type="button"
-                  aria-label={t('hardware.gpu.inspect_aria')}
-                  onClick={() =>
-                    onExpandChart({
-                      title: t('hardware.gpu.chart_full_title'),
-                      subtitle: metrics?.gpu?.name || t('hardware.gpu.system_fallback'),
-                      series: gpuSeries,
-                      timestamps,
-                      epochTs,
-                      leftUnit: '%',
-                      maxLeft: 100,
-                      chartKind: 'gpu',
-                    })
-                  }
-                  className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-violet-300"
-                >
-                  <Maximize2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="mt-4">
-            <TelemetryChart
-              series={gpuSeries}
-              timestamps={timestamps}
-              epochTs={epochTs}
-              height={200}
-              maxLeft={100}
-              leftUnit="%"
-              theme={theme}
-              onExpandClick={
-                onExpandChart
-                  ? () =>
-                      onExpandChart({
-                        title: t('hardware.gpu.chart_full_title'),
-                        subtitle: metrics?.gpu?.name || t('hardware.gpu.system_fallback'),
-                        series: gpuSeries,
-                        timestamps,
-                        epochTs,
-                        leftUnit: '%',
-                        maxLeft: 100,
-                        chartKind: 'gpu',
-                      })
-                  : undefined
-              }
+
+            {/* Rejilla paralela automática con las gráficas disponibles activas */}
+            {activeGraphs.length === 0 ? (
+              <div className="cockpit-bento p-8 text-center text-xs text-slate-500 dark:text-slate-400">
+                {t('hardware.gpu.no_active_graphs')}
+              </div>
+            ) : (
+              <div className="cockpit-auto-grid">
+                {activeGraphs.map((g) => {
+                  const buildExpandSpec = (): ExpandChartSpec => ({
+                    title: g.title,
+                    subtitle: `${metrics?.gpu?.name || t('hardware.gpu.system_fallback')} · ${g.subtitle}`,
+                    series: g.useMainGpuHistory ? gpuSeries : g.series,
+                    timestamps: g.useMainGpuHistory ? timestamps : g.timestamps,
+                    epochTs: g.useMainGpuHistory ? epochTs : g.epochTs,
+                    leftUnit: g.leftUnit,
+                    maxLeft: g.maxLeft,
+                    maxRight: g.maxRight,
+                    chartKind: 'gpu',
+                    gpuSubmetric: g.useMainGpuHistory ? undefined : g.id,
+                  });
+                  return (
+                    <div key={g.id} className="cockpit-bento flex flex-col justify-between p-5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white truncate">
+                            {g.title}
+                          </h3>
+                          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 truncate" title={g.subtitle}>
+                            {g.subtitle}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-xs font-bold tabular-nums">
+                            {g.headline}
+                          </span>
+                          {onExpandChart && (
+                            <button
+                              type="button"
+                              aria-label={t('hardware.gpu.inspect_aria')}
+                              onClick={() => onExpandChart(buildExpandSpec())}
+                              className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-violet-300"
+                            >
+                              <Maximize2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <TelemetryChart
+                          series={g.series}
+                          timestamps={g.timestamps}
+                          epochTs={g.epochTs}
+                          height={175}
+                          maxLeft={g.maxLeft}
+                          maxRight={g.maxRight}
+                          leftUnit={g.leftUnit}
+                          theme={theme}
+                          onExpandClick={onExpandChart ? () => onExpandChart(buildExpandSpec()) : undefined}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <ResourceProcessesPanel
+              kind="gpu"
+              metrics={metrics}
+              onViewAllProcesses={() => setSubTab('processes')}
             />
           </div>
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-xs dark:border-slate-800 sm:grid-cols-4">
-            <div>
-              <span className="text-slate-500 dark:text-slate-400">{t('hardware.gpu.vram_label')}</span>
-              <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
-                {metrics?.gpu?.vram_used_mb ?? 0} / {metrics?.gpu?.vram_total_mb ?? 0} MB
-              </p>
-            </div>
-            <div>
-              <span className="text-slate-500 dark:text-slate-400">{t('hardware.gpu.power_draw')}</span>
-              <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
-                {metrics?.gpu?.power_watts !== null && metrics?.gpu?.power_watts !== undefined
-                  ? `${metrics.gpu.power_watts} W`
-                  : '--'}
-              </p>
-            </div>
-            <div>
-              <span className="text-slate-500 dark:text-slate-400">{t('hardware.gpu.fan')}</span>
-              <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
-                {metrics?.gpu?.fan_percent !== null && metrics?.gpu?.fan_percent !== undefined
-                  ? `${metrics.gpu.fan_percent} %`
-                  : t('hardware.gpu.fan_auto')}
-              </p>
-            </div>
-            <div>
-              <span className="text-slate-500 dark:text-slate-400">{t('hardware.gpu.driver')}</span>
-              <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums truncate">
-                {metrics?.gpu?.driver || '--'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Subview: Almacenamiento */}
       {subTab === 'storage' && (
@@ -635,6 +1071,11 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               );
             })}
           </div>
+          <ResourceProcessesPanel
+            kind="storage"
+            metrics={metrics}
+            onViewAllProcesses={() => setSubTab('processes')}
+          />
         </div>
       )}
 
@@ -663,7 +1104,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               </div>
               <LayoutGroup id="proc-sort">
                 <div className="cockpit-subtile flex items-center gap-1 p-1">
-                  {(['cpu', 'mem', 'vram'] as const).map((k) => {
+                  {(['cpu', 'mem', 'vram', 'io'] as const).map((k) => {
                     const active = procSort === k;
                     return (
                       <button
@@ -678,7 +1119,13 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                       >
                         {active && <MorphPill layoutId="proc-sort-pill" className="rounded-lg" />}
                         <span className="relative z-10">
-                          {k === 'cpu' ? t('equipment.sort_cpu') : k === 'mem' ? t('equipment.sort_mem') : t('equipment.sort_vram')}
+                          {k === 'cpu'
+                            ? t('equipment.sort_cpu')
+                            : k === 'mem'
+                              ? t('equipment.sort_mem')
+                              : k === 'vram'
+                                ? t('equipment.sort_vram')
+                                : t('hardware.storage.title')}
                         </span>
                       </button>
                     );
@@ -696,13 +1143,14 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                   <th className="py-2.5 px-3 font-medium">{t('equipment.col_user')}</th>
                   <th className="py-2.5 px-3 text-right font-medium">{t('equipment.col_cpu')}</th>
                   <th className="py-2.5 px-3 text-right font-medium">{t('equipment.col_ram')}</th>
-                  <th className="py-2.5 pl-3 text-right font-medium">{t('equipment.col_vram')}</th>
+                  <th className="py-2.5 px-3 text-right font-medium">{t('equipment.col_vram')}</th>
+                  <th className="py-2.5 pl-3 text-right font-medium">{t('hardware.storage.title')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredProcesses.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan={6} className="py-8 text-center text-slate-500 dark:text-slate-400">
                       {t('equipment.processes_none_match', { query: procQuery })}
                     </td>
                   </tr>
@@ -715,13 +1163,18 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">{proc.user || t('equipment.user_system')}</td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-white">
-                        {formatPct(proc.cpu_percent)}
+                        {formatPct(proc.cpu_norm_percent ?? proc.cpu_percent)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
                         {Math.round(proc.priv_mb ?? proc.mem_mb ?? 0)} MB
                       </td>
-                      <td className="py-2.5 pl-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400">
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400">
                         {proc.vram_mb ? `${Math.round(proc.vram_mb)} MB` : '--'}
+                      </td>
+                      <td className="py-2.5 pl-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400">
+                        {proc.io_total_bps
+                          ? formatSpeed(proc.io_total_bps)
+                          : '--'}
                       </td>
                     </tr>
                   ))

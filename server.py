@@ -84,8 +84,10 @@ EXTRAS_CACHE = {"torrents": [], "torrent_stats": {}, "emby": {}, "parental": {}}
 DISKS_CACHE = []
 DISKS_LOCK = threading.Lock()
 
-GPU_CACHE = {"available": False, "gpu_procs_map": {}}
+GPU_CACHE = {"available": False, "gpu_procs_map": {}, "capabilities": {}, "history": []}
 GPU_LOCK = threading.Lock()
+_GPU_HISTORY_BUCKETS_20M = []  # cubetas de 5 s durante 20 min para sub-gráficas dinámicas de GPU
+_PROC_IO_PREV = {}             # { pid: (ts_float, read_bytes, write_bytes) }
 
 WIFI_CACHE = {
     "clients": [],
@@ -6254,151 +6256,521 @@ def get_cpu_info():
     except Exception as e:
         return {"error": str(e), "model": CPU_MODEL, "architecture": CPU_ARCH, "usage_percent": 0.0, "per_core_percent": [], "temp_c": None}
 
+def _parse_gpu_num(raw_val, cast=float):
+    """Convierte una lectura numérica de GPU (`'44 C'`, `'22.70 W'`, `'3 %'`) o devuelve None si es N/A."""
+    if raw_val is None:
+        return None
+    txt = str(raw_val).strip()
+    if not txt or txt.upper() in ("N/A", "NA", "NONE", "UNKNOWN", "-", "[N/A]", "[NOT SUPPORTED]"):
+        return None
+    m = re.search(r"-?\d+(?:\.\d+)?", txt)
+    if not m:
+        return None
+    try:
+        return cast(float(m.group(0))) if cast is int else float(m.group(0))
+    except Exception:
+        return None
+
+
+def _nvidia_pmon_snapshot():
+    """Consulta utilización GPU por proceso (`sm`, `mem`, `enc`, `dec`, `fb`) mediante `nvidia-smi pmon -c 1 -s um`."""
+    by_pid = {}
+    try:
+        out = subprocess.check_output(["nvidia-smi", "pmon", "-c", "1", "-s", "um"], timeout=2).decode("utf-8", errors="ignore")
+        cols = None
+        for raw_line in out.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith("#"):
+                hdr_tokens = line.lstrip("#").split()
+                if "pid" in hdr_tokens:
+                    cols = [c.lower() for c in hdr_tokens]
+                continue
+            parts = line.split()
+            if not cols or len(parts) < len(cols) - 1:
+                continue
+            row = {cols[i]: parts[i] for i in range(min(len(cols), len(parts)))}
+            pid_val = _parse_gpu_num(row.get("pid"), cast=int)
+            if not pid_val or pid_val <= 0:
+                continue
+            sm = _parse_gpu_num(row.get("sm"), cast=int)
+            mem_u = _parse_gpu_num(row.get("mem"), cast=int)
+            enc = _parse_gpu_num(row.get("enc"), cast=int)
+            dec = _parse_gpu_num(row.get("dec"), cast=int)
+            fb = _parse_gpu_num(row.get("fb"), cast=float)
+            active_vals = [v for v in (sm, enc, dec) if v is not None]
+            gpu_util = max(active_vals) if active_vals else None
+            prev = by_pid.get(pid_val)
+            if prev:
+                if fb is not None:
+                    prev["vram_mb"] = max(prev.get("vram_mb") or 0.0, fb)
+                if gpu_util is not None:
+                    prev["gpu_util"] = max(prev.get("gpu_util") or 0, gpu_util)
+                if mem_u is not None:
+                    prev["mem_util"] = max(prev.get("mem_util") or 0, mem_u)
+                if enc is not None:
+                    prev["enc_util"] = max(prev.get("enc_util") or 0, enc)
+                if dec is not None:
+                    prev["dec_util"] = max(prev.get("dec_util") or 0, dec)
+            else:
+                by_pid[pid_val] = {
+                    "gpu_util": gpu_util,
+                    "mem_util": mem_u,
+                    "enc_util": enc,
+                    "dec_util": dec,
+                    "vram_mb": fb,
+                    "type": str(row.get("type") or "").strip(),
+                }
+    except Exception:
+        pass
+    return by_pid
+
+
+def _append_gpu_history_bucket(sample):
+    """Registra una muestra en cubetas de 5 s (20 min) para las sub-gráficas dinámicas de GPU."""
+    ts_num = time.time()
+    b_ts = (int(ts_num) // HISTORY_BUCKET_SECONDS) * HISTORY_BUCKET_SECONDS
+    cutoff_b_ts = b_ts - HISTORY_WINDOW_SECONDS
+    t_ms = int(round(ts_num * 1000))
+
+    bucket_entry = {
+        "b_ts": b_ts,
+        "t": t_ms,
+        "util": sample.get("gpu_util_percent"),
+        "mem_util": sample.get("mem_util_percent"),
+        "vram_pct": sample.get("vram_percent"),
+        "vram_mb": sample.get("vram_used_mb"),
+        "enc": sample.get("encoder_util_percent"),
+        "dec": sample.get("decoder_util_percent"),
+        "temp": sample.get("temp_c"),
+        "power": sample.get("power_watts"),
+        "clock_gfx": sample.get("clock_graphics_mhz"),
+        "clock_mem": sample.get("clock_mem_mhz"),
+        "pcie_rx": round(float(sample["pcie_rx_kbps"]) / 1024.0, 2) if sample.get("pcie_rx_kbps") is not None else None,
+        "pcie_tx": round(float(sample["pcie_tx_kbps"]) / 1024.0, 2) if sample.get("pcie_tx_kbps") is not None else None,
+    }
+
+    with GPU_LOCK:
+        if not _GPU_HISTORY_BUCKETS_20M or _GPU_HISTORY_BUCKETS_20M[-1]["b_ts"] < b_ts:
+            _GPU_HISTORY_BUCKETS_20M.append(bucket_entry)
+        elif _GPU_HISTORY_BUCKETS_20M[-1]["b_ts"] == b_ts:
+            last = _GPU_HISTORY_BUCKETS_20M[-1]
+            last["t"] = t_ms
+            for k in ("util", "mem_util", "vram_pct", "vram_mb", "enc", "dec", "pcie_rx", "pcie_tx"):
+                nv = bucket_entry.get(k)
+                pv = last.get(k)
+                if nv is not None:
+                    last[k] = nv if pv is None else max(pv, nv)
+            for k in ("temp", "power", "clock_gfx", "clock_mem"):
+                nv = bucket_entry.get(k)
+                if nv is not None:
+                    last[k] = nv
+
+        while _GPU_HISTORY_BUCKETS_20M and _GPU_HISTORY_BUCKETS_20M[0]["b_ts"] < cutoff_b_ts:
+            _GPU_HISTORY_BUCKETS_20M.pop(0)
+
+        return [{k: v for k, v in b.items() if k != "b_ts"} for b in _GPU_HISTORY_BUCKETS_20M]
+
+
+def _classify_gpu_process_name(pid_int, raw_pname, fallback_label):
+    clean_cmd = str(raw_pname or "").strip()
+    first_token = clean_cmd.split()[0] if clean_cmd else ""
+    clean_name = os.path.basename(first_token) if first_token else fallback_label
+    try:
+        if pid_int is not None and pid_int > 0 and psutil.pid_exists(pid_int):
+            p_obj = psutil.Process(pid_int)
+            p_comm = p_obj.name()
+            if p_comm:
+                clean_name = p_comm
+            if not clean_cmd:
+                clean_cmd = " ".join(p_obj.cmdline()[:3])
+    except Exception:
+        pass
+
+    lower = clean_name.lower()
+    name_key = None
+    if "chrome" in lower or "chromium" in lower:
+        name_key = "chrome_gpu"
+        display_name = get_gpu_process_label(name_key, "Google Chrome (GPU / Render)", base_dir=BASE_DIR)
+    elif "gnome-shell" in lower:
+        name_key = "gnome_shell"
+        display_name = get_gpu_process_label(name_key, "GNOME Shell (Compositor Wayland)", base_dir=BASE_DIR)
+    elif "xwayland" in lower:
+        name_key = "xwayland"
+        display_name = get_gpu_process_label(name_key, "Xwayland (Compatibilidad X11)", base_dir=BASE_DIR)
+    elif "ptyxis" in lower:
+        name_key = "ptyxis"
+        display_name = get_gpu_process_label(name_key, "Ptyxis (Terminal)", base_dir=BASE_DIR)
+    elif "nautilus" in lower:
+        name_key = "nautilus"
+        display_name = get_gpu_process_label(name_key, "Nautilus (Archivos)", base_dir=BASE_DIR)
+    elif "ffmpeg" in lower:
+        name_key = "ffmpeg_nvenc"
+        display_name = get_gpu_process_label(name_key, "FFmpeg (Transcodificación NVENC)", base_dir=BASE_DIR)
+    elif "python" in lower:
+        if "asterisk" in clean_cmd.lower():
+            display_name = "Python (Asterisk PBX / Whisper)"
+        elif "immich" in clean_cmd.lower():
+            display_name = "Python (Immich Machine Learning)"
+        else:
+            display_name = f"Python3 ({clean_name})"
+    else:
+        if not first_token:
+            name_key = "gpu_process"
+        display_name = clean_name
+    return clean_name, display_name, name_key
+
+
+def _collect_drm_gpu_info():
+    """Respaldo genérico Zero-Hardcoding para GPUs AMD / Intel / ARM vía sysfs DRM y hwmon."""
+    drm_root = "/sys/class/drm"
+    gpu_name = ""
+    driver_name = "Linux Kernel DRM"
+    card_dev_dir = None
+
+    if os.path.isdir(drm_root):
+        for entry in sorted(os.listdir(drm_root)):
+            if not re.match(r"^card\d+$", entry):
+                continue
+            cand_dev = os.path.join(drm_root, entry, "device")
+            if os.path.isdir(cand_dev):
+                card_dev_dir = cand_dev
+                uevent_p = os.path.join(cand_dev, "uevent")
+                if os.path.isfile(uevent_p):
+                    try:
+                        for ln in open(uevent_p, "r", errors="ignore"):
+                            if ln.startswith("DRIVER="):
+                                driver_name = ln.split("=", 1)[1].strip() or driver_name
+                    except Exception:
+                        pass
+                break
+
+    try:
+        lspci_out = subprocess.check_output(["lspci"], timeout=2).decode("utf-8", errors="ignore")
+        for line in lspci_out.splitlines():
+            if any(k in line for k in ("VGA compatible controller:", "3D controller:", "Display controller:")):
+                gpu_name = line.split(":", 2)[-1].strip()
+                break
+    except Exception:
+        pass
+
+    if not card_dev_dir and not gpu_name:
+        return None
+
+    def _read_sysfs_num(path, scale=1.0, cast=float):
+        try:
+            with open(path, "r", errors="ignore") as f:
+                val = float(f.read().strip()) * scale
+                return cast(round(val)) if cast is int else round(val, 2)
+        except Exception:
+            return None
+
+    gpu_util = None
+    mem_util = None
+    vram_total_mb = 0
+    vram_used_mb = 0
+    vram_free_mb = 0
+    vram_pct = 0.0
+    temp_c = None
+    power_w = None
+    fan_pct = None
+    clock_gfx = None
+    clock_gfx_max = None
+    clock_mem = None
+
+    if card_dev_dir:
+        gpu_util = _read_sysfs_num(os.path.join(card_dev_dir, "gpu_busy_percent"), cast=int)
+        mem_util = _read_sysfs_num(os.path.join(card_dev_dir, "mem_busy_percent"), cast=int)
+        v_tot_b = _read_sysfs_num(os.path.join(card_dev_dir, "mem_info_vram_total"))
+        v_used_b = _read_sysfs_num(os.path.join(card_dev_dir, "mem_info_vram_used"))
+        if v_tot_b and v_tot_b > 0:
+            vram_total_mb = int(round(v_tot_b / (1024 * 1024)))
+            vram_used_mb = int(round((v_used_b or 0.0) / (1024 * 1024)))
+            vram_free_mb = max(0, vram_total_mb - vram_used_mb)
+            vram_pct = round((vram_used_mb / vram_total_mb) * 100.0, 1)
+
+        # Relojes Intel / AMD
+        card_parent = os.path.dirname(card_dev_dir)
+        clock_gfx = (
+            _read_sysfs_num(os.path.join(card_parent, "gt_cur_freq_mhz"), cast=int)
+            or _read_sysfs_num(os.path.join(card_parent, "gt/gt0/rps_cur_freq_mhz"), cast=int)
+        )
+        clock_gfx_max = (
+            _read_sysfs_num(os.path.join(card_parent, "gt_max_freq_mhz"), cast=int)
+            or _read_sysfs_num(os.path.join(card_parent, "gt/gt0/rps_max_freq_mhz"), cast=int)
+        )
+        for dpm_file, target in (("pp_dpm_sclk", "gfx"), ("pp_dpm_mclk", "mem")):
+            dpm_path = os.path.join(card_dev_dir, dpm_file)
+            if os.path.isfile(dpm_path):
+                try:
+                    freqs = []
+                    active_mhz = None
+                    with open(dpm_path, "r", errors="ignore") as f:
+                        for ln in f:
+                            m = re.search(r"(\d+)\s*Mhz", ln, re.IGNORECASE)
+                            if m:
+                                mv = int(m.group(1))
+                                freqs.append(mv)
+                                if "*" in ln:
+                                    active_mhz = mv
+                    if target == "gfx" and active_mhz is not None:
+                        clock_gfx = active_mhz
+                        clock_gfx_max = max(freqs) if freqs else clock_gfx_max
+                    elif target == "mem" and active_mhz is not None:
+                        clock_mem = active_mhz
+                except Exception:
+                    pass
+
+        # Hwmon (temp / potencia / ventilador)
+        hwmon_root = os.path.join(card_dev_dir, "hwmon")
+        if os.path.isdir(hwmon_root):
+            for hw in sorted(os.listdir(hwmon_root)):
+                hdir = os.path.join(hwmon_root, hw)
+                if not os.path.isdir(hdir):
+                    continue
+                if temp_c is None:
+                    temp_c = _read_sysfs_num(os.path.join(hdir, "temp1_input"), scale=0.001, cast=int)
+                if power_w is None:
+                    power_w = (
+                        _read_sysfs_num(os.path.join(hdir, "power1_average"), scale=1e-6, cast=float)
+                        or _read_sysfs_num(os.path.join(hdir, "power1_input"), scale=1e-6, cast=float)
+                    )
+                if fan_pct is None:
+                    pwm_v = _read_sysfs_num(os.path.join(hdir, "pwm1"))
+                    if pwm_v is not None:
+                        fan_pct = int(round((pwm_v / 255.0) * 100.0))
+
+    caps = {
+        "compute": gpu_util is not None,
+        "vram": vram_total_mb > 0,
+        "mem_ctrl": mem_util is not None,
+        "encoder": False,
+        "decoder": False,
+        "power": power_w is not None,
+        "temp": temp_c is not None,
+        "clocks": (clock_gfx is not None) or (clock_mem is not None),
+        "pcie": False,
+        "fan": fan_pct is not None,
+    }
+    sample = {
+        "available": True,
+        "name": gpu_name or driver_name,
+        "driver": driver_name,
+        "cuda": "",
+        "temp_c": temp_c,
+        "gpu_util_percent": gpu_util if gpu_util is not None else 0,
+        "mem_util_percent": mem_util,
+        "encoder_util_percent": None,
+        "decoder_util_percent": None,
+        "vram_total_mb": vram_total_mb,
+        "vram_used_mb": vram_used_mb,
+        "vram_free_mb": vram_free_mb,
+        "vram_percent": vram_pct,
+        "bar1_used_mb": None,
+        "bar1_total_mb": None,
+        "fan_percent": fan_pct,
+        "power_watts": power_w,
+        "power_limit_watts": None,
+        "clock_graphics_mhz": clock_gfx,
+        "clock_max_graphics_mhz": clock_gfx_max,
+        "clock_mem_mhz": clock_mem,
+        "clock_max_mem_mhz": None,
+        "clock_video_mhz": None,
+        "pcie_rx_kbps": None,
+        "pcie_tx_kbps": None,
+        "pcie_gen": None,
+        "pcie_width": None,
+        "capabilities": caps,
+        "processes": [],
+        "gpu_procs_map": {},
+    }
+    sample["history"] = _append_gpu_history_bucket(sample)
+    return sample
+
+
 def get_gpu_info():
     try:
         xml_out = subprocess.check_output(['nvidia-smi', '-q', '-x'], timeout=3).decode('utf-8', errors='ignore')
         root = ET.fromstring(xml_out)
         gpu = root.find('gpu')
         if gpu is None:
-            return {"available": False, "gpu_procs_map": {}}
-        
+            return {"available": False, "gpu_procs_map": {}, "capabilities": {}, "history": []}
+
         name = (gpu.findtext('product_name') or '').strip()
         driver = (root.findtext('driver_version') or gpu.findtext('driver_version') or '').strip()
         cuda = (root.findtext('cuda_version') or '').strip()
-        temp_str = gpu.findtext('temperature/gpu_temp', '')
-        temp = int(temp_str.replace('C', '').strip()) if temp_str and temp_str != 'N/A' else None
-        
-        gpu_util_str = gpu.findtext('utilization/gpu_util', '0')
-        gpu_util = int(gpu_util_str.replace('%', '').strip()) if gpu_util_str and gpu_util_str != 'N/A' else 0
-        
-        mem_util_str = gpu.findtext('utilization/memory_util', '0')
-        mem_util = int(mem_util_str.replace('%', '').strip()) if mem_util_str and mem_util_str != 'N/A' else 0
-        
-        mem_total_str = gpu.findtext('fb_memory_usage/total', '0')
-        mem_total = int(mem_total_str.replace('MiB', '').strip()) if mem_total_str and mem_total_str != 'N/A' else 0
-        
-        mem_used_str = gpu.findtext('fb_memory_usage/used', '0')
-        mem_used = int(mem_used_str.replace('MiB', '').strip()) if mem_used_str and mem_used_str != 'N/A' else 0
-        
-        mem_free_str = gpu.findtext('fb_memory_usage/free', '0')
-        mem_free = int(mem_free_str.replace('MiB', '').strip()) if mem_free_str and mem_free_str != 'N/A' else 0
-        
-        fan_str = gpu.findtext('fan_speed', '')
-        fan = int(fan_str.replace('%', '').strip()) if fan_str and fan_str != 'N/A' else None
-        
-        power_str = gpu.findtext('gpu_power_readings/power_draw', '') or gpu.findtext('power_readings/power_draw', '')
-        power = float(power_str.replace('W', '').strip()) if power_str and power_str != 'N/A' else None
-        
+
+        temp = _parse_gpu_num(gpu.findtext('temperature/gpu_temp'), cast=int)
+        mem_temp = _parse_gpu_num(gpu.findtext('temperature/memory_temp'), cast=int)
+
+        gpu_util_raw = _parse_gpu_num(gpu.findtext('utilization/gpu_util'), cast=int)
+        mem_util_raw = _parse_gpu_num(gpu.findtext('utilization/memory_util'), cast=int)
+        enc_util_raw = _parse_gpu_num(gpu.findtext('utilization/encoder_util'), cast=int)
+        dec_util_raw = _parse_gpu_num(gpu.findtext('utilization/decoder_util'), cast=int)
+        jpeg_util_raw = _parse_gpu_num(gpu.findtext('utilization/jpeg_util'), cast=int)
+        ofa_util_raw = _parse_gpu_num(gpu.findtext('utilization/ofa_util'), cast=int)
+
+        mem_total = _parse_gpu_num(gpu.findtext('fb_memory_usage/total'), cast=int) or 0
+        mem_used = _parse_gpu_num(gpu.findtext('fb_memory_usage/used'), cast=int) or 0
+        mem_free = _parse_gpu_num(gpu.findtext('fb_memory_usage/free'), cast=int) or 0
+        vram_pct = round((mem_used / mem_total * 100.0), 1) if mem_total > 0 else 0.0
+
+        bar1_total = _parse_gpu_num(gpu.findtext('bar1_memory_usage/total'), cast=int)
+        bar1_used = _parse_gpu_num(gpu.findtext('bar1_memory_usage/used'), cast=int)
+
+        fan = _parse_gpu_num(gpu.findtext('fan_speed'), cast=int)
+        power = (
+            _parse_gpu_num(gpu.findtext('gpu_power_readings/instant_power_draw'))
+            or _parse_gpu_num(gpu.findtext('gpu_power_readings/average_power_draw'))
+            or _parse_gpu_num(gpu.findtext('gpu_power_readings/power_draw'))
+            or _parse_gpu_num(gpu.findtext('power_readings/power_draw'))
+        )
+        if power is not None:
+            power = round(power, 1)
+        power_limit = (
+            _parse_gpu_num(gpu.findtext('gpu_power_readings/current_power_limit'))
+            or _parse_gpu_num(gpu.findtext('power_readings/power_limit'))
+        )
+        if power_limit is not None:
+            power_limit = round(power_limit, 0)
+
+        clock_gfx = _parse_gpu_num(gpu.findtext('clocks/graphics_clock'), cast=int)
+        clock_max_gfx = _parse_gpu_num(gpu.findtext('max_clocks/graphics_clock'), cast=int)
+        clock_mem = _parse_gpu_num(gpu.findtext('clocks/mem_clock'), cast=int)
+        clock_max_mem = _parse_gpu_num(gpu.findtext('max_clocks/mem_clock'), cast=int)
+        clock_vid = _parse_gpu_num(gpu.findtext('clocks/video_clock'), cast=int)
+
+        pcie_tx_kbps = _parse_gpu_num(gpu.findtext('pci/tx_util'), cast=int)
+        pcie_rx_kbps = _parse_gpu_num(gpu.findtext('pci/rx_util'), cast=int)
+        pcie_gen_el = gpu.find('.//current_link_gen')
+        pcie_width_el = gpu.find('.//current_link_width')
+        pcie_gen = _parse_gpu_num(pcie_gen_el.text if pcie_gen_el is not None else None, cast=int)
+        pcie_width = _parse_gpu_num(pcie_width_el.text if pcie_width_el is not None else None, cast=int)
+
+        enc_sessions = _parse_gpu_num(gpu.findtext('encoder_stats/session_count'), cast=int)
+        enc_fps = _parse_gpu_num(gpu.findtext('encoder_stats/average_fps'), cast=int)
+
+        pmon_map = _nvidia_pmon_snapshot()
+
         processes = []
         gpu_procs_map = {}
+        fallback_proc_label = get_gpu_process_label('gpu_process', 'Proceso GPU', base_dir=BASE_DIR)
+
         for p in gpu.findall('processes/process_info'):
-            pid_str = p.findtext('pid', '')
-            pname = p.findtext('process_name', '')
-            pmem = p.findtext('used_memory', '')
-            ptype = p.findtext('type', '')
-            
-            clean_cmd = pname.strip() if pname else ''
-            first_token = clean_cmd.split()[0] if clean_cmd else ''
-            clean_name = os.path.basename(first_token) if first_token else get_gpu_process_label('gpu_process', 'Proceso GPU', base_dir=BASE_DIR)
-            
-            try:
-                pid_int = int(pid_str)
-                vram_num = float(pmem.replace('MiB', '').replace('MB', '').strip())
-                gpu_procs_map[pid_int] = {"vram_mb": vram_num, "type": ptype}
-                
-                if psutil.pid_exists(pid_int):
-                    p_comm = psutil.Process(pid_int).name()
-                    if p_comm:
-                        clean_name = p_comm
-            except Exception:
-                pass
-                
-            lower = clean_name.lower()
-            name_key = None
-            if 'chrome' in lower:
-                name_key = 'chrome_gpu'
-                display_name = get_gpu_process_label(name_key, 'Google Chrome (GPU / Render)', base_dir=BASE_DIR)
-            elif 'gnome-shell' in lower:
-                name_key = 'gnome_shell'
-                display_name = get_gpu_process_label(name_key, 'GNOME Shell (Compositor Wayland)', base_dir=BASE_DIR)
-            elif 'xwayland' in lower:
-                name_key = 'xwayland'
-                display_name = get_gpu_process_label(name_key, 'Xwayland (Compatibilidad X11)', base_dir=BASE_DIR)
-            elif 'ptyxis' in lower:
-                name_key = 'ptyxis'
-                display_name = get_gpu_process_label(name_key, 'Ptyxis (Terminal)', base_dir=BASE_DIR)
-            elif 'nautilus' in lower:
-                name_key = 'nautilus'
-                display_name = get_gpu_process_label(name_key, 'Nautilus (Archivos)', base_dir=BASE_DIR)
-            elif 'ffmpeg' in lower:
-                name_key = 'ffmpeg_nvenc'
-                display_name = get_gpu_process_label(name_key, 'FFmpeg (Transcodificación NVENC)', base_dir=BASE_DIR)
-            elif 'python' in lower:
-                if 'asterisk' in clean_cmd:
-                    display_name = 'Python (Asterisk PBX / Whisper)'
-                elif 'immich' in clean_cmd:
-                    display_name = 'Python (Immich Machine Learning)'
-                else:
-                    display_name = f'Python3 ({clean_name})'
-            else:
-                if not first_token:
-                    name_key = 'gpu_process'
-                display_name = clean_name
-                
+            pid_str = (p.findtext('pid') or '').strip()
+            pname = (p.findtext('process_name') or '').strip()
+            pmem = (p.findtext('used_memory') or '').strip()
+            ptype = (p.findtext('type') or '').strip()
+
+            pid_int = _parse_gpu_num(pid_str, cast=int)
+            vram_num = _parse_gpu_num(pmem, cast=float) or 0.0
+            pmon_info = pmon_map.get(pid_int, {}) if pid_int else {}
+            if vram_num <= 0 and pmon_info.get("vram_mb"):
+                vram_num = float(pmon_info["vram_mb"])
+            vram_proc_pct = round((vram_num / mem_total) * 100.0, 1) if mem_total > 0 and vram_num > 0 else 0.0
+
+            p_gpu_util = pmon_info.get("gpu_util")
+            p_mem_util = pmon_info.get("mem_util")
+            p_enc_util = pmon_info.get("enc_util")
+            p_dec_util = pmon_info.get("dec_util")
+
+            if pid_int and pid_int > 0:
+                gpu_procs_map[pid_int] = {
+                    "vram_mb": round(vram_num, 1),
+                    "vram_percent": vram_proc_pct,
+                    "gpu_util_percent": p_gpu_util,
+                    "mem_util_percent": p_mem_util,
+                    "enc_util_percent": p_enc_util,
+                    "dec_util_percent": p_dec_util,
+                    "type": ptype or pmon_info.get("type", ""),
+                }
+
+            clean_name, display_name, name_key = _classify_gpu_process_name(pid_int, pname, fallback_proc_label)
             processes.append({
                 "pid": pid_str,
                 "name": display_name,
                 "name_key": name_key,
                 "raw_name": clean_name,
                 "full_path": pname,
-                "used_memory": pmem,
-                "type": ptype
+                "used_memory": pmem or (f"{int(round(vram_num))} MiB" if vram_num > 0 else "0 MiB"),
+                "vram_mb": round(vram_num, 1),
+                "vram_percent": vram_proc_pct,
+                "gpu_util_percent": p_gpu_util,
+                "gpu_mem_percent": p_mem_util,
+                "gpu_enc_percent": p_enc_util,
+                "gpu_dec_percent": p_dec_util,
+                "type": ptype or pmon_info.get("type", ""),
             })
-            
-        return {
+
+        processes.sort(
+            key=lambda pr: (
+                float(pr.get("gpu_util_percent") or -1),
+                float(pr.get("vram_mb") or 0.0),
+            ),
+            reverse=True,
+        )
+
+        capabilities = {
+            "compute": gpu_util_raw is not None,
+            "vram": mem_total > 0,
+            "mem_ctrl": mem_util_raw is not None,
+            "encoder": enc_util_raw is not None,
+            "decoder": dec_util_raw is not None,
+            "jpeg": jpeg_util_raw is not None,
+            "ofa": ofa_util_raw is not None,
+            "power": power is not None,
+            "temp": temp is not None,
+            "mem_temp": mem_temp is not None,
+            "clocks": (clock_gfx is not None) or (clock_mem is not None),
+            "pcie": (pcie_tx_kbps is not None) or (pcie_rx_kbps is not None),
+            "fan": fan is not None,
+        }
+
+        gpu_payload = {
             "available": True,
             "name": name,
             "driver": driver,
             "cuda": cuda,
             "temp_c": temp,
-            "gpu_util_percent": gpu_util,
-            "mem_util_percent": mem_util,
+            "mem_temp_c": mem_temp,
+            "gpu_util_percent": gpu_util_raw if gpu_util_raw is not None else 0,
+            "mem_util_percent": mem_util_raw,
+            "encoder_util_percent": enc_util_raw,
+            "decoder_util_percent": dec_util_raw,
+            "jpeg_util_percent": jpeg_util_raw,
+            "ofa_util_percent": ofa_util_raw,
+            "encoder_sessions": enc_sessions,
+            "encoder_fps": enc_fps,
             "vram_total_mb": mem_total,
             "vram_used_mb": mem_used,
             "vram_free_mb": mem_free,
-            "vram_percent": round((mem_used / mem_total * 100), 1) if mem_total > 0 else 0,
+            "vram_percent": vram_pct,
+            "bar1_used_mb": bar1_used,
+            "bar1_total_mb": bar1_total,
             "fan_percent": fan,
             "power_watts": power,
+            "power_limit_watts": power_limit,
+            "clock_graphics_mhz": clock_gfx,
+            "clock_max_graphics_mhz": clock_max_gfx,
+            "clock_mem_mhz": clock_mem,
+            "clock_max_mem_mhz": clock_max_mem,
+            "clock_video_mhz": clock_vid,
+            "pcie_tx_kbps": pcie_tx_kbps,
+            "pcie_rx_kbps": pcie_rx_kbps,
+            "pcie_gen": pcie_gen,
+            "pcie_width": pcie_width,
+            "capabilities": capabilities,
             "processes": processes,
-            "gpu_procs_map": gpu_procs_map
+            "gpu_procs_map": gpu_procs_map,
         }
+        gpu_payload["history"] = _append_gpu_history_bucket(gpu_payload)
+        return gpu_payload
     except Exception as e:
-        # Fallback dinámico para GPU AMD / Intel integrada mediante sysfs / lspci
-        try:
-            lspci_out = subprocess.check_output(['lspci'], timeout=2).decode('utf-8', errors='ignore')
-            for line in lspci_out.splitlines():
-                if any(k in line for k in ('VGA compatible controller:', '3D controller:', 'Display controller:')):
-                    gpu_name = line.split(':', 2)[-1].strip()
-                    return {
-                        "available": True,
-                        "name": gpu_name,
-                        "driver": "Linux Kernel DRM",
-                        "cuda": "",
-                        "temp_c": None,
-                        "gpu_util_percent": 0,
-                        "mem_util_percent": 0,
-                        "vram_total_mb": 0,
-                        "vram_used_mb": 0,
-                        "vram_free_mb": 0,
-                        "vram_percent": 0,
-                        "fan_percent": None,
-                        "power_watts": None,
-                        "processes": [],
-                        "gpu_procs_map": {}
-                    }
-        except Exception:
-            pass
-        return {"available": False, "name": "", "error": str(e), "gpu_procs_map": {}}
+        drm_fallback = _collect_drm_gpu_info()
+        if drm_fallback:
+            return drm_fallback
+        return {"available": False, "name": "", "error": str(e), "gpu_procs_map": {}, "capabilities": {}, "history": []}
 
 def fetch_gpu_worker():
     global GPU_CACHE
@@ -8681,24 +9053,55 @@ def fetch_security_worker():
 # ==============================================================================
 # Processes & Background Master Collector
 # ==============================================================================
-def get_system_processes(gpu_map=None):
+def get_system_processes(gpu_map=None, disk_io_total_bps=0.0):
     try:
         gpu_map = gpu_map or {}
+        now_ts = time.time()
+        logical_cores = max(1, psutil.cpu_count(logical=True) or os.cpu_count() or 1)
         procs = []
         vm_total = psutil.virtual_memory().total or 1
-        
-        for p in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info', 'status', 'nice']):
+        seen_pids = set()
+
+        # Mapa ligero de conexiones de red activas por PID
+        net_by_pid = {}
+        total_pid_sockets = 0
+        try:
+            for c in psutil.net_connections(kind='inet'):
+                cpid = c.pid
+                if not cpid:
+                    continue
+                entry = net_by_pid.get(cpid)
+                if entry is None:
+                    entry = {"total": 0, "established": 0, "ports": []}
+                    net_by_pid[cpid] = entry
+                entry["total"] += 1
+                total_pid_sockets += 1
+                if c.status == psutil.CONN_ESTABLISHED:
+                    entry["established"] += 1
+                lport = c.laddr.port if c.laddr else None
+                if lport and lport not in entry["ports"] and len(entry["ports"]) < 3:
+                    entry["ports"].append(lport)
+        except Exception:
+            pass
+
+        for p in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info', 'status', 'nice', 'num_threads']):
             try:
                 info = p.info
                 pid = info['pid']
-                cpu = info.get('cpu_percent') or 0.0
+                seen_pids.add(pid)
+                cpu = float(info.get('cpu_percent') or 0.0)
+                cpu_norm = round(min(100.0, cpu / logical_cores), 1)
+                if cpu_norm == 0.0 and cpu >= 0.4:
+                    cpu_norm = 0.1
+                cpu_cores_used = round(cpu / 100.0, 2)
+                num_threads = int(info.get('num_threads') or 1)
+
                 mem_bytes = info['memory_info'].rss if info.get('memory_info') else 0
                 mem_mb = round(mem_bytes / (1024 * 1024), 1)
-                
                 priv_mb = mem_mb
                 shared_mb = 0.0
-                
-                if mem_mb > 20.0:
+
+                if mem_mb > 5.0:
                     try:
                         with open(f"/proc/{pid}/statm", "r") as sf:
                             parts = sf.read().split()
@@ -8708,32 +9111,130 @@ def get_system_processes(gpu_map=None):
                             priv_mb = round(max(0, rss_pages - shared_pages) * 4096 / (1024 * 1024), 1)
                     except Exception:
                         pass
-                
-                mem_pct = round((priv_mb * 1024 * 1024) / vm_total * 100, 1)
-                gpu_data = gpu_map.get(pid, {})
-                vram_mb = round(gpu_data.get('vram_mb', 0.0), 1)
+
+                mem_pct = round((priv_mb * 1024 * 1024) / vm_total * 100.0, 1)
+
+                # Lectura/escritura real por proceso desde /proc/<pid>/io
+                io_read_bps = 0.0
+                io_write_bps = 0.0
+                io_read_tot = 0
+                io_write_tot = 0
+                try:
+                    with open(f"/proc/{pid}/io", "r") as iof:
+                        for ln in iof:
+                            if ln.startswith("read_bytes:"):
+                                io_read_tot = int(ln.split(":", 1)[1].strip())
+                            elif ln.startswith("write_bytes:"):
+                                io_write_tot = int(ln.split(":", 1)[1].strip())
+                    prev_io = _PROC_IO_PREV.get(pid)
+                    if prev_io:
+                        p_ts, p_r, p_w = prev_io
+                        dt_io = now_ts - p_ts
+                        if dt_io >= 0.3:
+                            io_read_bps = round(max(0.0, (io_read_tot - p_r) / dt_io), 1)
+                            io_write_bps = round(max(0.0, (io_write_tot - p_w) / dt_io), 1)
+                    _PROC_IO_PREV[pid] = (now_ts, io_read_tot, io_write_tot)
+                except Exception:
+                    pass
+
+                io_total_bps = round(io_read_bps + io_write_bps, 1)
+
+                gpu_data = gpu_map.get(pid, gpu_map.get(str(pid), {}))
+                vram_mb = round(float(gpu_data.get('vram_mb', 0.0) or 0.0), 1)
+                vram_pct = round(float(gpu_data.get('vram_percent', 0.0) or 0.0), 1)
+                gpu_util_pct = gpu_data.get('gpu_util_percent')
+                gpu_mem_pct = gpu_data.get('mem_util_percent')
+                gpu_enc_pct = gpu_data.get('enc_util_percent')
+                gpu_dec_pct = gpu_data.get('dec_util_percent')
                 gpu_type = gpu_data.get('type', '')
                 nice_val = info.get('nice') if info.get('nice') is not None else 0
-                
+
+                n_entry = net_by_pid.get(pid)
+                net_conns = n_entry["total"] if n_entry else 0
+                net_est = n_entry["established"] if n_entry else 0
+                net_ports = ", ".join(f":{prt}" for prt in n_entry["ports"]) if (n_entry and n_entry["ports"]) else ""
+                net_pct = round((net_conns / total_pid_sockets) * 100.0, 1) if (total_pid_sockets > 0 and net_conns > 0) else 0.0
+
                 procs.append({
                     "pid": pid,
                     "name": info['name'] or "unknown",
                     "user": info['username'] or "system",
                     "cpu_percent": round(cpu, 1),
+                    "cpu_norm_percent": cpu_norm,
+                    "cpu_cores_used": cpu_cores_used,
+                    "num_threads": num_threads,
                     "mem_mb": mem_mb,
                     "priv_mb": priv_mb,
                     "shared_mb": shared_mb,
                     "mem_percent": mem_pct,
+                    "io_read_bps": io_read_bps,
+                    "io_write_bps": io_write_bps,
+                    "io_total_bps": io_total_bps,
+                    "io_percent": 0.0,
+                    "io_read_total_bytes": io_read_tot,
+                    "io_write_total_bytes": io_write_tot,
+                    "net_connections": net_conns,
+                    "net_established": net_est,
+                    "net_percent": net_pct,
+                    "net_ports": net_ports,
                     "vram_mb": vram_mb,
+                    "vram_percent": vram_pct,
+                    "gpu_util_percent": gpu_util_pct,
+                    "gpu_mem_percent": gpu_mem_pct,
+                    "gpu_enc_percent": gpu_enc_pct,
+                    "gpu_dec_percent": gpu_dec_pct,
                     "gpu_type": gpu_type,
                     "nice": nice_val,
                     "status": info.get('status', 'running')
                 })
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
-                
-        filtered = [pr for pr in procs if pr['cpu_percent'] > 0.0 or pr['priv_mb'] > 5.0 or pr['mem_mb'] > 15.0 or pr['vram_mb'] > 0.0]
-        top_procs = sorted(filtered, key=lambda x: (x['vram_mb'], x['cpu_percent'], x['priv_mb']), reverse=True)[:100]
+
+        # Purgar PIDs terminados del historial E/S por proceso
+        for old_pid in list(_PROC_IO_PREV.keys()):
+            if old_pid not in seen_pids:
+                _PROC_IO_PREV.pop(old_pid, None)
+
+        sum_proc_io = sum(pr["io_total_bps"] for pr in procs)
+        io_denom = max(float(disk_io_total_bps or 0.0), sum_proc_io)
+        if io_denom > 0:
+            for pr in procs:
+                if pr["io_total_bps"] > 0:
+                    pr["io_percent"] = round(min(100.0, (pr["io_total_bps"] / io_denom) * 100.0), 1)
+                elif pr["io_read_total_bytes"] + pr["io_write_total_bytes"] > 0:
+                    pr["io_percent"] = 0.0
+
+        filtered = [
+            pr for pr in procs
+            if pr['cpu_percent'] > 0.0
+            or pr['priv_mb'] > 5.0
+            or pr['mem_mb'] > 15.0
+            or pr['vram_mb'] > 0.0
+            or pr['gpu_util_percent'] is not None
+            or pr['io_total_bps'] > 0.0
+            or (pr['io_read_total_bytes'] + pr['io_write_total_bytes']) >= 2 * 1024 * 1024
+            or pr['net_connections'] > 0
+        ]
+
+        # Unión equilibrada de los principales consumidores de cada recurso para no perder ningún líder en Disco/GPU/Red/RAM/CPU
+        selected_by_pid = {}
+        buckets = (
+            sorted(filtered, key=lambda x: (x['cpu_percent'], x['priv_mb']), reverse=True)[:45],
+            sorted(filtered, key=lambda x: (x['priv_mb'], x['mem_mb']), reverse=True)[:45],
+            sorted(filtered, key=lambda x: (float(x['gpu_util_percent'] or -1), x['vram_mb']), reverse=True)[:30],
+            sorted(filtered, key=lambda x: (x['io_total_bps'], x['io_read_total_bytes'] + x['io_write_total_bytes']), reverse=True)[:35],
+            sorted(filtered, key=lambda x: (x['net_established'], x['net_connections']), reverse=True)[:30],
+        )
+        for group in buckets:
+            for item in group:
+                if item['pid'] not in selected_by_pid:
+                    selected_by_pid[item['pid']] = item
+
+        top_procs = sorted(
+            selected_by_pid.values(),
+            key=lambda x: (x['vram_mb'], x['cpu_percent'], x['io_total_bps'], x['priv_mb']),
+            reverse=True
+        )[:140]
         return top_procs
     except Exception:
         return []
@@ -8927,7 +9428,10 @@ def background_collector():
                 gpu_info = dict(GPU_CACHE)
             
             if cycle_counter % 2 == 1 or not cached_procs:
-                cached_procs = get_system_processes(gpu_info.get("gpu_procs_map", {}))
+                cached_procs = get_system_processes(
+                    gpu_info.get("gpu_procs_map", {}),
+                    disk_io_total_bps=read_bytes_sec + write_bytes_sec,
+                )
             
             with DOCKER_LOCK:
                 docker_acts = [dict(c) for c in DOCKER_CACHE]

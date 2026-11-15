@@ -38,11 +38,49 @@ export interface CpuInfo {
 export interface GpuProcessInfo {
   pid?: string;
   name?: string;
-  name_key?: string;
+  name_key?: string | null;
   raw_name?: string;
   full_path?: string;
   used_memory?: string;
+  vram_mb?: number;
+  vram_percent?: number;
+  gpu_util_percent?: number | null;
+  gpu_mem_percent?: number | null;
+  gpu_enc_percent?: number | null;
+  gpu_dec_percent?: number | null;
   type?: string;
+}
+
+export interface GpuCapabilities {
+  compute?: boolean;
+  vram?: boolean;
+  mem_ctrl?: boolean;
+  encoder?: boolean;
+  decoder?: boolean;
+  jpeg?: boolean;
+  ofa?: boolean;
+  power?: boolean;
+  temp?: boolean;
+  mem_temp?: boolean;
+  clocks?: boolean;
+  pcie?: boolean;
+  fan?: boolean;
+}
+
+export interface GpuHistorySample {
+  t: number;
+  util?: number | null;
+  mem_util?: number | null;
+  vram_pct?: number | null;
+  vram_mb?: number | null;
+  enc?: number | null;
+  dec?: number | null;
+  temp?: number | null;
+  power?: number | null;
+  clock_gfx?: number | null;
+  clock_mem?: number | null;
+  pcie_rx?: number | null;
+  pcie_tx?: number | null;
 }
 
 export interface GpuInfo {
@@ -51,14 +89,35 @@ export interface GpuInfo {
   driver?: string;
   cuda?: string;
   temp_c?: number | null;
+  mem_temp_c?: number | null;
   gpu_util_percent?: number;
-  mem_util_percent?: number;
+  mem_util_percent?: number | null;
+  encoder_util_percent?: number | null;
+  decoder_util_percent?: number | null;
+  jpeg_util_percent?: number | null;
+  ofa_util_percent?: number | null;
+  encoder_sessions?: number | null;
+  encoder_fps?: number | null;
   vram_total_mb?: number;
   vram_used_mb?: number;
   vram_free_mb?: number;
   vram_percent?: number;
+  bar1_used_mb?: number | null;
+  bar1_total_mb?: number | null;
   fan_percent?: number | null;
   power_watts?: number | null;
+  power_limit_watts?: number | null;
+  clock_graphics_mhz?: number | null;
+  clock_max_graphics_mhz?: number | null;
+  clock_mem_mhz?: number | null;
+  clock_max_mem_mhz?: number | null;
+  clock_video_mhz?: number | null;
+  pcie_tx_kbps?: number | null;
+  pcie_rx_kbps?: number | null;
+  pcie_gen?: number | null;
+  pcie_width?: number | null;
+  capabilities?: GpuCapabilities;
+  history?: GpuHistorySample[];
   processes?: GpuProcessInfo[];
   error?: string;
 }
@@ -253,11 +312,29 @@ export interface SystemProcess {
   name: string;
   user?: string;
   cpu_percent?: number;
+  cpu_norm_percent?: number;
+  cpu_cores_used?: number;
+  num_threads?: number;
   mem_mb?: number;
   priv_mb?: number;
   shared_mb?: number;
   mem_percent?: number;
+  io_read_bps?: number;
+  io_write_bps?: number;
+  io_total_bps?: number;
+  io_percent?: number;
+  io_read_total_bytes?: number;
+  io_write_total_bytes?: number;
+  net_connections?: number;
+  net_established?: number;
+  net_percent?: number;
+  net_ports?: string;
   vram_mb?: number;
+  vram_percent?: number;
+  gpu_util_percent?: number | null;
+  gpu_mem_percent?: number | null;
+  gpu_enc_percent?: number | null;
+  gpu_dec_percent?: number | null;
   gpu_type?: string;
   nice?: number;
   status?: string;
