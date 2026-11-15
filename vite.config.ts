@@ -2201,9 +2201,14 @@ function realOsTelemetryMiddleware(): Plugin {
               const sIdx = Math.floor(i * bucketSize);
               const eIdx = Math.min(filtered.length, Math.max(sIdx + 1, Math.floor((i + 1) * bucketSize)));
               const chunk = filtered.slice(sIdx, eIdx);
-              if (chunk.length === 1) {
+              if (chunk.length === 0) continue;
+              if (i === 0) {
+                out.push(filtered[0]);
+              } else if (i === limit - 1) {
+                out.push(filtered[filtered.length - 1]);
+              } else if (chunk.length === 1) {
                 out.push(chunk[0]);
-              } else if (chunk.length > 1) {
+              } else {
                 let rep = chunk[0];
                 let repScore = rep.cpu + rep.ram + rep.gpu + rep.net_rx;
                 for (const item of chunk) {
@@ -2652,7 +2657,8 @@ function realOsTelemetryMiddleware(): Plugin {
           return;
         }
 
-        if (url === '/i18n/dictionary.csv') {
+        const isViteModuleImport = /(?:^|&)(?:raw|import|url|inline)(?:=|&|$)/.test(queryStr || '');
+        if (url === '/i18n/dictionary.csv' && !isViteModuleImport) {
           const csvFile = path.resolve(__dirname, 'i18n/dictionary.csv');
           res.setHeader('Content-Type', 'text/csv; charset=utf-8');
           res.setHeader('Cache-Control', 'no-cache');
@@ -2699,10 +2705,26 @@ function realOsTelemetryMiddleware(): Plugin {
           return;
         }
 
-        if (url === '/api/system/logs/clear' && (req.method === 'POST' || req.method === 'DELETE')) {
+        if (
+          (url === '/api/system/logs/clear' || url === '/api/system/logs/ack') &&
+          (req.method === 'POST' || req.method === 'DELETE')
+        ) {
           clearGeoIpWorkerErrors();
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ ok: true, success: true, cleared: true }));
+          res.end(
+            JSON.stringify({
+              ok: true,
+              success: true,
+              cleared: true,
+              system_errors_summary: {
+                total: 0,
+                total_errors: 0,
+                log_errors_count: 0,
+                failed_units_count: 0,
+                failed_units: [],
+              },
+            })
+          );
           return;
         }
 

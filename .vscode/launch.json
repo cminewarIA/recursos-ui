@@ -1,0 +1,100 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Backend Recursos (Debug · Puerto 8095)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server.py",
+      "cwd": "${workspaceFolder}",
+      "python": "/usr/bin/python3",
+      "pythonArgs": ["-Xfrozen_modules=off"],
+      "env": {
+        "RECURSOS_PORT": "8095",
+        "HOST": "127.0.0.1",
+        "PYDEVD_DISABLE_FILE_VALIDATION": "1"
+      },
+      "console": "internalConsole",
+      "redirectOutput": true,
+      "justMyCode": true,
+      "subProcess": true
+    },
+    {
+      "name": "Python: App Nativa Ubuntu (--test-mode)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/desktop_app/recursos_app.py",
+      "args": ["--test-mode"],
+      "cwd": "${workspaceFolder}",
+      "python": "/usr/bin/python3",
+      "pythonArgs": ["-Xfrozen_modules=off"],
+      "env": {
+        "PYDEVD_DISABLE_FILE_VALIDATION": "1"
+      },
+      "console": "internalConsole",
+      "redirectOutput": true,
+      "justMyCode": true
+    },
+    {
+      "name": "Python: App Nativa Ubuntu (GUI GTK3)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/desktop_app/recursos_app.py",
+      "cwd": "${workspaceFolder}",
+      "python": "/usr/bin/python3",
+      "pythonArgs": ["-Xfrozen_modules=off"],
+      "env": {
+        "PYDEVD_DISABLE_FILE_VALIDATION": "1"
+      },
+      "console": "internalConsole",
+      "redirectOutput": true,
+      "justMyCode": true
+    },
+    {
+      "name": "Python: Adjuntar Debugpy Remoto (Puerto 5678)",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "127.0.0.1",
+        "port": 5678
+      },
+      "justMyCode": true
+    },
+    {
+      "name": "Chrome: Frontend Debug Backend (127.0.0.1:8095)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://127.0.0.1:8095",
+      "webRoot": "${workspaceFolder}/src",
+      "sourceMaps": true
+    },
+    {
+      "name": "Chrome: Frontend Vite HMR (127.0.0.1:5173)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://127.0.0.1:5173",
+      "webRoot": "${workspaceFolder}/src",
+      "sourceMaps": true,
+      "preLaunchTask": "Vite: Servidor Dev (Puerto 5173)"
+    },
+    {
+      "name": "Chrome: Producción Local (127.0.0.1:8085)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://127.0.0.1:8085",
+      "webRoot": "${workspaceFolder}/src",
+      "sourceMaps": true
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full-Stack Cockpit: Backend Debug (8095) + Chrome",
+      "configurations": [
+        "Python: Backend Recursos (Debug · Puerto 8095)",
+        "Chrome: Frontend Debug Backend (127.0.0.1:8095)"
+      ],
+      "stopAll": true
+    }
+  ]
+}
+

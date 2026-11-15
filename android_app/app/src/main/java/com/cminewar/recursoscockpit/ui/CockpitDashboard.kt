@@ -267,7 +267,6 @@ fun CockpitDashboard(
                             ConnectionMode.REVOKED -> NeonRed
                             ConnectionMode.SCANNING_LAN, ConnectionMode.CONNECTING -> NeonOrange
                             ConnectionMode.DISCONNECTED, ConnectionMode.ERROR -> NeonRed
-                            else -> NeonOrange
                         }
                         Box(
                             contentAlignment = Alignment.Center,
@@ -298,7 +297,6 @@ fun CockpitDashboard(
                                 ConnectionMode.CONNECTING -> I18nDictionary.t(context, "native_android.connecting", "Conectando...")
                                 ConnectionMode.DISCONNECTED -> I18nDictionary.t(context, "native_android.disconnected", "Desconectado")
                                 ConnectionMode.ERROR -> I18nDictionary.t(context, "native_android.no_connection", "Sin conexión")
-                                else -> I18nDictionary.t(context, "native_android.connecting", "Conectando...")
                             },
                             color = statusColor,
                             fontSize = 12.sp,

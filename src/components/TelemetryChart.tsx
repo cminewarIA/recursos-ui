@@ -101,9 +101,10 @@ function traceMonotoneSpline(
   const slope: number[] = new Array(n - 1);
 
   for (let i = 0; i < n - 1; i++) {
-    dx[i] = Math.max(0.0001, pts[i + 1].x - pts[i].x);
+    const rawDx = pts[i + 1].x - pts[i].x;
+    dx[i] = Math.max(0.0001, rawDx);
     dy[i] = pts[i + 1].y - pts[i].y;
-    slope[i] = dy[i] / dx[i];
+    slope[i] = rawDx < 0.25 ? 0 : dy[i] / dx[i];
   }
 
   const m: number[] = new Array(n);
@@ -135,6 +136,10 @@ function traceMonotoneSpline(
   }
 
   for (let i = 0; i < n - 1; i++) {
+    if (pts[i + 1].x - pts[i].x < 0.25) {
+      ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+      continue;
+    }
     const segDx = dx[i] / 3;
     const cp1x = pts[i].x + segDx;
     const cp1y = pts[i].y + m[i] * segDx;

@@ -1,0 +1,66 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Vite: Servidor Dev (Puerto 5173)",
+      "type": "shell",
+      "command": "npx vite --port 5173 --host 127.0.0.1",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "VITE v",
+          "endsPattern": "Local:\\s+http://"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "TypeScript: Comprobar Tipos (tsc --noEmit)",
+      "type": "shell",
+      "command": "npx tsc --noEmit",
+      "group": "test",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Vite: Compilar Bundle (static/index.html)",
+      "type": "shell",
+      "command": "npm run build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Python: Validar Sintaxis (py_compile)",
+      "type": "shell",
+      "command": "python3 -m py_compile server.py i18n_catalog.py desktop_app/recursos_app.py desktop_app/dex_controller.py packaging/sign_deb.py",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Ubuntu Nativo: Ejecutar --test-mode",
+      "type": "shell",
+      "command": "/usr/bin/python3 desktop_app/recursos_app.py --test-mode",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Despliegue Completo: Deb + Android TV APK",
+      "type": "shell",
+      "command": "bash packaging/install_all.sh",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}
+

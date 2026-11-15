@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutGroup, motion } from 'motion/react';
 import {
+  AlertTriangle,
   BookOpen,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Download,
@@ -22,8 +24,10 @@ import {
 import { MorphPill, ViewStage } from './MotionPrimitives';
 import {
   DexStatusPayload,
+  FailedSystemdUnit,
   MetricsPayload,
   SystemErrorLogEntry,
+  SystemErrorsSummary,
   ThemeMode,
   TrustedDevice,
   VersionInfo,
@@ -84,6 +88,8 @@ export const MoreView: React.FC<MoreViewProps> = ({
   const [updateOutput, setUpdateOutput] = useState('');
   const [showTechUpdate, setShowTechUpdate] = useState(() => initialSubTab?.toLowerCase() === 'logs');
   const [sysLogs, setSysLogs] = useState<SystemErrorLogEntry[]>([]);
+  const [logsMeta, setLogsMeta] = useState<SystemErrorsSummary | null>(metrics?.system_errors_summary ?? null);
+  const [acknowledgingLogs, setAcknowledgingLogs] = useState(false);
 
   useEffect(() => {
     const mapped = resolveMoreSubTab(initialSubTab);
@@ -126,9 +132,49 @@ export const MoreView: React.FC<MoreViewProps> = ({
   }, [isUbuntuNative]);
 
   const loadLogs = useCallback(async () => {
-    const res = await apiFetchJson<{ logs?: SystemErrorLogEntry[] }>('/api/system/logs?limit=25');
-    if (res.ok && Array.isArray(res.data?.logs)) setSysLogs(res.data.logs);
+    const res = await apiFetchJson<{
+      logs?: SystemErrorLogEntry[];
+      total_errors?: number;
+      log_errors_count?: number;
+      failed_units_count?: number;
+      failed_units?: Array<FailedSystemdUnit | string>;
+      ack_ts?: number | null;
+      ack_time_str?: string | null;
+    }>('/api/system/logs?limit=30&refresh=1');
+    if (res.ok && res.data) {
+      if (Array.isArray(res.data.logs)) setSysLogs(res.data.logs);
+      setLogsMeta({
+        total: res.data.total_errors,
+        total_errors: res.data.total_errors,
+        log_errors_count: res.data.log_errors_count,
+        failed_units_count: res.data.failed_units_count,
+        failed_units: res.data.failed_units,
+        ack_ts: res.data.ack_ts,
+        ack_time_str: res.data.ack_time_str,
+      });
+    }
   }, []);
+
+  const handleAckSystemLogs = async () => {
+    setAcknowledgingLogs(true);
+    const res = await apiFetchJson<{
+      success?: boolean;
+      message?: string;
+      system_errors_summary?: SystemErrorsSummary;
+    }>('/api/system/logs/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    setAcknowledgingLogs(false);
+    if (res.ok && res.data?.success !== false) {
+      if (res.data?.system_errors_summary) {
+        setLogsMeta(res.data.system_errors_summary);
+      }
+      setSysLogs([]);
+      onNotify(res.data?.message || t('more.ack_logs_ok'));
+      await loadLogs();
+      onRefreshMetrics();
+    } else {
+      onNotify(res.error || t('more.ack_logs_err'), true);
+    }
+  };
 
   useEffect(() => {
     if (metrics?.version_info && !versionInfo) setVersionInfo(metrics.version_info);
@@ -547,6 +593,100 @@ export const MoreView: React.FC<MoreViewProps> = ({
               </div>
             )}
           </section>
+
+          {/* Panel dedicado de Salud y Avisos del Sistema */}
+          {(() => {
+            const effSummary = logsMeta || metrics?.system_errors_summary;
+            const failedUnitsList = effSummary?.failed_units ?? [];
+            const failedCount = Number(effSummary?.failed_units_count ?? failedUnitsList.length ?? 0);
+            const activeTotal = Number(effSummary?.total_errors ?? effSummary?.total ?? (sysLogs.length + failedCount));
+            const ackTimeStr = effSummary?.ack_time_str;
+            const isHealthy = activeTotal === 0 && failedCount === 0 && sysLogs.length === 0;
+            return (
+              <section className="cockpit-bento p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                        isHealthy ? 'cockpit-pill-emerald' : 'cockpit-pill-amber'
+                      }`}
+                    >
+                      {isHealthy ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+                    </span>
+                    <div>
+                      <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                        {t('more.system_health_title')}
+                      </h2>
+                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        {isHealthy
+                          ? t('more.system_health_clean')
+                          : t('more.system_health_issues', { count: Math.max(activeTotal, sysLogs.length + failedCount) })}
+                        {ackTimeStr ? ` · ${t('more.ack_logs_since', { time: ackTimeStr })}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => void loadLogs()}
+                      className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>{t('network.refresh')}</span>
+                    </button>
+                    {(sysLogs.length > 0 || activeTotal > failedCount) && (
+                      <button
+                        type="button"
+                        disabled={acknowledgingLogs}
+                        onClick={() => void handleAckSystemLogs()}
+                        className="cockpit-btn-accent inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold disabled:opacity-50"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        <span>{acknowledgingLogs ? t('more.acking_logs_btn') : t('more.ack_logs_btn')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {failedUnitsList.length > 0 && (
+                  <div className="mt-4 rounded-xl border border-amber-300/70 bg-amber-50/70 p-3 dark:border-amber-700/60 dark:bg-amber-950/30">
+                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                      {t('more.failed_units_label', { count: failedUnitsList.length })}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {failedUnitsList.map((u, idx) => {
+                        const label = typeof u === 'string' ? u : u.unit;
+                        return (
+                          <span
+                            key={`${label}-${idx}`}
+                            className="rounded-lg bg-amber-100 px-2.5 py-1 font-mono text-[11px] font-semibold text-amber-900 dark:bg-amber-900/50 dark:text-amber-200"
+                          >
+                            {label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {sysLogs.length > 0 ? (
+                  <div className="mt-4 max-h-60 space-y-1.5 overflow-y-auto pr-1 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                    {sysLogs.slice(0, 20).map((log, idx) => (
+                      <div key={log.id || `${log.ts || idx}`} className="cockpit-subtile px-3 py-1.5">
+                        <span className="text-slate-400 dark:text-slate-500">[{log.time_str || '--'}]</span>{' '}
+                        <span className="font-semibold text-slate-800 dark:text-slate-100">{log.unit || log.source || 'sys'}:</span>{' '}
+                        <span>{log.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                    {t('more.no_logs_clean')}
+                  </p>
+                )}
+              </section>
+            );
+          })()}
 
           {/* Native apps download (shown in Web browser only) */}
           {!isNativeApp && (

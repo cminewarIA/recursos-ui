@@ -1,0 +1,17 @@
+{
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "python.analysis.typeCheckingMode": "basic",
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "debug.openDebug": "openOnSessionStart",
+  "debug.internalConsoleOptions": "openOnSessionStart",
+  "debug.inlineValues": "on",
+  "debug.console.fontSize": 13,
+  "debug.toolBarLocation": "floating",
+  "search.exclude": {
+    "**/dist": true,
+    "**/build_deb": true,
+    "**/android_app/app/build": true,
+    "**/node_modules": true
+  }
+}

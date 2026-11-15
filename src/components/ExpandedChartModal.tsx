@@ -106,7 +106,8 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       metaOnly?: boolean;
     }) => {
       if (!hasMetricKeys) return;
-      const seq = ++fetchSeqRef.current;
+      // Las consultas solo-metadatos nunca deben invalidar la secuencia de ventanas históricas pedidas por el usuario
+      const seq = opts.metaOnly ? fetchSeqRef.current : ++fetchSeqRef.current;
       if (!opts.metaOnly) setLoadingHistory(true);
 
       const q = new URLSearchParams();
@@ -122,7 +123,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
 
       const res = await apiFetchJson<TelemetryHistoryResponse>(`/api/metrics/history?${q.toString()}`);
-      if (seq !== fetchSeqRef.current && !opts.metaOnly) return;
+      if (!opts.metaOnly && seq !== fetchSeqRef.current) return;
 
       if (res.ok && res.data?.ok) {
         setMetaBounds({
@@ -139,13 +140,17 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     [hasMetricKeys]
   );
 
-  // Consultar metadatos del historial en SQLite al abrir y periódicamente mientras esté en vivo
+  // Obtener límites temporales totales de la BD una sola vez al abrir la inspección
   useEffect(() => {
     if (!hasMetricKeys) return;
-    void fetchHistoricalSlice({ limit: 90, metaOnly: preset === 'live' });
-    if (preset !== 'live') return;
+    void fetchHistoricalSlice({ limit: 2, metaOnly: true });
+  }, [hasMetricKeys, fetchHistoricalSlice]);
+
+  // Refresco periódico de metadatos únicamente mientras el usuario está en modo en vivo
+  useEffect(() => {
+    if (!hasMetricKeys || preset !== 'live') return;
     const id = window.setInterval(() => {
-      void fetchHistoricalSlice({ limit: 60, metaOnly: true });
+      void fetchHistoricalSlice({ limit: 2, metaOnly: true });
     }, 6000);
     return () => window.clearInterval(id);
   }, [hasMetricKeys, preset, fetchHistoricalSlice]);
@@ -172,15 +177,15 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     }
     if (nextPreset === 'all') {
       setCursorEndTs(null);
-      void fetchHistoricalSlice({ windowParam: 'all', limit: 320 });
+      void fetchHistoricalSlice({ windowParam: 'all', limit: 360 });
       return;
     }
     const sec = Number(nextPreset);
-    const refEnd = cursorEndTs ?? newestTs;
+    const refEnd = cursorEndTs ?? newestTs ?? undefined;
     void fetchHistoricalSlice({
       windowParam: sec,
       beforeTs: refEnd,
-      limit: 240,
+      limit: 280,
     });
   };
 
@@ -298,6 +303,29 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     return { filterByEpoch };
   }, []);
 
+  const useLocal20mGpu = Boolean(
+    preset === '1200' && cursorEndTs === null && hasGpuSubHist && liveGpuHist && liveGpuHist.length >= 2
+  );
+  const useLocal20mStorage = Boolean(
+    preset === '1200' &&
+      cursorEndTs === null &&
+      spec.chartKind === 'storage' &&
+      liveDiskHist &&
+      liveDiskHist.length > 10 &&
+      ((liveDiskHist[liveDiskHist.length - 1].t - liveDiskHist[0].t) >= 1020_000 ||
+        !(historyData?.series?.disk_r?.length))
+  );
+  const useLocal20mNet = Boolean(
+    preset === '1200' &&
+      cursorEndTs === null &&
+      spec.chartKind === 'net' &&
+      spec.nicName &&
+      liveNicHist &&
+      liveNicHist.length > 10 &&
+      ((liveNicHist[liveNicHist.length - 1].t - liveNicHist[0].t) >= 1020_000 ||
+        !(historyData?.series?.net_rx?.length))
+  );
+
   const resolvedSeries: ChartSeries[] = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
       if (spec.chartKind === 'net' && liveNicHist) {
@@ -363,13 +391,15 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       return spec.series;
     }
 
-    if (preset === '1200' && cursorEndTs === null && hasGpuSubHist && liveGpuHist) {
+    if (useLocal20mGpu && liveGpuHist) {
+      const startIdx = liveSliceWindow.filterByEpoch(liveGpuHist.map((b) => Math.round(b.t / 1000)), 1200);
+      const sliced = liveGpuHist.slice(startIdx);
       return spec.series.map((s) => {
         const field = GPU_SUB_HISTORY_FIELD_MAP[s.id];
         if (!field) return s;
         return {
           ...s,
-          data: liveGpuHist.map((b) => {
+          data: sliced.map((b) => {
             const v = b[field];
             return typeof v === 'number' && Number.isFinite(v) ? v : 0;
           }),
@@ -377,13 +407,29 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       });
     }
 
-    if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) {
+    if (useLocal20mStorage && liveDiskHist) {
+      const startIdx = liveSliceWindow.filterByEpoch(liveDiskHist.map((b) => Math.round(b.t / 1000)), 1200);
+      const sliced = liveDiskHist.slice(startIdx);
       return spec.series.map((s) => {
         if (s.id === 'disk_r' || s.metricKey === 'disk_r') {
-          return { ...s, data: liveDiskHist.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
+          return { ...s, data: sliced.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
         }
         if (s.id === 'disk_w' || s.metricKey === 'disk_w') {
-          return { ...s, data: liveDiskHist.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
+          return { ...s, data: sliced.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
+        }
+        return s;
+      });
+    }
+
+    if (useLocal20mNet && liveNicHist) {
+      const startIdx = liveSliceWindow.filterByEpoch(liveNicHist.map((b) => Math.round(b.t / 1000)), 1200);
+      const sliced = liveNicHist.slice(startIdx);
+      return spec.series.map((s) => {
+        if (s.metricKey === 'net_rx') {
+          return { ...s, data: sliced.map((b) => Math.round((b.rx / (1024 * 1024)) * 100) / 100) };
+        }
+        if (s.metricKey === 'net_tx') {
+          return { ...s, data: sliced.map((b) => Math.round((b.tx / (1024 * 1024)) * 100) / 100) };
         }
         return s;
       });
@@ -397,17 +443,17 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       return s;
     });
-  }, [preset, cursorEndTs, liveMetrics?.history, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.series, historyData, liveSliceWindow]);
+  }, [preset, cursorEndTs, liveMetrics?.history, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.series, historyData, liveSliceWindow]);
 
   const resolvedTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
       if (spec.chartKind === 'net' && liveNicHist?.length) {
         const startIdx = liveSliceWindow.filterByEpoch(liveNicHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
-        return liveNicHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
+        return liveNicHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
       }
       if (spec.chartKind === 'storage' && liveDiskHist?.length) {
         const startIdx = liveSliceWindow.filterByEpoch(liveDiskHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
-        return liveDiskHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
+        return liveDiskHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
       }
       if (hasGpuSubHist && liveGpuHist) {
         const startIdx = liveSliceWindow.filterByEpoch(liveGpuHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
@@ -419,21 +465,26 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       return spec.timestamps;
     }
-    if (preset === '1200' && cursorEndTs === null && hasGpuSubHist && liveGpuHist) {
-      return liveGpuHist.map((b) => new Date(b.t).toLocaleTimeString(locale));
+    if (useLocal20mGpu && liveGpuHist) {
+      const startIdx = liveSliceWindow.filterByEpoch(liveGpuHist.map((b) => Math.round(b.t / 1000)), 1200);
+      return liveGpuHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
     }
-    if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) {
-      return liveDiskHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES'));
+    if (useLocal20mStorage && liveDiskHist) {
+      const startIdx = liveSliceWindow.filterByEpoch(liveDiskHist.map((b) => Math.round(b.t / 1000)), 1200);
+      return liveDiskHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
     }
-    return historyData?.series?.timestamps ?? [];
-  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.timestamps, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, locale, liveMetrics?.history?.timestamps, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
+    if (useLocal20mNet && liveNicHist) {
+      const startIdx = liveSliceWindow.filterByEpoch(liveNicHist.map((b) => Math.round(b.t / 1000)), 1200);
+      return liveNicHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
+    }
+    return historyData?.series?.timestamps ?? spec.timestamps;
+  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.timestamps, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, locale, liveMetrics?.history?.timestamps, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
 
   const resolvedDateTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) return undefined;
-    if (preset === '1200' && cursorEndTs === null && hasGpuSubHist) return undefined;
-    if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) return undefined;
+    if (useLocal20mGpu || useLocal20mStorage || useLocal20mNet) return undefined;
     return historyData?.series?.date_timestamps;
-  }, [preset, cursorEndTs, spec.chartKind, hasGpuSubHist, liveDiskHist, historyData]);
+  }, [preset, cursorEndTs, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, historyData]);
 
   const resolvedEpochTs = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) {
@@ -455,14 +506,20 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       return spec.epochTs;
     }
-    if (preset === '1200' && cursorEndTs === null && hasGpuSubHist && liveGpuHist) {
-      return liveGpuHist.map((b) => Math.round(b.t / 1000));
+    if (useLocal20mGpu && liveGpuHist) {
+      const epochs = liveGpuHist.map((b) => Math.round(b.t / 1000));
+      return epochs.slice(liveSliceWindow.filterByEpoch(epochs, 1200));
     }
-    if (preset === '1200' && cursorEndTs === null && spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 10) {
-      return liveDiskHist.map((b) => Math.round(b.t / 1000));
+    if (useLocal20mStorage && liveDiskHist) {
+      const epochs = liveDiskHist.map((b) => Math.round(b.t / 1000));
+      return epochs.slice(liveSliceWindow.filterByEpoch(epochs, 1200));
     }
-    return historyData?.series?.epoch_ts;
-  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.epochTs, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
+    if (useLocal20mNet && liveNicHist) {
+      const epochs = liveNicHist.map((b) => Math.round(b.t / 1000));
+      return epochs.slice(liveSliceWindow.filterByEpoch(epochs, 1200));
+    }
+    return historyData?.series?.epoch_ts ?? spec.epochTs;
+  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.epochTs, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
 
   // Para velocidades/flujos delegamos en TelemetryChart el autoajuste exacto al pico visible en la ventana
   const dynamicMaxLeft = useMemo(() => {
@@ -527,6 +584,9 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       onClick={onClose}
     >
       <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label={spec.title}
         initial={{ opacity: 0, scale: 0.94, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}

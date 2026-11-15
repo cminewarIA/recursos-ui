@@ -17,7 +17,7 @@ import {
   Usb,
   Wifi,
 } from 'lucide-react';
-import { AccordionBody, AnimatedMetricValue, COCKPIT_EASE, COCKPIT_SPRING } from './MotionPrimitives';
+import { AccordionBody, AnimatedMetricValue, COCKPIT_EASE } from './MotionPrimitives';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import {
   DiskInfo,
@@ -29,7 +29,6 @@ import {
 import {
   formatBytes,
   formatMbRate,
-  formatPct,
   formatSpeed,
   formatTemp,
   getHealthTone,

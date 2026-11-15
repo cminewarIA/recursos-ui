@@ -1749,6 +1749,94 @@ SYSTEM_LOGS_CACHE = {
     "warn": {"ts": 0.0, "data": None}
 }
 SYSTEM_LOGS_LOCK = threading.Lock()
+SYSTEM_LOGS_ACK_FILE = os.path.join(BASE_DIR, ".system_logs_ack.json")
+
+def load_system_logs_ack_state():
+    """Lee la marca temporal persistente de última revisión de avisos del sistema."""
+    try:
+        if os.path.isfile(SYSTEM_LOGS_ACK_FILE):
+            with open(SYSTEM_LOGS_ACK_FILE, "r", encoding="utf-8") as af:
+                data = json.load(af)
+                if isinstance(data, dict):
+                    return {
+                        "ack_ts": float(data.get("ack_ts") or 0.0),
+                        "ack_time_str": str(data.get("ack_time_str") or "") or None,
+                    }
+    except Exception:
+        pass
+    return {"ack_ts": 0.0, "ack_time_str": None}
+
+def save_system_logs_ack_state(ack_ts=None):
+    """Guarda (o reinicia con 0.0) la marca temporal de avisos revisados."""
+    ts_val = time.time() if ack_ts is None else float(ack_ts or 0.0)
+    time_str = datetime.fromtimestamp(ts_val).strftime("%d/%m %H:%M:%S") if ts_val > 0 else None
+    payload = {"ack_ts": ts_val, "ack_time_str": time_str}
+    with SYSTEM_LOGS_LOCK:
+        try:
+            with open(SYSTEM_LOGS_ACK_FILE, "w", encoding="utf-8") as af:
+                json.dump(payload, af, ensure_ascii=False)
+        except Exception as e:
+            print(f"[-] Error guardando {SYSTEM_LOGS_ACK_FILE}: {e}")
+        # Invalidar caché de logs para reflejar el nuevo corte temporal de inmediato
+        for k in SYSTEM_LOGS_CACHE:
+            SYSTEM_LOGS_CACHE[k]["ts"] = 0.0
+    return payload
+
+def _apply_system_logs_ack_and_totals(raw_payload):
+    """Filtra avisos ya revisados sin ocultar unidades systemd fallidas y unifica el total."""
+    if not isinstance(raw_payload, dict):
+        return raw_payload
+    ack_state = load_system_logs_ack_state()
+    ack_ts = float(ack_state.get("ack_ts") or 0.0)
+    ack_ts_ms = int(ack_ts * 1000) if ack_ts > 0 else 0
+
+    raw_logs = list(raw_payload.get("logs") or [])
+    if ack_ts_ms > 0:
+        filtered_logs = [e for e in raw_logs if int((e or {}).get("ts") or 0) > ack_ts_ms]
+    else:
+        filtered_logs = raw_logs
+
+    counts = {"docker": 0, "service": 0, "kernel": 0, "system": 0, "total": 0}
+    for entry in filtered_logs:
+        cat = str((entry or {}).get("category") or "system")
+        if cat not in counts:
+            cat = "system"
+        counts[cat] += 1
+        counts["total"] += 1
+
+    failed_units = list(raw_payload.get("failed_units") or [])
+    failed_count = len(failed_units)
+    effective_total = len(filtered_logs) + failed_count
+
+    out = dict(raw_payload)
+    out["logs"] = filtered_logs
+    out["entries"] = filtered_logs
+    out["log_errors_count"] = len(filtered_logs)
+    out["total_errors"] = effective_total
+    out["failed_units_count"] = failed_count
+    out["failed_units"] = failed_units
+    out["counts_by_category"] = counts
+    out["ack_ts"] = ack_ts if ack_ts > 0 else None
+    out["ack_time_str"] = ack_state.get("ack_time_str") if ack_ts > 0 else None
+    return out
+
+def fetch_effective_system_logs(priority_max=3, limit=80, force=False):
+    raw_payload = fetch_system_logs(priority_max=priority_max, limit=limit, force=force)
+    return _apply_system_logs_ack_and_totals(raw_payload)
+
+def get_effective_system_errors_summary():
+    data = fetch_effective_system_logs(priority_max=3, limit=50)
+    return {
+        "total": int(data.get("total_errors", 0)),
+        "total_errors": int(data.get("total_errors", 0)),
+        "log_errors_count": int(data.get("log_errors_count", 0)),
+        "failed_units_count": int(data.get("failed_units_count", 0)),
+        "failed_units": list(data.get("failed_units") or [])[:8],
+        "ack_ts": data.get("ack_ts"),
+        "ack_time_str": data.get("ack_time_str"),
+        "counts_by_category": data.get("counts_by_category", {}),
+        "fetched_at": data.get("fetched_at", ""),
+    }
 
 def fetch_system_logs(priority_max=3, limit=80, force=False):
     """
@@ -2452,21 +2540,33 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
             if len(raw_rows) > limit_val:
                 bucket_size = len(raw_rows) / float(limit_val)
                 sampled = []
+                last_ts = None
                 for idx in range(limit_val):
                     start_i = int(idx * bucket_size)
                     end_i = min(len(raw_rows), max(start_i + 1, int((idx + 1) * bucket_size)))
                     chunk = raw_rows[start_i:end_i]
                     if not chunk:
                         continue
-                    if len(chunk) == 1:
-                        sampled.append(chunk[0])
+                    if idx == 0:
+                        rep = raw_rows[0]
+                    elif idx == limit_val - 1:
+                        rep = raw_rows[-1]
+                    elif len(chunk) == 1:
+                        rep = chunk[0]
                     else:
-                        # Elegir el punto representativo con mayor carga combinada (o central si empata)
+                        # Elegir el punto representativo con mayor carga combinada
                         rep = max(chunk, key=lambda r: float(r["cpu"] or 0.0) + float(r["ram"] or 0.0) + float(r["gpu"] or 0.0) + float(r["net_rx"] or 0.0))
-                        sampled.append(rep)
+                    ts_cur = float(rep["ts"] or 0.0)
+                    if last_ts is not None and ts_cur <= last_ts:
+                        continue
+                    sampled.append(rep)
+                    last_ts = ts_cur
                 # Garantizar última muestra exacta en orden
-                if raw_rows and sampled and sampled[-1]["ts"] != raw_rows[-1]["ts"]:
-                    sampled[-1] = raw_rows[-1]
+                if raw_rows and sampled and float(sampled[-1]["ts"] or 0.0) < float(raw_rows[-1]["ts"] or 0.0):
+                    if len(sampled) >= 2:
+                        sampled[-1] = raw_rows[-1]
+                    else:
+                        sampled.append(raw_rows[-1])
                 rows = sampled
             else:
                 rows = raw_rows
@@ -9562,7 +9662,7 @@ def background_collector():
                 or (telegram_bot_act.get("enabled") and telegram_bot_act.get("running"))
             )
 
-            sys_errors_summary = get_system_errors_summary()
+            sys_errors_summary = get_effective_system_errors_summary()
             ver_info_act = get_version_info_cached_async()
             with CUSTOM_LOGOS_LOCK:
                 custom_logos_act = load_custom_logos()
@@ -10129,7 +10229,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 base_payload["version_info"] = get_version_info_cached_async()
                 base_payload["version_info"]["public_domain"] = req_domain
                 if "system_errors_summary" not in base_payload:
-                    base_payload["system_errors_summary"] = get_system_errors_summary()
+                    base_payload["system_errors_summary"] = get_effective_system_errors_summary()
                 with CUSTOM_LOGOS_LOCK:
                     base_payload["custom_logos"] = load_custom_logos()
                 data = json.dumps(base_payload).encode('utf-8')
@@ -10239,7 +10339,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 limit = 80
             force = (params.get('refresh', ['0'])[0] in ('1', 'true'))
 
-            logs_payload = fetch_system_logs(priority_max=prio, limit=limit, force=force)
+            logs_payload = fetch_effective_system_logs(priority_max=prio, limit=limit, force=force)
             if cat != 'all':
                 filtered_logs = [entry for entry in logs_payload.get('logs', []) if entry.get('category') == cat]
                 logs_payload = dict(logs_payload)
@@ -10917,6 +11017,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"Not Found")
 
     def do_POST(self):
+        global METRICS_CACHE_BYTES
         client_ip = get_client_ip(self)
         clean_path = self.path.split('?')[0].rstrip('/') or '/'
 
@@ -11972,7 +12073,6 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 VERSION_CACHE["timestamp"] = 0
             new_ver_info = get_version_info(force_refresh=True, allow_auto_trigger=False)
 
-            global METRICS_CACHE_BYTES
             with METRICS_LOCK:
                 if isinstance(METRICS_CACHE, dict):
                     METRICS_CACHE["version_info"] = new_ver_info
@@ -12242,6 +12342,47 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # 12. Marcar avisos anteriores del sistema como revisados (con opción de reset)
+        elif clean_path in ("/api/system/logs/ack", "/api/system/logs/clear"):
+            auth = check_trust_status(self)
+            req_lang = self.headers.get('X-Recursos-Lang') or self.headers.get('Accept-Language')
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            body, err_code = self._read_json_body(max_bytes=4096)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            reset_flag = bool((body or {}).get("reset", False))
+            ack_state = save_system_logs_ack_state(0.0 if reset_flag else time.time())
+            summary = get_effective_system_errors_summary()
+            with METRICS_LOCK:
+                if isinstance(METRICS_CACHE, dict) and METRICS_CACHE:
+                    METRICS_CACHE["system_errors_summary"] = summary
+                    try:
+                        METRICS_CACHE_BYTES = json.dumps(METRICS_CACHE).encode('utf-8')
+                    except Exception:
+                        pass
+            resp = json.dumps({
+                "success": True,
+                "ok": True,
+                "message": i18n_t("errors.system_logs_acked", lang=req_lang, base_dir=BASE_DIR),
+                "ack_ts": ack_state.get("ack_ts"),
+                "ack_time_str": ack_state.get("ack_time_str"),
+                "system_errors_summary": summary,
+            }, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         else:
             self.send_response(404)
             self.send_security_headers()
@@ -12252,7 +12393,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
-def run_server(port=8085):
+def run_server(port=None):
+    if port is None:
+        raw_port = os.environ.get("RECURSOS_PORT") or os.environ.get("PORT") or "8085"
+        try:
+            port = int(raw_port)
+        except (TypeError, ValueError):
+            port = 8085
     preload_telemetry_history_from_sqlite()
     threading.Thread(target=fetch_gpu_worker, daemon=True).start()
     threading.Thread(target=fetch_disks_worker, daemon=True).start()

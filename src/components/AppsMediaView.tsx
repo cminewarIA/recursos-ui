@@ -12,7 +12,7 @@ import {
   ServerCog,
   Square,
 } from 'lucide-react';
-import { AccordionBody, COCKPIT_EASE, MorphPill, ViewStage } from './MotionPrimitives';
+import { COCKPIT_EASE, MorphPill, ViewStage } from './MotionPrimitives';
 import { DockerActivity, MetricsPayload, SystemdService } from '../types/telemetry';
 import { formatBytes, formatSpeed } from '../utils/formatters';
 import { formatSystemdState, useI18n } from '../i18n';

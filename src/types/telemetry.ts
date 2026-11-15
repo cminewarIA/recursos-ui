@@ -597,19 +597,36 @@ export interface TrustedDevice {
 }
 
 export interface SystemErrorLogEntry {
+  id?: string;
+  ts?: number;
   timestamp?: string;
   time_str?: string;
+  time_iso?: string;
+  date_str?: string;
   unit?: string;
   source?: string;
+  container?: string;
   category?: string;
   level?: string;
+  priority?: number;
   message?: string;
+}
+
+export interface FailedSystemdUnit {
+  unit: string;
+  active?: string;
+  sub?: string;
+  description?: string;
 }
 
 export interface SystemErrorsSummary {
   total?: number;
   total_errors?: number;
+  log_errors_count?: number;
   failed_units_count?: number;
+  failed_units?: Array<FailedSystemdUnit | string>;
+  ack_ts?: number | null;
+  ack_time_str?: string | null;
   counts_by_category?: Record<string, number>;
 }
 

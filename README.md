@@ -113,9 +113,9 @@ Toda la plataforma se organiza en **5 vistas simétricas** conectadas por una ba
 </details>
 
 <details>
-<summary><b>⚙️ Vista 5 · <code>/mas</code> — Actualizador GitHub OTA, Dispositivos HMAC, Manual Interactivo y DeX USB</b></summary>
+<summary><b>⚙️ Vista 5 · <code>/mas</code> — Actualizador GitHub OTA, Salud del Sistema, Dispositivos HMAC, Manual y DeX USB</b></summary>
 
-1. **Actualizador GitHub OTA**: Compara el commit local y remoto de forma asíncrona (`get_version_info_cached_async()`), realiza respaldo de cambios si es necesario y aplica la actualización evitando bucles repetitivos mediante cooldown.
+1. **Actualizador GitHub OTA y Salud del Sistema**: Compara el commit local y remoto de forma asíncrona (`get_version_info_cached_async()`), realiza respaldo de cambios si es necesario y aplica la actualización evitando bucles repetitivos mediante cooldown; integra además la tarjeta de **Salud y avisos del sistema** con detalle de unidades `systemd` fallidas, bitácora `journalctl` y marcado persistente de revisión (`POST /api/system/logs/ack`).
 2. **Inventario Agrupado de Dispositivos (`HMAC`)**: Agrupa clientes navegadores y apps nativas bajo el mismo dispositivo físico (`MAC` / `hardware_id`) mostrando su certificado vigente y nivel de acceso (`FULL_NATIVE_ACCESS` vs `WEB_SANDBOX`).
 3. **Manual Interactivo Embebido**: Integra directamente `/manual` dentro del panel sin salir de la sesión y sincronizando el tema Claro/Oscuro vía `postMessage`.
 4. **Pantalla Móvil USB (`DeX` — Exclusivo Ubuntu `.deb`)**: Desbloquea resolución, tasa a `60 FPS`, auto-conexión USB y pantalla completa únicamente en la aplicación nativa de Ubuntu Linux.
@@ -335,16 +335,20 @@ Sirve [`static/manual.html`](./static/manual.html) (con respaldo [`docs/index.ht
 </details>
 
 <details>
-<summary><b><code>GET /api/system/logs?limit=10</code></b> — Agregador unificado de fallos Systemd, Docker y Kernel</summary>
+<summary><b><code>GET /api/system/logs?limit=10</code> y <code>POST /api/system/logs/ack</code></b> — Agregador unificado y revisión de avisos Systemd, Docker y Kernel</summary>
 
 ```bash
 curl -fsS -H "X-Device-Token: $TOKEN" "http://127.0.0.1:8085/api/system/logs?limit=10" | jq .
+curl -fsS -X POST -H "Content-Type: application/json" -H "X-Device-Token: $TOKEN" \
+  -d '{}' http://127.0.0.1:8085/api/system/logs/ack | jq .
 ```
 ```json
 {
   "ok": true,
   "total_errors": 0,
-  "counts_by_category": { "systemd": 0, "docker": 0, "kernel": 0 },
+  "failed_units_count": 0,
+  "failed_units": [],
+  "counts_by_category": { "service": 0, "docker": 0, "kernel": 0, "system": 0, "total": 0 },
   "entries": []
 }
 ```
@@ -482,7 +486,8 @@ Todo el proyecto se rige por [`./GEMINI.md`](./GEMINI.md) manteniendo [`./VERSIO
 | **Gráficas HiDPI, Trazado Limpio y Escalas** | Gráficas limitadas sin escalas claras o saturadas con decenas de puntos intermedios sobre la curva interpolada. | **Curva monótona `Fritsch–Carlson` sin saturación de puntos intermedios + marcador activo/inspección estrictamente sobre la línea en capa superior** + ventana exacta de **5 minutos en Inicio** (`20 min–Todo` en **Inspección Táctil** sobre `recursos_history.db`), ejes X/Y visibles con segundos en ventanas cortas y techo dinámico al pico máximo en red/disco. |
 | **Actualización Triple y Sincronización Web Ubuntu** | La app de Ubuntu comprobaba únicamente GitHub frente al paquete `.deb` instalado y requería `git pull` en el servidor para actualizar la interfaz web. | **Detección Triple (`App Ubuntu · Servidor web local · GitHub`) en un solo botón**: detecta si la App Ubuntu y/o GitHub superan al servidor local y sincroniza la web local en caliente mediante `POST /api/system/sync-web` con SHA-256 sin tocar `recursos_history.db`. |
 | **Persistencia Unificada (`SQLite`)** | Base de datos dedicada únicamente a DNS/GeoIP (`geoip_history.db`) sin series temporales de hardware. | Base de datos unificada **`recursos_history.db` (SQLite WAL)** creada al instalar e intacta tras cada actualización (nunca se sobrescribe; solo añade/actualiza registros en `geoip_locations`, `connection_history` y `telemetry_history`), consultable vía `GET /api/metrics/history`. |
-| **Mapa Geoespacial GeoIP y Seguridad** | Dependencia de API Key o proveedores con marca de agua (`basemaps.cartocdn.com`), invocaciones periódicas de `sudo` y credenciales planas. | **Leaflet sobre OpenStreetMap + ArcGIS Canvas vía proxy cacheado `/api/maps/tile/`** (100 % libre, sin CartoDB, sin marcas `"API KEY REQUIRED"` y sin API Key) + radar animado, capacidades POSIX `CAP_NET_ADMIN`, caché `METRICS_CACHE_BYTES`, bóveda **AES-256-GCM** y tokens **HMAC-SHA256**. |
+| **Mapa Geoespacial GeoIP y Seguridad** | Dependencia de API Key o proveedores con marca de agua (`basemaps.cartocdn.com`), marcadores diminutos apilados que cerraban el popup cada 3 s, invocaciones periódicas de `sudo` y credenciales planas. | **Leaflet sobre OpenStreetMap + ArcGIS Canvas vía proxy cacheado `/api/maps/tile/`** (100 % libre y sin API Key) con **clusters dinámicos por coordenada, zona clicable ampliada (`>= 48 px`), insignia numérica, tooltips al pasar el ratón, actualización incremental sin cerrar popups y enfoque animado desde tarjetas inferiores**, radar, `CAP_NET_ADMIN`, bóveda **AES-256-GCM** y **HMAC-SHA256**. |
+| **Consola de Depuración IDE (`debugpy` + Vite + Chrome)** | Sin configuraciones de depuración en `.vscode/`, fallo CORS/MIME en `vite dev` al importar `i18n/dictionary.csv?raw` y colisión de puerto con el servicio `8085`. | **Suite completa en [`.vscode/launch.json`](./.vscode/launch.json) y [`.vscode/tasks.json`](./.vscode/tasks.json)**: depuración Python con `debugpy` (`RECURSOS_PORT=8095`), app nativa GTK3 (`--test-mode` / GUI), Vite HMR (`5173`, preservando `?raw`/`?import`) y compuestos Full-Stack conectados a la Consola de Depuración interna del IDE. |
 | **Documentación y Manual** | `README.md` extenso con listados acumulados de versiones pasadas. | **Manual Visual e Interactivo** en `README.md` y app web autocontenida (`/manual`, `/readme`, `docs/index.html`) enfocada únicamente en la versión vigente y sus diferencias arquitectónicas. |
 
 </details>

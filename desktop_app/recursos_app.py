@@ -2468,7 +2468,7 @@ class LocalHtmlBridgeServer:
                     })
                     return
 
-                if clean_path == "/api/system/logs/clear":
+                if clean_path in ("/api/system/logs/clear", "/api/system/logs/ack"):
                     self._send_json({"ok": True, "success": True})
                     return
 

@@ -25,6 +25,7 @@ import { ExpandChartSpec } from './OverviewView';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
 import {
+  GeoConnectionItem,
   MetricsPayload,
   NetInterfaceInfo,
   TelegramBotStatusPayload,
@@ -34,6 +35,22 @@ import {
 import { apiFetchJson } from '../utils/api';
 import { formatBytes, formatSpeed } from '../utils/formatters';
 import { formatBandLabel, formatClientVendor, useI18n } from '../i18n';
+
+function escapeMapHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildGeoClusterKey(conn: GeoConnectionItem): string | null {
+  if (typeof conn.lat !== 'number' || typeof conn.lng !== 'number') return null;
+  if (!Number.isFinite(conn.lat) || !Number.isFinite(conn.lng)) return null;
+  if (conn.is_server_node) return 'server-node';
+  return `${conn.lat.toFixed(2)},${conn.lng.toFixed(2)}`;
+}
 
 type RedSubTab = 'home' | 'map' | 'security' | 'dns';
 
@@ -103,13 +120,17 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const [logoSaving, setLogoSaving] = useState(false);
 
   // Map & GeoIP
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const [mapContainerEl, setMapContainerEl] = useState<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapInstanceRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersLayerRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tileLayerRef = useRef<any>(null);
+  // Registro incremental para actualizar marcadores sin cerrar popups abiertos durante el refresco en vivo
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const markerRegistryRef = useRef<Map<string, { hitMarker: any; visMarker: any; badgeMarker?: any; pulseMarker?: any; signature: string; lat: number; lng: number }>>(new Map());
+  const handleBanIpRef = useRef<(ipToBan?: string) => Promise<void>>(async () => {});
   const [donutTooltip, setDonutTooltip] = useState<FloatingTooltipData | null>(null);
 
   // Fail2ban & Telegram
@@ -180,21 +201,21 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
     }
   }, [subTab]);
 
-  // Leaflet map lifecycle & responsive ResizeObserver
+  // Leaflet map lifecycle & responsive ResizeObserver (reactivado en cuanto ViewStage monta el nodo real)
   useEffect(() => {
-    if (subTab !== 'map') {
+    if (subTab !== 'map' || !mapContainerEl) {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
         markersLayerRef.current = null;
         tileLayerRef.current = null;
+        markerRegistryRef.current.clear();
       }
       return;
     }
 
-    const container = mapContainerRef.current;
     const L = window.L;
-    if (!container || !L) return;
+    if (!L) return;
 
     const primaryTileUrl =
       theme === 'dark'
@@ -202,9 +223,18 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         : '/api/maps/tile/light/{z}/{x}/{y}.png';
     const osmFallbackUrl = 'https://tile.openstreetmap.de/{z}/{x}/{y}.png';
 
-    if (!mapInstanceRef.current) {
-      container.classList.remove('cockpit-osm-dark-fallback');
-      const map = L.map(container, { zoomControl: true, attributionControl: false }).setView([40.4, -3.7], 3);
+    if (!mapInstanceRef.current || mapInstanceRef.current.getContainer?.() !== mapContainerEl) {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markerRegistryRef.current.clear();
+      }
+      mapContainerEl.classList.remove('cockpit-osm-dark-fallback');
+      const map = L.map(mapContainerEl, {
+        zoomControl: true,
+        attributionControl: false,
+        tapTolerance: 24,
+      }).setView([40.4, -3.7], 3);
       const layer = L.tileLayer(primaryTileUrl, { maxZoom: 18 });
       let switchedToOsm = false;
       layer.on('tileerror', () => {
@@ -214,9 +244,9 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             document.documentElement.getAttribute('data-theme') === 'dark' ||
             document.documentElement.classList.contains('dark');
           if (isDarkActive) {
-            container.classList.add('cockpit-osm-dark-fallback');
+            mapContainerEl.classList.add('cockpit-osm-dark-fallback');
           } else {
-            container.classList.remove('cockpit-osm-dark-fallback');
+            mapContainerEl.classList.remove('cockpit-osm-dark-fallback');
           }
           layer.setUrl(osmFallbackUrl);
         }
@@ -226,66 +256,263 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapInstanceRef.current = map;
       window.setTimeout(() => {
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.invalidateSize();
-        }
+        mapInstanceRef.current?.invalidateSize();
       }, 120);
+      window.setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+      }, 360);
     } else if (tileLayerRef.current) {
-      container.classList.remove('cockpit-osm-dark-fallback');
+      mapContainerEl.classList.remove('cockpit-osm-dark-fallback');
       tileLayerRef.current.setUrl(primaryTileUrl);
     }
+
+    const handlePopupActionClick = (ev: MouseEvent) => {
+      const target = (ev.target as HTMLElement | null)?.closest?.('[data-ban-ip]') as HTMLElement | null;
+      const ip = target?.getAttribute('data-ban-ip');
+      if (ip) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        void handleBanIpRef.current(ip);
+      }
+    };
+    mapContainerEl.addEventListener('click', handlePopupActionClick);
 
     const ro = new ResizeObserver(() => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.invalidateSize();
       }
     });
-    ro.observe(container);
+    ro.observe(mapContainerEl);
     return () => {
+      mapContainerEl.removeEventListener('click', handlePopupActionClick);
       ro.disconnect();
     };
-  }, [subTab, theme]);
+  }, [subTab, theme, mapContainerEl]);
 
-  // Update Leaflet markers when connections change
+  // Agrupación espacial dinámica y actualización incremental sin cerrar popups activos
   useEffect(() => {
     const map = mapInstanceRef.current;
     const layer = markersLayerRef.current;
     const L = window.L;
     if (!map || !layer || !L) return;
 
-    layer.clearLayers();
-    const validPoints: Array<[number, number]> = [];
+    const clusters = new Map<string, { key: string; lat: number; lng: number; isNode: boolean; items: GeoConnectionItem[] }>();
+    let hasServerMarker = false;
+
     for (const c of geoConnections) {
-      if (typeof c.lat === 'number' && typeof c.lng === 'number' && Number.isFinite(c.lat) && Number.isFinite(c.lng)) {
-        validPoints.push([c.lat, c.lng]);
-        const isNode = Boolean(c.is_server_node);
-        if (isNode && L.divIcon && L.marker) {
-          const pulseIcon = L.divIcon({
-            className: 'bg-transparent border-0',
-            html: '<div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><span style="width:12px;height:12px;border-radius:9999px;background:#10b981;opacity:0.45;animation:cockpitPingRing 2s cubic-bezier(0,0,0.2,1) infinite;"></span></div>',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11],
-          });
-          L.marker([c.lat, c.lng], { icon: pulseIcon, interactive: false }).addTo(layer);
-        }
-        const marker = L.circleMarker([c.lat, c.lng], {
-          radius: isNode ? 8 : 5,
-          color: isNode ? '#059669' : '#0284c7',
-          fillColor: isNode ? '#10b981' : '#38bdf8',
-          fillOpacity: 0.78,
-          weight: 2,
+      const key = buildGeoClusterKey(c);
+      if (!key || typeof c.lat !== 'number' || typeof c.lng !== 'number') continue;
+      if (c.is_server_node) hasServerMarker = true;
+      const existing = clusters.get(key);
+      if (existing) {
+        existing.items.push(c);
+      } else {
+        clusters.set(key, {
+          key,
+          lat: c.lat,
+          lng: c.lng,
+          isNode: Boolean(c.is_server_node),
+          items: [c],
         });
-        marker.bindPopup(
-          `<div style="font-size:12px"><strong>${c.service || t('hardware.net.geo.conn_generic')}</strong><br/>${c.remote_ip || c.ip || ''}<br/>${c.city || ''} ${c.country || ''}<br/>${c.org || c.isp || ''}</div>`
-        );
-        marker.addTo(layer);
       }
     }
-    if (validPoints.length > 0 && !mapInstanceRef.current._fittedOnce) {
-      map.fitBounds(L.latLngBounds(validPoints), { padding: [30, 30], maxZoom: 6 });
-      mapInstanceRef.current._fittedOnce = true;
+
+    const srvNode = metrics?.net?.connections_map?.server_node;
+    if (
+      !hasServerMarker &&
+      srvNode &&
+      typeof srvNode.lat === 'number' &&
+      typeof srvNode.lng === 'number' &&
+      Number.isFinite(srvNode.lat) &&
+      Number.isFinite(srvNode.lng)
+    ) {
+      clusters.set('server-node', {
+        key: 'server-node',
+        lat: srvNode.lat,
+        lng: srvNode.lng,
+        isNode: true,
+        items: [{ ...srvNode, is_server_node: true }],
+      });
     }
-  }, [geoConnections, subTab, t]);
+
+    const registry = markerRegistryRef.current;
+    for (const [key, entry] of registry.entries()) {
+      if (!clusters.has(key)) {
+        layer.removeLayer(entry.hitMarker);
+        layer.removeLayer(entry.visMarker);
+        if (entry.badgeMarker) layer.removeLayer(entry.badgeMarker);
+        if (entry.pulseMarker) layer.removeLayer(entry.pulseMarker);
+        registry.delete(key);
+      }
+    }
+
+    const validPoints: Array<[number, number]> = [];
+    const blockLabel = escapeMapHtml(t('network.block'));
+
+    for (const cluster of clusters.values()) {
+      validPoints.push([cluster.lat, cluster.lng]);
+      const { key, lat, lng, isNode, items } = cluster;
+      const primary = items[0];
+      const placeName = [primary.city, primary.country].filter(Boolean).join(', ') || t('hardware.net.geo.location_fallback');
+      const count = items.length;
+      const visRadius = isNode ? 9 : Math.min(18, 7.5 + Math.sqrt(count) * 2.4);
+      const hitRadius = Math.max(24, visRadius + 12);
+
+      const tooltipText = isNode
+        ? `${placeName} (${primary.ip || ''})`
+        : count > 1
+          ? t('network.map_cluster_count', { count, place: placeName })
+          : `${primary.service || t('hardware.net.geo.conn_generic')} · ${placeName}`;
+
+      const rowsHtml = items
+        .slice(0, 8)
+        .map((c) => {
+          const remoteIp = c.remote_ip || c.ip || '';
+          const svc = escapeMapHtml(c.service || t('hardware.net.geo.conn_generic'));
+          const port = c.remote_port || c.port;
+          const org = escapeMapHtml(c.org || c.isp || '');
+          const proc = escapeMapHtml(c.process || '');
+          const banBtn =
+            !isNode && remoteIp
+              ? `<button type="button" data-ban-ip="${escapeMapHtml(remoteIp)}" style="border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.12);color:#ef4444;border-radius:7px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0;">${blockLabel}</button>`
+              : '';
+          return `<div style="padding:5px 0;border-top:1px solid rgba(148,163,184,0.22);display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+            <div style="min-width:0;">
+              <div style="font-weight:700;font-size:12px;">${svc}${port ? ` <span style="opacity:.65;font-weight:500;">:${escapeMapHtml(port)}</span>` : ''}${proc ? ` <span style="opacity:.7;font-weight:500;">· ${proc}</span>` : ''}</div>
+              <div style="font-family:ui-monospace,monospace;font-size:11px;opacity:.88;">${escapeMapHtml(remoteIp)}</div>
+              ${org ? `<div style="font-size:10.5px;opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;">${org}</div>` : ''}
+            </div>
+            ${banBtn}
+          </div>`;
+        })
+        .join('');
+
+      const moreHtml =
+        count > 8
+          ? `<div style="margin-top:6px;padding-top:4px;border-top:1px dashed rgba(148,163,184,0.28);font-size:11px;opacity:.75;">${escapeMapHtml(t('network.map_popup_more', { count: count - 8 }))}</div>`
+          : '';
+
+      const popupHtml = `<div style="min-width:225px;max-width:315px;font-size:12px;line-height:1.35;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+          <strong style="font-size:12.5px;">${escapeMapHtml(placeName)}</strong>
+          <span style="background:rgba(14,165,233,0.16);color:#0284c7;border-radius:999px;padding:1px 7px;font-size:10.5px;font-weight:700;font-family:ui-monospace,monospace;">${count}</span>
+        </div>
+        <div style="max-height:210px;overflow-y:auto;padding-right:2px;">${rowsHtml}</div>
+        ${moreHtml}
+      </div>`;
+
+      const signature = `${lat.toFixed(3)},${lng.toFixed(3)}|${count}|${items
+        .slice(0, 8)
+        .map((c) => `${c.remote_ip || c.ip || ''}:${c.service || ''}:${c.remote_port || c.port || ''}`)
+        .join(',')}|${blockLabel}`;
+
+      const existing = registry.get(key);
+      if (existing) {
+        if (existing.signature !== signature) {
+          existing.hitMarker.setLatLng([lat, lng]);
+          existing.hitMarker.setRadius(hitRadius);
+          existing.hitMarker.setTooltipContent(tooltipText);
+          existing.hitMarker.setPopupContent(popupHtml);
+          existing.visMarker.setLatLng([lat, lng]);
+          existing.visMarker.setRadius(visRadius);
+          if (existing.badgeMarker) {
+            layer.removeLayer(existing.badgeMarker);
+            existing.badgeMarker = undefined;
+          }
+          if (!isNode && count > 1 && L.divIcon && L.marker) {
+            const countIcon = L.divIcon({
+              className: 'cockpit-map-count-badge bg-transparent border-0',
+              html: `<div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(2,6,23,.85);">${count > 99 ? '99+' : count}</div>`,
+              iconSize: [26, 26],
+              iconAnchor: [13, 13],
+            });
+            existing.badgeMarker = L.marker([lat, lng], { icon: countIcon, interactive: false }).addTo(layer);
+          }
+          existing.signature = signature;
+          existing.lat = lat;
+          existing.lng = lng;
+        }
+        continue;
+      }
+
+      let pulseMarker;
+      if (isNode && L.divIcon && L.marker) {
+        const pulseIcon = L.divIcon({
+          className: 'cockpit-map-count-badge bg-transparent border-0',
+          html: '<div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;"><span style="width:14px;height:14px;border-radius:9999px;background:#10b981;opacity:0.45;animation:cockpitPingRing 2s cubic-bezier(0,0,0.2,1) infinite;"></span></div>',
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        });
+        pulseMarker = L.marker([lat, lng], { icon: pulseIcon, interactive: false }).addTo(layer);
+      }
+
+      const visMarker = L.circleMarker([lat, lng], {
+        radius: visRadius,
+        color: isNode ? '#059669' : '#0284c7',
+        fillColor: isNode ? '#10b981' : '#0ea5e9',
+        fillOpacity: isNode ? 0.88 : 0.8,
+        weight: 2,
+        interactive: false,
+      }).addTo(layer);
+
+      let badgeMarker;
+      if (!isNode && count > 1 && L.divIcon && L.marker) {
+        const countIcon = L.divIcon({
+          className: 'cockpit-map-count-badge bg-transparent border-0',
+          html: `<div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(2,6,23,.85);">${count > 99 ? '99+' : count}</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        });
+        badgeMarker = L.marker([lat, lng], { icon: countIcon, interactive: false }).addTo(layer);
+      }
+
+      // Amplio objetivo táctil/ratón (>48 px diámetro) con cursor puntero y tooltip al pasar encima
+      const hitMarker = L.circleMarker([lat, lng], {
+        radius: hitRadius,
+        color: '#38bdf8',
+        fillColor: '#38bdf8',
+        opacity: 0,
+        fillOpacity: 0.01,
+        weight: 0,
+        interactive: true,
+        className: 'cockpit-map-hit-target',
+      });
+      hitMarker.bindTooltip(tooltipText, { direction: 'top', offset: [0, -Math.max(8, visRadius * 0.65)], opacity: 0.96 });
+      hitMarker.bindPopup(popupHtml, { maxWidth: 330, minWidth: 225, autoPan: true, closeButton: true });
+      hitMarker.on('mouseover', () => {
+        visMarker.setStyle({ weight: 3, fillOpacity: 0.95, color: isNode ? '#34d399' : '#38bdf8' });
+      });
+      hitMarker.on('mouseout', () => {
+        visMarker.setStyle({ weight: 2, fillOpacity: isNode ? 0.88 : 0.8, color: isNode ? '#059669' : '#0284c7' });
+      });
+      hitMarker.addTo(layer);
+
+      registry.set(key, { hitMarker, visMarker, badgeMarker, pulseMarker, signature, lat, lng });
+    }
+
+    if (validPoints.length > 0 && !map._fittedOnce) {
+      map.fitBounds(L.latLngBounds(validPoints), { padding: [36, 36], maxZoom: 5 });
+      map._fittedOnce = true;
+    }
+  }, [geoConnections, metrics?.net?.connections_map?.server_node, subTab, mapContainerEl, t]);
+
+  const focusConnectionOnMap = (conn: GeoConnectionItem) => {
+    const key = buildGeoClusterKey(conn);
+    const map = mapInstanceRef.current;
+    if (!key || !map) return;
+    const entry = markerRegistryRef.current.get(key);
+    mapContainerEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const targetLat = entry?.lat ?? conn.lat;
+    const targetLng = entry?.lng ?? conn.lng;
+    if (typeof targetLat === 'number' && typeof targetLng === 'number') {
+      map.flyTo([targetLat, targetLng], Math.max(map.getZoom(), 6), { duration: 0.45 });
+    }
+    if (entry?.hitMarker) {
+      window.setTimeout(() => {
+        entry.hitMarker.openPopup();
+      }, 220);
+    }
+  };
 
   // Logo picker search
   useEffect(() => {
@@ -336,6 +563,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       onNotify(res.error || t('network.block_err'), true);
     }
   };
+  handleBanIpRef.current = handleBanIp;
 
   const handleUnbanIp = async (ip: string, jail?: string) => {
     const res = await apiFetchJson<{ message?: string }>('/api/fail2ban/unban', {
@@ -658,7 +886,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {t('network.map_destinations_visible', { count: geoConnections.length })}
+                    {t('network.map_destinations_visible', { count: geoConnections.length })} · {t('network.map_click_hint')}
                   </p>
                 </div>
                 <button
@@ -679,7 +907,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   <span>{t('network.refresh')}</span>
                 </button>
               </div>
-              <div ref={mapContainerRef} className="h-[340px] lg:h-[420px] xl:h-[460px] w-full bg-slate-100 dark:bg-slate-900" />
+              <div ref={setMapContainerEl} className="relative h-[340px] lg:h-[420px] xl:h-[460px] w-full bg-slate-100 dark:bg-slate-900" />
             </div>
 
             {/* Service Breakdown Donut with interactive tooltip */}
@@ -773,21 +1001,35 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             <div className="mt-3 cockpit-auto-grid-cards">
               {geoConnections.slice(0, 25).map((c, idx) => {
                 const remoteIp = c.remote_ip || c.ip || '';
+                const hasCoords =
+                  typeof c.lat === 'number' &&
+                  typeof c.lng === 'number' &&
+                  Number.isFinite(c.lat) &&
+                  Number.isFinite(c.lng);
                 return (
-                  <div key={`${remoteIp}-${idx}`} className="cockpit-subtile flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-xs">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-900 dark:text-white">
+                  <div
+                    key={`${remoteIp}-${idx}`}
+                    className="cockpit-subtile flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-xs transition-colors hover:border-sky-400/60"
+                  >
+                    <button
+                      type="button"
+                      disabled={!hasCoords}
+                      onClick={() => focusConnectionOnMap(c)}
+                      title={hasCoords ? t('network.focus_on_map') : undefined}
+                      className="min-w-0 flex-1 text-left cursor-pointer disabled:cursor-default group"
+                    >
+                      <p className="font-semibold text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
                         {c.service || t('hardware.net.geo.external_conn')} · {c.city || t('hardware.net.geo.location_fallback')} {c.country ? `(${c.country})` : ''}
                       </p>
-                      <p className="font-mono text-slate-500 dark:text-slate-400">
+                      <p className="font-mono text-slate-500 dark:text-slate-400 truncate">
                         {remoteIp} {c.org ? `· ${c.org}` : ''}
                       </p>
-                    </div>
+                    </button>
                     {remoteIp && !c.is_server_node && (
                       <button
                         type="button"
                         onClick={() => handleBanIp(remoteIp)}
-                        className="cockpit-btn-off inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
+                        className="cockpit-btn-off inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors shrink-0"
                       >
                         <ShieldAlert className="h-3.5 w-3.5" />
                         <span>{t('network.block')}</span>

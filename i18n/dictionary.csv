@@ -737,3 +737,18 @@ hardware.gpu.no_active_graphs,Multi-gráfica dinámica GPU,Activa al menos una g
 hardware.gpu.bar1_badge,Multi-gráfica dinámica GPU,BAR1 {used}/{total} MB
 hardware.gpu.cuda_badge,Multi-gráfica dinámica GPU,CUDA {cuda}
 charts.presets.gpu_20m,Gráficas e historial completo,20 min
+more.system_health_title,"Vista Más, salud y avisos del sistema",Salud y avisos del sistema
+more.system_health_clean,"Vista Más, salud y avisos del sistema",Todos los servicios activos y sin avisos pendientes
+more.system_health_issues,"Vista Más, salud y avisos del sistema",{count} avisos activos pendientes de revisión
+more.failed_units_label,"Vista Más, salud y avisos del sistema",Servicios de systemd con fallo ({count})
+more.ack_logs_btn,"Vista Más, salud y avisos del sistema",Marcar revisados
+more.acking_logs_btn,"Vista Más, salud y avisos del sistema",Marcando...
+more.ack_logs_ok,"Vista Más, salud y avisos del sistema",Avisos anteriores marcados como revisados
+more.ack_logs_err,"Vista Más, salud y avisos del sistema",No se pudieron marcar los avisos del sistema
+more.ack_logs_since,"Vista Más, salud y avisos del sistema",revisado {time}
+more.no_logs_clean,"Vista Más, salud y avisos del sistema",No hay errores ni alertas recientes desde la última revisión.
+errors.system_logs_acked,"Respuestas API del servidor",Avisos anteriores del sistema marcados como revisados.
+network.map_cluster_count,"Vista Red y Seguridad",{count} conexiones en {place}
+network.map_click_hint,"Vista Red y Seguridad",Toca cualquier marcador o tarjeta inferior para inspeccionar y centrar
+network.focus_on_map,"Vista Red y Seguridad",Centrar en el mapa
+network.map_popup_more,"Vista Red y Seguridad",+{count} conexiones más en esta ubicación
