@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowDownUp,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Cpu,
   HardDrive,
@@ -18,6 +19,7 @@ import {
   Wifi,
 } from 'lucide-react';
 import { AccordionBody, AnimatedMetricValue, COCKPIT_EASE } from './MotionPrimitives';
+import { NetworkDevicesModal, NetworkInspectTab } from './NetworkDevicesModal';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import {
   DiskInfo,
@@ -74,6 +76,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 }) => {
   const { t, locale } = useI18n();
   const [showErrorsDetail, setShowErrorsDetail] = useState(false);
+  const [devicesModalMode, setDevicesModalMode] = useState<NetworkInspectTab | null>(null);
 
   const cpuPct = Number(metrics?.cpu?.usage_percent ?? 0);
   const cpuTemp = metrics?.cpu?.temp_c ?? null;
@@ -398,6 +401,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     () => (metrics?.wifi_clients ?? []).filter((c) => c.online !== false && c.is_online !== false),
     [metrics?.wifi_clients]
   );
+  const bannerRxBytes = metrics?.wifi_summary?.router_wan_available
+    ? Number(metrics?.wifi_summary?.router_wan_rx_bytes_sec ?? metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0);
+  const bannerTxBytes = metrics?.wifi_summary?.router_wan_available
+    ? Number(metrics?.wifi_summary?.router_wan_tx_bytes_sec ?? metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0);
   const controllableClients = useMemo(
     () => (metrics?.wifi_clients ?? []).filter((c) => !c.is_server && !c.is_gateway).slice(0, 6),
     [metrics?.wifi_clients]
@@ -430,19 +439,42 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {overallBusy ? t('overview.high_load_banner') : t('overview.all_normal_banner')}
             </h1>
             <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-              <span className="cockpit-subtile inline-flex items-center gap-1.5 px-2.5 py-1 font-mono text-[11px] tabular-nums">
+              <span className="cockpit-subtile inline-flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[11px] tabular-nums">
                 {t('overview.uptime_badge', { uptime: metrics?.system?.uptime_str || '--' })}
               </span>
-              <span className="cockpit-subtile inline-flex items-center gap-1.5 px-2.5 py-1 font-mono text-[11px] tabular-nums">
-                <Wifi className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
-                {t('overview.connected_devices_count', { count: onlineWifi.length })}
-              </span>
-              <span className="cockpit-subtile inline-flex items-center gap-1.5 px-2.5 py-1 font-mono text-[11px] tabular-nums">
-                {t('overview.internet_rate_badge', {
-                  rx: formatSpeed(metrics?.net?.rx_bytes_sec),
-                  tx: formatSpeed(metrics?.net?.tx_bytes_sec),
-                })}
-              </span>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                type="button"
+                data-testid="banner-devices-btn"
+                title={t('overview.devices_inspect_hint')}
+                onClick={() => setDevicesModalMode('devices')}
+                className="cockpit-subtile inline-flex min-h-[34px] items-center gap-1.5 px-3 py-1 font-mono text-[11px] font-semibold tabular-nums transition-colors hover:bg-sky-500/10 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:text-sky-300 cursor-pointer"
+              >
+                <Wifi className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                <span>{t('overview.connected_devices_count', { count: onlineWifi.length })}</span>
+                <ChevronRight className="h-3 w-3 opacity-60 shrink-0" />
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                type="button"
+                data-testid="banner-speed-btn"
+                title={t('overview.internet_rate_inspect_hint')}
+                onClick={() => setDevicesModalMode('bandwidth')}
+                className="cockpit-subtile inline-flex min-h-[34px] items-center gap-1.5 px-3 py-1 font-mono text-[11px] font-semibold tabular-nums transition-colors hover:bg-emerald-500/10 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:text-emerald-300 cursor-pointer"
+              >
+                <span>
+                  {t('overview.internet_rate_badge', {
+                    rx: formatSpeed(bannerRxBytes),
+                    tx: formatSpeed(bannerTxBytes),
+                  })}
+                </span>
+                {metrics?.wifi_summary?.router_wan_available && (
+                  <span className="hidden sm:inline-block rounded bg-sky-500/12 px-1.5 py-0.5 text-[10px] font-sans font-semibold text-sky-700 dark:text-sky-300">
+                    {t('overview.router_global_badge')}
+                  </span>
+                )}
+                <ChevronRight className="h-3 w-3 opacity-60 shrink-0" />
+              </motion.button>
             </div>
           </div>
 
@@ -1257,6 +1289,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
         )}
       </motion.section>
+
+      <AnimatePresence>
+        {devicesModalMode && (
+          <NetworkDevicesModal
+            initialTab={devicesModalMode}
+            metrics={metrics}
+            onPowerAction={onPowerAction}
+            actionPendingMac={actionPendingMac}
+            onClose={() => setDevicesModalMode(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

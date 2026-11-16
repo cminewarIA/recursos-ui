@@ -315,13 +315,31 @@ export interface WifiClient {
   vendor_key?: string;
   brand?: string;
   device_type?: string;
+  dev_type?: string;
+  dev_icon?: string;
+  iface?: string;
   interface?: string;
+  conn_type?: string;
   band?: string;
   band_key?: string;
   band_params?: Record<string, string | number>;
   rssi?: number | string;
   tx_rate?: string;
   rx_rate?: string;
+  tx_bytes?: number;
+  rx_bytes?: number;
+  speed_down?: number;
+  speed_up?: number;
+  wan_speed_down?: number;
+  wan_speed_up?: number;
+  lan_speed_down?: number;
+  lan_speed_up?: number;
+  sources?: string[];
+  pihole_queries?: number;
+  first_seen_ts?: number;
+  last_seen_ts?: number;
+  asus_node?: string;
+  in_network?: number;
   online?: boolean;
   is_online?: boolean;
   is_server?: boolean;
@@ -330,6 +348,15 @@ export interface WifiClient {
   custom_logo_key?: string;
   last_seen?: string;
   uptime?: string;
+}
+
+export interface WifiSourceStatus {
+  available?: boolean;
+  count?: number;
+  online_count?: number;
+  label?: string;
+  model?: string;
+  ip?: string;
 }
 
 export interface WifiSummary {
@@ -341,9 +368,34 @@ export interface WifiSummary {
   router_online?: boolean;
   router_encrypted?: boolean;
   router_auth_mode?: string;
+  asus_model?: string;
+  gateway_ip?: string;
+  gateway_mac?: string;
+  gateway_name?: string;
+  gateway_model?: string;
+  pihole_db_total?: number;
+  router_wan_available?: boolean;
+  router_wan_rx_bytes_sec?: number;
+  router_wan_tx_bytes_sec?: number;
+  router_lan_rx_bytes_sec?: number;
+  router_lan_tx_bytes_sec?: number;
+  router_traffic_source?: string;
+  sources_status?: {
+    pihole?: WifiSourceStatus;
+    asus?: WifiSourceStatus;
+    gateway?: WifiSourceStatus;
+  };
   band_24g?: number;
   band_5g?: number;
   wired_clients?: number;
+}
+
+export interface NetworkDevicesDbResponse {
+  ok?: boolean;
+  updated_at?: string;
+  summary?: WifiSummary;
+  devices?: WifiClient[];
+  total_count?: number;
 }
 
 export interface SystemProcess {

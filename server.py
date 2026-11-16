@@ -9069,24 +9069,324 @@ def search_logos_catalog(query):
     return results[:24]
 
 MAC_RATE_CACHE = {}
+_FCACHE_FLOW_PREV = {}          # { flow_key: bytes_est }
+_FCACHE_LAST_TS = 0.0
+_FCACHE_BASELINE_READY = False
+_WL_BYTES_PREV = {}             # { mac: (ts, tx_bytes, rx_bytes) }
+_GATEWAY_UPNP_CACHE = {"ts": 0.0, "ip": "", "data": {}}
+_SERVER_DIRECT_NET_SPEEDS = {"wan_rx": 0.0, "wan_tx": 0.0, "lan_rx": 0.0, "lan_tx": 0.0, "ts": 0.0}
+_DEVICES_DB_CACHE = {"ts": 0.0, "payload": None}
+_DEVICES_DB_LOCK = threading.Lock()
+_PIHOLE_CATALOG_CACHE = {"ts": 0.0, "data": {}}
+
+_RE_FCACHE_FLOW = re.compile(
+    r'^(0x[0-9a-fA-F]+)@\S+\s+(\d+):\s+\d+\s+(\d+):\s+(\d+)\s+\S+\s+\S+\s+(\d+)\s+(?:EPHY|WPHY)\s+\d+\s+<([0-9a-fA-F:]{17})>\s+<([0-9a-fA-F:]{17})>.*?\b(\d+)\s+\d+\s*$'
+)
+
+
+def _discover_gateway_upnp_info(gw_ip):
+    """Descubre dinámicamente fabricante, modelo y nombre UPnP IGD del router gateway sin valores fijos."""
+    gw_ip = str(gw_ip or "").strip()
+    if not gw_ip or not _is_lan_ipv4(gw_ip):
+        return {}
+    now = time.time()
+    if _GATEWAY_UPNP_CACHE.get("ip") == gw_ip and (now - float(_GATEWAY_UPNP_CACHE.get("ts") or 0)) < 300.0:
+        return dict(_GATEWAY_UPNP_CACHE.get("data") or {})
+
+    locs = []
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.settimeout(0.75)
+        msg = (
+            "M-SEARCH * HTTP/1.1\r\n"
+            f"HOST: {gw_ip}:1900\r\n"
+            'MAN: "ssdp:discover"\r\n'
+            "MX: 1\r\n"
+            "ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n\r\n"
+        ).encode("utf-8")
+        sock.sendto(msg, (gw_ip, 1900))
+        while len(locs) < 3:
+            try:
+                data, _addr = sock.recvfrom(4096)
+                for ln in data.decode("utf-8", errors="ignore").splitlines():
+                    if ln.lower().startswith("location:"):
+                        loc = ln.split(":", 1)[1].strip()
+                        if loc.startswith("http") and loc not in locs:
+                            locs.append(loc)
+            except Exception:
+                break
+        sock.close()
+    except Exception:
+        pass
+
+    for fallback_port in (52869, 49152, 5000, 1900):
+        cand = f"http://{gw_ip}:{fallback_port}/gatedesc.xml"
+        if cand not in locs:
+            locs.append(cand)
+
+    info = {}
+    for loc_url in locs[:5]:
+        try:
+            with urllib.request.urlopen(loc_url, timeout=1.0) as resp:
+                xml_txt = resp.read(32768).decode("utf-8", errors="ignore")
+            root = ET.fromstring(xml_txt)
+            manuf = ""
+            model_name = ""
+            model_num = ""
+            friendly = ""
+            for elem in root.iter():
+                tag = elem.tag.split("}")[-1]
+                val = (elem.text or "").strip()
+                if not val:
+                    continue
+                if tag == "manufacturer" and not manuf:
+                    manuf = val
+                elif tag == "modelName" and not model_name:
+                    model_name = val
+                elif tag == "modelNumber" and not model_num:
+                    model_num = val
+                elif tag == "friendlyName" and not friendly:
+                    friendly = val
+            if manuf or model_name or friendly:
+                model_parts = []
+                if manuf:
+                    model_parts.append(manuf)
+                if model_name and model_name.lower() not in manuf.lower():
+                    model_parts.append(model_name)
+                info = {
+                    "manufacturer": manuf,
+                    "model_name": model_name,
+                    "model_number": model_num,
+                    "friendly_name": friendly,
+                    "model_display": " ".join(model_parts).strip() or friendly,
+                    "location": loc_url,
+                }
+                break
+        except Exception:
+            continue
+
+    _GATEWAY_UPNP_CACHE["ip"] = gw_ip
+    _GATEWAY_UPNP_CACHE["ts"] = now
+    _GATEWAY_UPNP_CACHE["data"] = info
+    return dict(info)
+
+
+def _read_pihole_network_catalog(limit=2000, max_age=10.0):
+    """Lee en modo solo lectura los equipos registrados en Pi-hole (`network` + `network_addresses`)."""
+    now = time.time()
+    cached = _PIHOLE_CATALOG_CACHE.get("data")
+    if cached and (now - float(_PIHOLE_CATALOG_CACHE.get("ts") or 0.0)) < max_age:
+        return dict(cached)
+
+    db_path = "/etc/pihole/pihole-FTL.db"
+    if not os.path.exists(db_path):
+        return {}
+
+    friendly_names = load_device_friendly_names()
+    catalog = {}
+    try:
+        conn_pi = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=1.5)
+        cur_pi = conn_pi.cursor()
+        cur_pi.execute(
+            """
+            SELECT n.hwaddr, n.interface, n.firstSeen, n.lastQuery, n.numQueries,
+                   n.macVendor, na.ip, na.name, na.lastSeen
+            FROM network n
+            LEFT JOIN network_addresses na ON na.network_id = n.id
+            ORDER BY COALESCE(na.lastSeen, n.lastQuery, n.firstSeen, 0) DESC
+            """
+        )
+        for row in cur_pi.fetchall():
+            mac = str(row[0] or "").strip().upper()
+            if not mac or mac in ("00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"):
+                continue
+            iface = str(row[1] or "").strip()
+            first_seen = int(row[2] or 0)
+            last_query = int(row[3] or 0)
+            num_queries = int(row[4] or 0)
+            vendor = str(row[5] or "").strip()
+            ip = str(row[6] or "").strip()
+            na_name = str(row[7] or "").strip()
+            last_seen = int(row[8] or 0)
+            eff_last = max(last_seen, last_query, first_seen)
+
+            is_v4 = bool(ip and _is_lan_ipv4(ip))
+            existing = catalog.get(mac)
+            if existing is None:
+                best_ip = ip if is_v4 else ""
+                best_name = friendly_names.get(mac) or na_name or vendor or best_ip or mac
+                catalog[mac] = {
+                    "mac": mac,
+                    "ip": best_ip,
+                    "name": best_name,
+                    "vendor": vendor,
+                    "iface": iface,
+                    "first_seen_ts": first_seen,
+                    "last_seen_ts": eff_last,
+                    "last_query_ts": last_query,
+                    "pihole_queries": num_queries,
+                }
+            else:
+                if is_v4 and not existing.get("ip"):
+                    existing["ip"] = ip
+                if na_name and existing.get("name") in ("", existing.get("mac"), existing.get("ip"), existing.get("vendor")):
+                    existing["name"] = friendly_names.get(mac) or na_name
+                if vendor and not existing.get("vendor"):
+                    existing["vendor"] = vendor
+                existing["pihole_queries"] = max(existing.get("pihole_queries", 0), num_queries)
+                existing["last_seen_ts"] = max(existing.get("last_seen_ts", 0), eff_last)
+                existing["last_query_ts"] = max(existing.get("last_query_ts", 0), last_query)
+            if len(catalog) >= limit:
+                break
+        conn_pi.close()
+    except Exception:
+        pass
+
+    _PIHOLE_CATALOG_CACHE["ts"] = now
+    _PIHOLE_CATALOG_CACHE["data"] = catalog
+    return dict(catalog)
+
+
+def build_unified_devices_database(force_refresh=False):
+    """Combina en vivo los dispositivos activos con el catálogo completo de Pi-hole, router Wi-Fi y Gateway."""
+    now = time.time()
+    with _DEVICES_DB_LOCK:
+        cached = _DEVICES_DB_CACHE.get("payload")
+        if not force_refresh and cached is not None and (now - float(_DEVICES_DB_CACHE.get("ts") or 0.0)) < 6.0:
+            return cached
+
+    with WIFI_LOCK:
+        wifi_snapshot = list(WIFI_CACHE.get("clients", []))
+        wifi_summary = dict(WIFI_CACHE.get("summary", {}))
+
+    pihole_catalog = _read_pihole_network_catalog(limit=2000, max_age=0.0 if force_refresh else 10.0)
+    friendly_names = load_device_friendly_names()
+
+    merged = []
+    seen_macs = set()
+    for cl in wifi_snapshot:
+        item = dict(cl)
+        mac_u = str(item.get("mac") or "").upper()
+        if mac_u:
+            seen_macs.add(mac_u)
+            ph = pihole_catalog.get(mac_u)
+            if ph:
+                srcs = list(item.get("sources") or [])
+                if "pihole" not in srcs:
+                    srcs.append("pihole")
+                item["sources"] = srcs
+                item["pihole_queries"] = int(item.get("pihole_queries") or ph.get("pihole_queries") or 0)
+                item["first_seen_ts"] = int(item.get("first_seen_ts") or ph.get("first_seen_ts") or 0)
+                item["last_seen_ts"] = max(int(item.get("last_seen_ts") or 0), int(ph.get("last_seen_ts") or 0))
+        if item.get("last_seen_ts") and not item.get("last_seen"):
+            try:
+                item["last_seen"] = datetime.fromtimestamp(int(item["last_seen_ts"])).strftime("%d/%m %H:%M")
+            except Exception:
+                pass
+        merged.append(item)
+
+    for mac_u, ph in pihole_catalog.items():
+        if mac_u in seen_macs:
+            continue
+        p_ip = str(ph.get("ip") or "").strip()
+        if not p_ip:
+            continue
+        d_name = friendly_names.get(mac_u) or ph.get("name") or p_ip
+        c_meta = classify_device(d_name, mac_u)
+        dev_type = c_meta.get("type", "generic")
+        is_wired_guess = dev_type in ("server", "pc", "nas", "network", "tv", "console")
+        last_ts = int(ph.get("last_seen_ts") or 0)
+        last_str = ""
+        if last_ts > 0:
+            try:
+                last_str = datetime.fromtimestamp(last_ts).strftime("%d/%m %H:%M")
+            except Exception:
+                last_str = ""
+        off_band_key = "lan_offline" if is_wired_guess else "wifi_offline"
+        merged.append({
+            "conn_type": "cable" if is_wired_guess else "wifi",
+            "band": i18n_t(f"hardware.net.band.{off_band_key}", base_dir=BASE_DIR),
+            "band_key": off_band_key,
+            "iface": "pihole-db",
+            "mac": mac_u,
+            "ip": p_ip,
+            "name": d_name,
+            "tx_bytes": 0,
+            "rx_bytes": 0,
+            "speed_down": 0.0,
+            "speed_up": 0.0,
+            "wan_speed_down": 0.0,
+            "wan_speed_up": 0.0,
+            "lan_speed_down": 0.0,
+            "lan_speed_up": 0.0,
+            "rssi": 0 if is_wired_guess else -90,
+            "in_network": 0,
+            "dev_type": dev_type,
+            "dev_icon": c_meta["icon"],
+            "brand": c_meta.get("brand", "generic"),
+            "brand_name": c_meta.get("brand_name") or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+            "vendor": ph.get("vendor") or c_meta.get("brand_name") or i18n_t("hardware.net.device.generic", base_dir=BASE_DIR),
+            "vendor_key": None if (ph.get("vendor") or c_meta.get("brand_name")) else "generic",
+            "status": "offline",
+            "online": False,
+            "is_online": False,
+            "is_server": False,
+            "is_gateway": False,
+            "sources": ["pihole"],
+            "pihole_queries": int(ph.get("pihole_queries") or 0),
+            "first_seen_ts": int(ph.get("first_seen_ts") or 0),
+            "last_seen_ts": last_ts,
+            "last_seen": last_str,
+        })
+
+    # Reordenar: en línea primero (por descarga WAN -> descarga total -> consultas Pi-hole -> último contacto)
+    merged.sort(
+        key=lambda x: (
+            1 if x.get("online", True) else 0,
+            float(x.get("wan_speed_down") or 0.0) + float(x.get("wan_speed_up") or 0.0),
+            float(x.get("speed_down") or 0.0) + float(x.get("speed_up") or 0.0),
+            int(x.get("last_seen_ts") or 0),
+            int(x.get("pihole_queries") or 0),
+        ),
+        reverse=True,
+    )
+
+    payload = {
+        "ok": True,
+        "updated_at": datetime.now().strftime("%H:%M:%S"),
+        "summary": wifi_summary,
+        "devices": merged,
+        "total_count": len(merged),
+    }
+    with _DEVICES_DB_LOCK:
+        _DEVICES_DB_CACHE["ts"] = now
+        _DEVICES_DB_CACHE["payload"] = payload
+    return payload
 
 def fetch_wifi_worker():
-    global WIFI_CACHE, MAC_RATE_CACHE
+    global WIFI_CACHE, MAC_RATE_CACHE, _FCACHE_FLOW_PREV, _FCACHE_LAST_TS, _FCACHE_BASELINE_READY, _WL_BYTES_PREV
     while True:
         try:
             arp_map = get_arp_and_pihole_names()
+            pihole_catalog = _read_pihole_network_catalog(limit=2000, max_age=10.0)
             friendly_names = load_device_friendly_names()
+
+            # Descubrir puerta de enlace y su descriptor UPnP dinámicamente
+            gw_ip = _detect_default_gateway_ip()
+            gw_mac = next((m for m, info in arp_map.items() if info.get("ip") == gw_ip), "") if gw_ip else ""
+            gw_upnp = _discover_gateway_upnp_info(gw_ip) if gw_ip else {}
 
             # Detectar interfaces y MACs locales dinámicamente desde psutil y /proc/net/dev
             local_server_tx = 0
             local_server_rx = 0
+            server_macs = set()
             cable_clients = []
             try:
                 net_io_map = psutil.net_io_counters(pernic=True)
                 net_if_addrs = psutil.net_if_addrs()
                 net_if_stats = psutil.net_if_stats()
                 for if_name, addrs in net_if_addrs.items():
-                    if if_name == "lo" or if_name.startswith(("veth", "docker", "br-")):
+                    if if_name == "lo" or if_name.startswith(("veth", "docker", "br-", "virbr", "tailscale", "tun", "wg")):
                         continue
                     st = net_if_stats.get(if_name)
                     if st and not st.isup:
@@ -9100,12 +9400,17 @@ def fetch_wifi_worker():
                             mac_addr = a.address.upper()
                     if not ipv4_addr:
                         continue
+                    if mac_addr:
+                        server_macs.add(mac_addr)
                     io_c = net_io_map.get(if_name)
                     tx_b = io_c.bytes_sent if io_c else 0
                     rx_b = io_c.bytes_recv if io_c else 0
                     local_server_tx += tx_b
                     local_server_rx += rx_b
                     link_mbps = st.speed if (st and st.speed) else 1000
+                    srv_sources = ["server"]
+                    if mac_addr and mac_addr in pihole_catalog:
+                        srv_sources.append("pihole")
                     cable_clients.append({
                         "conn_type": "cable",
                         "band": f"Cable ({link_mbps} Mbps)" if link_mbps else "Ethernet Local",
@@ -9125,7 +9430,9 @@ def fetch_wifi_worker():
                         "online": True,
                         "is_online": True,
                         "is_server": True,
+                        "is_local_host": bool(ipv4_addr == SERVER_LOCAL_IP),
                         "is_gateway": False,
+                        "sources": srv_sources,
                         "tx_bytes": tx_b,
                         "rx_bytes": rx_b,
                         "rssi": 1000,
@@ -9135,12 +9442,15 @@ def fetch_wifi_worker():
                 pass
 
             # Descubrir dinámicamente la puerta de enlace en ARP
-            gw_ip = _detect_default_gateway_ip()
+            gw_name_resolved = ""
             if gw_ip:
-                gw_mac = next((m for m, info in arp_map.items() if info.get("ip") == gw_ip), "")
+                gw_meta_src = arp_map.get(gw_mac, {}) if gw_mac else {}
+                gw_name_resolved = friendly_names.get(gw_mac) or gw_meta_src.get("name") or f"Gateway ({gw_ip})"
                 if gw_mac or _is_lan_ipv4(gw_ip):
-                    gw_name = (arp_map.get(gw_mac, {}).get("name") if gw_mac else None) or f"Gateway ({gw_ip})"
-                    gw_meta = classify_device(gw_name, gw_mac)
+                    gw_meta = classify_device(gw_name_resolved, gw_mac)
+                    gw_sources = ["gateway"]
+                    if gw_mac and gw_mac in pihole_catalog:
+                        gw_sources.append("pihole")
                     cable_clients.append({
                         "conn_type": "cable",
                         "band": "Gateway Uplink",
@@ -9148,18 +9458,19 @@ def fetch_wifi_worker():
                         "iface": "WAN / LAN",
                         "mac": gw_mac or f"GW:{gw_ip}",
                         "ip": gw_ip,
-                        "name": gw_name,
+                        "name": gw_name_resolved,
                         "dev_type": "network",
                         "dev_icon": "router",
                         "brand": gw_meta.get("brand", "generic"),
-                        "brand_name": gw_meta.get("brand_name", "Gateway"),
-                        "vendor": gw_meta.get("brand_name", "Gateway"),
-                        "vendor_key": "gateway" if gw_meta.get("brand_name", "Gateway") == "Gateway" else None,
+                        "brand_name": gw_upnp.get("model_display") or gw_meta.get("brand_name", "Gateway"),
+                        "vendor": gw_upnp.get("model_display") or gw_meta.get("brand_name", "Gateway"),
+                        "vendor_key": "gateway" if not gw_upnp.get("model_display") and gw_meta.get("brand_name", "Gateway") == "Gateway" else None,
                         "status": "online",
                         "online": True,
                         "is_online": True,
                         "is_server": False,
                         "is_gateway": True,
+                        "sources": gw_sources,
                         "tx_bytes": 0,
                         "rx_bytes": 0,
                         "rssi": 1000,
@@ -9169,8 +9480,12 @@ def fetch_wifi_worker():
             wifi_clients = []
             aimesh_wifi_map = {}
             router_wired_map = {}
+            router_macs_seen = set()
+            router_arp_mac_to_ip = {}
+            asus_model = ""
             router_ssh_ok = False
             fcache_stats = {}
+            fcache_wan_macs = set()
             asus_eth0_rx = asus_eth0_tx = 0
             asus_eth4_rx = asus_eth4_tx = 0
             asus_eth3_rx = asus_eth3_tx = 0
@@ -9185,6 +9500,9 @@ def fetch_wifi_worker():
                         'ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=4',
                         f'{ROUTER_USER}@{ROUTER_IP}',
                         '''
+                        echo "=== ROUTER_MODEL ==="
+                        nvram get productid 2>/dev/null
+                        echo "=== WL_CLIENTS ==="
                         for iface in eth5 eth6; do
                             for mac in $(wl -i $iface assoclist 2>/dev/null | awk '{print $2}'); do
                                 echo "=== $iface $mac ==="
@@ -9196,6 +9514,8 @@ def fetch_wifi_worker():
                         echo ""
                         echo "=== BRCTL_MACS ==="
                         brctl showmacs br0 2>/dev/null
+                        echo "=== ROUTER_ARP ==="
+                        ip neigh 2>/dev/null || arp -n 2>/dev/null
                         echo "=== ETH_PORTS ==="
                         cat /proc/net/dev | grep -E "(eth0|eth3|eth4):"
                         echo "=== FCACHE_L2 ==="
@@ -9208,18 +9528,31 @@ def fetch_wifi_worker():
                         current = None
                         clientlist_lines = []
                         brctl_lines = []
+                        router_arp_lines = []
                         eth_lines = []
                         fcache_lines = []
                         section = 'wifi'
 
                         for line in p.stdout.splitlines():
                             line = line.strip()
-                            if line == '=== CLIENTLIST_JSON ===':
+                            if line == '=== ROUTER_MODEL ===':
+                                section = 'model'
+                                current = None
+                                continue
+                            elif line == '=== WL_CLIENTS ===':
+                                section = 'wifi'
+                                current = None
+                                continue
+                            elif line == '=== CLIENTLIST_JSON ===':
                                 section = 'clientlist'
                                 current = None
                                 continue
                             elif line == '=== BRCTL_MACS ===':
                                 section = 'brctl'
+                                current = None
+                                continue
+                            elif line == '=== ROUTER_ARP ===':
+                                section = 'router_arp'
                                 current = None
                                 continue
                             elif line == '=== ETH_PORTS ===':
@@ -9231,13 +9564,21 @@ def fetch_wifi_worker():
                                 current = None
                                 continue
 
-                            if section == 'clientlist':
+                            if section == 'model':
+                                if line and not asus_model:
+                                    asus_model = line
+                                continue
+                            elif section == 'clientlist':
                                 if line:
                                     clientlist_lines.append(line)
                                 continue
                             elif section == 'brctl':
                                 if line:
                                     brctl_lines.append(line)
+                                continue
+                            elif section == 'router_arp':
+                                if line:
+                                    router_arp_lines.append(line)
                                 continue
                             elif section == 'eth':
                                 if ':' in line:
@@ -9252,12 +9593,14 @@ def fetch_wifi_worker():
                                 parts = line.split()
                                 if len(parts) >= 3:
                                     w_band_key = 'wifi_5ghz' if parts[1] == 'eth6' else 'wifi_24ghz'
+                                    w_mac_u = parts[2].upper()
+                                    router_macs_seen.add(w_mac_u)
                                     current = {
                                         'conn_type': 'wifi',
                                         'band': i18n_t(f'hardware.net.band.{w_band_key}', base_dir=BASE_DIR),
                                         'band_key': w_band_key,
                                         'iface': parts[1],
-                                        'mac': parts[2].upper(),
+                                        'mac': w_mac_u,
                                         'in_network': 0,
                                         'tx_bytes': 0,
                                         'rx_bytes': 0,
@@ -9278,13 +9621,20 @@ def fetch_wifi_worker():
                                     m = re.search(r'smoothed rssi:\s+([-\d]+)', line)
                                     if m: current['rssi'] = int(m.group(1))
 
+                        for rline in router_arp_lines:
+                            rm = re.search(r'(\d+\.\d+\.\d+\.\d+)\s+.*?(?:lladdr|at)\s+([0-9a-fA-F:]{17})', rline)
+                            if rm and _is_lan_ipv4(rm.group(1)):
+                                r_ip, r_mac = rm.group(1), rm.group(2).upper()
+                                router_arp_mac_to_ip[r_mac] = r_ip
+                                if gw_ip and r_ip == gw_ip and not gw_mac:
+                                    gw_mac = r_mac
+
                         explicit_wired_macs = set()
                         clientlist_raw = "".join(clientlist_lines).strip()
                         if clientlist_raw:
                             try:
                                 cl_data = json.loads(clientlist_raw)
                                 if isinstance(cl_data, dict):
-                                    # Pasada 1: recoger todos los clientes Wi-Fi en todos los nodos AiMesh
                                     for node_mac, node_bands in cl_data.items():
                                         node_u = str(node_mac).strip().upper()
                                         if not isinstance(node_bands, dict):
@@ -9312,6 +9662,7 @@ def fetch_wifi_worker():
                                                 m_u = str(raw_mac).strip().upper()
                                                 if not re.match(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$', m_u):
                                                     continue
+                                                router_macs_seen.add(m_u)
                                                 rssi_val = 0
                                                 ip_val = ""
                                                 if isinstance(meta, dict):
@@ -9329,7 +9680,6 @@ def fetch_wifi_worker():
                                                         "ip": ip_val
                                                     }
 
-                                    # Pasada 2: clientes cableados (wired_mac) excluyendo los asociados por Wi-Fi
                                     for node_mac, node_bands in cl_data.items():
                                         node_u = str(node_mac).strip().upper()
                                         if not isinstance(node_bands, dict):
@@ -9350,6 +9700,7 @@ def fetch_wifi_worker():
                                                 m_u = str(raw_mac).strip().upper()
                                                 if not re.match(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$', m_u):
                                                     continue
+                                                router_macs_seen.add(m_u)
                                                 if m_u in aimesh_wifi_map:
                                                     continue
                                                 ip_val = str(meta.get("ip", "") or "").strip() if isinstance(meta, dict) else ""
@@ -9368,43 +9719,122 @@ def fetch_wifi_worker():
                                 continue
                             b_mac = m_br.group(1).upper()
                             is_local = (m_br.group(2).lower() == 'yes')
-                            if is_local or b_mac in aimesh_wifi_map:
+                            if is_local:
                                 continue
-                            if b_mac not in router_wired_map and (b_mac in arp_map or b_mac in explicit_wired_macs):
+                            router_macs_seen.add(b_mac)
+                            if b_mac in aimesh_wifi_map:
+                                continue
+                            if b_mac not in router_wired_map and (b_mac in arp_map or b_mac in router_arp_mac_to_ip or b_mac in explicit_wired_macs):
                                 router_wired_map[b_mac] = {
                                     "node": "br0",
                                     "iface": "LAN",
-                                    "ip": arp_map.get(b_mac, {}).get("ip", "")
+                                    "ip": router_arp_mac_to_ip.get(b_mac) or arp_map.get(b_mac, {}).get("ip", "")
                                 }
 
+                        # Medición precisa por FlowObject en Broadcom FlowCache separando WAN (<-> gw_mac) de LAN interna
+                        now_fc = time.monotonic()
+                        dt_fc = max(0.5, now_fc - _FCACHE_LAST_TS) if _FCACHE_LAST_TS > 0 else 5.0
+                        cur_flow_map = {}
+
+                        def _mac_bucket(m_key):
+                            b = fcache_stats.get(m_key)
+                            if b is None:
+                                b = {
+                                    "tx_bytes": 0, "rx_bytes": 0,
+                                    "wan_down_bytes": 0, "wan_up_bytes": 0,
+                                    "lan_down_bytes": 0, "lan_up_bytes": 0,
+                                    "speed_down": 0.0, "speed_up": 0.0,
+                                    "wan_speed_down": 0.0, "wan_speed_up": 0.0,
+                                    "lan_speed_down": 0.0, "lan_speed_up": 0.0,
+                                }
+                                fcache_stats[m_key] = b
+                            return b
+
                         for f_line in fcache_lines:
-                            m_fc = re.search(r'(\d+)\s+(?:EPHY|WPHY)\s+\d+\s+<([0-9a-fA-F:]{17})>\s+<([0-9a-fA-F:]{17})>', f_line)
-                            if m_fc:
-                                hits = int(m_fc.group(1))
+                            m_strict = _RE_FCACHE_FLOW.search(f_line)
+                            if m_strict:
+                                flow_id = m_strict.group(1)
+                                idle_s = int(m_strict.group(2))
+                                sw_hits = int(m_strict.group(3))
+                                sw_bytes = int(m_strict.group(4))
+                                hw_hits = int(m_strict.group(5))
+                                src = m_strict.group(6).upper()
+                                dst = m_strict.group(7).upper()
+                                ack_prio = int(m_strict.group(8))
+                                is_ack = (ack_prio == 1)
+                                if is_ack:
+                                    hw_est = hw_hits * 66
+                                elif sw_hits > 0:
+                                    avg_pkt = sw_bytes / sw_hits
+                                    if hw_hits > 0 and avg_pkt < 120 and sw_hits <= 2:
+                                        avg_pkt = 1420.0
+                                    else:
+                                        avg_pkt = max(64.0, min(1500.0, avg_pkt))
+                                    hw_est = int(hw_hits * avg_pkt)
+                                else:
+                                    hw_est = hw_hits * 1420
+                                flow_total = sw_bytes + hw_est
+                            else:
+                                m_fc = re.search(r'(\d+)\s+(?:EPHY|WPHY)\s+\d+\s+<([0-9a-fA-F:]{17})>\s+<([0-9a-fA-F:]{17})>', f_line)
+                                if not m_fc:
+                                    continue
+                                flow_id = "fb"
+                                idle_s = 0
+                                hw_hits = int(m_fc.group(1))
                                 src = m_fc.group(2).upper()
                                 dst = m_fc.group(3).upper()
-                                is_ack = ' 1   0' in f_line or f_line.endswith(' 1   0')
-                                bytes_est = hits * (66 if is_ack else 1450)
-                                fcache_stats.setdefault(dst, {'tx_bytes': 0, 'rx_bytes': 0})
-                                fcache_stats[dst]['tx_bytes'] += bytes_est
-                                fcache_stats.setdefault(src, {'tx_bytes': 0, 'rx_bytes': 0})
-                                fcache_stats[src]['rx_bytes'] += bytes_est
+                                is_ack = (' 1   0' in f_line or f_line.endswith(' 1   0'))
+                                flow_total = hw_hits * (66 if is_ack else 1420)
 
-                        now_t = time.time()
-                        for mac_k, st_v in fcache_stats.items():
-                            prev = MAC_RATE_CACHE.get(mac_k)
-                            if prev:
-                                dt = now_t - prev['time']
-                                if dt > 0:
-                                    st_v['speed_down'] = max(0, int((st_v['tx_bytes'] - prev['tx']) / dt))
-                                    st_v['speed_up'] = max(0, int((st_v['rx_bytes'] - prev['rx']) / dt))
+                            router_macs_seen.add(src)
+                            router_macs_seen.add(dst)
+                            f_key = f"{flow_id}:{src}>{dst}:{1 if is_ack else 0}"
+                            cur_flow_map[f_key] = flow_total
+
+                            if _FCACHE_BASELINE_READY:
+                                prev_val = _FCACHE_FLOW_PREV.get(f_key)
+                                if prev_val is not None:
+                                    delta_b = max(0, flow_total - prev_val)
+                                elif idle_s <= max(int(dt_fc) + 3, 12) and flow_total < 64 * 1024 * 1024:
+                                    delta_b = flow_total
                                 else:
-                                    st_v['speed_down'] = 0
-                                    st_v['speed_up'] = 0
+                                    delta_b = 0
                             else:
-                                st_v['speed_down'] = 0
-                                st_v['speed_up'] = 0
-                            MAC_RATE_CACHE[mac_k] = {'tx': st_v['tx_bytes'], 'rx': st_v['rx_bytes'], 'time': now_t}
+                                delta_b = 0
+
+                            if gw_mac and (src == gw_mac or dst == gw_mac):
+                                fcache_wan_macs.add(dst if src == gw_mac else src)
+
+                            b_dst = _mac_bucket(dst)
+                            b_src = _mac_bucket(src)
+                            b_dst["tx_bytes"] += flow_total
+                            b_src["rx_bytes"] += flow_total
+
+                            if gw_mac and src == gw_mac and dst != gw_mac:
+                                b_dst["wan_down_bytes"] += delta_b
+                                b_src["wan_down_bytes"] += delta_b
+                            elif gw_mac and dst == gw_mac and src != gw_mac:
+                                b_src["wan_up_bytes"] += delta_b
+                                b_dst["wan_up_bytes"] += delta_b
+                            else:
+                                b_dst["lan_down_bytes"] += delta_b
+                                b_src["lan_up_bytes"] += delta_b
+
+                        _FCACHE_FLOW_PREV = cur_flow_map
+                        _FCACHE_LAST_TS = now_fc
+                        _FCACHE_BASELINE_READY = True
+
+                        for _m_k, st_v in fcache_stats.items():
+                            w_down = round(st_v["wan_down_bytes"] / dt_fc, 1)
+                            w_up = round(st_v["wan_up_bytes"] / dt_fc, 1)
+                            l_down = round(st_v["lan_down_bytes"] / dt_fc, 1)
+                            l_up = round(st_v["lan_up_bytes"] / dt_fc, 1)
+                            st_v["wan_speed_down"] = w_down
+                            st_v["wan_speed_up"] = w_up
+                            st_v["lan_speed_down"] = l_down
+                            st_v["lan_speed_up"] = l_up
+                            st_v["speed_down"] = round(w_down + l_down, 1)
+                            st_v["speed_up"] = round(w_up + l_up, 1)
 
                         for line in eth_lines:
                             if 'eth0:' in line:
@@ -9418,6 +9848,24 @@ def fetch_wifi_worker():
                                 asus_eth3_rx, asus_eth3_tx = int(parts[0]), int(parts[8])
                 except Exception:
                     pass
+
+            # Incorporar delta directo de wl sta_info como refuerzo de velocidad Wi-Fi
+            now_wl = time.monotonic()
+            wl_speed_map = {}
+            for wc in wifi_clients:
+                wmac = wc.get("mac", "").upper()
+                wtx = int(wc.get("tx_bytes") or 0)
+                wrx = int(wc.get("rx_bytes") or 0)
+                prev_wl = _WL_BYTES_PREV.get(wmac)
+                if prev_wl and (wtx > 0 or wrx > 0):
+                    p_ts, p_tx, p_rx = prev_wl
+                    dt_wl = max(0.5, now_wl - p_ts)
+                    wl_speed_map[wmac] = (
+                        round(max(0, wtx - p_tx) / dt_wl, 1),
+                        round(max(0, wrx - p_rx) / dt_wl, 1),
+                    )
+                if wtx > 0 or wrx > 0:
+                    _WL_BYTES_PREV[wmac] = (now_wl, wtx, wrx)
 
             c_24 = 0
             c_5 = 0
@@ -9459,6 +9907,7 @@ def fetch_wifi_worker():
                     "is_online": True,
                     "is_server": (c_meta.get('type') == 'server'),
                     "is_gateway": False,
+                    "asus_node": w_info.get("node", "br0"),
                     "tx_bytes": 0,
                     "rx_bytes": 0,
                     "rssi": 0,
@@ -9471,7 +9920,7 @@ def fetch_wifi_worker():
                 if mac not in known_macs:
                     info = arp_map.get(mac, {})
                     mesh_info = aimesh_wifi_map.get(mac, {})
-                    c_ip = info.get('ip') or mesh_info.get('ip') or 'Desconocida'
+                    c_ip = info.get('ip') or mesh_info.get('ip') or router_arp_mac_to_ip.get(mac) or 'Desconocida'
                     if c_ip in known_ips:
                         continue
                     known_macs.add(mac)
@@ -9479,6 +9928,8 @@ def fetch_wifi_worker():
                         known_ips.add(c_ip)
                     if mesh_info.get('band'):
                         c['band'] = mesh_info['band']
+                    if mesh_info.get('node'):
+                        c['asus_node'] = mesh_info['node']
                     if c.get('rssi', 0) == 0 and mesh_info.get('rssi'):
                         c['rssi'] = mesh_info['rssi']
                     c['ip'] = c_ip
@@ -9505,7 +9956,7 @@ def fetch_wifi_worker():
                 if w_mac in known_macs:
                     continue
                 info = arp_map.get(w_mac, {})
-                c_ip = info.get('ip') or mesh_info.get('ip') or 'Desconocida'
+                c_ip = info.get('ip') or mesh_info.get('ip') or router_arp_mac_to_ip.get(w_mac) or 'Desconocida'
                 if c_ip != 'Desconocida' and c_ip in known_ips:
                     continue
                 known_macs.add(w_mac)
@@ -9525,6 +9976,7 @@ def fetch_wifi_worker():
                     "band": band_val,
                     "band_key": band_key,
                     "iface": "AiMesh",
+                    "asus_node": mesh_info.get("node", ""),
                     "mac": w_mac,
                     "ip": c_ip,
                     "name": d_name,
@@ -9547,6 +9999,7 @@ def fetch_wifi_worker():
             wifi_clients = dedup_wifi
 
             # Incorporar vecinos ARP activos descubiertos dinámicamente en cualquier subred LAN privada
+            arp_active_macs = set()
             try:
                 p_neigh = subprocess.run(['ip', 'neigh'], capture_output=True, text=True, timeout=2)
                 for nline in p_neigh.stdout.splitlines():
@@ -9557,6 +10010,7 @@ def fetch_wifi_worker():
                     m_n = re.search(r'^(\d+\.\d+\.\d+\.\d+)\s+.*lladdr\s+([0-9a-fA-F:]{17})\s+(\w+)', nline)
                     if m_n and _is_lan_ipv4(m_n.group(1)):
                         n_ip, n_mac, n_state = m_n.group(1), m_n.group(2).upper(), m_n.group(3)
+                        arp_active_macs.add(n_mac)
                         if n_state in ('REACHABLE', 'STALE', 'DELAY') and n_mac not in known_macs and n_ip not in known_ips:
                             known_macs.add(n_mac)
                             known_ips.add(n_ip)
@@ -9636,7 +10090,6 @@ def fetch_wifi_worker():
                 r_ip = str(r_info.get('ip') or '').strip()
                 if not r_ip or r_ip == "0.0.0.0" or r_ip in known_ips or not _is_lan_ipv4(r_ip):
                     continue
-                # Excluir rango típico Docker bridge 172.16.0.0/12 y direcciones no especificadas
                 try:
                     ip_obj_r = ipaddress.ip_address(r_ip)
                     octs = r_ip.split('.')
@@ -9684,18 +10137,82 @@ def fetch_wifi_worker():
                 else:
                     wifi_clients.append(off_entry)
 
+            # Enriquecer cada dispositivo con velocidades WAN/LAN separadas, fuentes reales y datos de Pi-hole
+            srv_direct = dict(_SERVER_DIRECT_NET_SPEEDS)
+            srv_direct_fresh = (time.time() - float(srv_direct.get("ts") or 0.0)) < 10.0
+
+            router_wan_rx_sum = 0.0
+            router_wan_tx_sum = 0.0
+            router_lan_rx_sum = 0.0
+            router_lan_tx_sum = 0.0
+
             for c in cable_clients + wifi_clients:
                 mac = c.get('mac', '').upper()
-                if mac in fcache_stats:
-                    fc = fcache_stats[mac]
-                    c['tx_bytes'] = max(c.get('tx_bytes', 0), fc['tx_bytes'])
-                    c['rx_bytes'] = max(c.get('rx_bytes', 0), fc['rx_bytes'])
-                    c['speed_down'] = fc.get('speed_down', 0)
-                    c['speed_up'] = fc.get('speed_up', 0)
-                    if c['speed_down'] > 30000 or c['speed_up'] > 20000:
-                        c['status'] = 'online'
-                        c['online'] = True
-                        c['is_online'] = True
+                srcs = set(c.get('sources') or [])
+                ph = pihole_catalog.get(mac)
+                if ph:
+                    srcs.add("pihole")
+                    c["pihole_queries"] = int(ph.get("pihole_queries") or 0)
+                    c["first_seen_ts"] = int(ph.get("first_seen_ts") or 0)
+                    c["last_seen_ts"] = int(ph.get("last_seen_ts") or 0)
+                    if not c.get("last_seen") and c["last_seen_ts"] > 0:
+                        try:
+                            c["last_seen"] = datetime.fromtimestamp(c["last_seen_ts"]).strftime("%d/%m %H:%M")
+                        except Exception:
+                            pass
+                    if ph.get("vendor") and c.get("vendor") in ("", "Dispositivo", "Dispositivo Genérico"):
+                        c["vendor"] = ph["vendor"]
+                if mac in router_macs_seen or c.get("iface") in ("eth5", "eth6", "AiMesh") or c.get("asus_node"):
+                    srcs.add("asus")
+                if c.get("is_gateway") or mac in fcache_wan_macs or mac in router_arp_mac_to_ip:
+                    srcs.add("gateway")
+                if mac in arp_active_macs:
+                    srcs.add("arp")
+                if c.get("is_server"):
+                    srcs.add("server")
+                c["sources"] = sorted(srcs)
+
+                fc = fcache_stats.get(mac, {})
+                if fc:
+                    c['tx_bytes'] = max(c.get('tx_bytes', 0), fc.get('tx_bytes', 0))
+                    c['rx_bytes'] = max(c.get('rx_bytes', 0), fc.get('rx_bytes', 0))
+
+                wan_down = float(fc.get('wan_speed_down', 0.0) or 0.0)
+                wan_up = float(fc.get('wan_speed_up', 0.0) or 0.0)
+                lan_down = float(fc.get('lan_speed_down', 0.0) or 0.0)
+                lan_up = float(fc.get('lan_speed_up', 0.0) or 0.0)
+
+                if c.get("is_local_host") and srv_direct_fresh:
+                    wan_down = max(wan_down, float(srv_direct.get("wan_rx") or 0.0))
+                    wan_up = max(wan_up, float(srv_direct.get("wan_tx") or 0.0))
+                    lan_down = max(lan_down, float(srv_direct.get("lan_rx") or 0.0))
+                    lan_up = max(lan_up, float(srv_direct.get("lan_tx") or 0.0))
+                elif mac in wl_speed_map:
+                    wl_d, wl_u = wl_speed_map[mac]
+                    cur_tot_d = wan_down + lan_down
+                    cur_tot_u = wan_up + lan_up
+                    if wl_d > cur_tot_d:
+                        lan_down = round(lan_down + (wl_d - cur_tot_d), 1)
+                    if wl_u > cur_tot_u:
+                        lan_up = round(lan_up + (wl_u - cur_tot_u), 1)
+
+                c['wan_speed_down'] = round(wan_down, 1)
+                c['wan_speed_up'] = round(wan_up, 1)
+                c['lan_speed_down'] = round(lan_down, 1)
+                c['lan_speed_up'] = round(lan_up, 1)
+                c['speed_down'] = round(wan_down + lan_down, 1)
+                c['speed_up'] = round(wan_up + lan_up, 1)
+
+                if not c.get('is_gateway'):
+                    router_wan_rx_sum += wan_down
+                    router_wan_tx_sum += wan_up
+                    router_lan_rx_sum += lan_down
+                    router_lan_tx_sum += lan_up
+
+                if c['speed_down'] > 30000 or c['speed_up'] > 20000 or c['wan_speed_down'] > 5000 or c['wan_speed_up'] > 5000:
+                    c['status'] = 'online'
+                    c['online'] = True
+                    c['is_online'] = True
 
             wifi_tx = sum(c.get('tx_bytes', 0) for c in wifi_clients)
             wifi_rx = sum(c.get('rx_bytes', 0) for c in wifi_clients)
@@ -9703,10 +10220,20 @@ def fetch_wifi_worker():
             cable_rx = asus_eth4_rx + asus_eth0_rx + asus_eth3_rx + local_server_rx
 
             all_clients = cable_clients + wifi_clients
-            all_clients.sort(key=lambda x: (x.get('speed_down', 0), x.get('tx_bytes', 0), x.get('ip', '')), reverse=True)
+            all_clients.sort(key=lambda x: (x.get('wan_speed_down', 0), x.get('speed_down', 0), x.get('tx_bytes', 0), x.get('ip', '')), reverse=True)
 
             online_count = sum(1 for c in all_clients if c.get('online', c.get('status') == 'online'))
             detected_router_ip = ROUTER_IP or next((c.get('ip', '') for c in cable_clients if c.get('is_gateway')), '')
+            router_wan_avail = bool(router_ssh_ok and gw_mac)
+            if not router_wan_avail and srv_direct_fresh:
+                router_wan_rx_sum = float(srv_direct.get("wan_rx") or 0.0)
+                router_wan_tx_sum = float(srv_direct.get("wan_tx") or 0.0)
+                router_lan_rx_sum = float(srv_direct.get("lan_rx") or 0.0)
+                router_lan_tx_sum = float(srv_direct.get("lan_tx") or 0.0)
+
+            pihole_online_cnt = sum(1 for c in all_clients if "pihole" in (c.get("sources") or []) and c.get("online", True))
+            asus_cnt = sum(1 for c in all_clients if "asus" in (c.get("sources") or []))
+            gw_cnt = sum(1 for c in all_clients if "gateway" in (c.get("sources") or []))
 
             summary = {
                 "total_clients": len(all_clients),
@@ -9718,9 +10245,49 @@ def fetch_wifi_worker():
                 "clients_5g": c_5,
                 "band_5g": c_5,
                 "router_ip": detected_router_ip,
+                "router_model": asus_model,
+                "asus_model": asus_model,
+                "gateway_ip": gw_ip or "",
+                "gateway_mac": gw_mac or "",
+                "gateway_name": gw_name_resolved,
+                "gateway_model": gw_upnp.get("model_display", ""),
                 "router_online": bool(router_ssh_ok or any(c.get('is_gateway') for c in cable_clients)),
                 "router_encrypted": bool(ROUTER_CREDS_ENCRYPTED),
                 "router_auth_mode": "SSH + AES-256-GCM" if ROUTER_CREDS_ENCRYPTED else "SSH",
+                "router_wan_available": router_wan_avail,
+                "router_wan_rx_bytes_sec": round(router_wan_rx_sum, 1),
+                "router_wan_tx_bytes_sec": round(router_wan_tx_sum, 1),
+                "router_lan_rx_bytes_sec": round(router_lan_rx_sum, 1),
+                "router_lan_tx_bytes_sec": round(router_lan_tx_sum, 1),
+                "router_traffic_source": (
+                    f"{asus_model or 'Router'} + {gw_upnp.get('model_display') or gw_name_resolved or gw_ip}"
+                    if router_wan_avail
+                    else (HOSTNAME or "Host Local")
+                ),
+                "pihole_db_total": len(pihole_catalog),
+                "sources_status": {
+                    "pihole": {
+                        "available": bool(pihole_catalog),
+                        "count": len(pihole_catalog),
+                        "online_count": pihole_online_cnt,
+                        "label": "Pi-hole",
+                    },
+                    "asus": {
+                        "available": bool(router_ssh_ok),
+                        "count": asus_cnt,
+                        "online_count": asus_cnt,
+                        "model": asus_model,
+                        "ip": ROUTER_IP or "",
+                    },
+                    "gateway": {
+                        "available": bool(gw_ip),
+                        "count": gw_cnt,
+                        "online_count": gw_cnt,
+                        "label": gw_name_resolved or gw_ip,
+                        "model": gw_upnp.get("model_display", ""),
+                        "ip": gw_ip or "",
+                    },
+                },
                 "total_tx_bytes": cable_tx + wifi_tx,
                 "total_rx_bytes": cable_rx + wifi_rx,
                 "cable_tx_bytes": cable_tx,
@@ -9737,7 +10304,7 @@ def fetch_wifi_worker():
                 }
         except Exception:
             pass
-        time.sleep(12)
+        time.sleep(5)
 
 # ==============================================================================
 # Security Worker: Pi-hole DNS Shield & Fail2ban Intrusion Defense
@@ -10403,6 +10970,13 @@ def background_collector():
             lan_rx_bytes_sec = round(max(0.0, rx_bytes_sec - wan_rx_bytes_sec), 1)
             wan_tx_bytes_sec = round(tx_bytes_sec * wan_tx_share, 1)
             lan_tx_bytes_sec = round(max(0.0, tx_bytes_sec - wan_tx_bytes_sec), 1)
+            _SERVER_DIRECT_NET_SPEEDS.update({
+                "wan_rx": wan_rx_bytes_sec,
+                "wan_tx": wan_tx_bytes_sec,
+                "lan_rx": lan_rx_bytes_sec,
+                "lan_tx": lan_tx_bytes_sec,
+                "ts": now,
+            })
 
             # Accumulate rolling 20-minute bandwidth history per NIC (5s fixed buckets, 240 buckets across 1200s)
             with NIC_BANDWIDTH_LOCK:
@@ -11251,6 +11825,33 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             )
             resp = json.dumps(hist_payload).encode('utf-8')
             wants_gz = 'gzip' in (self.headers.get('Accept-Encoding') or '').lower() and len(resp) > 2048
+            if wants_gz:
+                resp = gzip.compress(resp, compresslevel=4)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Vary', 'Accept-Encoding')
+            if wants_gz:
+                self.send_header('Content-Encoding', 'gzip')
+            self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 1a-ter. BASE DE DATOS UNIFICADA DE DISPOSITIVOS DE RED (Pi-hole + ASUS + Puerta de Enlace)
+        elif clean_path == "/api/network/devices-db":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            force_ref = ("refresh=1" in self.path or "refresh=true" in self.path)
+            db_payload = build_unified_devices_database(force_refresh=force_ref)
+            resp = json.dumps(db_payload).encode('utf-8')
+            wants_gz = 'gzip' in (self.headers.get('Accept-Encoding') or '').lower() and len(resp) > 1024
             if wants_gz:
                 resp = gzip.compress(resp, compresslevel=4)
             self.send_response(200)

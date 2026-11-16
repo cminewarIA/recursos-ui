@@ -806,5 +806,40 @@ network.map_traffic_rx,"Vista Red y Seguridad",↓ Descarga
 network.map_traffic_tx,"Vista Red y Seguridad",↑ Carga
 network.map_traffic_total,"Vista Red y Seguridad",∑ Total
 network.map_server_node_title,"Vista Red y Seguridad",Nodo Central del Servidor
+overview.devices_inspect_hint,"Banner Principal Inicio",Ver base de datos
+overview.internet_rate_inspect_hint,"Banner Principal Inicio",Tráfico por aparato
+overview.devices_modal_title,"Modal Inspección Dispositivos",Dispositivos en Red y Bases de Datos
+overview.devices_modal_sub,"Modal Inspección Dispositivos",Inventario unificado en tiempo real con Pi-hole · router local y puerta de enlace
+overview.bandwidth_modal_title,"Modal Inspección Dispositivos",Velocidad Global y Consumo por Dispositivo
+overview.bandwidth_modal_sub,"Modal Inspección Dispositivos",Caudal de Internet del router y tráfico actual de descarga y carga ordenable
+overview.tab_devices_db,"Modal Inspección Dispositivos",Aparatos conectados
+overview.tab_bandwidth_live,"Modal Inspección Dispositivos",Descarga y carga
+overview.db_source_all,"Modal Inspección Dispositivos",Todas
+overview.db_source_online,"Modal Inspección Dispositivos",Conectados
+overview.db_source_pihole,"Modal Inspección Dispositivos",Pi-hole
+overview.db_source_asus,"Modal Inspección Dispositivos",Router ASUS
+overview.db_source_gateway,"Modal Inspección Dispositivos",Puerta de enlace
+overview.db_search_placeholder,"Modal Inspección Dispositivos","Buscar dispositivo, IP, MAC o fabricante..."
+overview.db_queries_dns,"Modal Inspección Dispositivos",{count} consultas DNS
+overview.db_last_seen,"Modal Inspección Dispositivos",Último contacto: {time}
+overview.db_empty,"Modal Inspección Dispositivos",No se encontraron dispositivos con este filtro.
+overview.db_loading,"Modal Inspección Dispositivos",Cargando catálogo desde Pi-hole y router...
+overview.bw_global_down,"Modal Inspección Dispositivos",↓ Descarga Global Router
+overview.bw_global_up,"Modal Inspección Dispositivos",↑ Subida Global Router
+overview.bw_internal_lan,"Modal Inspección Dispositivos",Tráfico Interno LAN
+overview.bw_source_label,"Modal Inspección Dispositivos",Telemetría activa
+overview.bw_sort_down,"Modal Inspección Dispositivos",Descarga
+overview.bw_sort_up,"Modal Inspección Dispositivos",Subida
+overview.bw_sort_total,"Modal Inspección Dispositivos",Total
+overview.bw_sort_lan,"Modal Inspección Dispositivos",Red LAN
+overview.bw_sort_name,"Modal Inspección Dispositivos",Nombre / IP
+overview.bw_only_active,"Modal Inspección Dispositivos",Solo con tráfico
+overview.bw_show_all,"Modal Inspección Dispositivos",Todos
+overview.bw_no_active_traffic,"Modal Inspección Dispositivos",Sin tráfico activo detectado en este instante.
+overview.bw_col_down,"Modal Inspección Dispositivos",↓ Descarga
+overview.bw_col_up,"Modal Inspección Dispositivos",↑ Subida
+overview.bw_col_lan,"Modal Inspección Dispositivos",LAN interna
+overview.router_global_badge,"Banner Principal Inicio",Router global
+
 
 

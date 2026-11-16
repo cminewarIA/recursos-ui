@@ -2856,6 +2856,61 @@ function realOsTelemetryMiddleware(): Plugin {
           return;
         }
 
+        if (url === '/api/network/devices-db' && req.method === 'GET') {
+          const netSnap = sampleRealNetwork();
+          const devClients = (
+            netSnap.interfaces_list as Array<{
+              name: string;
+              ip: string;
+              mac: string;
+              speed_mbps: number;
+              bytes_recv?: number;
+              bytes_sent?: number;
+              rx_bytes_sec?: number;
+              tx_bytes_sec?: number;
+              wan_rx_bytes_sec?: number;
+              wan_tx_bytes_sec?: number;
+              lan_rx_bytes_sec?: number;
+              lan_tx_bytes_sec?: number;
+            }>
+          ).map((nic) => ({
+            name: `${os.hostname()} (${nic.name})`,
+            ip: nic.ip || '127.0.0.1',
+            mac: nic.mac || 'INTERFAZ-ACTIVA',
+            band: 'Ethernet',
+            conn_type: 'cable',
+            online: true,
+            is_online: true,
+            is_server: true,
+            sources: ['server'],
+            tx_bytes: nic.bytes_recv || 0,
+            rx_bytes: nic.bytes_sent || 0,
+            speed_down: nic.rx_bytes_sec || 0,
+            speed_up: nic.tx_bytes_sec || 0,
+            wan_speed_down: nic.wan_rx_bytes_sec ?? nic.rx_bytes_sec ?? 0,
+            wan_speed_up: nic.wan_tx_bytes_sec ?? nic.tx_bytes_sec ?? 0,
+            lan_speed_down: nic.lan_rx_bytes_sec ?? 0,
+            lan_speed_up: nic.lan_tx_bytes_sec ?? 0,
+          }));
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              ok: true,
+              updated_at: new Date().toLocaleTimeString('es-ES', { hour12: false }),
+              summary: {
+                total_clients: devClients.length,
+                online_clients: devClients.length,
+                router_wan_available: false,
+                router_wan_rx_bytes_sec: netSnap.wan_rx_bytes_sec ?? netSnap.rx_bytes_sec ?? 0,
+                router_wan_tx_bytes_sec: netSnap.wan_tx_bytes_sec ?? netSnap.tx_bytes_sec ?? 0,
+              },
+              devices: devClients,
+              total_count: devClients.length,
+            })
+          );
+          return;
+        }
+
         if (url === '/api/system/logs' && req.method === 'GET') {
           const logs = geoIpErrorHistory.map((err, idx) => ({
             id: err.id || `err_${idx}`,
