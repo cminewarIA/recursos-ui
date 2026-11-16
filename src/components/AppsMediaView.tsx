@@ -136,17 +136,22 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
       <ViewStage tabKey={subTab}>
 
       {subTab === 'services' && (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* Docker Containers */}
           <section className="cockpit-bento p-5">
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <div>
-                <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  {t('apps.installed_apps')}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {t('apps.apps_detected', { count: containers.length })}
-                </p>
+            <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <span className="cockpit-pill-cyan inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                  <Box className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                    {t('apps.installed_apps')}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('apps.apps_detected', { count: containers.length })}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -155,7 +160,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                 {t('apps.containers_empty')}
               </p>
             ) : (
-              <div className="cockpit-auto-grid-cards">
+              <div className="mt-4 cockpit-auto-grid-cards">
                 {containers.map((c) => {
                   const running = (c.state || '').toLowerCase() === 'running';
                   const busy = actionPendingTarget === c.name;
@@ -199,7 +204,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => onServiceAction('docker', c.name, 'restart')}
-                                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                               >
                                 <RotateCw className="h-3.5 w-3.5" />
                                 <span>{t('apps.restart')}</span>
@@ -229,7 +234,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                       </div>
 
                       {techOpen && (
-                        <div className="mt-2.5 rounded-xl border border-slate-200/70 bg-white/80 p-2.5 text-xs font-mono text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                        <div className="mt-2.5 space-y-0.5 border-t border-slate-200/70 pt-2.5 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                           <div className="truncate">{t('apps.image_label', { image: c.image || '--' })}</div>
                           <div>{t('apps.container_io', { net: c.net_io || '--', disk: c.block_io || '--' })}</div>
                           <div>{t('apps.exact_state_label', { state: c.status || c.state || '--' })}</div>
@@ -244,8 +249,10 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
 
           {/* Systemd Services */}
           <section className="cockpit-bento p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <ServerCog className="h-4 w-4 text-slate-500" />
+            <div className="flex items-center gap-2.5 pb-4 border-b border-slate-200/70 dark:border-slate-800">
+              <span className="cockpit-pill-violet inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                <ServerCog className="h-4 w-4" />
+              </span>
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                   {t('apps.systemd_title')}
@@ -261,7 +268,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                 {t('apps.systemd_empty')}
               </p>
             ) : (
-              <div className="cockpit-auto-grid-cards">
+              <div className="mt-4 cockpit-auto-grid-cards">
                 {systemdServices.slice(0, 30).map((s) => {
                   const unitTarget = s.unit || s.name;
                   const active = s.active === true || (s.active_state || s.state || '').toLowerCase() === 'active';
@@ -298,7 +305,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                           type="button"
                           disabled={busy}
                           onClick={() => onServiceAction('systemd', unitTarget, 'restart')}
-                          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                          className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
                           <RotateCw className="h-3.5 w-3.5" />
                           <span>{t('apps.restart')}</span>
@@ -318,18 +325,23 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
           {/* Emby / Multimedia */}
           <section className="cockpit-bento p-5">
             <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
-              <div>
-                <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  {t('apps.media_title')}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {(emby?.online ?? emby?.available)
-                    ? t('apps.emby_streams', {
-                        name: emby?.server_name || 'Emby',
-                        count: emby?.active_streams || 0,
-                      })
-                    : t('apps.emby_unavailable')}
-                </p>
+              <div className="flex items-center gap-2.5">
+                <span className="cockpit-pill-violet inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                  <Film className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                    {t('apps.media_title')}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {(emby?.online ?? emby?.available)
+                      ? t('apps.emby_streams', {
+                          name: emby?.server_name || 'Emby',
+                          count: emby?.active_streams || 0,
+                        })
+                      : t('apps.emby_unavailable')}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -357,7 +369,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
             ) : null}
 
             {emby?.sessions && emby.sessions.length > 0 ? (
-              <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="mt-3 divide-y divide-slate-200/70 dark:divide-slate-800">
                 {emby.sessions.map((sess, i) => (
                   <div key={i} className="py-3">
                     <div className="flex items-center justify-between gap-2">
@@ -376,7 +388,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                 ))}
               </div>
             ) : emby?.recent_media && emby.recent_media.length > 0 ? (
-              <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="mt-3 divide-y divide-slate-200/70 dark:divide-slate-800">
                 {emby.recent_media.slice(0, 6).map((item, idx) => {
                   const rawTitle = (item.title || item.name || '').trim();
                   const rawSeries = (item.series_name || item.series || '').trim();
@@ -391,7 +403,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                         {displayTitle}
                       </span>
                       {item.type && (
-                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="cockpit-subtile shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">
                           {t(`hardware.media.emby_type.${typeKey}`, undefined, t(`hardware.media.emby_type.${item.type}`, undefined, item.type))}
                         </span>
                       )}
@@ -409,18 +421,22 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
           {/* Torrents / Descargas */}
           <section className="cockpit-bento p-5">
             <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
-              <div>
-                <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  {t('apps.downloads_title')}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                  {t('apps.dl_speeds', {
+              <div className="flex items-center gap-2.5">
+                <span className="cockpit-pill-cyan inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                  <Download className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                    {t('apps.downloads_title')}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+                    {t('apps.dl_speeds', {
   dl: formatSpeed(torrentStats?.dl_info_speed),
   up: formatSpeed(torrentStats?.up_info_speed),
 })}
-                </p>
+                  </p>
+                </div>
               </div>
-              <Download className="h-4 w-4 text-sky-600 dark:text-sky-400" />
             </div>
 
             {torrents.length === 0 ? (

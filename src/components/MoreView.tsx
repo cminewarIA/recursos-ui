@@ -424,7 +424,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
         <div className="space-y-4">
           {/* Theme & Spreadsheet Dictionary Switcher */}
           <section className="cockpit-bento p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 pb-4 border-b border-slate-200/70 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                   {t('more.appearance_title')}
@@ -460,7 +460,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
               </LayoutGroup>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="inline-flex items-center gap-1.5 font-display text-sm font-semibold text-slate-900 dark:text-white">
@@ -633,7 +633,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             </div>
 
             {activeVer?.recent_commits && activeVer.recent_commits.length > 0 && (
-              <div className="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div className="mt-5 border-t border-slate-200/70 pt-4 dark:border-slate-800">
                 <p className="mb-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
                   {t('more.latest_changes')}
                 </p>
@@ -663,7 +663,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             </button>
 
             {showTechUpdate && (
-              <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
+              <div className="mt-3 space-y-3 border-t border-slate-200/70 pt-3 text-xs font-mono text-slate-600 dark:border-slate-800 dark:text-slate-300">
                 <div>
                   {t('more.internal_version_row', {
                     version: activeVer?.current_version || activeVer?.version || getCanonicalVersion(),
@@ -672,12 +672,12 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   })}
                 </div>
                 {updateOutput && (
-                  <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-[11px] dark:bg-slate-800/60">
+                  <pre className="cockpit-subtile max-h-40 overflow-y-auto whitespace-pre-wrap p-3 text-[11px]">
                     {updateOutput}
                   </pre>
                 )}
                 {sysLogs.length > 0 && (
-                  <div className="max-h-40 overflow-y-auto rounded-xl bg-slate-50 p-3 text-[11px] dark:bg-slate-800/60">
+                  <div className="cockpit-subtile max-h-40 overflow-y-auto p-3 text-[11px]">
                     <p className="mb-1 font-semibold">{t('more.system_warnings_title')}</p>
                     {sysLogs.slice(0, 12).map((log, idx) => (
                       <div key={idx} className="truncate">
@@ -745,8 +745,8 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 </div>
 
                 {failedUnitsList.length > 0 && (
-                  <div className="mt-4 rounded-xl border border-amber-300/70 bg-amber-50/70 p-3 dark:border-amber-700/60 dark:bg-amber-950/30">
-                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                  <div className="cockpit-pill-amber mt-4 rounded-xl p-3">
+                    <p className="text-xs font-semibold">
                       {t('more.failed_units_label', { count: failedUnitsList.length })}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -755,7 +755,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                         return (
                           <span
                             key={`${label}-${idx}`}
-                            className="rounded-lg bg-amber-100 px-2.5 py-1 font-mono text-[11px] font-semibold text-amber-900 dark:bg-amber-900/50 dark:text-amber-200"
+                            className="cockpit-subtile rounded-lg px-2.5 py-1 font-mono text-[11px] font-semibold text-amber-900 dark:text-amber-200"
                           >
                             {label}
                           </span>
@@ -787,12 +787,14 @@ export const MoreView: React.FC<MoreViewProps> = ({
           {/* Native apps download (shown in Web browser only) */}
           {!isNativeApp && (
             <section className="cockpit-bento p-5">
-              <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                {t('more.native_apps_title')}
-              </h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {t('more.devices_desc')}
-              </p>
+              <div className="pb-4 border-b border-slate-200/70 dark:border-slate-800">
+                <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                  {t('more.native_apps_title')}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t('more.devices_desc')}
+                </p>
+              </div>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <a
                   href="/download/recursos-cockpit.deb"
@@ -910,7 +912,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                             setEditingId(dev.id);
                             setAliasDraft(dev.custom_alias || dev.name);
                           }}
-                          className="min-h-[38px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                          className="cockpit-subtile min-h-[38px] px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
                           {t('more.rename_btn')}
                         </button>
@@ -936,7 +938,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     </div>
 
                     {isOpen && (
-                      <pre className="mt-3 overflow-x-auto rounded-xl border border-slate-200/70 bg-white p-3 font-mono text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                      <pre className="mt-3 overflow-x-auto border-t border-slate-200/70 pt-3 font-mono text-[11px] text-slate-600 dark:border-slate-800 dark:text-slate-300">
                         {JSON.stringify(
                           {
                             id: dev.id,
@@ -959,7 +961,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
       {/* 3. Manual Interactivo */}
       {subTab === 'manual' && (
         <section className="cockpit-bento space-y-3 p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200/70 dark:border-slate-800">
             <div>
               <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                 {t('more.manual_title')}
@@ -978,7 +980,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
-          <div className="overflow-hidden rounded-[14px] border border-slate-200 dark:border-slate-800">
+          <div className="cockpit-subtile overflow-hidden">
             <iframe
               ref={manualIframeRef}
               src="/manual"
@@ -1072,7 +1074,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   <button
                     type="button"
                     onClick={() => handleDexAction(false)}
-                    className="min-h-[44px] rounded-xl bg-rose-600 px-5 text-xs font-semibold text-white hover:bg-rose-700"
+                    className="cockpit-btn-off min-h-[44px] rounded-xl px-5 text-xs font-semibold transition-colors"
                   >
                     {t('more.stop_projection')}
                   </button>

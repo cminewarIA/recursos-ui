@@ -326,116 +326,81 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         !(historyData?.series?.net_rx?.length))
   );
 
-  const resolvedSeries: ChartSeries[] = useMemo(() => {
-    if (preset === 'live' && cursorEndTs === null) {
-      if (spec.chartKind === 'net' && liveNicHist) {
-        const startIdx = liveSliceWindow.filterByEpoch(
-          liveNicHist.map((b) => Math.round(b.t / 1000)),
-          LIVE_WINDOW_SECONDS
-        );
-        const sliced = liveNicHist.slice(startIdx);
-        return spec.series.map((s) => {
-          if (s.metricKey === 'net_wan_rx') {
-            return { ...s, data: sliced.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100) };
-          }
-          if (s.metricKey === 'net_wan_tx') {
-            return { ...s, data: sliced.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100) };
-          }
-          if (s.metricKey === 'net_lan_rx') {
-            return { ...s, data: sliced.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100) };
-          }
-          if (s.metricKey === 'net_lan_tx') {
-            return { ...s, data: sliced.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100) };
-          }
-          if (s.metricKey === 'net_rx') {
-            return { ...s, data: sliced.map((b) => Math.round((b.rx / (1024 * 1024)) * 100) / 100) };
-          }
-          if (s.metricKey === 'net_tx') {
-            return { ...s, data: sliced.map((b) => Math.round((b.tx / (1024 * 1024)) * 100) / 100) };
-          }
-          return s;
-        });
-      }
-      if (spec.chartKind === 'storage' && liveDiskHist && liveDiskHist.length > 0) {
-        const startIdx = liveSliceWindow.filterByEpoch(
-          liveDiskHist.map((b) => Math.round(b.t / 1000)),
-          LIVE_WINDOW_SECONDS
-        );
-        const sliced = liveDiskHist.slice(startIdx);
-        return spec.series.map((s) => {
-          if (s.id === 'disk_r' || s.metricKey === 'disk_r') {
-            return { ...s, data: sliced.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
-          }
-          if (s.id === 'disk_w' || s.metricKey === 'disk_w') {
-            return { ...s, data: sliced.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
-          }
-          return s;
-        });
-      }
-      if (hasGpuSubHist && liveGpuHist) {
-        const startIdx = liveSliceWindow.filterByEpoch(
-          liveGpuHist.map((b) => Math.round(b.t / 1000)),
-          LIVE_WINDOW_SECONDS
-        );
-        const sliced = liveGpuHist.slice(startIdx);
-        return spec.series.map((s) => {
-          const field = GPU_SUB_HISTORY_FIELD_MAP[s.id];
-          if (!field) return s;
-          return {
-            ...s,
-            data: sliced.map((b) => {
-              const v = b[field];
-              return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-            }),
-          };
-        });
-      }
-      const liveHist = liveMetrics?.history;
-      if (liveHist && (spec.chartKind !== 'net' || !spec.nicName) && !spec.gpuSubmetric) {
-        const startIdx = liveSliceWindow.filterByEpoch(liveHist.epoch_ts ?? [], LIVE_WINDOW_SECONDS);
-        return spec.series.map((s) => {
-          if (s.metricKey && Array.isArray(liveHist[s.metricKey])) {
-            return { ...s, data: (liveHist[s.metricKey] ?? s.data).slice(startIdx) };
-          }
-          return s;
-        });
-      }
-      return spec.series;
-    }
+  const liveBucketWindow = useMemo(() => {
+    const isLiveHead = preset === 'live' && cursorEndTs === null;
+    const spanSec = isLiveHead ? LIVE_WINDOW_SECONDS : 1200;
 
-    if (useLocal20mGpu && liveGpuHist) {
-      const startIdx = liveSliceWindow.filterByEpoch(liveGpuHist.map((b) => Math.round(b.t / 1000)), 1200);
-      const sliced = liveGpuHist.slice(startIdx);
-      return spec.series.map((s) => {
-        const field = GPU_SUB_HISTORY_FIELD_MAP[s.id];
-        if (!field) return s;
-        return {
-          ...s,
-          data: sliced.map((b) => {
-            const v = b[field];
-            return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-          }),
-        };
-      });
-    }
-
-    if (useLocal20mStorage && liveDiskHist) {
-      const startIdx = liveSliceWindow.filterByEpoch(liveDiskHist.map((b) => Math.round(b.t / 1000)), 1200);
-      const sliced = liveDiskHist.slice(startIdx);
-      return spec.series.map((s) => {
-        if (s.id === 'disk_r' || s.metricKey === 'disk_r') {
-          return { ...s, data: sliced.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
-        }
-        if (s.id === 'disk_w' || s.metricKey === 'disk_w') {
-          return { ...s, data: sliced.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
-        }
-        return s;
-      });
-    }
-
-    if (useLocal20mNet && liveNicHist) {
-      const startIdx = liveSliceWindow.filterByEpoch(liveNicHist.map((b) => Math.round(b.t / 1000)), 1200);
+    if ((isLiveHead && spec.chartKind === 'net' && liveNicHist) || (!isLiveHead && useLocal20mNet && liveNicHist)) {
+      const epochsAll = liveNicHist.map((b) => Math.round(b.t / 1000));
+      const startIdx = liveSliceWindow.filterByEpoch(epochsAll, spanSec);
       const sliced = liveNicHist.slice(startIdx);
+      return {
+        kind: 'nic' as const,
+        sliced,
+        epochs: epochsAll.slice(startIdx),
+        timestamps: sliced.map((b) => new Date(b.t).toLocaleTimeString(locale)),
+      };
+    }
+
+    if ((isLiveHead && spec.chartKind === 'storage' && liveDiskHist?.length) || (!isLiveHead && useLocal20mStorage && liveDiskHist)) {
+      const epochsAll = liveDiskHist.map((b) => Math.round(b.t / 1000));
+      const startIdx = liveSliceWindow.filterByEpoch(epochsAll, spanSec);
+      const sliced = liveDiskHist.slice(startIdx);
+      return {
+        kind: 'disk' as const,
+        sliced,
+        epochs: epochsAll.slice(startIdx),
+        timestamps: sliced.map((b) => new Date(b.t).toLocaleTimeString(locale)),
+      };
+    }
+
+    if ((isLiveHead && hasGpuSubHist && liveGpuHist) || (!isLiveHead && useLocal20mGpu && liveGpuHist)) {
+      const epochsAll = liveGpuHist.map((b) => Math.round(b.t / 1000));
+      const startIdx = liveSliceWindow.filterByEpoch(epochsAll, spanSec);
+      const sliced = liveGpuHist.slice(startIdx);
+      return {
+        kind: 'gpu' as const,
+        sliced,
+        epochs: epochsAll.slice(startIdx),
+        timestamps: sliced.map((b) => new Date(b.t).toLocaleTimeString(locale)),
+      };
+    }
+
+    if (isLiveHead && liveMetrics?.history && (spec.chartKind !== 'net' || !spec.nicName) && !spec.gpuSubmetric) {
+      const liveHist = liveMetrics.history;
+      const epochsAll = liveHist.epoch_ts ?? [];
+      const startIdx = liveSliceWindow.filterByEpoch(epochsAll, LIVE_WINDOW_SECONDS);
+      return {
+        kind: 'main_live' as const,
+        liveHist,
+        startIdx,
+        epochs: epochsAll.slice(startIdx),
+        timestamps: (liveHist.timestamps ?? []).slice(startIdx),
+      };
+    }
+
+    return null;
+  }, [
+    preset,
+    cursorEndTs,
+    spec.chartKind,
+    spec.nicName,
+    spec.gpuSubmetric,
+    liveNicHist,
+    liveDiskHist,
+    liveGpuHist,
+    hasGpuSubHist,
+    useLocal20mNet,
+    useLocal20mStorage,
+    useLocal20mGpu,
+    liveMetrics?.history,
+    liveSliceWindow,
+    locale,
+  ]);
+
+  const resolvedSeries: ChartSeries[] = useMemo(() => {
+    if (liveBucketWindow?.kind === 'nic') {
+      const { sliced } = liveBucketWindow;
       return spec.series.map((s) => {
         if (s.metricKey === 'net_wan_rx') {
           return { ...s, data: sliced.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100) };
@@ -459,6 +424,48 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       });
     }
 
+    if (liveBucketWindow?.kind === 'disk') {
+      const { sliced } = liveBucketWindow;
+      return spec.series.map((s) => {
+        if (s.id === 'disk_r' || s.metricKey === 'disk_r') {
+          return { ...s, data: sliced.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
+        }
+        if (s.id === 'disk_w' || s.metricKey === 'disk_w') {
+          return { ...s, data: sliced.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
+        }
+        return s;
+      });
+    }
+
+    if (liveBucketWindow?.kind === 'gpu') {
+      const { sliced } = liveBucketWindow;
+      return spec.series.map((s) => {
+        const field = GPU_SUB_HISTORY_FIELD_MAP[s.id];
+        if (!field) return s;
+        return {
+          ...s,
+          data: sliced.map((b) => {
+            const v = b[field];
+            return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+          }),
+        };
+      });
+    }
+
+    if (liveBucketWindow?.kind === 'main_live') {
+      const { liveHist, startIdx } = liveBucketWindow;
+      return spec.series.map((s) => {
+        if (s.metricKey && Array.isArray(liveHist[s.metricKey])) {
+          return { ...s, data: (liveHist[s.metricKey] ?? s.data).slice(startIdx) };
+        }
+        return s;
+      });
+    }
+
+    if (preset === 'live' && cursorEndTs === null) {
+      return spec.series;
+    }
+
     const sqlHist: HistorySeries | undefined = historyData?.series;
     if (!sqlHist) return spec.series;
     return spec.series.map((s) => {
@@ -467,42 +474,17 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       return s;
     });
-  }, [preset, cursorEndTs, liveMetrics?.history, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.series, historyData, liveSliceWindow]);
+  }, [liveBucketWindow, preset, cursorEndTs, spec.series, historyData]);
 
   const resolvedTimestamps = useMemo(() => {
+    if (liveBucketWindow) {
+      return liveBucketWindow.timestamps.length > 0 ? liveBucketWindow.timestamps : spec.timestamps;
+    }
     if (preset === 'live' && cursorEndTs === null) {
-      if (spec.chartKind === 'net' && liveNicHist?.length) {
-        const startIdx = liveSliceWindow.filterByEpoch(liveNicHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
-        return liveNicHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
-      }
-      if (spec.chartKind === 'storage' && liveDiskHist?.length) {
-        const startIdx = liveSliceWindow.filterByEpoch(liveDiskHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
-        return liveDiskHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
-      }
-      if (hasGpuSubHist && liveGpuHist) {
-        const startIdx = liveSliceWindow.filterByEpoch(liveGpuHist.map((b) => Math.round(b.t / 1000)), LIVE_WINDOW_SECONDS);
-        return liveGpuHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
-      }
-      if ((spec.chartKind !== 'net' || !spec.nicName) && !spec.gpuSubmetric && liveMetrics?.history?.timestamps?.length) {
-        const startIdx = liveSliceWindow.filterByEpoch(liveMetrics?.history?.epoch_ts ?? [], LIVE_WINDOW_SECONDS);
-        return liveMetrics.history.timestamps.slice(startIdx);
-      }
       return spec.timestamps;
     }
-    if (useLocal20mGpu && liveGpuHist) {
-      const startIdx = liveSliceWindow.filterByEpoch(liveGpuHist.map((b) => Math.round(b.t / 1000)), 1200);
-      return liveGpuHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
-    }
-    if (useLocal20mStorage && liveDiskHist) {
-      const startIdx = liveSliceWindow.filterByEpoch(liveDiskHist.map((b) => Math.round(b.t / 1000)), 1200);
-      return liveDiskHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
-    }
-    if (useLocal20mNet && liveNicHist) {
-      const startIdx = liveSliceWindow.filterByEpoch(liveNicHist.map((b) => Math.round(b.t / 1000)), 1200);
-      return liveNicHist.slice(startIdx).map((b) => new Date(b.t).toLocaleTimeString(locale));
-    }
     return historyData?.series?.timestamps ?? spec.timestamps;
-  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.timestamps, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, locale, liveMetrics?.history?.timestamps, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
+  }, [liveBucketWindow, preset, cursorEndTs, spec.timestamps, historyData]);
 
   const resolvedDateTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) return undefined;
@@ -511,39 +493,14 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   }, [preset, cursorEndTs, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, historyData]);
 
   const resolvedEpochTs = useMemo(() => {
+    if (liveBucketWindow) {
+      return liveBucketWindow.epochs.length > 0 ? liveBucketWindow.epochs : spec.epochTs;
+    }
     if (preset === 'live' && cursorEndTs === null) {
-      if (spec.chartKind === 'net' && liveNicHist?.length) {
-        const epochs = liveNicHist.map((b) => Math.round(b.t / 1000));
-        return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
-      }
-      if (spec.chartKind === 'storage' && liveDiskHist?.length) {
-        const epochs = liveDiskHist.map((b) => Math.round(b.t / 1000));
-        return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
-      }
-      if (hasGpuSubHist && liveGpuHist) {
-        const epochs = liveGpuHist.map((b) => Math.round(b.t / 1000));
-        return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
-      }
-      if ((spec.chartKind !== 'net' || !spec.nicName) && !spec.gpuSubmetric && liveMetrics?.history?.epoch_ts?.length) {
-        const epochs = liveMetrics.history.epoch_ts;
-        return epochs.slice(liveSliceWindow.filterByEpoch(epochs, LIVE_WINDOW_SECONDS));
-      }
       return spec.epochTs;
     }
-    if (useLocal20mGpu && liveGpuHist) {
-      const epochs = liveGpuHist.map((b) => Math.round(b.t / 1000));
-      return epochs.slice(liveSliceWindow.filterByEpoch(epochs, 1200));
-    }
-    if (useLocal20mStorage && liveDiskHist) {
-      const epochs = liveDiskHist.map((b) => Math.round(b.t / 1000));
-      return epochs.slice(liveSliceWindow.filterByEpoch(epochs, 1200));
-    }
-    if (useLocal20mNet && liveNicHist) {
-      const epochs = liveNicHist.map((b) => Math.round(b.t / 1000));
-      return epochs.slice(liveSliceWindow.filterByEpoch(epochs, 1200));
-    }
     return historyData?.series?.epoch_ts ?? spec.epochTs;
-  }, [preset, cursorEndTs, spec.chartKind, spec.nicName, spec.gpuSubmetric, spec.epochTs, liveNicHist, liveDiskHist, liveGpuHist, hasGpuSubHist, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, liveMetrics?.history?.epoch_ts, historyData, liveSliceWindow]);
+  }, [liveBucketWindow, preset, cursorEndTs, spec.epochTs, historyData]);
 
   // Para velocidades/flujos delegamos en TelemetryChart el autoajuste exacto al pico visible en la ventana
   const dynamicMaxLeft = useMemo(() => {
@@ -615,7 +572,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={COCKPIT_SPRING}
-        className="cockpit-bento w-full max-w-6xl max-h-[94vh] overflow-y-auto p-4 sm:p-5 shadow-2xl"
+        className="cockpit-bento cockpit-modal-enter w-full max-w-6xl max-h-[94vh] overflow-y-auto p-4 sm:p-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera */}
@@ -654,9 +611,9 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
             type="button"
             aria-label={t('charts.close_aria')}
             onClick={onClose}
-            className="cockpit-subtile flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            className="cockpit-subtile flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -803,7 +760,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 type="button"
                 disabled={!canStepBack}
                 onClick={handleJumpOldest}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="cockpit-subtile inline-flex min-h-[44px] items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <Rewind className="h-4 w-4" />
                 <span>{t('charts.oldest')}</span>
@@ -812,7 +769,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 type="button"
                 disabled={!canStepBack}
                 onClick={handleStepBackward}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="cockpit-subtile inline-flex min-h-[44px] items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <ChevronLeft className="h-4 w-4" />
                 <span>{t('charts.step_back')}</span>
@@ -821,7 +778,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                 type="button"
                 disabled={!canStepForward}
                 onClick={handleStepForward}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="cockpit-subtile inline-flex min-h-[44px] items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <span>{t('charts.step_forward')}</span>
                 <ChevronRight className="h-4 w-4" />

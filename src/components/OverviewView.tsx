@@ -66,6 +66,270 @@ interface OverviewViewProps {
   actionPendingMac: string | null;
 }
 
+const OVERVIEW_WINDOW_SECONDS = 300; // Ventana en vivo de 5 minutos en Inicio
+
+interface OverviewDiskCardProps {
+  disk: DiskInfo;
+  timestamps: string[];
+  epochTs: number[];
+  theme: ThemeMode;
+  locale: string;
+  onExpandChart: (spec: ExpandChartSpec) => void;
+}
+
+const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
+  ({ disk: d, timestamps, epochTs, theme, locale, onExpandChart }) => {
+    const { t } = useI18n();
+    const isNet = d.kind === 'network';
+    const isRem = d.kind === 'removable' || Boolean(d.is_removable);
+    const isMounted = d.mounted !== false;
+    const pct = Math.min(100, Math.max(0, Number(d.percent ?? 0)));
+    const tone = getHealthTone(pct);
+    const readMb = Number(d.read_bytes_sec ?? 0) / (1024 * 1024);
+    const writeMb = Number(d.write_bytes_sec ?? 0) / (1024 * 1024);
+
+    const pillClass = isRem
+      ? 'cockpit-pill-violet'
+      : isNet
+        ? 'cockpit-pill-cyan'
+        : 'cockpit-pill-amber';
+    const readColor = isRem ? '#7c3aed' : isNet ? '#0284c7' : '#f59e0b';
+    const writeColor = isRem ? '#a855f7' : isNet ? '#06b6d4' : '#ea580c';
+    const barClass =
+      pct >= 90
+        ? 'bg-[#ef4444]'
+        : isRem
+          ? 'bg-[#7c3aed] dark:bg-[#a78bfa]'
+          : isNet
+            ? 'bg-[#0284c7] dark:bg-[#38bdf8]'
+            : 'bg-[#f59e0b] dark:bg-[#fbbf24]';
+
+    const devStr = String(d.device || '');
+    const netHost = isNet
+      ? devStr.startsWith('//')
+        ? devStr.replace(/^\/+/, '').split('/')[0]
+        : devStr.includes(':/')
+          ? devStr.split(':')[0]
+          : devStr
+      : '';
+    const sharedLabels = (d.shared_labels || []).filter(Boolean);
+    const resolvedDiskLabel = formatDiskLabel(d, locale);
+    const resolvedTransport = formatDiskTransport(d, locale);
+    const resolvedFstype = formatDiskFstype(d, locale);
+    const widgetTitle =
+      d.mountpoint === '/'
+        ? t('hardware.storage.label.disk_system')
+        : isNet
+          ? t('hardware.storage.label.nas_host', { host: netHost || d.mountpoint })
+          : resolvedDiskLabel;
+    const statusText = !isMounted
+      ? t('hardware.storage.unmounted')
+      : isNet && sharedLabels.length > 1
+        ? t('hardware.storage.folders_count', { count: sharedLabels.length })
+        : isRem
+          ? t('hardware.storage.removable_badge')
+          : tone.label;
+    const statusClass = !isMounted
+      ? 'text-violet-600 dark:text-violet-400'
+      : isNet
+        ? 'text-sky-600 dark:text-sky-400'
+        : tone.textClass;
+
+    const { diskSeries, diskTimestamps, diskEpochTs } = useMemo(() => {
+      const rawIoHist = d.io_history || [];
+      let ioHist = rawIoHist;
+      if (rawIoHist.length >= 2) {
+        const latestMs = Number(rawIoHist[rawIoHist.length - 1]?.t ?? 0);
+        if (!Number.isFinite(latestMs) || latestMs <= 0) {
+          ioHist = rawIoHist.slice(-60);
+        } else {
+          const cutoffMs = latestMs - OVERVIEW_WINDOW_SECONDS * 1000;
+          const idx = rawIoHist.findIndex((b) => Number(b.t) >= cutoffMs);
+          if (idx < 0) {
+            ioHist = rawIoHist.slice(-2);
+          } else {
+            const sliced = rawIoHist.slice(Math.min(idx, Math.max(0, rawIoHist.length - 2)));
+            ioHist = sliced.length >= 2 ? sliced : rawIoHist.slice(-2);
+          }
+        }
+      }
+
+      const diskReadPoints =
+        ioHist.length >= 2
+          ? ioHist.map((b) => Math.round(((b.r || 0) / (1024 * 1024)) * 100) / 100)
+          : [Math.round(readMb * 100) / 100, Math.round(readMb * 100) / 100];
+      const diskWritePoints =
+        ioHist.length >= 2
+          ? ioHist.map((b) => Math.round(((b.w || 0) / (1024 * 1024)) * 100) / 100)
+          : [Math.round(writeMb * 100) / 100, Math.round(writeMb * 100) / 100];
+      const computedTimestamps =
+        ioHist.length >= 2
+          ? ioHist.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale))
+          : timestamps.slice(-2);
+      const computedEpochTs =
+        ioHist.length >= 2
+          ? ioHist.map((b) => Math.round(b.t / 1000))
+          : epochTs.slice(-2);
+
+      const series: ChartSeries[] = [
+        {
+          id: 'disk_r',
+          metricKey: 'disk_r',
+          label: t('hardware.storage.read'),
+          data: diskReadPoints,
+          color: readColor,
+          unit: 'MB/s',
+          decimals: 2,
+          fillAlpha: 0.16,
+        },
+        {
+          id: 'disk_w',
+          metricKey: 'disk_w',
+          label: t('hardware.storage.write'),
+          data: diskWritePoints,
+          color: writeColor,
+          unit: 'MB/s',
+          decimals: 2,
+          fillAlpha: 0.08,
+        },
+      ];
+
+      return {
+        diskSeries: series,
+        diskTimestamps: computedTimestamps,
+        diskEpochTs: computedEpochTs,
+      };
+    }, [d.io_history, readMb, writeMb, readColor, writeColor, locale, timestamps, epochTs, t]);
+
+    const expandSpec = useMemo<ExpandChartSpec>(
+      () => ({
+        title: t('hardware.storage.activity_capacity', { name: widgetTitle }),
+        subtitle: isMounted
+          ? t('hardware.storage.free_of_total_mount', {
+              free: formatBytes(d.free_bytes),
+              total: formatBytes(d.total_bytes),
+              mount: d.mountpoint,
+            })
+          : t('hardware.storage.detected_device', { dev: d.device || d.mountpoint }),
+        series: diskSeries,
+        timestamps: diskTimestamps,
+        epochTs: diskEpochTs,
+        leftUnit: 'MB/s',
+        chartKind: 'storage',
+        diskMountpoint: d.mountpoint,
+      }),
+      [widgetTitle, isMounted, d.free_bytes, d.total_bytes, d.mountpoint, d.device, diskSeries, diskTimestamps, diskEpochTs, t]
+    );
+
+    const subtitleText =
+      isNet && sharedLabels.length > 0
+        ? `${sharedLabels.join(' · ')}${resolvedTransport ? ` · ${resolvedTransport}` : ''}`
+        : `${d.mountpoint}${resolvedTransport ? ` · ${resolvedTransport}` : ''}${resolvedFstype ? ` · ${resolvedFstype}` : ''}`;
+
+    return (
+      <motion.article
+        layout
+        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -12, scale: 0.94 }}
+        transition={{ duration: 0.36, ease: COCKPIT_EASE }}
+        whileHover={{ y: -2, transition: { duration: 0.2 } }}
+        className="cockpit-bento flex flex-col justify-between p-5"
+      >
+        <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span className={`${pillClass} inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg`}>
+                  {isRem ? (
+                    <Usb className="h-3.5 w-3.5" />
+                  ) : isNet ? (
+                    <Server className="h-3.5 w-3.5" />
+                  ) : (
+                    <HardDrive className="h-3.5 w-3.5" />
+                  )}
+                </span>
+                <span className="truncate font-semibold text-slate-700 dark:text-slate-200">
+                  {widgetTitle}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span className={`shrink-0 ${statusClass}`}>{statusText}</span>
+              </div>
+
+              <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
+                {isMounted ? (
+                  <AnimatedMetricValue
+                    value={pct}
+                    decimals={1}
+                    suffix=" %"
+                    className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white"
+                  />
+                ) : (
+                  <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white sm:text-3xl">
+                    {formatBytes(d.total_bytes)}
+                  </span>
+                )}
+                <span className={`${pillClass} rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums`}>
+                  {isMounted
+                    ? `${formatBytes(d.used_bytes)} / ${formatBytes(d.total_bytes)}`
+                    : resolvedTransport || t('hardware.storage.connected_badge')}
+                </span>
+                {d.temp_c !== null && d.temp_c !== undefined && (
+                  <span className="cockpit-pill-amber rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                    {formatTemp(d.temp_c)}
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-1.5 flex items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <span className="min-w-0 truncate" title={subtitleText}>
+                  {subtitleText}
+                </span>
+                <span aria-hidden="true" className="shrink-0">·</span>
+                <span className="shrink-0 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
+                  {t('hardware.storage.read_short')} {formatMbRate(readMb)} · {t('hardware.storage.write_short')} {formatMbRate(writeMb)}
+                </span>
+              </div>
+            </div>
+
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              type="button"
+              aria-label={t('hardware.storage.expand_aria', { name: widgetTitle })}
+              onClick={() => onExpandChart(expandSpec)}
+              className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-amber-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-amber-300"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </motion.button>
+          </div>
+
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${isMounted ? Math.max(2, pct) : 100}%` }}
+              transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+              className={`cockpit-progress-fill h-full rounded-full ${barClass}`}
+              style={{ opacity: isMounted ? 1 : 0.35 }}
+            />
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <TelemetryChart
+            series={diskSeries}
+            timestamps={diskTimestamps}
+            epochTs={diskEpochTs}
+            height={160}
+            leftUnit="MB/s"
+            theme={theme}
+            onExpandClick={() => onExpandChart(expandSpec)}
+          />
+        </div>
+      </motion.article>
+    );
+  }
+);
+
 export const OverviewView: React.FC<OverviewViewProps> = ({
   metrics,
   theme,
@@ -255,8 +519,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       (metrics?.net?.interfaces ? Object.values(metrics.net.interfaces) : []);
     return list.filter((i) => i.is_up && i.name !== 'lo');
   }, [metrics?.net?.interfaces, metrics?.net?.interfaces_list]);
-
-  const OVERVIEW_WINDOW_SECONDS = 300; // Ventana en vivo de 5 minutos en Inicio
 
   const hist = metrics?.history;
   const {
@@ -508,7 +770,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
 
         <AccordionBody open={showErrorsDetail}>
-          <div className="mt-4 border-t border-slate-200/80 pt-4 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+          <div className="mt-4 border-t border-slate-200/70 pt-4 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>{t('overview.errors_banner', { count: totalErrors })}</span>
               <button
@@ -932,255 +1194,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <AnimatePresence mode="popLayout">
           {independentDisks.map((d) => {
             const widgetKey = d.pool_key || d.mountpoint || d.device || 'disk';
-            const isNet = d.kind === 'network';
-            const isRem = d.kind === 'removable' || Boolean(d.is_removable);
-            const isMounted = d.mounted !== false;
-            const pct = Math.min(100, Math.max(0, Number(d.percent ?? 0)));
-            const tone = getHealthTone(pct);
-            const readMb = Number(d.read_bytes_sec ?? 0) / (1024 * 1024);
-            const writeMb = Number(d.write_bytes_sec ?? 0) / (1024 * 1024);
-
-            const pillClass = isRem
-              ? 'cockpit-pill-violet'
-              : isNet
-                ? 'cockpit-pill-cyan'
-                : 'cockpit-pill-amber';
-            const readColor = isRem ? '#7c3aed' : isNet ? '#0284c7' : '#f59e0b';
-            const writeColor = isRem ? '#a855f7' : isNet ? '#06b6d4' : '#ea580c';
-            const barClass =
-              pct >= 90
-                ? 'bg-[#ef4444]'
-                : isRem
-                  ? 'bg-[#7c3aed] dark:bg-[#a78bfa]'
-                  : isNet
-                    ? 'bg-[#0284c7] dark:bg-[#38bdf8]'
-                    : 'bg-[#f59e0b] dark:bg-[#fbbf24]';
-
-            const devStr = String(d.device || '');
-            const netHost = isNet
-              ? devStr.startsWith('//')
-                ? devStr.replace(/^\/+/, '').split('/')[0]
-                : devStr.includes(':/')
-                  ? devStr.split(':')[0]
-                  : devStr
-              : '';
-            const sharedLabels = (d.shared_labels || []).filter(Boolean);
-            const resolvedDiskLabel = formatDiskLabel(d, locale);
-            const resolvedTransport = formatDiskTransport(d, locale);
-            const resolvedFstype = formatDiskFstype(d, locale);
-            const widgetTitle =
-              d.mountpoint === '/'
-                ? t('hardware.storage.label.disk_system')
-                : isNet
-                  ? t('hardware.storage.label.nas_host', { host: netHost || d.mountpoint })
-                  : resolvedDiskLabel;
-            const statusText = !isMounted
-              ? t('hardware.storage.unmounted')
-              : isNet && sharedLabels.length > 1
-                ? t('hardware.storage.folders_count', { count: sharedLabels.length })
-                : isRem
-                  ? t('hardware.storage.removable_badge')
-                  : tone.label;
-            const statusClass = !isMounted
-              ? 'text-violet-600 dark:text-violet-400'
-              : isNet
-                ? 'text-sky-600 dark:text-sky-400'
-                : tone.textClass;
-
-            const rawIoHist = d.io_history || [];
-            const ioHist =
-              rawIoHist.length >= 2
-                ? (() => {
-                    const latestMs = Number(rawIoHist[rawIoHist.length - 1]?.t ?? 0);
-                    if (!Number.isFinite(latestMs) || latestMs <= 0) {
-                      return rawIoHist.slice(-60);
-                    }
-                    const cutoffMs = latestMs - OVERVIEW_WINDOW_SECONDS * 1000;
-                    const idx = rawIoHist.findIndex((b) => Number(b.t) >= cutoffMs);
-                    if (idx < 0) return rawIoHist.slice(-2);
-                    const sliced = rawIoHist.slice(Math.min(idx, Math.max(0, rawIoHist.length - 2)));
-                    return sliced.length >= 2 ? sliced : rawIoHist.slice(-2);
-                  })()
-                : rawIoHist;
-            const diskReadPoints =
-              ioHist.length >= 2
-                ? ioHist.map((b) => Math.round(((b.r || 0) / (1024 * 1024)) * 100) / 100)
-                : [Math.round(readMb * 100) / 100, Math.round(readMb * 100) / 100];
-            const diskWritePoints =
-              ioHist.length >= 2
-                ? ioHist.map((b) => Math.round(((b.w || 0) / (1024 * 1024)) * 100) / 100)
-                : [Math.round(writeMb * 100) / 100, Math.round(writeMb * 100) / 100];
-            const diskTimestamps =
-              ioHist.length >= 2
-                ? ioHist.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale))
-                : timestamps.slice(-2);
-            const diskEpochTs =
-              ioHist.length >= 2
-                ? ioHist.map((b) => Math.round(b.t / 1000))
-                : epochTs.slice(-2);
-
-            const diskSeries: ChartSeries[] = [
-              {
-                id: 'disk_r',
-                metricKey: 'disk_r',
-                label: t('hardware.storage.read'),
-                data: diskReadPoints,
-                color: readColor,
-                unit: 'MB/s',
-                decimals: 2,
-                fillAlpha: 0.16,
-              },
-              {
-                id: 'disk_w',
-                metricKey: 'disk_w',
-                label: t('hardware.storage.write'),
-                data: diskWritePoints,
-                color: writeColor,
-                unit: 'MB/s',
-                decimals: 2,
-                fillAlpha: 0.08,
-              },
-            ];
-
-            const subtitleText = isNet && sharedLabels.length > 0
-              ? `${sharedLabels.join(' · ')}${resolvedTransport ? ` · ${resolvedTransport}` : ''}`
-              : `${d.mountpoint}${resolvedTransport ? ` · ${resolvedTransport}` : ''}${resolvedFstype ? ` · ${resolvedFstype}` : ''}`;
-
             return (
-              <motion.article
-                layout
+              <OverviewDiskCard
                 key={widgetKey}
-                initial={{ opacity: 0, y: 16, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -12, scale: 0.94 }}
-                transition={{ duration: 0.36, ease: COCKPIT_EASE }}
-                whileHover={{ y: -2, transition: { duration: 0.2 } }}
-                className="cockpit-bento flex flex-col justify-between p-5"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                        <span className={`${pillClass} inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg`}>
-                          {isRem ? (
-                            <Usb className="h-3.5 w-3.5" />
-                          ) : isNet ? (
-                            <Server className="h-3.5 w-3.5" />
-                          ) : (
-                            <HardDrive className="h-3.5 w-3.5" />
-                          )}
-                        </span>
-                        <span className="truncate font-semibold text-slate-700 dark:text-slate-200">
-                          {widgetTitle}
-                        </span>
-                        <span aria-hidden="true">·</span>
-                        <span className={`shrink-0 ${statusClass}`}>{statusText}</span>
-                      </div>
-
-                      <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
-                        {isMounted ? (
-                          <AnimatedMetricValue
-                            value={pct}
-                            decimals={1}
-                            suffix=" %"
-                            className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white"
-                          />
-                        ) : (
-                          <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white sm:text-3xl">
-                            {formatBytes(d.total_bytes)}
-                          </span>
-                        )}
-                        <span className={`${pillClass} rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums`}>
-                          {isMounted
-                            ? `${formatBytes(d.used_bytes)} / ${formatBytes(d.total_bytes)}`
-                            : resolvedTransport || t('hardware.storage.connected_badge')}
-                        </span>
-                        {d.temp_c !== null && d.temp_c !== undefined && (
-                          <span className="cockpit-pill-amber rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
-                            {formatTemp(d.temp_c)}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-1.5 flex items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                        <span className="min-w-0 truncate" title={subtitleText}>
-                          {subtitleText}
-                        </span>
-                        <span aria-hidden="true" className="shrink-0">·</span>
-                        <span className="shrink-0 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
-                          {t('hardware.storage.read_short')} {formatMbRate(readMb)} · {t('hardware.storage.write_short')} {formatMbRate(writeMb)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <motion.button
-                      whileTap={{ scale: 0.92 }}
-                      type="button"
-                      aria-label={t('hardware.storage.expand_aria', { name: widgetTitle })}
-                      onClick={() =>
-                        onExpandChart({
-                          title: t('hardware.storage.activity_capacity', { name: widgetTitle }),
-                          subtitle: isMounted
-                            ? t('hardware.storage.free_of_total_mount', {
-                                free: formatBytes(d.free_bytes),
-                                total: formatBytes(d.total_bytes),
-                                mount: d.mountpoint,
-                              })
-                            : t('hardware.storage.detected_device', { dev: d.device || d.mountpoint }),
-                          series: diskSeries,
-                          timestamps: diskTimestamps,
-                          epochTs: diskEpochTs,
-                          leftUnit: 'MB/s',
-                          chartKind: 'storage',
-                          diskMountpoint: d.mountpoint,
-                        })
-                      }
-                      className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-amber-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-amber-300"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                    </motion.button>
-                  </div>
-
-                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${isMounted ? Math.max(2, pct) : 100}%` }}
-                      transition={{ type: 'spring', stiffness: 120, damping: 22 }}
-                      className={`cockpit-progress-fill h-full rounded-full ${barClass}`}
-                      style={{ opacity: isMounted ? 1 : 0.35 }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <TelemetryChart
-                    series={diskSeries}
-                    timestamps={diskTimestamps}
-                    epochTs={diskEpochTs}
-                    height={160}
-                    leftUnit="MB/s"
-                    theme={theme}
-                    onExpandClick={() =>
-                      onExpandChart({
-                        title: t('hardware.storage.activity_capacity', { name: widgetTitle }),
-                        subtitle: isMounted
-                          ? t('hardware.storage.free_of_total_mount', {
-                              free: formatBytes(d.free_bytes),
-                              total: formatBytes(d.total_bytes),
-                              mount: d.mountpoint,
-                            })
-                          : t('hardware.storage.detected_device', { dev: d.device || d.mountpoint }),
-                        series: diskSeries,
-                        timestamps: diskTimestamps,
-                        epochTs: diskEpochTs,
-                        leftUnit: 'MB/s',
-                        chartKind: 'storage',
-                        diskMountpoint: d.mountpoint,
-                      })
-                    }
-                  />
-                </div>
-              </motion.article>
+                disk={d}
+                timestamps={timestamps}
+                epochTs={epochTs}
+                theme={theme}
+                locale={locale}
+                onExpandChart={onExpandChart}
+              />
             );
           })}
         </AnimatePresence>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import {
   Bell,
@@ -57,6 +57,121 @@ interface ActiveMapPopupState {
   lat: number | null;
   lng: number | null;
 }
+
+interface NicHistoryCardProps {
+  nic: NetInterfaceInfo;
+  theme: ThemeMode;
+  locale: string;
+  onExpandChart?: (spec: ExpandChartSpec) => void;
+}
+
+const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, onExpandChart }) => {
+  const { t } = useI18n();
+  const hist2h = useMemo(() => nic.history_2h ?? [], [nic.history_2h]);
+
+  const { nicSeries, nicTimestamps, nicEpochTs, expandNicSpec } = useMemo(() => {
+    const wanRxData = hist2h.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100);
+    const wanTxData = hist2h.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100);
+    const lanRxData = hist2h.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100);
+    const lanTxData = hist2h.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100);
+    const timestamps = hist2h.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale));
+    const epochTs = hist2h.map((b) => Math.round(b.t / 1000));
+    const series: ChartSeries[] = [
+      { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: '#0284c7', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
+      { id: 'wan_tx', metricKey: 'net_wan_tx', label: t('hardware.net.wan_upload'), data: wanTxData, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
+      { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.10 },
+      { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.06 },
+    ];
+    const spec: ExpandChartSpec = {
+      title: t('hardware.net.iface_full_title', { name: nic.name }),
+      subtitle: t('hardware.net.iface_20m_subtitle', { ip: nic.ip || t('hardware.net.local_net') }),
+      series,
+      timestamps,
+      epochTs,
+      leftUnit: 'MB/s',
+      chartKind: 'net',
+      nicName: nic.name,
+    };
+    return { nicSeries: series, nicTimestamps: timestamps, nicEpochTs: epochTs, expandNicSpec: spec };
+  }, [hist2h, nic.name, nic.ip, locale, t]);
+
+  const formatNicLabel = useCallback(
+    (idx: number) => {
+      const bucket = hist2h[idx];
+      return bucket
+        ? new Date(bucket.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale)
+        : t('charts.sample_n', { n: idx + 1 });
+    },
+    [hist2h, locale, t]
+  );
+
+  const handleExpand = useCallback(() => {
+    if (onExpandChart) onExpandChart(expandNicSpec);
+  }, [onExpandChart, expandNicSpec]);
+
+  const wanRxNow = nic.wan_rx_bytes_sec ?? nic.rx_bytes_sec;
+  const wanTxNow = nic.wan_tx_bytes_sec ?? nic.tx_bytes_sec;
+  const lanRxNow = nic.lan_rx_bytes_sec ?? 0;
+  const lanTxNow = nic.lan_tx_bytes_sec ?? 0;
+
+  return (
+    <div className="cockpit-bento p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+            {t('hardware.net.iface_title', { name: nic.name })}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+            {nic.ip || t('hardware.net.no_local_ip')} · {nic.is_up ? t('hardware.net.active') : t('hardware.net.disconnected')}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-right font-mono text-[11px] tabular-nums">
+            <div className="text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
+              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+              ↓ {formatSpeed(wanRxNow)}
+            </div>
+            <div className="text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
+              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+              ↓ {formatSpeed(lanRxNow)}
+            </div>
+            <div className="text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
+              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+              ↑ {formatSpeed(wanTxNow)}
+            </div>
+            <div className="text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
+              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+              ↑ {formatSpeed(lanTxNow)}
+            </div>
+          </div>
+          {onExpandChart && (
+            <button
+              type="button"
+              aria-label={t('hardware.net.inspect_aria', { name: nic.name })}
+              onClick={handleExpand}
+              className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="mt-3">
+        <TelemetryChart
+          series={nicSeries}
+          timestamps={nicTimestamps}
+          epochTs={nicEpochTs}
+          height={112}
+          leftUnit="MB/s"
+          theme={theme}
+          emptyMessage={t('hardware.net.accumulating_20m')}
+          onExpandClick={onExpandChart ? handleExpand : undefined}
+          formatLabel={formatNicLabel}
+        />
+      </div>
+    </div>
+  );
+});
 
 interface DynamicGeoCluster {
   key: string;
@@ -1294,101 +1409,18 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
       {/* 1. Aparatos en casa */}
       {subTab === 'home' && (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* Network Interfaces with 20m Sparkline + Tooltip */}
           <section className="cockpit-auto-grid">
-            {interfaces.map((nic) => {
-              const hist2h = nic.history_2h ?? [];
-              const wanRxData = hist2h.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100);
-              const wanTxData = hist2h.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100);
-              const lanRxData = hist2h.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100);
-              const lanTxData = hist2h.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100);
-              const nicTimestamps = hist2h.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale));
-              const nicEpochTs = hist2h.map((b) => Math.round(b.t / 1000));
-              const nicSeries: ChartSeries[] = [
-                { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: '#0284c7', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
-                { id: 'wan_tx', metricKey: 'net_wan_tx', label: t('hardware.net.wan_upload'), data: wanTxData, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
-                { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.10 },
-                { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.06 },
-              ];
-              const expandNicSpec: ExpandChartSpec = {
-                title: t('hardware.net.iface_full_title', { name: nic.name }),
-                subtitle: t('hardware.net.iface_20m_subtitle', { ip: nic.ip || t('hardware.net.local_net') }),
-                series: nicSeries,
-                timestamps: nicTimestamps,
-                epochTs: nicEpochTs,
-                leftUnit: 'MB/s',
-                chartKind: 'net',
-                nicName: nic.name,
-              };
-              const wanRxNow = nic.wan_rx_bytes_sec ?? nic.rx_bytes_sec;
-              const wanTxNow = nic.wan_tx_bytes_sec ?? nic.tx_bytes_sec;
-              const lanRxNow = nic.lan_rx_bytes_sec ?? 0;
-              const lanTxNow = nic.lan_tx_bytes_sec ?? 0;
-              return (
-                <div
-                  key={nic.name}
-                  className="cockpit-bento p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {t('hardware.net.iface_title', { name: nic.name })}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                        {nic.ip || t('hardware.net.no_local_ip')} · {nic.is_up ? t('hardware.net.active') : t('hardware.net.disconnected')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-right font-mono text-[11px] tabular-nums">
-                        <div className="text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
-                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
-                          ↓ {formatSpeed(wanRxNow)}
-                        </div>
-                        <div className="text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
-                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
-                          ↓ {formatSpeed(lanRxNow)}
-                        </div>
-                        <div className="text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
-                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
-                          ↑ {formatSpeed(wanTxNow)}
-                        </div>
-                        <div className="text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
-                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
-                          ↑ {formatSpeed(lanTxNow)}
-                        </div>
-                      </div>
-                      {onExpandChart && (
-                        <button
-                          type="button"
-                          aria-label={t('hardware.net.inspect_aria', { name: nic.name })}
-                          onClick={() => onExpandChart(expandNicSpec)}
-                          className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-                        >
-                          <Maximize2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <TelemetryChart
-                      series={nicSeries}
-                      timestamps={nicTimestamps}
-                      epochTs={nicEpochTs}
-                      height={112}
-                      leftUnit="MB/s"
-                      theme={theme}
-                      emptyMessage={t('hardware.net.accumulating_20m')}
-                      onExpandClick={onExpandChart ? () => onExpandChart(expandNicSpec) : undefined}
-                      formatLabel={(idx) => {
-                        const bucket = hist2h[idx];
-                        return bucket ? new Date(bucket.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale) : t('charts.sample_n', { n: idx + 1 });
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+            {interfaces.map((nic) => (
+              <NicHistoryCard
+                key={nic.name}
+                nic={nic}
+                theme={theme}
+                locale={locale}
+                onExpandChart={onExpandChart}
+              />
+            ))}
           </section>
 
           {/* Connected Devices with Custom Logo + WoL + Shutdown */}
@@ -1445,7 +1477,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                             setLogoSearchQ(client.brand || client.vendor || client.name || '');
                           }}
                           title={t('network.change_icon_title')}
-                          className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white hover:border-sky-400 dark:border-slate-700 dark:bg-slate-900"
+                          className="cockpit-subtile flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden hover:border-sky-400 dark:hover:border-sky-500"
                         >
                           {imgSrc ? (
                             <img
@@ -1583,11 +1615,11 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   <div className="flex flex-wrap items-center gap-1.5">
                     {(
                       [
-                        { id: 'all' as const, label: t('network.map_filter_all'), count: mapFilterCounts.all, activeCls: 'bg-sky-600 text-white border-sky-600' },
-                        { id: 'incoming' as const, label: t('network.map_filter_incoming'), count: mapFilterCounts.incoming, activeCls: 'bg-amber-600 text-white border-amber-600' },
-                        { id: 'outgoing' as const, label: t('network.map_filter_outgoing'), count: mapFilterCounts.outgoing, activeCls: 'bg-emerald-600 text-white border-emerald-600' },
-                        { id: 'devices' as const, label: t('network.map_filter_devices'), count: mapFilterCounts.devices, activeCls: 'bg-indigo-600 text-white border-indigo-600' },
-                        { id: 'blocked' as const, label: t('network.map_filter_blocked'), count: mapFilterCounts.blocked, activeCls: 'bg-rose-600 text-white border-rose-600' },
+                        { id: 'all' as const, label: t('network.map_filter_all'), count: mapFilterCounts.all, activeCls: 'cockpit-pill-cyan ring-1 ring-sky-400/50 dark:ring-sky-500/40' },
+                        { id: 'incoming' as const, label: t('network.map_filter_incoming'), count: mapFilterCounts.incoming, activeCls: 'cockpit-pill-amber ring-1 ring-amber-400/50 dark:ring-amber-500/40' },
+                        { id: 'outgoing' as const, label: t('network.map_filter_outgoing'), count: mapFilterCounts.outgoing, activeCls: 'cockpit-pill-emerald ring-1 ring-emerald-400/50 dark:ring-emerald-500/40' },
+                        { id: 'devices' as const, label: t('network.map_filter_devices'), count: mapFilterCounts.devices, activeCls: 'cockpit-pill-violet ring-1 ring-violet-400/50 dark:ring-violet-500/40' },
+                        { id: 'blocked' as const, label: t('network.map_filter_blocked'), count: mapFilterCounts.blocked, activeCls: 'cockpit-pill-red ring-1 ring-rose-400/50 dark:ring-rose-500/40' },
                       ]
                     ).map((f) => {
                       const active = mapFilter === f.id;
@@ -1596,16 +1628,16 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                           key={f.id}
                           type="button"
                           onClick={() => setMapFilter(f.id)}
-                          className={`inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                          className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-semibold transition-colors ${
                             active
                               ? f.activeCls
-                              : 'border-slate-200/80 bg-white/70 text-slate-600 hover:bg-slate-100 dark:border-slate-700/80 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
+                              : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                           }`}
                         >
                           <span>{f.label}</span>
                           <span
                             className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] tabular-nums ${
-                              active ? 'bg-black/20 text-white' : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                              active ? 'bg-black/10 dark:bg-white/10' : 'bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                             }`}
                           >
                             {f.count}
@@ -1732,10 +1764,10 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                     Number.isFinite(c.lat) &&
                     Number.isFinite(c.lng);
                   const dirBadge = isBanned
-                    ? { label: t('network.map_direction_blocked'), cls: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30' }
+                    ? { label: t('network.map_direction_blocked'), cls: 'cockpit-pill-red' }
                     : c.direction === 'incoming'
-                    ? { label: t('network.map_direction_in'), cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' }
-                    : { label: t('network.map_direction_out'), cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' };
+                    ? { label: t('network.map_direction_in'), cls: 'cockpit-pill-amber' }
+                    : { label: t('network.map_direction_out'), cls: 'cockpit-pill-emerald' };
 
                   return (
                     <div
@@ -1751,7 +1783,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                           className="min-w-0 flex-1 text-left cursor-pointer disabled:cursor-default group"
                         >
                           <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                            <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${dirBadge.cls}`}>
+                            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${dirBadge.cls}`}>
                               {dirBadge.label}
                             </span>
                             <span className="font-semibold text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
@@ -1808,12 +1840,12 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                       </div>
 
                       {/* Franja simétrica de tráfico en tiempo real por conexión (v10.4.0) */}
-                      <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-200/70 bg-slate-50/70 px-2.5 py-1.5 font-mono text-[11px] tabular-nums dark:border-slate-800/80 dark:bg-slate-900/50">
+                      <div className="mt-0.5 grid grid-cols-3 gap-1.5 border-t border-slate-200/70 pt-2 font-mono text-[11px] tabular-nums dark:border-slate-800">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('network.map_traffic_rx')}</span>
                           <span className="font-semibold text-sky-600 dark:text-sky-400">{formatSpeed(c.rx_speed ?? 0)}</span>
                         </div>
-                        <div className="flex items-center justify-between gap-1 border-x border-slate-200/60 px-2 dark:border-slate-800">
+                        <div className="flex items-center justify-between gap-1 border-x border-slate-200/70 px-2 dark:border-slate-800">
                           <span className="font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('network.map_traffic_tx')}</span>
                           <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatSpeed(c.tx_speed ?? 0)}</span>
                         </div>
@@ -1976,13 +2008,18 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <section className="cockpit-bento p-5">
             <div className="flex items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
-              <div>
-                <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  {t('network.ddns_title')}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {t('network.ddns_sub')}
-                </p>
+              <div className="flex items-center gap-2.5">
+                <span className="cockpit-pill-cyan inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                  <Globe className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                    {t('network.ddns_title')}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('network.ddns_sub')}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
@@ -2038,15 +2075,22 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           </section>
 
           <section className="cockpit-bento p-5">
-            <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-              {t('network.pihole_title')}
-            </h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {(metrics?.security?.pihole?.online ?? metrics?.security?.pihole?.available)
-                ? t('network.pihole_active')
-                : t('network.pihole_missing')}
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3 text-xs">
+            <div className="flex items-center gap-2.5 pb-4 border-b border-slate-200/70 dark:border-slate-800">
+              <span className="cockpit-pill-emerald inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                <Shield className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                  {t('network.pihole_title')}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {(metrics?.security?.pihole?.online ?? metrics?.security?.pihole?.available)
+                    ? t('network.pihole_active')
+                    : t('network.pihole_missing')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
               <div className="cockpit-pill-cyan rounded-xl p-3.5">
                 <span className="text-[11px] font-semibold opacity-80">{t('network.queries_today')}</span>
                 <p className="mt-1 font-mono text-xl font-bold tabular-nums">
@@ -2077,11 +2121,13 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             onClick={() => setLogoModalClient(null)}
           >
             <motion.div
+              role="dialog"
+              aria-modal="true"
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
               transition={COCKPIT_SPRING}
-              className="cockpit-bento w-full max-w-md p-5 shadow-2xl"
+              className="cockpit-bento cockpit-modal-enter w-full max-w-md p-5"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-200/70 dark:border-slate-800">

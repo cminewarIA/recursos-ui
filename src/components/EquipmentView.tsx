@@ -62,8 +62,8 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
   }, [initialSubTab, navTick]);
 
   const hist = metrics?.history;
-  const timestamps = hist?.timestamps ?? [];
-  const epochTs = hist?.epoch_ts ?? [];
+  const timestamps = useMemo(() => hist?.timestamps ?? [], [hist?.timestamps]);
+  const epochTs = useMemo(() => hist?.epoch_ts ?? [], [hist?.epoch_ts]);
 
   const cpuCores = useMemo(() => metrics?.cpu?.per_core_percent ?? [], [metrics?.cpu?.per_core_percent]);
   const cpuSeries: ChartSeries[] = useMemo(
@@ -384,7 +384,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     });
 
     return cards;
-  }, [metrics?.gpu, hist?.gpu, timestamps, epochTs, t]);
+  }, [metrics?.gpu, hist?.gpu, timestamps, epochTs, locale, t]);
 
   const disks = useMemo(() => metrics?.disks ?? [], [metrics?.disks]);
   const diskReadHist = hist?.disk_r ?? [];
@@ -585,7 +585,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               <span>{t('equipment.technical_details')}</span>
             </button>
             <AccordionBody open={showTech}>
-              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-xs font-mono tabular-nums text-slate-600 dark:border-slate-800 dark:text-slate-300 sm:grid-cols-4">
+              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-200/70 pt-3 text-xs font-mono tabular-nums text-slate-600 dark:border-slate-800 dark:text-slate-300 sm:grid-cols-4">
                 <div>{t('equipment.tech_arch_row', { arch: metrics?.cpu?.architecture || '--' })}</div>
                 <div>{t('hardware.cpu.physical_cores', { count: metrics?.cpu?.physical_cores || '--' })}</div>
                 <div>{t('equipment.freq_row', { freq: metrics?.cpu?.freq_mhz ? `${Math.round(metrics.cpu.freq_mhz)} MHz` : '--' })}</div>
@@ -677,7 +677,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               }
             />
           </div>
-          <div className="mt-5 grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 text-xs dark:border-slate-800 sm:grid-cols-3">
+          <div className="mt-5 grid grid-cols-1 gap-3 border-t border-slate-200/70 pt-4 text-xs dark:border-slate-800 sm:grid-cols-3">
             <div>
               <span className="text-slate-500 dark:text-slate-400">{t('hardware.ram.installed_total')}</span>
               <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
@@ -770,7 +770,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               </div>
 
               {/* Resumen de sensores */}
-              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-xs dark:border-slate-800 sm:grid-cols-4">
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200/70 pt-4 text-xs dark:border-slate-800 sm:grid-cols-4">
                 <div>
                   <span className="text-slate-500 dark:text-slate-400">{t('hardware.gpu.vram_label')}</span>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
@@ -802,7 +802,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               </div>
 
               {/* Barra dinámica de sub-gráficas activadas/desactivadas según hardware */}
-              <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-800">
                 <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                     {t('hardware.gpu.sensors_bar_label')}
@@ -1143,7 +1143,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-100 text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                <tr className="border-b border-slate-200/70 text-slate-500 dark:border-slate-800 dark:text-slate-400">
                   <th className="py-2.5 pr-3 font-medium">{t('equipment.col_program')}</th>
                   <th className="py-2.5 px-3 font-medium">{t('equipment.col_user')}</th>
                   <th className="py-2.5 px-3 text-right font-medium">{t('equipment.col_cpu')}</th>
@@ -1152,7 +1152,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                   <th className="py-2.5 pl-3 text-right font-medium">{t('hardware.storage.title')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
                 {filteredProcesses.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-slate-500 dark:text-slate-400">
@@ -1161,7 +1161,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                   </tr>
                 ) : (
                   filteredProcesses.map((proc) => (
-                    <tr key={`${proc.pid}-${proc.name}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <tr key={`${proc.pid}-${proc.name}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                       <td className="py-2.5 pr-3">
                         <p className="font-medium text-slate-900 dark:text-slate-100">{proc.name}</p>
                         <p className="font-mono text-[11px] text-slate-400">{t('equipment.pid_label', { pid: proc.pid })}</p>

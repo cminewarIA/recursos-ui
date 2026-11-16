@@ -352,13 +352,13 @@ export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-100 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+              <tr className="border-b border-slate-200/70 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
                 <th className="py-2 pr-3 font-medium">{t('equipment.col_program')}</th>
                 <th className="py-2 px-3 font-medium">{t('equipment.active_procs.col_consume')}</th>
                 <th className="py-2 pl-3 text-right font-medium">{t('equipment.active_procs.col_share')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100/80 dark:divide-slate-800/80">
+            <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
               {visibleRows.map((row) => (
                 <tr key={`${kind}-${row.pid}-${row.name}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                   <td className="py-2 pr-3 min-w-[140px]">

@@ -784,7 +784,7 @@ export function App() {
             </div>
 
             {/* Summary KPI row separated by clean hairline divider */}
-            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200/80 pt-4 sm:grid-cols-4 dark:border-slate-800">
+            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200/70 pt-4 sm:grid-cols-4 dark:border-slate-800">
               <div>
                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                   {t('hardware.net.wan_download')} ({t('overview.net_history_24h_peak_wan')})
@@ -921,17 +921,21 @@ export function App() {
               onClick={() => setConfirmShutdownClient(null)}
             >
               <motion.div
+                role="dialog"
+                aria-modal="true"
                 initial={{ opacity: 0, scale: 0.94, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 8 }}
                 transition={COCKPIT_SPRING}
-                className="cockpit-bento w-full max-w-sm p-5 shadow-2xl"
+                className="cockpit-bento cockpit-modal-enter w-full max-w-sm p-5"
                 onClick={(e) => e.stopPropagation()}
               >
-                <h3 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  {t('status.power_confirm_title')}
-                </h3>
-                <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                <div className="pb-3 border-b border-slate-200/70 dark:border-slate-800">
+                  <h3 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                    {t('status.power_confirm_title')}
+                  </h3>
+                </div>
+                <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
                   {t('status.power_confirm_body_pre')}{' '}
                   <strong>
                     {confirmShutdownClient.name || confirmShutdownClient.hostname || confirmShutdownClient.ip}
@@ -942,7 +946,7 @@ export function App() {
                   <button
                     type="button"
                     onClick={() => setConfirmShutdownClient(null)}
-                    className="cockpit-subtile min-h-[42px] px-4 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="cockpit-subtile min-h-[42px] px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     {t('status.power_confirm_cancel')}
                   </button>
@@ -953,7 +957,7 @@ export function App() {
                       setConfirmShutdownClient(null);
                       void executePowerAction('shutdown', target);
                     }}
-                    className="min-h-[42px] rounded-xl bg-rose-600 px-4 text-xs font-semibold text-white hover:bg-rose-700"
+                    className="cockpit-btn-off min-h-[42px] rounded-xl px-4 text-xs font-semibold transition-colors"
                   >
                     {t('status.power_confirm_yes')}
                   </button>
@@ -972,7 +976,7 @@ export function App() {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 24, scale: 0.94 }}
               transition={COCKPIT_SPRING}
-              className="cockpit-bento fixed right-4 top-20 z-50 max-w-xs px-4 py-3 text-xs font-medium text-slate-900 shadow-xl dark:text-white"
+              className="cockpit-bento cockpit-toast-enter fixed right-4 top-20 z-50 max-w-xs px-4 py-3 text-xs font-medium text-slate-900 dark:text-white"
             >
               <span className={toast.isError ? 'text-rose-600 dark:text-rose-400' : 'text-sky-700 dark:text-sky-300'}>
                 {toast.message}

@@ -332,7 +332,7 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={COCKPIT_SPRING}
-        className="cockpit-bento w-full max-w-6xl max-h-[94vh] overflow-y-auto p-4 sm:p-5 shadow-2xl"
+        className="cockpit-bento cockpit-modal-enter w-full max-w-6xl max-h-[94vh] overflow-y-auto p-4 sm:p-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera estilo Inspección Táctil */}
@@ -356,7 +356,7 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
               type="button"
               onClick={() => void fetchDevicesDb(true)}
               aria-label={t('network.refresh')}
-              className="cockpit-subtile flex h-9 w-9 items-center justify-center rounded-xl text-slate-600 transition-colors hover:bg-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-sky-300"
             >
               <RefreshCw className={`h-4 w-4 ${loadingDb ? 'animate-spin text-sky-600' : ''}`} />
             </button>
@@ -364,7 +364,7 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
               type="button"
               aria-label={t('charts.close_aria')}
               onClick={onClose}
-              className="cockpit-subtile flex h-9 w-9 items-center justify-center rounded-xl text-slate-600 transition-colors hover:bg-slate-200/70 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
@@ -397,11 +397,11 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                     onClick={() => setActiveTab(tab.key)}
                     className={`relative min-h-[38px] rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
                       active
-                        ? 'text-sky-700 dark:text-sky-200'
-                        : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
+                        ? 'text-sky-700 dark:text-sky-300'
+                        : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                     }`}
                   >
-                    {active && <MorphPill layoutId="net-inspect-mode-pill" className="cockpit-pill-cyan shadow-sm" />}
+                    {active && <MorphPill layoutId="net-inspect-mode-pill" className="rounded-lg" />}
                     <span className="relative z-10 inline-flex items-center gap-1.5">
                       {tab.icon}
                       {tab.label}
@@ -444,13 +444,13 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                       key={item.key}
                       type="button"
                       onClick={() => setSourceFilter(item.key)}
-                      className={`cockpit-subtile relative min-h-[38px] rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
+                      className={`relative min-h-[38px] rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
                         active
-                          ? 'text-sky-700 dark:text-sky-200 ring-1 ring-sky-500/40'
-                          : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                          ? 'text-sky-700 dark:text-sky-300'
+                          : 'cockpit-subtile text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
                       }`}
                     >
-                      {active && <MorphPill layoutId="net-db-source-pill" className="cockpit-pill-cyan" />}
+                      {active && <MorphPill layoutId="net-db-source-pill" className="rounded-xl" />}
                       <span className="relative z-10 inline-flex items-center gap-1.5">
                         {item.icon}
                         {item.label}
@@ -526,25 +526,25 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-800/70">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/70 dark:border-slate-800">
                         <div className="flex flex-wrap items-center gap-1 text-[10px] font-semibold">
                           {client.band && (
-                            <span className="rounded-md bg-slate-200/70 px-1.5 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            <span className="cockpit-subtile rounded-md px-1.5 py-0.5 text-slate-700 dark:text-slate-300">
                               {client.band}
                             </span>
                           )}
                           {srcs.includes('pihole') && (
-                            <span className="rounded-md bg-rose-500/10 px-1.5 py-0.5 text-rose-700 dark:text-rose-300">
+                            <span className="cockpit-pill-red rounded-md px-1.5 py-0.5">
                               Pi-hole
                             </span>
                           )}
                           {srcs.includes('asus') && (
-                            <span className="rounded-md bg-sky-500/10 px-1.5 py-0.5 text-sky-700 dark:text-sky-300">
+                            <span className="cockpit-pill-cyan rounded-md px-1.5 py-0.5">
                               {summary.asus_model || t('overview.db_source_router_short')}
                             </span>
                           )}
                           {srcs.includes('gateway') && (
-                            <span className="rounded-md bg-violet-500/10 px-1.5 py-0.5 text-violet-700 dark:text-violet-300">
+                            <span className="cockpit-pill-violet rounded-md px-1.5 py-0.5">
                               {summary.gateway_name || t('overview.db_source_gateway')}
                             </span>
                           )}
@@ -641,13 +641,13 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                         key={opt.key}
                         type="button"
                         onClick={() => toggleSort(opt.key)}
-                        className={`cockpit-subtile relative min-h-[38px] rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
+                        className={`relative min-h-[38px] rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
                           active
-                            ? 'text-sky-700 dark:text-sky-200 ring-1 ring-sky-500/40'
-                            : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                            ? 'text-sky-700 dark:text-sky-300'
+                            : 'cockpit-subtile text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
                         }`}
                       >
-                        {active && <MorphPill layoutId="net-bw-sort-pill" className="cockpit-pill-cyan" />}
+                        {active && <MorphPill layoutId="net-bw-sort-pill" className="rounded-xl" />}
                         <span className="relative z-10 inline-flex items-center gap-1">
                           {opt.label}
                           {active ? (
@@ -671,8 +671,8 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                 onClick={() => setOnlyActiveTraffic((v) => !v)}
                 className={`min-h-[38px] rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
                   onlyActiveTraffic
-                    ? 'cockpit-pill-cyan ring-1 ring-sky-500/40'
-                    : 'cockpit-subtile text-slate-600 hover:text-slate-900 dark:text-slate-300'
+                    ? 'cockpit-pill-cyan'
+                    : 'cockpit-subtile text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                 }`}
               >
                 {onlyActiveTraffic ? t('overview.bw_only_active') : t('overview.bw_show_all')} ({bandwidthDevices.length})

@@ -27,6 +27,7 @@ interface TelemetryChartProps {
   maxRight?: number;
   leftUnit?: string;
   intervalSec?: number;
+  significantDelta?: number;
   theme: ThemeMode;
   className?: string;
   formatLabel?: (index: number) => string;
@@ -35,6 +36,230 @@ interface TelemetryChartProps {
   onExpandClick?: () => void;
   interactionMode?: 'inspect' | 'pan';
   onPanDeltaSteps?: (deltaSteps: number) => void;
+}
+
+let cachedMeasureCtx: CanvasRenderingContext2D | null = null;
+function measureAxisTextWidth(text: string, font: string): number {
+  if (typeof document === 'undefined') return text.length * 6.2;
+  if (!cachedMeasureCtx) {
+    const offscreen = document.createElement('canvas');
+    cachedMeasureCtx = offscreen.getContext('2d');
+  }
+  if (!cachedMeasureCtx) return text.length * 6.2;
+  cachedMeasureCtx.font = font;
+  return cachedMeasureCtx.measureText(text).width;
+}
+
+function getSensorSignificantThreshold(
+  unit: string,
+  scalePeak: number,
+  decimals?: number,
+  customDelta?: number
+): number {
+  if (typeof customDelta === 'number' && Number.isFinite(customDelta) && customDelta > 0) {
+    return customDelta;
+  }
+  if (unit === '%') return 0.5;
+  if (unit === '°C' || unit === 'C') return 0.5;
+  if (unit === 'MB/s') {
+    return Math.min(0.5, Math.max(0.02, scalePeak * 0.015));
+  }
+  if (decimals === 0) {
+    return Math.max(1, scalePeak * 0.01);
+  }
+  return Math.max(0.25, scalePeak * 0.01);
+}
+
+interface BucketedSeriesResult {
+  s: ChartSeries;
+  values: number[];
+  sourceIndices: number[]; // Empty when 1:1 (no downsampling applied)
+}
+
+/**
+ * Agrupa series extensas en buckets que conservan picos y valles (min/max cronológico por bucket)
+ * cuando la densidad de muestras supera la resolución horizontal en píxeles.
+ */
+function buildSeriesBuckets(rawData: number[], maxBuckets: number): { values: number[]; sourceIndices: number[] } {
+  const n = rawData.length;
+  if (n <= maxBuckets || maxBuckets < 8 || n <= 4) {
+    const clean = new Array<number>(n);
+    for (let i = 0; i < n; i++) {
+      const v = Number(rawData[i]);
+      clean[i] = Number.isFinite(v) ? v : 0;
+    }
+    return { values: clean, sourceIndices: [] };
+  }
+
+  const bucketCount = Math.max(2, Math.floor((maxBuckets - 2) / 2));
+  const interiorLen = n - 2;
+  const bucketSize = interiorLen / bucketCount;
+  const values: number[] = [Number.isFinite(Number(rawData[0])) ? Number(rawData[0]) : 0];
+  const sourceIndices: number[] = [0];
+
+  for (let b = 0; b < bucketCount; b++) {
+    const start = 1 + Math.floor(b * bucketSize);
+    const end = Math.min(n - 1, 1 + Math.floor((b + 1) * bucketSize));
+    if (start >= end) continue;
+
+    let minIdx = start;
+    let maxIdx = start;
+    let minVal = Number(rawData[start]);
+    if (!Number.isFinite(minVal)) minVal = 0;
+    let maxVal = minVal;
+
+    for (let i = start + 1; i < end; i++) {
+      const raw = Number(rawData[i]);
+      const val = Number.isFinite(raw) ? raw : 0;
+      if (val < minVal) {
+        minVal = val;
+        minIdx = i;
+      }
+      if (val > maxVal) {
+        maxVal = val;
+        maxIdx = i;
+      }
+    }
+
+    if (minIdx === maxIdx) {
+      values.push(maxVal);
+      sourceIndices.push(maxIdx);
+    } else if (minIdx < maxIdx) {
+      values.push(minVal, maxVal);
+      sourceIndices.push(minIdx, maxIdx);
+    } else {
+      values.push(maxVal, minVal);
+      sourceIndices.push(maxIdx, minIdx);
+    }
+  }
+
+  const lastIdx = n - 1;
+  const lastVal = Number(rawData[lastIdx]);
+  values.push(Number.isFinite(lastVal) ? lastVal : 0);
+  sourceIndices.push(lastIdx);
+  return { values, sourceIndices };
+}
+
+function areTelemetryChartPropsEqual(prev: TelemetryChartProps, next: TelemetryChartProps): boolean {
+  if (
+    prev.theme !== next.theme ||
+    prev.height !== next.height ||
+    prev.maxLeft !== next.maxLeft ||
+    prev.maxRight !== next.maxRight ||
+    prev.leftUnit !== next.leftUnit ||
+    prev.intervalSec !== next.intervalSec ||
+    prev.significantDelta !== next.significantDelta ||
+    prev.interactionMode !== next.interactionMode ||
+    prev.emptyMessage !== next.emptyMessage ||
+    prev.className !== next.className ||
+    Boolean(prev.onExpandClick) !== Boolean(next.onExpandClick) ||
+    Boolean(prev.onPanDeltaSteps) !== Boolean(next.onPanDeltaSteps)
+  ) {
+    return false;
+  }
+
+  if (prev.series.length !== next.series.length) return false;
+
+  const prevEpoch = prev.epochTs ?? [];
+  const nextEpoch = next.epochTs ?? [];
+  if (prevEpoch.length !== nextEpoch.length) return false;
+  if (prevEpoch.length >= 2 && nextEpoch.length >= 2) {
+    const windowJumpTolerance = Math.max((next.intervalSec ?? 5) * 3, 20);
+    if (
+      Math.abs(Number(nextEpoch[0]) - Number(prevEpoch[0])) > windowJumpTolerance ||
+      Math.abs(Number(nextEpoch[nextEpoch.length - 1]) - Number(prevEpoch[prevEpoch.length - 1])) > windowJumpTolerance
+    ) {
+      return false;
+    }
+  }
+
+  let leftScalePeak = typeof next.maxLeft === 'number' && next.maxLeft > 0 ? next.maxLeft : 0;
+  let rightScalePeak = typeof next.maxRight === 'number' && next.maxRight > 0 ? next.maxRight : 100;
+
+  for (let i = 0; i < next.series.length; i++) {
+    const p = prev.series[i];
+    const n = next.series[i];
+    if (
+      p.id !== n.id ||
+      p.label !== n.label ||
+      p.color !== n.color ||
+      p.unit !== n.unit ||
+      p.axis !== n.axis ||
+      p.dashed !== n.dashed ||
+      p.decimals !== n.decimals ||
+      p.fillAlpha !== n.fillAlpha ||
+      p.data.length !== n.data.length
+    ) {
+      return false;
+    }
+    for (let k = 0; k < n.data.length; k++) {
+      const nv = Number(n.data[k]);
+      const pv = Number(p.data[k]);
+      if (n.axis === 'right') {
+        if (Number.isFinite(nv) && nv > rightScalePeak) rightScalePeak = nv;
+        if (Number.isFinite(pv) && pv > rightScalePeak) rightScalePeak = pv;
+      } else {
+        if (Number.isFinite(nv) && nv > leftScalePeak) leftScalePeak = nv;
+        if (Number.isFinite(pv) && pv > leftScalePeak) leftScalePeak = pv;
+      }
+    }
+  }
+
+  const defaultLeftUnit = next.leftUnit ?? '%';
+  for (let i = 0; i < next.series.length; i++) {
+    const pData = prev.series[i].data;
+    const nData = next.series[i].data;
+    const len = nData.length;
+    if (len === 0) continue;
+
+    const unit = next.series[i].unit ?? defaultLeftUnit;
+    const scalePeak = next.series[i].axis === 'right' ? rightScalePeak : leftScalePeak;
+    const threshold = getSensorSignificantThreshold(
+      unit,
+      scalePeak,
+      next.series[i].decimals,
+      next.significantDelta
+    );
+
+    const pLast = Number(pData[len - 1] ?? 0);
+    const nLast = Number(nData[len - 1] ?? 0);
+    if (!Number.isFinite(pLast) || !Number.isFinite(nLast)) {
+      if (pLast !== nLast) return false;
+    } else {
+      if ((pLast <= 0.001) !== (nLast <= 0.001)) return false;
+      if (Math.abs(nLast - pLast) >= threshold) return false;
+    }
+
+    let pMin = Infinity;
+    let pMax = -Infinity;
+    let nMin = Infinity;
+    let nMax = -Infinity;
+
+    for (let k = 0; k < len; k++) {
+      const pv = Number(pData[k] ?? 0);
+      const nv = Number(nData[k] ?? 0);
+      if (Number.isFinite(pv)) {
+        if (pv < pMin) pMin = pv;
+        if (pv > pMax) pMax = pv;
+      }
+      if (Number.isFinite(nv)) {
+        if (nv < nMin) nMin = nv;
+        if (nv > nMax) nMax = nv;
+      }
+      if (Math.abs(nv - pv) >= threshold) {
+        return false;
+      }
+    }
+
+    if (
+      (Number.isFinite(pMax) && Number.isFinite(nMax) && Math.abs(nMax - pMax) >= threshold) ||
+      (Number.isFinite(pMin) && Number.isFinite(nMin) && Math.abs(nMin - pMin) >= threshold)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function formatAxisTick(value: number, unit: string, isPeakTop = false): string {
@@ -149,7 +374,7 @@ function traceMonotoneSpline(
   }
 }
 
-export const TelemetryChart: React.FC<TelemetryChartProps> = ({
+const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
   series,
   timestamps = [],
   dateTimestamps = [],
@@ -198,6 +423,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
   }, [series]);
 
   const hasRightAxis = useMemo(() => series.some((s) => s.axis === 'right'), [series]);
+  const resolvedRightUnit = useMemo(() => series.find((s) => s.axis === 'right')?.unit ?? '%', [series]);
 
   const validEpochRange = useMemo(() => {
     if (!epochTs || epochTs.length < 2) return null;
@@ -208,6 +434,10 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
     if (!Number.isFinite(tStart) || !Number.isFinite(tEnd) || tEnd <= tStart) return null;
     return { tStart, tEnd, spanSec: tEnd - tStart, arr: usable };
   }, [epochTs, sampleCount]);
+
+  useEffect(() => {
+    setSize((prev) => (prev.height === height ? prev : { ...prev, height }));
+  }, [height]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -236,99 +466,56 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
     return peak > 0.0001 ? peak : 0.1;
   }, [series, maxLeft, leftUnit]);
 
-  const drawChart = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  // Memoización de buckets visuales de datos para curvas densas (preserva exactamente picos y valles)
+  const bucketedSeries: BucketedSeriesResult[] = useMemo(() => {
+    const maxBuckets = Math.max(48, Math.floor((size.width - 56) / 2.2));
+    return series
+      .filter((s) => s.data && s.data.length >= 2)
+      .map((s) => {
+        const { values, sourceIndices } = buildSeriesBuckets(s.data, maxBuckets);
+        return { s, values, sourceIndices };
+      });
+  }, [series, size.width]);
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // Memoización del diseño de ejes, etiquetas de escala y rejilla temporal
+  const axisLayout = useMemo(() => {
     const w = size.width;
     const h = size.height;
-
-    if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-    }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-
     const compact = h < 110;
     const fontAxis = `${compact ? '600 9.5px' : '600 10px'} ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
-    ctx.font = fontAxis;
-
     const gridFracs = compact ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
     const leftLabels = gridFracs.map((f) =>
       formatAxisTick(computedMaxLeft * (1 - f), leftUnit, f === 0)
     );
     let maxLeftLabelW = 0;
     for (const lbl of leftLabels) {
-      const m = ctx.measureText(lbl).width;
-      if (m > maxLeftLabelW) maxLeftLabelW = m;
+      const mw = measureAxisTextWidth(lbl, fontAxis);
+      if (mw > maxLeftLabelW) maxLeftLabelW = mw;
     }
 
-    const resolvedRightUnit = series.find((s) => s.axis === 'right')?.unit ?? '%';
     const maxRightLabelW = hasRightAxis
-      ? ctx.measureText(`${Math.round(maxRight)}${resolvedRightUnit}`).width
+      ? measureAxisTextWidth(`${Math.round(maxRight)}${resolvedRightUnit}`, fontAxis)
       : 0;
     const padL = Math.max(leftUnit === '%' ? 34 : 48, Math.ceil(maxLeftLabelW) + 10);
     const padR = hasRightAxis ? Math.max(36, Math.ceil(maxRightLabelW) + 12) : 12;
     const padT = compact ? 9 : 11;
     const padB = compact ? 18 : 20;
-    plotBoundsRef.current = { padL, padR, padT, padB };
-
     const plotW = Math.max(20, w - padL - padR);
     const plotH = Math.max(20, h - padT - padB);
 
-    const gridColor = theme === 'dark' ? 'rgba(51, 65, 85, 0.55)' : 'rgba(203, 213, 225, 0.85)';
-    const topLineColor = theme === 'dark' ? 'rgba(71, 85, 105, 0.7)' : 'rgba(203, 213, 225, 0.95)';
-    const axisLabelColor = theme === 'dark' ? 'rgba(148, 163, 184, 0.9)' : 'rgba(100, 116, 139, 0.95)';
-    const peakLabelColor = theme === 'dark' ? 'rgba(125, 211, 252, 0.98)' : 'rgba(2, 132, 199, 0.98)';
-    const crosshairColor = theme === 'dark' ? 'rgba(56, 189, 248, 0.5)' : 'rgba(2, 132, 199, 0.42)';
-
-    // Horizontal grid lines (dashed 4-6 style matching SVG assets) + Left/Right Y-axis scale labels
-    ctx.font = fontAxis;
-    ctx.textBaseline = 'middle';
-    gridFracs.forEach((frac, i) => {
+    const gridLines = gridFracs.map((frac, i) => {
       const gy = Math.round(padT + plotH * frac) + 0.5;
-      ctx.save();
-      ctx.strokeStyle = frac === 0 || frac === 1 ? topLineColor : gridColor;
-      ctx.lineWidth = 1;
-      if (frac > 0 && frac < 1) ctx.setLineDash([4, 6]);
-      ctx.beginPath();
-      ctx.moveTo(padL, gy);
-      ctx.lineTo(padL + plotW, gy);
-      ctx.stroke();
-      ctx.restore();
-
-      ctx.textAlign = 'right';
-      ctx.fillStyle = frac === 0 && leftUnit !== '%' ? peakLabelColor : axisLabelColor;
       const yText = frac === 0 ? Math.max(7, gy + 1) : frac === 1 ? Math.min(padT + plotH - 1, gy) : gy;
-      ctx.fillText(leftLabels[i], padL - 6, yText);
-
-      if (hasRightAxis) {
-        ctx.textAlign = 'left';
-        ctx.fillStyle = axisLabelColor;
-        const rVal = Math.round(maxRight * (1 - frac));
-        ctx.fillText(`${rVal}${resolvedRightUnit}`, padL + plotW + 6, yText);
-      }
+      const rightVal = hasRightAxis ? `${Math.round(maxRight * (1 - frac))}${resolvedRightUnit}` : '';
+      return {
+        frac,
+        gy,
+        yText,
+        leftLabel: leftLabels[i],
+        rightLabel: rightVal,
+      };
     });
 
-    if (sampleCount < 2) return;
-
-    const getXForGlobalIndex = (globalIdx: number): number => {
-      if (validEpochRange) {
-        const offsetInEpoch = globalIdx - (sampleCount - validEpochRange.arr.length);
-        const tVal = validEpochRange.arr[Math.max(0, Math.min(validEpochRange.arr.length - 1, offsetInEpoch))];
-        if (Number.isFinite(tVal)) {
-          const frac = Math.max(0, Math.min(1, (tVal - validEpochRange.tStart) / validEpochRange.spanSec));
-          return padL + frac * plotW;
-        }
-      }
-      return padL + (sampleCount > 1 ? (globalIdx / (sampleCount - 1)) * plotW : plotW);
-    };
-
-    // Vertical grid lines (dashed 4-6) + X-axis Time scale ticks (evitar HH:MM repetidos en ventanas cortas de 5m)
     const tickCount = plotW < 230 ? 3 : plotW < 400 ? 4 : 5;
     let forceSecondsTick = false;
     if (validEpochRange) {
@@ -344,64 +531,186 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
         seenMm.add(lbl);
       }
     }
+
+    const xTicks: Array<{
+      gx: number;
+      showLine: boolean;
+      label: string;
+      align: CanvasTextAlign;
+    }> = [];
+
+    if (sampleCount >= 2) {
+      for (let ti = 0; ti < tickCount; ti++) {
+        const frac = tickCount > 1 ? ti / (tickCount - 1) : 0;
+        const gx = Math.round(padL + frac * plotW) + 0.5;
+        let xLabel = '';
+        if (validEpochRange) {
+          const tickTs = validEpochRange.tStart + frac * validEpochRange.spanSec;
+          xLabel = formatEpochTick(tickTs, forceSecondsTick ? 120 : validEpochRange.spanSec);
+        } else {
+          const approxIdx = Math.round(frac * (sampleCount - 1));
+          const rawDate = dateTimestamps[approxIdx];
+          const rawTs = timestamps[approxIdx] || '';
+          if (rawDate) {
+            xLabel = rawDate.slice(0, 11);
+          } else if (rawTs) {
+            const estSpan = (sampleCount - 1) * intervalSec;
+            xLabel = estSpan >= 180 && rawTs.length >= 5 ? rawTs.slice(0, 5) : rawTs;
+          }
+        }
+        xTicks.push({
+          gx,
+          showLine: ti > 0 && ti < tickCount - 1,
+          label: xLabel,
+          align: ti === 0 ? 'left' : ti === tickCount - 1 ? 'right' : 'center',
+        });
+      }
+    }
+
+    return {
+      w,
+      h,
+      fontAxis,
+      padL,
+      padR,
+      padT,
+      padB,
+      plotW,
+      plotH,
+      gridLines,
+      xTicks,
+    };
+  }, [
+    size.width,
+    size.height,
+    computedMaxLeft,
+    leftUnit,
+    hasRightAxis,
+    maxRight,
+    resolvedRightUnit,
+    validEpochRange,
+    sampleCount,
+    dateTimestamps,
+    timestamps,
+    intervalSec,
+  ]);
+
+  useEffect(() => {
+    plotBoundsRef.current = {
+      padL: axisLayout.padL,
+      padR: axisLayout.padR,
+      padT: axisLayout.padT,
+      padB: axisLayout.padB,
+    };
+  }, [axisLayout.padL, axisLayout.padR, axisLayout.padT, axisLayout.padB]);
+
+  const getXForGlobalIndex = useCallback(
+    (globalIdx: number): number => {
+      const { padL, plotW } = axisLayout;
+      if (validEpochRange) {
+        const offsetInEpoch = globalIdx - (sampleCount - validEpochRange.arr.length);
+        const tVal = validEpochRange.arr[Math.max(0, Math.min(validEpochRange.arr.length - 1, offsetInEpoch))];
+        if (Number.isFinite(tVal)) {
+          const frac = Math.max(0, Math.min(1, (tVal - validEpochRange.tStart) / validEpochRange.spanSec));
+          return padL + frac * plotW;
+        }
+      }
+      return padL + (sampleCount > 1 ? (globalIdx / (sampleCount - 1)) * plotW : plotW);
+    },
+    [axisLayout, validEpochRange, sampleCount]
+  );
+
+  // Memoización de las coordenadas vectoriales por bucket/punto para evitar recalcular geometría a 30fps
+  const computedSeriesGeometry = useMemo(() => {
+    if (sampleCount < 2) return [];
+    const { padT, plotH } = axisLayout;
+    return bucketedSeries.map(({ s, values, sourceIndices }) => {
+      const rawLen = s.data.length;
+      const maxScale = s.axis === 'right' ? maxRight : computedMaxLeft;
+      const denomScale = Math.max(0.0001, maxScale);
+      const pts = values.map((val, bi) => {
+        const origIdx = sourceIndices.length > 0 ? sourceIndices[bi] : bi;
+        const ratio = Math.max(0, Math.min(1, val / denomScale));
+        const xOffsetIdx = sampleCount - rawLen + origIdx;
+        return {
+          x: getXForGlobalIndex(xOffsetIdx),
+          y: padT + plotH - ratio * plotH,
+        };
+      });
+      return { s, pts, sourceIndices };
+    });
+  }, [bucketedSeries, axisLayout, sampleCount, maxRight, computedMaxLeft, getXForGlobalIndex]);
+
+  const drawChart = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const { w, h, fontAxis, padL, padR, padT, plotW, plotH, gridLines, xTicks } = axisLayout;
+
+    if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const gridColor = theme === 'dark' ? 'rgba(51, 65, 85, 0.55)' : 'rgba(203, 213, 225, 0.85)';
+    const topLineColor = theme === 'dark' ? 'rgba(71, 85, 105, 0.7)' : 'rgba(203, 213, 225, 0.95)';
+    const axisLabelColor = theme === 'dark' ? 'rgba(148, 163, 184, 0.9)' : 'rgba(100, 116, 139, 0.95)';
+    const peakLabelColor = theme === 'dark' ? 'rgba(125, 211, 252, 0.98)' : 'rgba(2, 132, 199, 0.98)';
+    const crosshairColor = theme === 'dark' ? 'rgba(56, 189, 248, 0.5)' : 'rgba(2, 132, 199, 0.42)';
+
+    // Horizontal grid lines + Left/Right Y-axis scale labels
+    ctx.font = fontAxis;
+    ctx.textBaseline = 'middle';
+    for (const line of gridLines) {
+      ctx.save();
+      ctx.strokeStyle = line.frac === 0 || line.frac === 1 ? topLineColor : gridColor;
+      ctx.lineWidth = 1;
+      if (line.frac > 0 && line.frac < 1) ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(padL, line.gy);
+      ctx.lineTo(padL + plotW, line.gy);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = line.frac === 0 && leftUnit !== '%' ? peakLabelColor : axisLabelColor;
+      ctx.fillText(line.leftLabel, padL - 6, line.yText);
+
+      if (hasRightAxis) {
+        ctx.textAlign = 'left';
+        ctx.fillStyle = axisLabelColor;
+        ctx.fillText(line.rightLabel, padL + plotW + 6, line.yText);
+      }
+    }
+
+    if (sampleCount < 2) return;
+
+    // Vertical grid lines + X-axis Time scale ticks
     ctx.font = fontAxis;
     ctx.textBaseline = 'top';
-    for (let ti = 0; ti < tickCount; ti++) {
-      const frac = tickCount > 1 ? ti / (tickCount - 1) : 0;
-      const gx = Math.round(padL + frac * plotW) + 0.5;
-      if (ti > 0 && ti < tickCount - 1) {
+    for (const tick of xTicks) {
+      if (tick.showLine) {
         ctx.save();
         ctx.strokeStyle = gridColor;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 6]);
         ctx.beginPath();
-        ctx.moveTo(gx, padT);
-        ctx.lineTo(gx, padT + plotH);
+        ctx.moveTo(tick.gx, padT);
+        ctx.lineTo(tick.gx, padT + plotH);
         ctx.stroke();
         ctx.restore();
       }
-
-      let xLabel = '';
-      if (validEpochRange) {
-        const tickTs = validEpochRange.tStart + frac * validEpochRange.spanSec;
-        xLabel = formatEpochTick(tickTs, forceSecondsTick ? 120 : validEpochRange.spanSec);
-      } else {
-        const approxIdx = Math.round(frac * (sampleCount - 1));
-        const rawDate = dateTimestamps[approxIdx];
-        const rawTs = timestamps[approxIdx] || '';
-        if (rawDate) {
-          xLabel = rawDate.slice(0, 11);
-        } else if (rawTs) {
-          // Mostrar HH:MM si hay formato HH:MM:SS y la ventana supera ~3 min
-          const estSpan = (sampleCount - 1) * intervalSec;
-          xLabel = estSpan >= 180 && rawTs.length >= 5 ? rawTs.slice(0, 5) : rawTs;
-        }
-      }
-
-      if (xLabel) {
+      if (tick.label) {
         ctx.fillStyle = axisLabelColor;
-        ctx.textAlign = ti === 0 ? 'left' : ti === tickCount - 1 ? 'right' : 'center';
-        ctx.fillText(xLabel, gx, padT + plotH + 5);
+        ctx.textAlign = tick.align;
+        ctx.fillText(tick.label, tick.gx, padT + plotH + 5);
       }
     }
-
-    const getPointXY = (s: ChartSeries, idx: number): { x: number; y: number } => {
-      const len = s.data.length;
-      const val = Number(s.data[idx] ?? 0);
-      const maxScale = s.axis === 'right' ? maxRight : computedMaxLeft;
-      const ratio = Math.max(0, Math.min(1, val / Math.max(0.0001, maxScale)));
-      const xOffsetIdx = sampleCount - len + idx;
-      const x = getXForGlobalIndex(xOffsetIdx);
-      const y = padT + plotH - ratio * plotH;
-      return { x, y };
-    };
-
-    const computedSeries = series
-      .filter((s) => s.data && s.data.length >= 2)
-      .map((s) => ({
-        s,
-        pts: s.data.map((_, i) => getPointXY(s, i)),
-      }));
 
     // Smooth horizontal clip reveal on initial mount
     const prefersReduced =
@@ -423,7 +732,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
     }
 
     // 1. Draw gradient area fills under every curve first
-    for (const { s, pts } of computedSeries) {
+    for (const { s, pts } of computedSeriesGeometry) {
       const fillAlpha = s.fillAlpha ?? (s.dashed ? 0 : 0.16);
       if (fillAlpha > 0) {
         const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
@@ -440,7 +749,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
     }
 
     // 2. Stroke smooth monotone spline lines (exact knot alignment, zero overshoot)
-    for (const { s, pts } of computedSeries) {
+    for (const { s, pts } of computedSeriesGeometry) {
       ctx.save();
       ctx.beginPath();
       traceMonotoneSpline(ctx, pts, true);
@@ -451,7 +760,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       if (s.dashed) ctx.setLineDash([5, 4]);
       ctx.stroke();
 
-      // Luminous traveling wave overlay clipped onto the EXACT full spline (0.00px deviation)
+      // Luminous traveling wave overlay clipped onto the EXACT full spline
       if (!s.dashed && pts.length >= 6 && revealFrac >= 1) {
         const sweepFrac = animPhaseRef.current % 1;
         const winStartX = padL + Math.max(0, sweepFrac - 0.14) * plotW;
@@ -474,12 +783,11 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
 
     const dotBgFill = theme === 'dark' ? '#0f172a' : '#ffffff';
 
-    // 3. Draw pulsing live tip beacon STRICTLY ON TOP OF all lines and right ON the final knot (sin saturar la línea con puntos intermedios)
+    // 3. Draw pulsing live tip beacon STRICTLY ON TOP OF all lines and right ON the final knot
     const pulseWave = 0.5 + 0.5 * Math.sin(animPhaseRef.current * Math.PI * 2);
-    for (const { s, pts } of computedSeries) {
+    for (const { s, pts } of computedSeriesGeometry) {
       if (s.dashed || pts.length === 0) continue;
 
-      // Live tip point + animated sonar halo right ON the final knot of the line
       const tip = pts[pts.length - 1];
       ctx.save();
       ctx.beginPath();
@@ -499,7 +807,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
 
     ctx.restore();
 
-    // 4. Hover / touch crosshair & highlighted active sample points (top-most layer, exact knot coordinates)
+    // 4. Hover / touch crosshair & highlighted active sample points
     if (hoverIdx !== null && hoverIdx >= 0 && hoverIdx < sampleCount) {
       const xPos = getXForGlobalIndex(hoverIdx);
       ctx.save();
@@ -512,10 +820,29 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       ctx.stroke();
       ctx.restore();
 
-      for (const { s, pts } of computedSeries) {
+      for (const { s, pts, sourceIndices } of computedSeriesGeometry) {
         const localIdx = hoverIdx - (sampleCount - s.data.length);
-        if (localIdx < 0 || localIdx >= pts.length) continue;
-        const pt = pts[localIdx];
+        if (localIdx < 0 || localIdx >= s.data.length) continue;
+
+        let pt: { x: number; y: number } | undefined;
+        if (sourceIndices.length === 0) {
+          pt = pts[localIdx];
+        } else {
+          let lo = 0;
+          let hi = sourceIndices.length - 1;
+          while (lo < hi) {
+            const mid = (lo + hi) >> 1;
+            if (sourceIndices[mid] < localIdx) lo = mid + 1;
+            else hi = mid;
+          }
+          const bestIdx =
+            lo > 0 && Math.abs(sourceIndices[lo - 1] - localIdx) < Math.abs(sourceIndices[lo] - localIdx)
+              ? lo - 1
+              : lo;
+          pt = pts[bestIdx];
+        }
+        if (!pt) continue;
+
         ctx.beginPath();
         ctx.arc(pt.x, pt.y, 5.8, 0, Math.PI * 2);
         ctx.fillStyle = dotBgFill;
@@ -530,7 +857,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
         ctx.fill();
       }
     }
-  }, [size, series, sampleCount, computedMaxLeft, maxRight, leftUnit, hasRightAxis, validEpochRange, timestamps, dateTimestamps, intervalSec, theme, hoverIdx]);
+  }, [axisLayout, computedSeriesGeometry, getXForGlobalIndex, leftUnit, hasRightAxis, sampleCount, theme, hoverIdx]);
 
   drawChartRef.current = drawChart;
 
@@ -649,7 +976,7 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
       subtitle,
       entries,
     };
-  }, [hoverIdx, pointerPos, sampleCount, timestamps, dateTimestamps, validEpochRange, intervalSec, series, formatLabel, formatValue, leftUnit]);
+  }, [hoverIdx, pointerPos, sampleCount, timestamps, dateTimestamps, validEpochRange, intervalSec, series, formatLabel, formatValue, leftUnit, t]);
 
   const handlePanMove = useCallback(
     (clientX: number) => {
@@ -759,3 +1086,6 @@ export const TelemetryChart: React.FC<TelemetryChartProps> = ({
     </div>
   );
 };
+
+export const TelemetryChart = React.memo(TelemetryChartComponent, areTelemetryChartPropsEqual);
+
