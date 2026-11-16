@@ -1,5 +1,7 @@
 import json
+import gzip
 import os
+import pwd
 import re
 import subprocess
 import threading
@@ -73,8 +75,59 @@ except Exception:
 # Global Caches, Concurrency Locks & Configuration
 # ==============================================================================
 METRICS_CACHE = {}
-METRICS_CACHE_BYTES = b"{}"
+METRICS_CACHE_BYTES = None
+METRICS_CACHE_SEQ = 0
+_METRICS_SERIALIZED_CACHE = {}
 METRICS_LOCK = threading.Lock()
+
+_NET_CONNS_LOCK = threading.Lock()
+_NET_CONNS_CACHE = []
+_NET_CONNS_CACHE_TS = 0.0
+_UID_NAME_CACHE = {}
+_LAST_CONN_HISTORY_SAVE_TS = 0.0
+_LAST_GEOIP_PRUNE_TS = 0.0
+_LAST_PMON_IDLE_POLL_TS = 0.0
+_PMON_IDLE_CACHE = {}
+
+def _invalidate_metrics_bytes_cache():
+    global METRICS_CACHE_BYTES, METRICS_CACHE_SEQ
+    METRICS_CACHE_BYTES = None
+    METRICS_CACHE_SEQ += 1
+    _METRICS_SERIALIZED_CACHE.clear()
+
+def get_cached_inet_connections(max_age=3.5):
+    """Comparte la instantánea de sockets `psutil.net_connections(kind='inet')` entre hilos para evitar escaneos redundantes de `/proc/*/fd/*`."""
+    global _NET_CONNS_CACHE, _NET_CONNS_CACHE_TS
+    now_mono = time.monotonic()
+    with _NET_CONNS_LOCK:
+        if _NET_CONNS_CACHE and (now_mono - _NET_CONNS_CACHE_TS) < max_age:
+            return _NET_CONNS_CACHE
+        try:
+            conns = psutil.net_connections(kind="inet")
+        except Exception:
+            conns = _NET_CONNS_CACHE or []
+        _NET_CONNS_CACHE = conns
+        _NET_CONNS_CACHE_TS = time.monotonic()
+        return _NET_CONNS_CACHE
+
+def _resolve_uid_name(uids_val):
+    """Resuelve el UID real a nombre de usuario con caché en memoria (evita cientos de llamadas C `pwd.getpwuid` por ciclo)."""
+    if uids_val is None:
+        return "system"
+    uid = getattr(uids_val, "real", None)
+    if uid is None:
+        return "system"
+    cached = _UID_NAME_CACHE.get(uid)
+    if cached is not None:
+        return cached
+    try:
+        name = pwd.getpwuid(uid).pw_name
+    except Exception:
+        name = str(uid)
+    if len(_UID_NAME_CACHE) > 2048:
+        _UID_NAME_CACHE.clear()
+    _UID_NAME_CACHE[uid] = name
+    return name
 
 DOCKER_CACHE = []
 DOCKER_LOCK = threading.Lock()
@@ -329,7 +382,8 @@ def save_custom_logos(logos_dict):
         except Exception:
             CUSTOM_LOGOS_CACHE["mtime"] = time.time()
         CUSTOM_LOGOS_CACHE["data"] = dict(clean)
-        METRICS_CACHE_BYTES = b"{}"
+        with METRICS_LOCK:
+            _invalidate_metrics_bytes_cache()
         return True
     except Exception:
         return False
@@ -1901,7 +1955,7 @@ def fetch_system_logs(priority_max=3, limit=80, force=False):
     now = time.time()
     with SYSTEM_LOGS_LOCK:
         cached = SYSTEM_LOGS_CACHE.get(cache_key, {})
-        if not force and cached.get("data") and (now - cached.get("ts", 0) < 4.0):
+        if not force and cached.get("data") and (now - cached.get("ts", 0) < 18.0):
             return cached["data"]
 
     # 1. Comprobar unidades en estado fallido (systemctl list-units --failed)
@@ -2286,6 +2340,26 @@ def init_geoip_history_db():
                     updated_at REAL NOT NULL
                 )
             """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_geoip_updated_at ON geoip_locations(updated_at DESC);")
+            # Poda preventiva segura al arranque para mantener geoip_locations acotado (<=12,000 IPs, <=7d)
+            try:
+                ttl_sec = globals().get("GEOIP_TTL_SECONDS", 7 * 86400)
+                cutoff_geo = time.time() - ttl_sec
+                c_exp = conn.execute("DELETE FROM geoip_locations WHERE updated_at < ?", (cutoff_geo,)).rowcount or 0
+                tot_geo = conn.execute("SELECT COUNT(*) FROM geoip_locations").fetchone()[0]
+                c_cap = 0
+                if tot_geo > 12000:
+                    c_cap = conn.execute("""
+                        DELETE FROM geoip_locations
+                        WHERE ip NOT IN (
+                            SELECT ip FROM geoip_locations ORDER BY updated_at DESC LIMIT 12000
+                        )
+                    """).rowcount or 0
+                if (c_exp + c_cap) > 2000:
+                    conn.commit()
+                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+            except Exception:
+                pass
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS connection_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2451,7 +2525,7 @@ def record_telemetry_sample_to_sqlite(
         round(float(disk_pct_val or 0.0), 1),
     )
     _TELEMETRY_SQLITE_BUFFER.append(sample)
-    if not force_flush and len(_TELEMETRY_SQLITE_BUFFER) < 2 and (now_ts - _LAST_TELEMETRY_FLUSH_TS) < 3.0:
+    if not force_flush and len(_TELEMETRY_SQLITE_BUFFER) < 4 and (now_ts - _LAST_TELEMETRY_FLUSH_TS) < 6.0:
         return
     batch = list(_TELEMETRY_SQLITE_BUFFER)
     _TELEMETRY_SQLITE_BUFFER.clear()
@@ -2795,6 +2869,19 @@ def save_geoip_locations_to_sqlite(entries_dict):
                     accuracy_source=excluded.accuracy_source,
                     updated_at=excluded.updated_at
             """, rows)
+            global _LAST_GEOIP_PRUNE_TS
+            if now - _LAST_GEOIP_PRUNE_TS >= 180.0:
+                ttl_sec = globals().get("GEOIP_TTL_SECONDS", 7 * 86400)
+                conn.execute("DELETE FROM geoip_locations WHERE updated_at < ?", (now - ttl_sec,))
+                tot_geo = conn.execute("SELECT COUNT(*) FROM geoip_locations").fetchone()[0]
+                if tot_geo > 12000:
+                    conn.execute("""
+                        DELETE FROM geoip_locations
+                        WHERE ip NOT IN (
+                            SELECT ip FROM geoip_locations ORDER BY updated_at DESC LIMIT 12000
+                        )
+                    """)
+                _LAST_GEOIP_PRUNE_TS = now
             conn.commit()
             conn.close()
         except Exception:
@@ -2802,9 +2889,13 @@ def save_geoip_locations_to_sqlite(entries_dict):
 
 def record_connections_to_sqlite(connections_list):
     """Registra y actualiza en SQLite todas las conexiones públicas geolocalizadas catalogadas por servicio."""
+    global _LAST_CONN_HISTORY_SAVE_TS
     if not connections_list:
         return
     now = time.time()
+    if (now - _LAST_CONN_HISTORY_SAVE_TS) < 12.0:
+        return
+    _LAST_CONN_HISTORY_SAVE_TS = now
     rows = []
     for c in connections_list:
         if not isinstance(c, dict) or c.get("is_lan"):
@@ -3116,13 +3207,16 @@ def load_geoip_disk_cache():
     cutoff = now - GEOIP_TTL_SECONDS
     loaded = {}
 
-    # 1. Cargar ubicaciones exactas desde SQLite geoip_locations
+    # 1. Cargar ubicaciones exactas acotadas desde SQLite geoip_locations
     with GEOIP_HISTORY_DB_LOCK:
         try:
             conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
-            cur.execute("SELECT * FROM geoip_locations WHERE updated_at >= ?", (cutoff,))
+            cur.execute(
+                "SELECT * FROM geoip_locations WHERE updated_at >= ? ORDER BY updated_at DESC LIMIT ?",
+                (cutoff, int(GEOIP_MAX_ENTRIES))
+            )
             for r in cur.fetchall():
                 ip_k = str(r["ip"] or "").strip()
                 if ip_k:
@@ -3144,7 +3238,8 @@ def load_geoip_disk_cache():
         except Exception:
             pass
 
-    # 2. Complementar con archivo JSON si existe
+    # 2. Complementar con archivo JSON si existe (solo IPs ausentes en SQLite)
+    json_only_loaded = {}
     if os.path.exists(GEOIP_CACHE_FILE):
         try:
             with open(GEOIP_CACHE_FILE, "r", encoding="utf-8", errors="ignore") as f:
@@ -3152,11 +3247,12 @@ def load_geoip_disk_cache():
             if isinstance(raw, dict):
                 entries = raw.get("entries", raw) if isinstance(raw.get("entries"), dict) else raw
                 for ip_k, val in entries.items():
-                    if str(ip_k) not in loaded and isinstance(val, dict) and isinstance(val.get("lat"), (int, float)) and isinstance(val.get("lng"), (int, float)):
+                    s_ip = str(ip_k)
+                    if s_ip not in loaded and isinstance(val, dict) and isinstance(val.get("lat"), (int, float)) and isinstance(val.get("lng"), (int, float)):
                         ts = float(val.get("ts", now))
                         if ts >= cutoff:
-                            loaded[str(ip_k)] = {
-                                "ip": str(ip_k),
+                            entry_obj = {
+                                "ip": s_ip,
                                 "lat": float(val["lat"]),
                                 "lng": float(val["lng"]),
                                 "city": str(val.get("city") or "Nodo Remoto"),
@@ -3169,6 +3265,8 @@ def load_geoip_disk_cache():
                                 "accuracy_source": str(val.get("accuracy_source") or "ip-api"),
                                 "ts": ts
                             }
+                            loaded[s_ip] = entry_obj
+                            json_only_loaded[s_ip] = entry_obj
         except Exception:
             pass
 
@@ -3183,8 +3281,8 @@ def load_geoip_disk_cache():
                 "country_code": os.environ.get("SERVER_GEO_CC", "")
             }
 
-    if loaded:
-        save_geoip_locations_to_sqlite(loaded)
+    if json_only_loaded:
+        save_geoip_locations_to_sqlite(json_only_loaded)
 
 def save_geoip_disk_cache(force=False):
     """Persiste de forma atómica la caché GeoIP en disco y SQLite para reducir carga sobre ip-api.com tras reinicios."""
@@ -3209,7 +3307,6 @@ def save_geoip_disk_cache(force=False):
         GEOIP_WORKER_STATS["dirty_disk"] = False
         GEOIP_WORKER_STATS["last_disk_save_ts"] = now
 
-    save_geoip_locations_to_sqlite(entries_copy)
     try:
         tmp_path = GEOIP_CACHE_FILE + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
@@ -3768,7 +3865,7 @@ def fetch_connections_geo_worker():
             pid_proc_cache = {}
             rdns_budget = [6]  # Límite por ciclo para evitar bloqueos por rDNS síncrono
             try:
-                conns = psutil.net_connections(kind="inet")
+                conns = get_cached_inet_connections(max_age=3.0)
                 for c in conns:
                     if c.status == "LISTEN" and c.laddr:
                         listening_ports.add(c.laddr.port)
@@ -4269,8 +4366,8 @@ def fetch_connections_geo_worker():
         except Exception as e:
             import traceback
             traceback.print_exc()
-        # Wait up to 2.5 seconds or wake immediately when new remote IPs are enqueued
-        GEOIP_WAKE_EVENT.wait(timeout=2.5)
+        # Wait up to 3.5 seconds or wake immediately when new remote IPs are enqueued
+        GEOIP_WAKE_EVENT.wait(timeout=3.5)
         GEOIP_WAKE_EVENT.clear()
 
 
@@ -5144,7 +5241,7 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
         with METRICS_LOCK:
             if isinstance(METRICS_CACHE, dict):
                 METRICS_CACHE["version_info"] = updated_ver
-            METRICS_CACHE_BYTES = b"{}"
+            _invalidate_metrics_bytes_cache()
 
         combined_output = "\n".join([line for line in out_lines if line]).strip()
         now_str = datetime.now().strftime("%H:%M:%S")
@@ -7439,13 +7536,21 @@ def get_gpu_info():
         enc_sessions = _parse_gpu_num(gpu.findtext('encoder_stats/session_count'), cast=int)
         enc_fps = _parse_gpu_num(gpu.findtext('encoder_stats/average_fps'), cast=int)
 
-        pmon_map = _nvidia_pmon_snapshot()
+        proc_nodes = gpu.findall('processes/process_info')
+        global _LAST_PMON_IDLE_POLL_TS, _PMON_IDLE_CACHE
+        now_pmon = time.monotonic()
+        if proc_nodes or (now_pmon - _LAST_PMON_IDLE_POLL_TS >= 30.0):
+            pmon_map = _nvidia_pmon_snapshot()
+            _PMON_IDLE_CACHE = pmon_map
+            _LAST_PMON_IDLE_POLL_TS = now_pmon
+        else:
+            pmon_map = _PMON_IDLE_CACHE
 
         processes = []
         gpu_procs_map = {}
         fallback_proc_label = get_gpu_process_label('gpu_process', 'Proceso GPU', base_dir=BASE_DIR)
 
-        for p in gpu.findall('processes/process_info'):
+        for p in proc_nodes:
             pid_str = (p.findtext('pid') or '').strip()
             pname = (p.findtext('process_name') or '').strip()
             pmem = (p.findtext('used_memory') or '').strip()
@@ -7569,7 +7674,7 @@ def fetch_gpu_worker():
                 GPU_CACHE = info
         except Exception:
             pass
-        time.sleep(1.8)
+        time.sleep(2.5)
 
 def get_ram_info():
     try:
@@ -9857,11 +9962,11 @@ def get_system_processes(gpu_map=None, disk_io_total_bps=0.0):
         vm_total = psutil.virtual_memory().total or 1
         seen_pids = set()
 
-        # Mapa ligero de conexiones de red activas por PID
+        # Mapa ligero de conexiones de red activas por PID (compartido con GeoIP worker)
         net_by_pid = {}
         total_pid_sockets = 0
         try:
-            for c in psutil.net_connections(kind='inet'):
+            for c in get_cached_inet_connections(max_age=5.0):
                 cpid = c.pid
                 if not cpid:
                     continue
@@ -9879,7 +9984,7 @@ def get_system_processes(gpu_map=None, disk_io_total_bps=0.0):
         except Exception:
             pass
 
-        for p in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info', 'status', 'nice', 'num_threads']):
+        for p in psutil.process_iter(['pid', 'name', 'uids', 'cpu_percent', 'memory_info', 'status', 'nice', 'num_threads']):
             try:
                 info = p.info
                 pid = info['pid']
@@ -9909,28 +10014,29 @@ def get_system_processes(gpu_map=None, disk_io_total_bps=0.0):
 
                 mem_pct = round((priv_mb * 1024 * 1024) / vm_total * 100.0, 1)
 
-                # Lectura/escritura real por proceso desde /proc/<pid>/io
+                # Lectura/escritura real por proceso desde /proc/<pid>/io (omitir kernel threads sin RSS/CPU)
                 io_read_bps = 0.0
                 io_write_bps = 0.0
                 io_read_tot = 0
                 io_write_tot = 0
-                try:
-                    with open(f"/proc/{pid}/io", "r") as iof:
-                        for ln in iof:
-                            if ln.startswith("read_bytes:"):
-                                io_read_tot = int(ln.split(":", 1)[1].strip())
-                            elif ln.startswith("write_bytes:"):
-                                io_write_tot = int(ln.split(":", 1)[1].strip())
-                    prev_io = _PROC_IO_PREV.get(pid)
-                    if prev_io:
-                        p_ts, p_r, p_w = prev_io
-                        dt_io = now_ts - p_ts
-                        if dt_io >= 0.3:
-                            io_read_bps = round(max(0.0, (io_read_tot - p_r) / dt_io), 1)
-                            io_write_bps = round(max(0.0, (io_write_tot - p_w) / dt_io), 1)
-                    _PROC_IO_PREV[pid] = (now_ts, io_read_tot, io_write_tot)
-                except Exception:
-                    pass
+                if mem_bytes > 0 or cpu > 0.0:
+                    try:
+                        with open(f"/proc/{pid}/io", "r") as iof:
+                            for ln in iof:
+                                if ln.startswith("read_bytes:"):
+                                    io_read_tot = int(ln.split(":", 1)[1].strip())
+                                elif ln.startswith("write_bytes:"):
+                                    io_write_tot = int(ln.split(":", 1)[1].strip())
+                        prev_io = _PROC_IO_PREV.get(pid)
+                        if prev_io:
+                            p_ts, p_r, p_w = prev_io
+                            dt_io = now_ts - p_ts
+                            if dt_io >= 0.3:
+                                io_read_bps = round(max(0.0, (io_read_tot - p_r) / dt_io), 1)
+                                io_write_bps = round(max(0.0, (io_write_tot - p_w) / dt_io), 1)
+                        _PROC_IO_PREV[pid] = (now_ts, io_read_tot, io_write_tot)
+                    except Exception:
+                        pass
 
                 io_total_bps = round(io_read_bps + io_write_bps, 1)
 
@@ -9953,7 +10059,7 @@ def get_system_processes(gpu_map=None, disk_io_total_bps=0.0):
                 procs.append({
                     "pid": pid,
                     "name": info['name'] or "unknown",
-                    "user": info['username'] or "system",
+                    "user": _resolve_uid_name(info.get('uids')),
                     "cpu_percent": round(cpu, 1),
                     "cpu_norm_percent": cpu_norm,
                     "cpu_cores_used": cpu_cores_used,
@@ -10356,7 +10462,7 @@ def background_collector():
             with GPU_LOCK:
                 gpu_info = dict(GPU_CACHE)
             
-            if cycle_counter % 2 == 1 or not cached_procs:
+            if cycle_counter % 3 == 1 or not cached_procs:
                 cached_procs = get_system_processes(
                     gpu_info.get("gpu_procs_map", {}),
                     disk_io_total_bps=read_bytes_sec + write_bytes_sec,
@@ -10538,10 +10644,9 @@ def background_collector():
                 "custom_logos": custom_logos_act,
             }
             
-            serialized = json.dumps(payload).encode('utf-8')
             with METRICS_LOCK:
                 METRICS_CACHE = payload
-                METRICS_CACHE_BYTES = serialized
+                _invalidate_metrics_bytes_cache()
                 
         except Exception:
             pass
@@ -11049,47 +11154,80 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 "device_name": auth["device_info"]["name"] if auth.get("device_info") else "Dispositivo Local"
             }
 
+            accept_enc = (self.headers.get('Accept-Encoding') or '').lower()
+            wants_gzip = 'gzip' in accept_enc
+            auth_cache_key = f"{auth_status_obj['client_ip']}|{req_domain}|{auth_status_obj['is_trusted']}|{auth_status_obj['token']}"
+
+            out_bytes = None
+            is_gzipped = False
             with METRICS_LOCK:
-                cached_bytes = METRICS_CACHE_BYTES
-                cached_payload = METRICS_CACHE
-                cached_domain = (cached_payload.get("system") or {}).get("public_domain", "") if isinstance(cached_payload, dict) else ""
+                cur_seq = METRICS_CACHE_SEQ
+                cached_domain = (METRICS_CACHE.get("system") or {}).get("public_domain", "") if isinstance(METRICS_CACHE, dict) else ""
+                if (
+                    _METRICS_SERIALIZED_CACHE.get("seq") == cur_seq
+                    and _METRICS_SERIALIZED_CACHE.get("domain") == req_domain
+                ):
+                    variant = (_METRICS_SERIALIZED_CACHE.get("variants") or {}).get(auth_cache_key)
+                    if variant is not None:
+                        raw_v, gz_v = variant
+                        if wants_gzip:
+                            if gz_v is None:
+                                gz_v = gzip.compress(raw_v, compresslevel=4)
+                                _METRICS_SERIALIZED_CACHE["variants"][auth_cache_key] = (raw_v, gz_v)
+                            out_bytes = gz_v
+                            is_gzipped = True
+                        else:
+                            out_bytes = raw_v
+                    else:
+                        base_bytes = _METRICS_SERIALIZED_CACHE.get("base_bytes")
+                        if base_bytes and base_bytes.endswith(b"}"):
+                            raw_v = base_bytes[:-1] + b', "auth_status": ' + json.dumps(auth_status_obj).encode('utf-8') + b'}'
+                            gz_v = gzip.compress(raw_v, compresslevel=4) if wants_gzip else None
+                            _METRICS_SERIALIZED_CACHE.setdefault("variants", {})[auth_cache_key] = (raw_v, gz_v)
+                            out_bytes = gz_v if wants_gzip else raw_v
+                            is_gzipped = wants_gzip
 
-            if (
-                cached_bytes
-                and len(cached_bytes) > 2
-                and cached_bytes.endswith(b"}")
-                and cached_domain == req_domain
-                and "version_info" in cached_payload
-            ):
-                data = cached_bytes[:-1] + b', "auth_status": ' + json.dumps(auth_status_obj).encode('utf-8') + b'}'
-            else:
-                with METRICS_LOCK:
-                    base_payload = dict(METRICS_CACHE)
-
-                if "system" in base_payload and isinstance(base_payload["system"], dict):
-                    base_payload["system"] = dict(base_payload["system"])
-                    base_payload["system"]["public_domain"] = req_domain
-                    base_payload["system"]["local_ip"] = SERVER_LOCAL_IP
-
-                base_payload["auth_status"] = auth_status_obj
-                base_payload["maps_engine"] = "leaflet"
-                base_payload["version_info"] = get_version_info_cached_async()
-                base_payload["version_info"]["public_domain"] = req_domain
-                if "system_errors_summary" not in base_payload:
-                    base_payload["system_errors_summary"] = get_effective_system_errors_summary()
-                with CUSTOM_LOGOS_LOCK:
-                    base_payload["custom_logos"] = load_custom_logos()
-                data = json.dumps(base_payload).encode('utf-8')
+                if out_bytes is None:
+                    base_payload = dict(METRICS_CACHE) if isinstance(METRICS_CACHE, dict) else {}
+                    if "system" in base_payload and isinstance(base_payload["system"], dict):
+                        base_payload["system"] = dict(base_payload["system"])
+                        base_payload["system"]["public_domain"] = req_domain
+                        base_payload["system"]["local_ip"] = SERVER_LOCAL_IP
+                    base_payload["maps_engine"] = "leaflet"
+                    if "version_info" not in base_payload or cached_domain != req_domain:
+                        vinfo_cp = dict(get_version_info_cached_async())
+                        vinfo_cp["public_domain"] = req_domain
+                        base_payload["version_info"] = vinfo_cp
+                    if "system_errors_summary" not in base_payload:
+                        base_payload["system_errors_summary"] = get_effective_system_errors_summary()
+                    if "custom_logos" not in base_payload:
+                        with CUSTOM_LOGOS_LOCK:
+                            base_payload["custom_logos"] = load_custom_logos()
+                    base_bytes = json.dumps(base_payload).encode('utf-8')
+                    raw_v = base_bytes[:-1] + b', "auth_status": ' + json.dumps(auth_status_obj).encode('utf-8') + b'}' if base_bytes.endswith(b"}") else json.dumps({**base_payload, "auth_status": auth_status_obj}).encode('utf-8')
+                    gz_v = gzip.compress(raw_v, compresslevel=4) if wants_gzip else None
+                    _METRICS_SERIALIZED_CACHE.clear()
+                    _METRICS_SERIALIZED_CACHE.update({
+                        "seq": cur_seq,
+                        "domain": req_domain,
+                        "base_bytes": base_bytes,
+                        "variants": {auth_cache_key: (raw_v, gz_v)},
+                    })
+                    out_bytes = gz_v if wants_gzip else raw_v
+                    is_gzipped = wants_gzip
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Vary', 'Accept-Encoding')
+            if is_gzipped:
+                self.send_header('Content-Encoding', 'gzip')
             self.send_security_headers()
             if auth.get("new_token"):
                 self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
-            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Content-Length', str(len(out_bytes)))
             self.end_headers()
-            self.wfile.write(data)
+            self.wfile.write(out_bytes)
             return
 
         # 1a-bis. HISTORIAL PERSISTENTE DE CONSUMO DESDE SQLITE (recursos_history.db)
@@ -11112,9 +11250,15 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 limit=limit_param,
             )
             resp = json.dumps(hist_payload).encode('utf-8')
+            wants_gz = 'gzip' in (self.headers.get('Accept-Encoding') or '').lower() and len(resp) > 2048
+            if wants_gz:
+                resp = gzip.compress(resp, compresslevel=4)
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Vary', 'Accept-Encoding')
+            if wants_gz:
+                self.send_header('Content-Encoding', 'gzip')
             self.send_security_headers()
             if auth.get("new_token"):
                 self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
@@ -11864,7 +12008,6 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"Not Found")
 
     def do_POST(self):
-        global METRICS_CACHE_BYTES
         client_ip = get_client_ip(self)
         clean_path = self.path.split('?')[0].rstrip('/') or '/'
 
@@ -12989,7 +13132,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             with METRICS_LOCK:
                 if isinstance(METRICS_CACHE, dict):
                     METRICS_CACHE["version_info"] = new_ver_info
-                METRICS_CACHE_BYTES = b"{}"
+                _invalidate_metrics_bytes_cache()
 
             now_str = datetime.now().strftime("%H:%M:%S")
             disp_new = get_display_version(incoming_ver)
@@ -13280,10 +13423,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             with METRICS_LOCK:
                 if isinstance(METRICS_CACHE, dict) and METRICS_CACHE:
                     METRICS_CACHE["system_errors_summary"] = summary
-                    try:
-                        METRICS_CACHE_BYTES = json.dumps(METRICS_CACHE).encode('utf-8')
-                    except Exception:
-                        pass
+                    _invalidate_metrics_bytes_cache()
             resp = json.dumps({
                 "success": True,
                 "ok": True,

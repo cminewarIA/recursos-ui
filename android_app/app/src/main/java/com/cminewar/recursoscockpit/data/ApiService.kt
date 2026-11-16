@@ -93,11 +93,7 @@ class ApiService(
         val buildDisplay = Build.DISPLAY ?: ""
 
         val osDistro = "Android ${Build.VERSION.RELEASE ?: ""} (API ${Build.VERSION.SDK_INT})"
-        val securityPatch = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Build.VERSION.SECURITY_PATCH ?: ""
-        } else {
-            ""
-        }
+        val securityPatch = Build.VERSION.SECURITY_PATCH ?: ""
         val kernelVer = System.getProperty("os.version") ?: ""
         val kernel = if (kernelVer.isNotBlank()) "Linux $kernelVer" else "Linux Android Kernel"
         val abis = Build.SUPPORTED_ABIS ?: emptyArray()

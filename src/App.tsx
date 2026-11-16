@@ -417,7 +417,6 @@ export function App() {
   const network24hView = useMemo(() => {
     const dbSeries = netHistory24h?.series;
     const dbRx = dbSeries?.net_rx ?? [];
-    const dbTx = dbSeries?.net_tx ?? [];
     const useFallbackLive = dbRx.length < 2 && (metrics?.history?.net_rx?.length ?? 0) >= 2;
     const sourceSeries = useFallbackLive ? metrics?.history : dbSeries;
 

@@ -528,6 +528,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         ? '/api/maps/tile/dark/{z}/{x}/{y}.png'
         : '/api/maps/tile/light/{z}/{x}/{y}.png';
     const osmFallbackUrl = 'https://tile.openstreetmap.de/{z}/{x}/{y}.png';
+    const invalidateTimers: number[] = [];
 
     if (!mapInstanceRef.current || mapInstanceRef.current.getContainer?.() !== mapContainerEl) {
       if (mapInstanceRef.current) {
@@ -575,12 +576,14 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         }
       });
 
-      window.setTimeout(() => {
-        mapInstanceRef.current?.invalidateSize();
-      }, 120);
-      window.setTimeout(() => {
-        mapInstanceRef.current?.invalidateSize();
-      }, 360);
+      invalidateTimers.push(
+        window.setTimeout(() => {
+          mapInstanceRef.current?.invalidateSize();
+        }, 120),
+        window.setTimeout(() => {
+          mapInstanceRef.current?.invalidateSize();
+        }, 360)
+      );
     } else if (tileLayerRef.current) {
       mapContainerEl.classList.remove('cockpit-osm-dark-fallback');
       tileLayerRef.current.setUrl(primaryTileUrl);
@@ -672,6 +675,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
     });
     ro.observe(mapContainerEl);
     return () => {
+      invalidateTimers.forEach((timerId) => window.clearTimeout(timerId));
       mapContainerEl.removeEventListener('click', handlePopupActionClick, true);
       ro.disconnect();
     };
