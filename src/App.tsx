@@ -508,141 +508,115 @@ export function App() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] pb-28">
-        {/* Unified Cockpit Topbar (matching docs/assets/cockpit-ui-preview.svg) */}
+        {/* Clean Frameless Brand Header with Enlarged Transparent CMineWar Emblem */}
         <motion.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.42, ease: COCKPIT_EASE }}
-          className="cockpit-shell pt-3 md:sticky md:top-3 md:z-30"
+          className="cockpit-shell pt-3 sm:pt-4"
         >
-          <header className="cockpit-topbar">
-            <div className="flex min-h-[68px] items-center justify-between gap-3 px-3.5 py-1.5 sm:min-h-[76px] sm:px-5">
-              {/* Zone 1: Brand with transparent CMineWar emblem */}
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                type="button"
-                onClick={() => navigateTo('inicio')}
-                className="flex items-center gap-2.5 sm:gap-3 text-left whitespace-nowrap shrink-0"
-              >
-                {!logoBroken ? (
-                  <img
-                    src="/recursos-cockpit.png"
-                    alt={t('app.brand_alt')}
-                    onError={() => setLogoBroken(true)}
-                    className="h-12 w-12 sm:h-[62px] sm:w-[62px] shrink-0 object-contain drop-shadow-[0_3px_10px_rgba(14,165,233,0.22)] dark:drop-shadow-[0_4px_14px_rgba(56,189,248,0.28)]"
-                  />
-                ) : (
-                  <div className="flex h-12 w-12 sm:h-[62px] sm:w-[62px] shrink-0 items-center justify-center">
-                    <Activity className="h-6 w-6 text-sky-600 dark:text-sky-400" />
-                  </div>
-                )}
-                <div className="leading-tight">
-                  <span className="block font-display text-base font-bold tracking-tight text-slate-900 dark:text-white sm:text-lg">
-                    {t('app.brand')}
-                  </span>
-                  <span className="hidden sm:block font-mono text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                    {metrics?.system?.hostname || t('app.cockpit_fallback')} · {theme === 'dark' ? t('app.theme_dark') : t('app.theme_light')}
-                  </span>
+          <header className="flex flex-wrap items-center justify-between gap-4 py-1">
+            {/* Zone 1: Brand with enlarged transparent CMineWar emblem */}
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              type="button"
+              onClick={() => navigateTo('inicio')}
+              className="flex items-center gap-3.5 sm:gap-4 text-left whitespace-nowrap shrink-0"
+            >
+              {!logoBroken ? (
+                <img
+                  src="/recursos-cockpit.png"
+                  alt={t('app.brand_alt')}
+                  onError={() => setLogoBroken(true)}
+                  className="h-20 w-20 sm:h-28 sm:w-28 shrink-0 object-contain drop-shadow-[0_4px_14px_rgba(14,165,233,0.26)] dark:drop-shadow-[0_6px_18px_rgba(56,189,248,0.34)]"
+                />
+              ) : (
+                <div className="flex h-20 w-20 sm:h-28 sm:w-28 shrink-0 items-center justify-center">
+                  <Activity className="h-10 w-10 text-sky-600 dark:text-sky-400" />
                 </div>
+              )}
+              <div className="leading-tight">
+                <span className="block font-display text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                  {t('app.brand')}
+                </span>
+                <span className="mt-0.5 block font-mono text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {metrics?.system?.hostname || t('app.cockpit_fallback')} · {theme === 'dark' ? t('app.theme_dark') : t('app.theme_light')}
+                </span>
+              </div>
+            </motion.button>
+
+            {/* Zone 2: Live Health Pill + Quick Theme + Version Pill */}
+            <div className="flex items-center gap-2 shrink-0">
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                type="button"
+                onClick={() => navigateTo(topbarErrors > 0 ? 'mas' : 'inicio', topbarErrors > 0 ? 'logs' : undefined)}
+                className={`hidden sm:inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-colors whitespace-nowrap ${
+                  connError || topbarErrors > 0 ? 'cockpit-pill-amber' : 'cockpit-pill-emerald'
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    connError || topbarErrors > 0
+                      ? 'bg-amber-500 text-amber-500'
+                      : 'bg-emerald-500 text-emerald-500 cockpit-live-dot cockpit-live-ring'
+                  }`}
+                />
+                <span>
+                  {connError
+                    ? t('status.reconnecting')
+                    : topbarErrors > 0
+                      ? `${topbarErrors} ${topbarErrors === 1 ? t('status.notice_single') : t('status.notice_plural')}`
+                      : isHealthy
+                        ? t('status.healthy')
+                        : t('status.high_load')}
+                </span>
               </motion.button>
 
-              {/* Zone 2: Desktop Segmented Pills con layoutId deslizante */}
-              <LayoutGroup id="desktop-nav">
-                <nav aria-label={t('nav.desktop_aria')} className="hidden md:flex items-center gap-1">
-                  {navItems.map((item) => {
-                    const active = activeTab === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => navigateTo(item.id)}
-                        className={`relative rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
-                          active
-                            ? 'text-sky-700 dark:text-sky-300'
-                            : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-                        }`}
-                      >
-                        {active && <MorphPill layoutId="desktop-nav-pill" className="rounded-xl shadow-xs" />}
-                        <span className="relative z-10">{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </nav>
-              </LayoutGroup>
+              <motion.button
+                whileTap={{ scale: 0.9, rotate: 18 }}
+                type="button"
+                aria-label={theme === 'dark' ? t('app.toggle_to_light') : t('app.toggle_to_dark')}
+                onClick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="cockpit-subtile flex min-h-[38px] min-w-[38px] items-center justify-center text-slate-600 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={theme}
+                    initial={{ opacity: 0, rotate: -45, scale: 0.7 }}
+                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                    exit={{ opacity: 0, rotate: 45, scale: 0.7 }}
+                    transition={{ duration: 0.2 }}
+                    className="inline-flex"
+                  >
+                    {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-sky-700" />}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.button>
 
-              {/* Zone 3: Live Health Pill + Quick Theme + Version Pill */}
-              <div className="flex items-center gap-2 shrink-0">
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  type="button"
-                  onClick={() => navigateTo(topbarErrors > 0 ? 'mas' : 'inicio', topbarErrors > 0 ? 'logs' : undefined)}
-                  className={`hidden sm:inline-flex min-h-[34px] items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors whitespace-nowrap ${
-                    connError || topbarErrors > 0 ? 'cockpit-pill-amber' : 'cockpit-pill-emerald'
-                  }`}
-                >
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      connError || topbarErrors > 0
-                        ? 'bg-amber-500 text-amber-500'
-                        : 'bg-emerald-500 text-emerald-500 cockpit-live-dot cockpit-live-ring'
-                    }`}
-                  />
-                  <span>
-                    {connError
-                      ? t('status.reconnecting')
-                      : topbarErrors > 0
-                        ? `${topbarErrors} ${topbarErrors === 1 ? t('status.notice_single') : t('status.notice_plural')}`
-                        : isHealthy
-                          ? t('status.healthy')
-                          : t('status.high_load')}
-                  </span>
-                </motion.button>
-
-                <motion.button
-                  whileTap={{ scale: 0.9, rotate: 18 }}
-                  type="button"
-                  aria-label={theme === 'dark' ? t('app.toggle_to_light') : t('app.toggle_to_dark')}
-                  onClick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}
-                  className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-600 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-                >
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.span
-                      key={theme}
-                      initial={{ opacity: 0, rotate: -45, scale: 0.7 }}
-                      animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                      exit={{ opacity: 0, rotate: 45, scale: 0.7 }}
-                      transition={{ duration: 0.2 }}
-                      className="inline-flex"
-                    >
-                      {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-sky-700" />}
-                    </motion.span>
-                  </AnimatePresence>
-                </motion.button>
-
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  type="button"
-                  onClick={() => navigateTo('mas', 'updates')}
-                  title={
-                    updateAvailable
-                      ? t('more.new_version_available', { ver: remoteDisplayVersion })
-                      : `v${displayVersion}`
-                  }
-                  aria-label={
-                    updateAvailable
-                      ? t('more.new_version_available', { ver: remoteDisplayVersion })
-                      : `v${displayVersion}`
-                  }
-                  className={`${
-                    updateAvailable ? 'cockpit-pill-emerald' : 'cockpit-pill-cyan'
-                  } inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-2.5 py-1 font-mono text-xs font-semibold tabular-nums transition-opacity hover:opacity-90 whitespace-nowrap`}
-                >
-                  {updateAvailable && (
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 cockpit-live-dot" />
-                  )}
-                  <span>v{displayVersion}</span>
-                </motion.button>
-              </div>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                type="button"
+                onClick={() => navigateTo('mas', 'updates')}
+                title={
+                  updateAvailable
+                    ? t('more.new_version_available', { ver: remoteDisplayVersion })
+                    : `v${displayVersion}`
+                }
+                aria-label={
+                  updateAvailable
+                    ? t('more.new_version_available', { ver: remoteDisplayVersion })
+                    : `v${displayVersion}`
+                }
+                className={`${
+                  updateAvailable ? 'cockpit-pill-emerald' : 'cockpit-pill-cyan'
+                } inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3 py-1 font-mono text-xs font-semibold tabular-nums transition-opacity hover:opacity-90 whitespace-nowrap`}
+              >
+                {updateAvailable && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 cockpit-live-dot" />
+                )}
+                <span>v{displayVersion}</span>
+              </motion.button>
             </div>
           </header>
         </motion.div>

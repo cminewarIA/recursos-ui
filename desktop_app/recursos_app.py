@@ -3219,7 +3219,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         logo_path = resolve_static_asset_path("recursos-cockpit.png")
         if logo_path:
             try:
-                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(logo_path, 116, 116, True)
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(logo_path, 140, 140, True)
                 img = Gtk.Image.new_from_pixbuf(pb)
                 brand_box.pack_start(img, False, False, 0)
             except Exception:

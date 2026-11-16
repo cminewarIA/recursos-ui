@@ -786,4 +786,25 @@ overview.net_history_24h_peak_wan,"Historial de tráfico de red 24h en App",Pico
 overview.net_history_24h_peak_lan,"Historial de tráfico de red 24h en App",Pico Interna (LAN)
 overview.net_history_24h_avg_wan,"Historial de tráfico de red 24h en App",Media Externa (WAN)
 overview.net_history_24h_avg_lan,"Historial de tráfico de red 24h en App",Media Interna (LAN)
+network.map_filter_all,"Vista Red y Seguridad",Todas
+network.map_filter_incoming,"Vista Red y Seguridad",↓ Entrantes
+network.map_filter_outgoing,"Vista Red y Seguridad",↑ Salientes
+network.map_filter_devices,"Vista Red y Seguridad",Dispositivos
+network.map_filter_blocked,"Vista Red y Seguridad",Bloqueadas
+network.map_search_placeholder,"Vista Red y Seguridad","Buscar IP, dominio, servicio, ciudad o dispositivo..."
+network.map_fit_all,"Vista Red y Seguridad",Centrar todo
+network.map_back_to_list,"Vista Red y Seguridad",◀ Ver todas las conexiones ({count})
+network.map_inspect_conn,"Vista Red y Seguridad",Ver detalle
+network.map_source_device,"Vista Red y Seguridad",Dispositivo origen
+network.map_dns_domain,"Vista Red y Seguridad",Dominio DNS (Pi-hole)
+network.map_isp_asn,"Vista Red y Seguridad",Proveedor / ASN
+network.map_process_label,"Vista Red y Seguridad",Proceso / Servicio
+network.map_direction_in,"Vista Red y Seguridad",↓ Entrante
+network.map_direction_out,"Vista Red y Seguridad",↑ Saliente
+network.map_direction_blocked,"Vista Red y Seguridad",Bloqueada (IPS)
+network.map_traffic_rx,"Vista Red y Seguridad",↓ Descarga
+network.map_traffic_tx,"Vista Red y Seguridad",↑ Carga
+network.map_traffic_total,"Vista Red y Seguridad",∑ Total
+network.map_server_node_title,"Vista Red y Seguridad",Nodo Central del Servidor
+
 

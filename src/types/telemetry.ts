@@ -220,19 +220,29 @@ export interface NetInterfaceInfo {
 }
 
 export interface GeoConnectionItem {
+  id?: string;
   ip?: string;
+  public_ip?: string;
   remote_ip?: string;
   local_ip?: string;
+  local_hostname?: string;
   port?: number;
   remote_port?: number;
   local_port?: number;
+  protocol?: string;
+  domain?: string;
   service?: string;
   process?: string;
+  jail?: string;
+  details?: string;
+  state?: string;
   lat?: number;
   lng?: number;
   city?: string;
+  raw_city?: string;
   city_key?: string;
   region?: string;
+  postal?: string;
   country?: string;
   country_code?: string;
   isp?: string;
@@ -240,14 +250,30 @@ export interface GeoConnectionItem {
   asn?: string;
   rx_bytes?: number;
   tx_bytes?: number;
-  direction?: string;
+  bytes_sent?: number;
+  bytes_received?: number;
+  bytes_total?: number;
+  tx_speed?: number;
+  rx_speed?: number;
+  total_speed?: number;
+  direction?: 'incoming' | 'outgoing' | 'blocked' | string;
+  is_lan?: boolean;
   is_server_node?: boolean;
   status?: string;
+}
+
+export interface ConnectionsMapSummary {
+  total?: number;
+  incoming?: number;
+  outgoing?: number;
+  blocked?: number;
+  devices?: number;
 }
 
 export interface ConnectionsMapPayload {
   connections?: GeoConnectionItem[];
   server_node?: GeoConnectionItem;
+  summary?: ConnectionsMapSummary;
   geoip_worker?: {
     resolved_count?: number;
     pending_count?: number;
