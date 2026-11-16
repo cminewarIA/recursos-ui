@@ -391,6 +391,10 @@ HISTORY = {
     "ram_total": [],
     "net_rx": [],
     "net_tx": [],
+    "net_wan_rx": [],
+    "net_wan_tx": [],
+    "net_lan_rx": [],
+    "net_lan_tx": [],
     "disk_r": [],
     "disk_w": [],
     "disk_pct": []
@@ -405,11 +409,32 @@ def _sync_history_dict_from_buckets():
     HISTORY["ram_total"] = [b["ram_total"] for b in _HISTORY_BUCKETS_20M]
     HISTORY["net_rx"] = [b["net_rx"] for b in _HISTORY_BUCKETS_20M]
     HISTORY["net_tx"] = [b["net_tx"] for b in _HISTORY_BUCKETS_20M]
+    HISTORY["net_wan_rx"] = [b.get("net_wan_rx", b["net_rx"]) for b in _HISTORY_BUCKETS_20M]
+    HISTORY["net_wan_tx"] = [b.get("net_wan_tx", b["net_tx"]) for b in _HISTORY_BUCKETS_20M]
+    HISTORY["net_lan_rx"] = [b.get("net_lan_rx", 0.0) for b in _HISTORY_BUCKETS_20M]
+    HISTORY["net_lan_tx"] = [b.get("net_lan_tx", 0.0) for b in _HISTORY_BUCKETS_20M]
     HISTORY["disk_r"] = [b["disk_r"] for b in _HISTORY_BUCKETS_20M]
     HISTORY["disk_w"] = [b["disk_w"] for b in _HISTORY_BUCKETS_20M]
     HISTORY["disk_pct"] = [b["disk_pct"] for b in _HISTORY_BUCKETS_20M]
 
-def _push_history_bucket(sample_ts, time_str, cpu_val, gpu_val, ram_val, ram_tot_val, net_rx_val, net_tx_val, disk_r_val, disk_w_val, disk_pct_val, sync=True):
+def _push_history_bucket(
+    sample_ts,
+    time_str,
+    cpu_val,
+    gpu_val,
+    ram_val,
+    ram_tot_val,
+    net_rx_val,
+    net_tx_val,
+    disk_r_val,
+    disk_w_val,
+    disk_pct_val,
+    net_wan_rx_val=None,
+    net_wan_tx_val=None,
+    net_lan_rx_val=None,
+    net_lan_tx_val=None,
+    sync=True,
+):
     ts_num = float(sample_ts)
     b_ts = (int(ts_num) // HISTORY_BUCKET_SECONDS) * HISTORY_BUCKET_SECONDS
     cutoff_b_ts = b_ts - HISTORY_WINDOW_SECONDS
@@ -420,6 +445,10 @@ def _push_history_bucket(sample_ts, time_str, cpu_val, gpu_val, ram_val, ram_tot
     rt_v = round(float(ram_tot_val or 0.0), 2)
     nrx_v = round(float(net_rx_val or 0.0), 2)
     ntx_v = round(float(net_tx_val or 0.0), 2)
+    nwan_rx_v = round(float(nrx_v if net_wan_rx_val is None else (net_wan_rx_val or 0.0)), 2)
+    nwan_tx_v = round(float(ntx_v if net_wan_tx_val is None else (net_wan_tx_val or 0.0)), 2)
+    nlan_rx_v = round(float(0.0 if net_lan_rx_val is None else (net_lan_rx_val or 0.0)), 2)
+    nlan_tx_v = round(float(0.0 if net_lan_tx_val is None else (net_lan_tx_val or 0.0)), 2)
     dr_v = round(float(disk_r_val or 0.0), 2)
     dw_v = round(float(disk_w_val or 0.0), 2)
     dp_v = round(float(disk_pct_val or 0.0), 1)
@@ -436,6 +465,10 @@ def _push_history_bucket(sample_ts, time_str, cpu_val, gpu_val, ram_val, ram_tot
             "ram_total": rt_v,
             "net_rx": nrx_v,
             "net_tx": ntx_v,
+            "net_wan_rx": nwan_rx_v,
+            "net_wan_tx": nwan_tx_v,
+            "net_lan_rx": nlan_rx_v,
+            "net_lan_tx": nlan_tx_v,
             "disk_r": dr_v,
             "disk_w": dw_v,
             "disk_pct": dp_v,
@@ -451,6 +484,10 @@ def _push_history_bucket(sample_ts, time_str, cpu_val, gpu_val, ram_val, ram_tot
         last_b["ram_total"] = max(last_b["ram_total"], rt_v)
         last_b["net_rx"] = max(last_b["net_rx"], nrx_v)
         last_b["net_tx"] = max(last_b["net_tx"], ntx_v)
+        last_b["net_wan_rx"] = max(last_b.get("net_wan_rx", 0.0), nwan_rx_v)
+        last_b["net_wan_tx"] = max(last_b.get("net_wan_tx", 0.0), nwan_tx_v)
+        last_b["net_lan_rx"] = max(last_b.get("net_lan_rx", 0.0), nlan_rx_v)
+        last_b["net_lan_tx"] = max(last_b.get("net_lan_tx", 0.0), nlan_tx_v)
         last_b["disk_r"] = max(last_b["disk_r"], dr_v)
         last_b["disk_w"] = max(last_b["disk_w"], dw_v)
         last_b["disk_pct"] = max(last_b["disk_pct"], dp_v)
@@ -648,11 +685,27 @@ def _load_nic_history_2h():
                     b_ts = (t_val // NIC_BUCKET_INTERVAL_MS) * NIC_BUCKET_INTERVAL_MS
                     rx_v = max(0.0, float(pt.get("rx", 0.0)))
                     tx_v = max(0.0, float(pt.get("tx", 0.0)))
+                    wan_rx_v = max(0.0, float(pt.get("wan_rx", rx_v)))
+                    wan_tx_v = max(0.0, float(pt.get("wan_tx", tx_v)))
+                    lan_rx_v = max(0.0, float(pt.get("lan_rx", max(0.0, rx_v - wan_rx_v))))
+                    lan_tx_v = max(0.0, float(pt.get("lan_tx", max(0.0, tx_v - wan_tx_v))))
                     if b_ts in bucket_map:
                         bucket_map[b_ts]["rx"] = max(bucket_map[b_ts]["rx"], rx_v)
                         bucket_map[b_ts]["tx"] = max(bucket_map[b_ts]["tx"], tx_v)
+                        bucket_map[b_ts]["wan_rx"] = max(bucket_map[b_ts]["wan_rx"], wan_rx_v)
+                        bucket_map[b_ts]["wan_tx"] = max(bucket_map[b_ts]["wan_tx"], wan_tx_v)
+                        bucket_map[b_ts]["lan_rx"] = max(bucket_map[b_ts]["lan_rx"], lan_rx_v)
+                        bucket_map[b_ts]["lan_tx"] = max(bucket_map[b_ts]["lan_tx"], lan_tx_v)
                     else:
-                        bucket_map[b_ts] = {"t": b_ts, "rx": rx_v, "tx": tx_v}
+                        bucket_map[b_ts] = {
+                            "t": b_ts,
+                            "rx": rx_v,
+                            "tx": tx_v,
+                            "wan_rx": wan_rx_v,
+                            "wan_tx": wan_tx_v,
+                            "lan_rx": lan_rx_v,
+                            "lan_tx": lan_tx_v,
+                        }
                 NIC_BANDWIDTH_HISTORY_2H[nic_name] = sorted(bucket_map.values(), key=lambda x: x["t"])
     except Exception:
         pass
@@ -2277,11 +2330,21 @@ def init_geoip_history_db():
                     ram_total REAL DEFAULT 0,
                     net_rx REAL DEFAULT 0,
                     net_tx REAL DEFAULT 0,
+                    net_wan_rx REAL DEFAULT 0,
+                    net_wan_tx REAL DEFAULT 0,
+                    net_lan_rx REAL DEFAULT 0,
+                    net_lan_tx REAL DEFAULT 0,
                     disk_r REAL DEFAULT 0,
                     disk_w REAL DEFAULT 0,
                     disk_pct REAL DEFAULT 0
                 )
             """)
+            existing_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(telemetry_history)").fetchall()
+            }
+            for col_name in ("net_wan_rx", "net_wan_tx", "net_lan_rx", "net_lan_tx"):
+                if col_name not in existing_cols:
+                    conn.execute(f"ALTER TABLE telemetry_history ADD COLUMN {col_name} REAL DEFAULT 0;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_history_ts ON telemetry_history(ts DESC);")
             conn.commit()
             conn.close()
@@ -2298,7 +2361,9 @@ def preload_telemetry_history_from_sqlite():
             conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
             conn.row_factory = sqlite3.Row
             rows = conn.execute("""
-                SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx,
+                       net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
+                       disk_r, disk_w, disk_pct
                 FROM telemetry_history
                 WHERE ts >= ?
                 ORDER BY ts ASC
@@ -2308,6 +2373,16 @@ def preload_telemetry_history_from_sqlite():
                 return
             _HISTORY_BUCKETS_20M.clear()
             for r in rows:
+                nrx = float(r["net_rx"] or 0.0)
+                ntx = float(r["net_tx"] or 0.0)
+                wan_rx = float(r["net_wan_rx"] or 0.0)
+                wan_tx = float(r["net_wan_tx"] or 0.0)
+                lan_rx = float(r["net_lan_rx"] or 0.0)
+                lan_tx = float(r["net_lan_tx"] or 0.0)
+                if wan_rx == 0.0 and lan_rx == 0.0 and nrx > 0.0:
+                    wan_rx = nrx
+                if wan_tx == 0.0 and lan_tx == 0.0 and ntx > 0.0:
+                    wan_tx = ntx
                 _push_history_bucket(
                     r["ts"] or 0.0,
                     r["time_str"] or "",
@@ -2315,22 +2390,49 @@ def preload_telemetry_history_from_sqlite():
                     r["gpu"] or 0.0,
                     r["ram"] or 0.0,
                     r["ram_total"] or 0.0,
-                    r["net_rx"] or 0.0,
-                    r["net_tx"] or 0.0,
+                    nrx,
+                    ntx,
                     r["disk_r"] or 0.0,
                     r["disk_w"] or 0.0,
                     r["disk_pct"] or 0.0,
+                    net_wan_rx_val=wan_rx,
+                    net_wan_tx_val=wan_tx,
+                    net_lan_rx_val=lan_rx,
+                    net_lan_tx_val=lan_tx,
                     sync=False,
                 )
             _sync_history_dict_from_buckets()
         except Exception as e:
             print(f"[-] Error precargando telemetry_history desde SQLite: {e}")
 
-def record_telemetry_sample_to_sqlite(now_ts, time_str, cpu_val, gpu_val, ram_val, ram_tot_val, net_rx_val, net_tx_val, disk_r_val, disk_w_val, disk_pct_val, force_flush=False):
+def record_telemetry_sample_to_sqlite(
+    now_ts,
+    time_str,
+    cpu_val,
+    gpu_val,
+    ram_val,
+    ram_tot_val,
+    net_rx_val,
+    net_tx_val,
+    disk_r_val,
+    disk_w_val,
+    disk_pct_val,
+    net_wan_rx_val=None,
+    net_wan_tx_val=None,
+    net_lan_rx_val=None,
+    net_lan_tx_val=None,
+    force_flush=False,
+):
     """Encola y persiste periódicamente en recursos_history.db cada muestra de consumo del sistema."""
     global _LAST_TELEMETRY_FLUSH_TS, _LAST_TELEMETRY_PRUNE_TS
     if not _TELEMETRY_HISTORY_INITIALIZED:
         init_geoip_history_db()
+    nrx_v = round(float(net_rx_val or 0.0), 2)
+    ntx_v = round(float(net_tx_val or 0.0), 2)
+    nwan_rx_v = round(float(nrx_v if net_wan_rx_val is None else (net_wan_rx_val or 0.0)), 2)
+    nwan_tx_v = round(float(ntx_v if net_wan_tx_val is None else (net_wan_tx_val or 0.0)), 2)
+    nlan_rx_v = round(float(0.0 if net_lan_rx_val is None else (net_lan_rx_val or 0.0)), 2)
+    nlan_tx_v = round(float(0.0 if net_lan_tx_val is None else (net_lan_tx_val or 0.0)), 2)
     sample = (
         round(float(now_ts), 3),
         str(time_str or ""),
@@ -2338,8 +2440,12 @@ def record_telemetry_sample_to_sqlite(now_ts, time_str, cpu_val, gpu_val, ram_va
         round(float(gpu_val or 0.0), 2),
         round(float(ram_val or 0.0), 2),
         round(float(ram_tot_val or 0.0), 2),
-        round(float(net_rx_val or 0.0), 2),
-        round(float(net_tx_val or 0.0), 2),
+        nrx_v,
+        ntx_v,
+        nwan_rx_v,
+        nwan_tx_v,
+        nlan_rx_v,
+        nlan_tx_v,
         round(float(disk_r_val or 0.0), 2),
         round(float(disk_w_val or 0.0), 2),
         round(float(disk_pct_val or 0.0), 1),
@@ -2355,8 +2461,10 @@ def record_telemetry_sample_to_sqlite(now_ts, time_str, cpu_val, gpu_val, ram_va
             conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
             conn.executemany("""
                 INSERT INTO telemetry_history (
-                    ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ts, time_str, cpu, gpu, ram, ram_total,
+                    net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
+                    disk_r, disk_w, disk_pct
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(ts) DO UPDATE SET
                     time_str=excluded.time_str,
                     cpu=excluded.cpu,
@@ -2365,6 +2473,10 @@ def record_telemetry_sample_to_sqlite(now_ts, time_str, cpu_val, gpu_val, ram_va
                     ram_total=excluded.ram_total,
                     net_rx=excluded.net_rx,
                     net_tx=excluded.net_tx,
+                    net_wan_rx=excluded.net_wan_rx,
+                    net_wan_tx=excluded.net_wan_tx,
+                    net_lan_rx=excluded.net_lan_rx,
+                    net_lan_tx=excluded.net_lan_tx,
                     disk_r=excluded.disk_r,
                     disk_w=excluded.disk_w,
                     disk_pct=excluded.disk_pct
@@ -2394,6 +2506,10 @@ def _format_telemetry_rows_payload(rows):
     ram_total = []
     net_rx = []
     net_tx = []
+    net_wan_rx = []
+    net_wan_tx = []
+    net_lan_rx = []
+    net_lan_tx = []
     disk_r = []
     disk_w = []
     disk_pct = []
@@ -2410,8 +2526,23 @@ def _format_telemetry_rows_payload(rows):
         gpu.append(round(float(r["gpu"] or 0.0), 2))
         ram.append(round(float(r["ram"] or 0.0), 2))
         ram_total.append(round(float(r["ram_total"] or 0.0), 2))
-        net_rx.append(round(float(r["net_rx"] or 0.0), 2))
-        net_tx.append(round(float(r["net_tx"] or 0.0), 2))
+        nrx_val = round(float(r["net_rx"] or 0.0), 2)
+        ntx_val = round(float(r["net_tx"] or 0.0), 2)
+        keys = r.keys() if hasattr(r, "keys") else ()
+        wan_rx_val = round(float((r["net_wan_rx"] if "net_wan_rx" in keys else 0.0) or 0.0), 2)
+        wan_tx_val = round(float((r["net_wan_tx"] if "net_wan_tx" in keys else 0.0) or 0.0), 2)
+        lan_rx_val = round(float((r["net_lan_rx"] if "net_lan_rx" in keys else 0.0) or 0.0), 2)
+        lan_tx_val = round(float((r["net_lan_tx"] if "net_lan_tx" in keys else 0.0) or 0.0), 2)
+        if wan_rx_val == 0.0 and lan_rx_val == 0.0 and nrx_val > 0.0:
+            wan_rx_val = nrx_val
+        if wan_tx_val == 0.0 and lan_tx_val == 0.0 and ntx_val > 0.0:
+            wan_tx_val = ntx_val
+        net_rx.append(nrx_val)
+        net_tx.append(ntx_val)
+        net_wan_rx.append(wan_rx_val)
+        net_wan_tx.append(wan_tx_val)
+        net_lan_rx.append(lan_rx_val)
+        net_lan_tx.append(lan_tx_val)
         disk_r.append(round(float(r["disk_r"] or 0.0), 2))
         disk_w.append(round(float(r["disk_w"] or 0.0), 2))
         disk_pct.append(round(float(r["disk_pct"] or 0.0), 1))
@@ -2425,6 +2556,10 @@ def _format_telemetry_rows_payload(rows):
         "ram_total": ram_total,
         "net_rx": net_rx,
         "net_tx": net_tx,
+        "net_wan_rx": net_wan_rx,
+        "net_wan_tx": net_wan_tx,
+        "net_lan_rx": net_lan_rx,
+        "net_lan_tx": net_lan_tx,
         "disk_r": disk_r,
         "disk_w": disk_w,
         "disk_pct": disk_pct,
@@ -2497,7 +2632,9 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
 
             if is_all_window:
                 raw_rows = cur.execute("""
-                    SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                    SELECT ts, time_str, cpu, gpu, ram, ram_total,
+                           net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
+                           disk_r, disk_w, disk_pct
                     FROM telemetry_history
                     ORDER BY ts ASC
                 """).fetchall()
@@ -2505,14 +2642,18 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
                 end_ref = b_ts if b_ts is not None else newest_ts
                 start_ref = max(oldest_ts or 0.0, float(end_ref) - w_sec)
                 raw_rows = cur.execute("""
-                    SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                    SELECT ts, time_str, cpu, gpu, ram, ram_total,
+                           net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
+                           disk_r, disk_w, disk_pct
                     FROM telemetry_history
                     WHERE ts >= ? AND ts <= ?
                     ORDER BY ts ASC
                 """, (start_ref, end_ref)).fetchall()
             elif a_ts is not None and b_ts is None:
                 raw_rows = cur.execute("""
-                    SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                    SELECT ts, time_str, cpu, gpu, ram, ram_total,
+                           net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
+                           disk_r, disk_w, disk_pct
                     FROM telemetry_history
                     WHERE ts >= ?
                     ORDER BY ts ASC
@@ -2527,7 +2668,9 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
                     params.append(a_ts)
                 where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
                 desc_rows = cur.execute(f"""
-                    SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx, disk_r, disk_w, disk_pct
+                    SELECT ts, time_str, cpu, gpu, ram, ram_total,
+                           net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
+                           disk_r, disk_w, disk_pct
                     FROM telemetry_history
                     {where_sql}
                     ORDER BY ts DESC
@@ -4695,9 +4838,157 @@ def ensure_local_deb_built_and_installed(target_version=None, force_rebuild=Fals
     final_inst = get_installed_deb_version()
     return bool(final_inst and _parse_semver_tuple(final_inst) >= _parse_semver_tuple(ver)), "\n".join(logs)
 
+_SAFE_GIT_Configured = False
+_GENERATED_ARTIFACT_PREFIXES = (
+    "static/index.html",
+    "dist/",
+    "packaging/",
+    "nic_history_2h.json",
+    "auto_install_config.json",
+    "recursos_history.db",
+    "geoip_history.db",
+    "trusted_devices.json",
+    "custom_logos.json",
+    "planes/",
+)
+
+def _ensure_git_safe_directory():
+    """Configura safe.directory para evitar errores 'dubious ownership' cuando systemd ejecuta como root."""
+    global _SAFE_GIT_Configured
+    if _SAFE_GIT_Configured:
+        return
+    _SAFE_GIT_Configured = True
+    try:
+        subprocess.run(
+            ["git", "config", "--global", "--add", "safe.directory", BASE_DIR],
+            cwd=BASE_DIR, capture_output=True, text=True, timeout=3
+        )
+    except Exception:
+        pass
+
+def _get_git_status_summary():
+    """
+    Devuelve (has_any_dirty, has_code_dirty, modified_paths).
+    Ignora archivos generados/runtime para que la autoactualización nunca se bloquee por artefactos locales.
+    """
+    _ensure_git_safe_directory()
+    try:
+        p_st = subprocess.run(
+            ["git", "status", "--porcelain", "-uno"],
+            cwd=BASE_DIR, capture_output=True, text=True, timeout=3
+        )
+        if p_st.returncode != 0:
+            return False, False, []
+        raw_lines = [ln.strip() for ln in (p_st.stdout or "").splitlines() if ln.strip()]
+        if not raw_lines:
+            return False, False, []
+        mod_paths = []
+        code_dirty = False
+        for ln in raw_lines:
+            parts = ln.split(None, 1)
+            rel_p = parts[1].strip().strip('"') if len(parts) > 1 else ln
+            if " -> " in rel_p:
+                rel_p = rel_p.split(" -> ", 1)[1].strip()
+            mod_paths.append(rel_p)
+            if not any(rel_p == pref.rstrip("/") or rel_p.startswith(pref) for pref in _GENERATED_ARTIFACT_PREFIXES):
+                code_dirty = True
+        return True, code_dirty, mod_paths
+    except Exception:
+        return False, False, []
+
+def _download_and_apply_github_tarball(out_lines):
+    """
+    Motor de respaldo HTTPS directo: descarga y aplica el tarball oficial de GitHub
+    preservando bases de datos (.db), configuraciones locales (.json) y claves (.env).
+    """
+    import tarfile
+    import tempfile
+    import shutil
+
+    tar_urls = [
+        f"https://codeload.github.com/{GITHUB_REPO}/tar.gz/refs/heads/{GITHUB_BRANCH}",
+        f"https://github.com/{GITHUB_REPO}/archive/refs/heads/{GITHUB_BRANCH}.tar.gz",
+    ]
+    preserve_exact = {
+        "recursos_history.db",
+        "recursos_history.db-wal",
+        "recursos_history.db-shm",
+        "geoip_history.db",
+        "geoip_history.db-wal",
+        "geoip_history.db-shm",
+        "nic_history_2h.json",
+        "auto_install_config.json",
+        "trusted_devices.json",
+        "custom_logos.json",
+        "telegram_bot_config.json",
+        "parental_control.json",
+        ".env",
+    }
+    last_err = ""
+    for t_url in tar_urls:
+        try:
+            req = urllib.request.Request(
+                t_url,
+                headers={"User-Agent": f"Recursos-Updater/{get_app_version()}"},
+            )
+            with urllib.request.urlopen(req, timeout=35.0) as resp:
+                tar_bytes = resp.read()
+            if len(tar_bytes) < 4096:
+                last_err = f"Archivo demasiado pequeño desde {t_url}"
+                continue
+            with tempfile.TemporaryDirectory(prefix="recursos_ota_") as tmp_dir:
+                tar_path = os.path.join(tmp_dir, "repo.tar.gz")
+                with open(tar_path, "wb") as tf:
+                    tf.write(tar_bytes)
+                extract_dir = os.path.join(tmp_dir, "extracted")
+                os.makedirs(extract_dir, exist_ok=True)
+                with tarfile.open(tar_path, "r:gz") as tar_obj:
+                    try:
+                        tar_obj.extractall(path=extract_dir, filter="data")
+                    except TypeError:
+                        tar_obj.extractall(path=extract_dir)
+                entries = [
+                    os.path.join(extract_dir, d)
+                    for d in os.listdir(extract_dir)
+                    if os.path.isdir(os.path.join(extract_dir, d))
+                ]
+                src_root = entries[0] if entries else extract_dir
+                ver_cand = os.path.join(src_root, "VERSION")
+                if not os.path.isfile(ver_cand):
+                    last_err = "El paquete descargado no contiene ./VERSION"
+                    continue
+                copied_files = 0
+                for root_dir, dirs, files in os.walk(src_root):
+                    dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "__pycache__", ".venv", "venv")]
+                    rel_dir = os.path.relpath(root_dir, src_root)
+                    dest_dir = BASE_DIR if rel_dir == "." else os.path.join(BASE_DIR, rel_dir)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    for fname in files:
+                        rel_file = fname if rel_dir == "." else os.path.join(rel_dir, fname)
+                        norm_rel = rel_file.replace("\\", "/")
+                        if norm_rel in preserve_exact or norm_rel.endswith((".db", ".db-wal", ".db-shm", ".vault")):
+                            continue
+                        src_f = os.path.join(root_dir, fname)
+                        dst_f = os.path.join(dest_dir, fname)
+                        shutil.copy2(src_f, dst_f)
+                        copied_files += 1
+                if os.path.isdir(os.path.join(BASE_DIR, ".git")):
+                    try:
+                        subprocess.run(["git", "fetch", "origin", GITHUB_BRANCH], cwd=BASE_DIR, capture_output=True, timeout=15)
+                        subprocess.run(["git", "reset", "--soft", f"origin/{GITHUB_BRANCH}"], cwd=BASE_DIR, capture_output=True, timeout=5)
+                    except Exception:
+                        pass
+                out_lines.append(f"[✓] Descarga directa HTTPS desde GitHub completada ({copied_files} archivos sincronizados hacia v{get_app_version()}).")
+                return True
+        except Exception as e:
+            last_err = str(e)
+    if last_err:
+        out_lines.append(f"[-] Respaldo HTTPS desde GitHub falló: {last_err}")
+    return False
+
 def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
     """
-    Ejecuta la sincronización desde GitHub (`git pull origin main`) cuando procede
+    Ejecuta la sincronización desde GitHub (`git pull` / `git reset` o descarga directa HTTPS Tarball)
     y compila + instala inmediatamente el paquete local `.deb` según se detecta.
     """
     global _LOCAL_GIT_SHA_CACHE, METRICS_CACHE_BYTES
@@ -4720,87 +5011,114 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
             AUTO_INSTALL_STATE["last_attempt_ts"] = time.time()
             AUTO_INSTALL_STATE["last_status"] = "Comprobando y aplicando mejoras..."
 
+        _ensure_git_safe_directory()
         out_lines = []
         has_git = os.path.isdir(os.path.join(BASE_DIR, ".git"))
         pull_ok = True
         code_updated = False
         did_stash = False
+        before_ver = get_app_version()
 
         if do_git_pull:
+            remote_ver_target = ""
+            try:
+                raw_ver_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/VERSION"
+                req_rv = urllib.request.Request(raw_ver_url, headers={"User-Agent": "Recursos-Server-Monitor/12.0"})
+                with urllib.request.urlopen(req_rv, timeout=4.0) as rv_resp:
+                    if rv_resp.status == 200:
+                        remote_ver_target = rv_resp.read().decode("utf-8", errors="ignore").strip().lstrip("vV")
+            except Exception:
+                pass
+
             if not has_git:
-                remote_ver_no_git = ""
-                try:
-                    raw_ver_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/VERSION"
-                    req_rv = urllib.request.Request(raw_ver_url, headers={"User-Agent": "Recursos-Server-Monitor/12.0"})
-                    with urllib.request.urlopen(req_rv, timeout=3.0) as rv_resp:
-                        if rv_resp.status == 200:
-                            remote_ver_no_git = rv_resp.read().decode("utf-8", errors="ignore").strip().lstrip("vV")
-                except Exception:
-                    pass
-                cur_ver_no_git = get_app_version()
-                if remote_ver_no_git and _parse_semver_tuple(remote_ver_no_git) > _parse_semver_tuple(cur_ver_no_git):
-                    pull_ok = False
-                    out_lines.append(
-                        f"[!] Hay versión nueva en GitHub (v{remote_ver_no_git} > v{cur_ver_no_git}), pero este despliegue no contiene repositorio Git (.git) para ejecutar git pull directo."
-                    )
+                if remote_ver_target and _parse_semver_tuple(remote_ver_target) > _parse_semver_tuple(before_ver):
+                    out_lines.append(f"[+] Sincronizando v{remote_ver_target} desde GitHub mediante paquete HTTPS directo...")
+                    pull_ok = _download_and_apply_github_tarball(out_lines)
+                    code_updated = bool(pull_ok and get_app_version() != before_ver)
+                elif is_manual and remote_ver_target:
+                    out_lines.append(f"[i] Verificando archivos de v{remote_ver_target} desde GitHub HTTPS...")
+                    pull_ok = _download_and_apply_github_tarball(out_lines)
+                    code_updated = bool(pull_ok and get_app_version() != before_ver)
                 else:
                     pull_ok = True
-                    out_lines.append("Repositorio sin metadatos Git (.git); sincronización remota omitida en este entorno.")
+                    out_lines.append(f"[✓] Versión local v{before_ver} ya está al día.")
             else:
                 try:
                     p_before = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=3)
                     before_sha = p_before.stdout.strip() if p_before.returncode == 0 else ""
 
-                    p_dirty = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=5)
-                    is_dirty_tree = bool(p_dirty.returncode == 0 and p_dirty.stdout.strip())
-                    if is_dirty_tree and not is_manual:
-                        p_pull = subprocess.CompletedProcess([], 1, "", "Despliegue local modificado; auto-pull omitido.")
+                    has_any_dirty, has_code_dirty, mod_paths = _get_git_status_summary()
+                    # Restaurar artefactos autogenerados antes de actualizar para evitar conflictos espurios
+                    if has_any_dirty and not has_code_dirty:
+                        for mp in mod_paths:
+                            subprocess.run(["git", "checkout", "--", mp], cwd=BASE_DIR, capture_output=True, timeout=3)
+
+                    p_fetch = subprocess.run(
+                        ["git", "fetch", "--prune", "origin", GITHUB_BRANCH],
+                        cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                    )
+                    p_rver = subprocess.run(
+                        ["git", "show", f"origin/{GITHUB_BRANCH}:VERSION"],
+                        cwd=BASE_DIR, capture_output=True, text=True, timeout=5
+                    )
+                    remote_git_ver = p_rver.stdout.strip().lstrip("vV") if (p_rver.returncode == 0 and p_rver.stdout.strip()) else remote_ver_target
+
+                    if remote_git_ver and _parse_semver_tuple(before_ver) > _parse_semver_tuple(remote_git_ver):
+                        p_pull = subprocess.CompletedProcess([], 0, f"Versión local (v{before_ver}) superior a GitHub (v{remote_git_ver}).", "")
                     else:
-                        subprocess.run(
-                            ["git", "fetch", "origin", GITHUB_BRANCH],
-                            cwd=BASE_DIR, capture_output=True, text=True, timeout=20
-                        )
-                        p_rver = subprocess.run(
-                            ["git", "show", f"origin/{GITHUB_BRANCH}:VERSION"],
-                            cwd=BASE_DIR, capture_output=True, text=True, timeout=5
-                        )
-                        remote_git_ver = p_rver.stdout.strip().lstrip("vV") if (p_rver.returncode == 0 and p_rver.stdout.strip()) else ""
-                        if remote_git_ver and _parse_semver_tuple(get_app_version()) > _parse_semver_tuple(remote_git_ver):
-                            p_pull = subprocess.CompletedProcess([], 0, f"Versión local ({get_app_version()}) > remoto ({remote_git_ver}).", "")
-                        else:
-                            p_pull = subprocess.run(
-                                ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
-                                cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                        if has_code_dirty:
+                            p_st = subprocess.run(
+                                ["git", "stash", "push", "-m", "auto-updater-backup"],
+                                cwd=BASE_DIR, capture_output=True, text=True, timeout=10
                             )
-                    if p_pull.returncode != 0 and is_manual:
-                        # Guardar solo archivos rastreados; las bases de datos (.db) y caches en tiempo real nunca se tocan al actualizar
-                        p_st = subprocess.run(["git", "stash", "push", "-m", "auto-updater-backup"], cwd=BASE_DIR, capture_output=True, text=True, timeout=10)
-                        did_stash = (p_st.returncode == 0 and "No local changes" not in (p_st.stdout or ""))
+                            did_stash = (p_st.returncode == 0 and "No local changes" not in (p_st.stdout or ""))
                         p_pull = subprocess.run(
                             ["git", "pull", "--ff-only", "origin", GITHUB_BRANCH],
                             cwd=BASE_DIR, capture_output=True, text=True, timeout=25
                         )
-                        if p_pull.returncode != 0:
+                        if p_pull.returncode != 0 and p_fetch.returncode == 0:
+                            # Si las ramas divergieron o no hay upstream configurado, alinear limpiamente con origin/main
                             p_pull = subprocess.run(
-                                ["git", "pull", "origin", GITHUB_BRANCH],
-                                cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                                ["git", "reset", "--hard", f"origin/{GITHUB_BRANCH}"],
+                                cwd=BASE_DIR, capture_output=True, text=True, timeout=15
                             )
                         if did_stash:
                             p_pop = subprocess.run(["git", "stash", "pop"], cwd=BASE_DIR, capture_output=True, text=True, timeout=10)
                             if p_pop.returncode != 0:
-                                out_lines.append("[!] Hay cambios locales guardados en git stash (revisa manualmente si hubo conflicto).")
+                                out_lines.append("[!] Cambios locales preservados en git stash.")
+
                     p_after = subprocess.run(["git", "rev-parse", "HEAD"], cwd=BASE_DIR, capture_output=True, text=True, timeout=3)
                     after_sha = p_after.stdout.strip() if p_after.returncode == 0 else ""
-                    code_updated = bool(before_sha and after_sha and before_sha != after_sha)
+                    code_updated = bool((before_sha and after_sha and before_sha != after_sha) or (get_app_version() != before_ver))
 
                     pull_out = ((p_pull.stdout or "").strip() + "\n" + (p_pull.stderr or "").strip()).strip()
                     out_lines.append(f"$ git pull origin {GITHUB_BRANCH}\n{pull_out or 'Ya está actualizado.'}")
                     pull_ok = (p_pull.returncode == 0)
+
+                    # Si git pull/reset falló, activar automáticamente el respaldo HTTPS Tarball
+                    if not pull_ok:
+                        out_lines.append("[i] Git pull devolvió error; activando descarga directa HTTPS desde GitHub...")
+                        pull_ok = _download_and_apply_github_tarball(out_lines)
+                        if pull_ok:
+                            code_updated = bool(code_updated or get_app_version() != before_ver or is_manual)
                 except Exception as e:
-                    pull_ok = False
-                    out_lines.append(f"[-] Error descargando desde GitHub: {e}")
+                    out_lines.append(f"[!] Aviso en cliente Git ({e}); activando descarga directa HTTPS desde GitHub...")
+                    pull_ok = _download_and_apply_github_tarball(out_lines)
+                    if pull_ok:
+                        code_updated = bool(get_app_version() != before_ver or is_manual)
 
         new_ver = get_app_version()
+        # Si el código fuente cambió y existe npm/package.json, reconstruir static/index.html antes del paquete .deb
+        if code_updated and os.path.isfile(os.path.join(BASE_DIR, "package.json")):
+            try:
+                if subprocess.run(["which", "npm"], capture_output=True).returncode == 0:
+                    out_lines.append("[+] Compilando interfaz web actualizada (npm run build)...")
+                    p_npm = subprocess.run(["npm", "run", "build"], cwd=BASE_DIR, capture_output=True, text=True, timeout=120)
+                    if p_npm.returncode == 0:
+                        out_lines.append("[✓] Interfaz web compilada en static/index.html.")
+            except Exception:
+                pass
+
         in_perm_cooldown = (time.time() < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
         desktop_installed = os.path.isfile("/usr/bin/recursos-cockpit")
         should_install_deb = bool(desktop_installed or is_manual or trigger_source == "local_package_detected")
@@ -4890,11 +5208,11 @@ def auto_install_watcher_worker():
                     perform_auto_update_and_install(trigger_source="local_package_detected", do_git_pull=False)
 
                 info = get_version_info(force_refresh=False, allow_auto_trigger=False)
-                if info.get("update_available") and info.get("has_git") and not info.get("ahead_of_remote") and info.get("local_clean", True):
+                if info.get("update_available") and not info.get("ahead_of_remote"):
                     perform_auto_update_and_install(trigger_source="github_ota_detected", do_git_pull=True)
         except Exception as e:
             print(f"[-] Advertencia en auto_install_watcher_worker: {e}")
-        time.sleep(90)
+        time.sleep(60)
 
 def get_version_info(force_refresh=False, allow_auto_trigger=True):
     """
@@ -4911,6 +5229,7 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
             cached_copy["last_auto_install"] = AUTO_INSTALL_STATE.get("last_installed_at", "")
             return cached_copy
 
+    _ensure_git_safe_directory()
     pkg_version = get_app_version()
     disp_version = get_display_version(pkg_version)
     has_git = os.path.isdir(os.path.join(BASE_DIR, ".git"))
@@ -5073,14 +5392,8 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
     if not recent_commits and local_recent_commits:
         recent_commits = local_recent_commits
 
-    local_clean = True
-    if has_git:
-        try:
-            p_st = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=2)
-            if p_st.returncode == 0:
-                local_clean = (len(p_st.stdout.strip()) == 0)
-        except Exception:
-            pass
+    _any_dirty, code_dirty, _mod_paths = _get_git_status_summary() if has_git else (False, False, [])
+    local_clean = not code_dirty
 
     ahead_of_remote = False
     update_available = False
@@ -5096,7 +5409,6 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
         ahead_of_remote = True
         update_available = False
     elif has_git and github_reachable and remote_full_sha and local_full_sha and remote_full_sha != local_full_sha:
-        # Verificar si el commit remoto ya es ancestro de HEAD (es decir, el equipo local está por delante)
         try:
             p_anc = subprocess.run(
                 ["git", "merge-base", "--is-ancestor", remote_full_sha, "HEAD"],
@@ -5133,7 +5445,7 @@ def get_version_info(force_refresh=False, allow_auto_trigger=True):
     package_needs_install = bool(desktop_bin_exists and (not installed_deb_ver or _parse_semver_tuple(installed_deb_ver) < local_tuple))
     in_perm_cooldown = (now < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
 
-    can_auto_pull = bool(update_available and has_git and not ahead_of_remote and local_clean)
+    can_auto_pull = bool(update_available and not ahead_of_remote)
     can_auto_deb = bool(package_needs_install and not in_perm_cooldown)
 
     if (
@@ -9851,6 +10163,115 @@ def background_collector():
             w_bytes += d_st.write_bytes
         return r_bytes, w_bytes
 
+    prev_socket_bytes = {}  # { flow_key: (rx_bytes, tx_bytes, is_private) }
+    prev_cifs_totals = [0, 0]
+
+    def sample_lan_wan_flow_shares(dt_sec):
+        """
+        Mide deltas de bytes en tiempo real por flujo TCP/CIFS clasificando cada par remoto
+        mediante _is_private_ip (RFC1918 LAN privada vs WAN pública) y devuelve
+        (wan_rx_share, wan_tx_share, lan_rx_bps_floor, lan_tx_bps_floor).
+        """
+        nonlocal prev_socket_bytes
+        lan_rx_delta = 0.0
+        lan_tx_delta = 0.0
+        wan_rx_delta = 0.0
+        wan_tx_delta = 0.0
+        lan_conns = 0
+        wan_conns = 0
+
+        # 1. Contadores CIFS/SMB montados en red local
+        try:
+            cifs_hosts, _ = _read_cifs_stats_by_host()
+            tot_cifs_r = sum(v[0] for v in cifs_hosts.values())
+            tot_cifs_w = sum(v[1] for v in cifs_hosts.values())
+            if prev_cifs_totals[0] > 0 or prev_cifs_totals[1] > 0:
+                dr = max(0, tot_cifs_r - prev_cifs_totals[0])
+                dw = max(0, tot_cifs_w - prev_cifs_totals[1])
+                lan_rx_delta += dr
+                lan_tx_delta += dw
+            prev_cifs_totals[0] = tot_cifs_r
+            prev_cifs_totals[1] = tot_cifs_w
+        except Exception:
+            pass
+
+        # 2. Contadores TCP por socket del kernel (ss -tin -H state established)
+        curr_sockets = {}
+        try:
+            p_ss = subprocess.run(
+                ["ss", "-tin", "-H", "state", "established"],
+                capture_output=True, text=True, timeout=1.2
+            )
+            if p_ss.returncode == 0 and p_ss.stdout:
+                lines = p_ss.stdout.splitlines()
+                cur_key = None
+                cur_priv = True
+                for ln in lines:
+                    s = ln.strip()
+                    if not s:
+                        continue
+                    parts = s.split()
+                    if len(parts) >= 4 and (":" in parts[2] or ":" in parts[3]) and not s.startswith(("cubic", "bbr", "reno", "ts ", "sack")):
+                        l_ep = parts[-2]
+                        r_ep = parts[-1]
+                        r_ip = r_ep.rsplit(":", 1)[0].strip("[]")
+                        if r_ip.startswith("::ffff:"):
+                            r_ip = r_ip[7:]
+                        if r_ip in ("127.0.0.1", "::1", "0.0.0.0", "*"):
+                            cur_key = None
+                            continue
+                        cur_priv = _is_private_ip(r_ip)
+                        if cur_priv:
+                            lan_conns += 1
+                        else:
+                            wan_conns += 1
+                        cur_key = f"{l_ep}->{r_ep}"
+                        curr_sockets.setdefault(cur_key, [0, 0, cur_priv])
+                    elif cur_key is not None:
+                        m_rcv = re.search(r"bytes_received:(\d+)", s)
+                        m_ack = re.search(r"bytes_acked:(\d+)", s)
+                        m_sent = re.search(r"bytes_sent:(\d+)", s)
+                        rx_b = int(m_rcv.group(1)) if m_rcv else 0
+                        tx_b = int(m_sent.group(1)) if m_sent else (int(m_ack.group(1)) if m_ack else 0)
+                        curr_sockets[cur_key] = [rx_b, tx_b, cur_priv]
+                        prev_entry = prev_socket_bytes.get(cur_key)
+                        if prev_entry is not None:
+                            d_rx = max(0, rx_b - prev_entry[0])
+                            d_tx = max(0, tx_b - prev_entry[1])
+                        else:
+                            d_rx = rx_b
+                            d_tx = tx_b
+                        if cur_priv:
+                            lan_rx_delta += d_rx
+                            lan_tx_delta += d_tx
+                        else:
+                            wan_rx_delta += d_rx
+                            wan_tx_delta += d_tx
+                        cur_key = None
+            prev_socket_bytes = curr_sockets
+        except Exception:
+            pass
+
+        tot_rx_delta = lan_rx_delta + wan_rx_delta
+        tot_tx_delta = lan_tx_delta + wan_tx_delta
+        tot_conns = lan_conns + wan_conns
+
+        if tot_rx_delta > 0:
+            wan_rx_share = min(1.0, max(0.0, wan_rx_delta / tot_rx_delta))
+        elif tot_conns > 0:
+            wan_rx_share = min(1.0, max(0.0, wan_conns / float(tot_conns)))
+        else:
+            wan_rx_share = 0.65
+
+        if tot_tx_delta > 0:
+            wan_tx_share = min(1.0, max(0.0, wan_tx_delta / tot_tx_delta))
+        elif tot_conns > 0:
+            wan_tx_share = min(1.0, max(0.0, wan_conns / float(tot_conns)))
+        else:
+            wan_tx_share = 0.65
+
+        return wan_rx_share, wan_tx_share
+
     last_rx, last_tx, prev_ifaces_map, _ = get_real_net()
     last_r, last_w = get_real_disk()
     cycle_counter = 0
@@ -9869,6 +10290,12 @@ def background_collector():
             tx_bytes_sec = max(0, (curr_tx - last_tx) / dt)
             last_rx, last_tx = curr_rx, curr_tx
 
+            wan_rx_share, wan_tx_share = sample_lan_wan_flow_shares(dt)
+            wan_rx_bytes_sec = round(rx_bytes_sec * wan_rx_share, 1)
+            lan_rx_bytes_sec = round(max(0.0, rx_bytes_sec - wan_rx_bytes_sec), 1)
+            wan_tx_bytes_sec = round(tx_bytes_sec * wan_tx_share, 1)
+            lan_tx_bytes_sec = round(max(0.0, tx_bytes_sec - wan_tx_bytes_sec), 1)
+
             # Accumulate rolling 20-minute bandwidth history per NIC (5s fixed buckets, 240 buckets across 1200s)
             with NIC_BANDWIDTH_LOCK:
                 now_ms = int(now * 1000)
@@ -9876,16 +10303,35 @@ def background_collector():
                 cutoff_ms = bucket_ms - (MAX_NIC_HISTORY_SECONDS * 1000)
                 for nic_item in interfaces_list:
                     n_name = nic_item["name"]
+                    n_rx = float(nic_item["rx_bytes_sec"] or 0.0)
+                    n_tx = float(nic_item["tx_bytes_sec"] or 0.0)
+                    n_wan_rx = round(n_rx * wan_rx_share, 1)
+                    n_lan_rx = round(max(0.0, n_rx - n_wan_rx), 1)
+                    n_wan_tx = round(n_tx * wan_tx_share, 1)
+                    n_lan_tx = round(max(0.0, n_tx - n_wan_tx), 1)
+                    nic_item["wan_rx_bytes_sec"] = n_wan_rx
+                    nic_item["wan_tx_bytes_sec"] = n_wan_tx
+                    nic_item["lan_rx_bytes_sec"] = n_lan_rx
+                    nic_item["lan_tx_bytes_sec"] = n_lan_tx
+
                     n_hist = NIC_BANDWIDTH_HISTORY_2H.setdefault(n_name, [])
                     if not n_hist or n_hist[-1]["t"] < bucket_ms:
                         n_hist.append({
                             "t": bucket_ms,
-                            "rx": nic_item["rx_bytes_sec"],
-                            "tx": nic_item["tx_bytes_sec"]
+                            "rx": n_rx,
+                            "tx": n_tx,
+                            "wan_rx": n_wan_rx,
+                            "wan_tx": n_wan_tx,
+                            "lan_rx": n_lan_rx,
+                            "lan_tx": n_lan_tx,
                         })
                     else:
-                        n_hist[-1]["rx"] = max(n_hist[-1]["rx"], nic_item["rx_bytes_sec"])
-                        n_hist[-1]["tx"] = max(n_hist[-1]["tx"], nic_item["tx_bytes_sec"])
+                        n_hist[-1]["rx"] = max(n_hist[-1]["rx"], n_rx)
+                        n_hist[-1]["tx"] = max(n_hist[-1]["tx"], n_tx)
+                        n_hist[-1]["wan_rx"] = max(n_hist[-1].get("wan_rx", 0.0), n_wan_rx)
+                        n_hist[-1]["wan_tx"] = max(n_hist[-1].get("wan_tx", 0.0), n_wan_tx)
+                        n_hist[-1]["lan_rx"] = max(n_hist[-1].get("lan_rx", 0.0), n_lan_rx)
+                        n_hist[-1]["lan_tx"] = max(n_hist[-1].get("lan_tx", 0.0), n_lan_tx)
                     
                     while n_hist and n_hist[0]["t"] < cutoff_ms:
                         n_hist.pop(0)
@@ -9954,6 +10400,10 @@ def background_collector():
             net_info = {
                 "rx_bytes_sec": rx_bytes_sec,
                 "tx_bytes_sec": tx_bytes_sec,
+                "wan_rx_bytes_sec": wan_rx_bytes_sec,
+                "wan_tx_bytes_sec": wan_tx_bytes_sec,
+                "lan_rx_bytes_sec": lan_rx_bytes_sec,
+                "lan_tx_bytes_sec": lan_tx_bytes_sec,
                 "rx_total_bytes": curr_rx,
                 "tx_total_bytes": curr_tx,
                 "local_ip": SERVER_LOCAL_IP,
@@ -9997,6 +10447,10 @@ def background_collector():
             ram_tot_sample = round(float(ram_info.get("total_used_percent", 0) or 0.0), 2)
             net_rx_sample = round(rx_bytes_sec / (1024 * 1024), 2)
             net_tx_sample = round(tx_bytes_sec / (1024 * 1024), 2)
+            net_wan_rx_sample = round(wan_rx_bytes_sec / (1024 * 1024), 2)
+            net_wan_tx_sample = round(wan_tx_bytes_sec / (1024 * 1024), 2)
+            net_lan_rx_sample = round(lan_rx_bytes_sec / (1024 * 1024), 2)
+            net_lan_tx_sample = round(lan_tx_bytes_sec / (1024 * 1024), 2)
             disk_r_sample = round(read_bytes_sec / (1024 * 1024), 2)
             disk_w_sample = round(write_bytes_sec / (1024 * 1024), 2)
 
@@ -10012,6 +10466,10 @@ def background_collector():
                 disk_r_sample,
                 disk_w_sample,
                 disk_pct_val,
+                net_wan_rx_val=net_wan_rx_sample,
+                net_wan_tx_val=net_wan_tx_sample,
+                net_lan_rx_val=net_lan_rx_sample,
+                net_lan_tx_val=net_lan_tx_sample,
                 sync=True,
             )
 
@@ -10027,6 +10485,10 @@ def background_collector():
                 disk_r_sample,
                 disk_w_sample,
                 disk_pct_val,
+                net_wan_rx_val=net_wan_rx_sample,
+                net_wan_tx_val=net_wan_tx_sample,
+                net_lan_rx_val=net_lan_rx_sample,
+                net_lan_tx_val=net_lan_tx_sample,
             )
             
             with DOCKER_LOCK:

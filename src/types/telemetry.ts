@@ -194,6 +194,10 @@ export interface NicHistoryBucket {
   t: number;
   rx: number;
   tx: number;
+  wan_rx?: number;
+  wan_tx?: number;
+  lan_rx?: number;
+  lan_tx?: number;
 }
 
 export interface NetInterfaceInfo {
@@ -208,6 +212,10 @@ export interface NetInterfaceInfo {
   bytes_recv?: number;
   rx_bytes_sec?: number;
   tx_bytes_sec?: number;
+  wan_rx_bytes_sec?: number;
+  wan_tx_bytes_sec?: number;
+  lan_rx_bytes_sec?: number;
+  lan_tx_bytes_sec?: number;
   history_2h?: NicHistoryBucket[];
 }
 
@@ -260,6 +268,10 @@ export interface ConnectionsMapPayload {
 export interface NetInfo {
   rx_bytes_sec?: number;
   tx_bytes_sec?: number;
+  wan_rx_bytes_sec?: number;
+  wan_tx_bytes_sec?: number;
+  lan_rx_bytes_sec?: number;
+  lan_tx_bytes_sec?: number;
   rx_total_bytes?: number;
   tx_total_bytes?: number;
   local_ip?: string;
@@ -476,6 +488,10 @@ export type TelemetryMetricKey =
   | 'ram_total'
   | 'net_rx'
   | 'net_tx'
+  | 'net_wan_rx'
+  | 'net_wan_tx'
+  | 'net_lan_rx'
+  | 'net_lan_tx'
   | 'disk_r'
   | 'disk_w'
   | 'disk_pct';
@@ -490,6 +506,10 @@ export interface HistorySeries {
   ram_total?: number[];
   net_rx?: number[];
   net_tx?: number[];
+  net_wan_rx?: number[];
+  net_wan_tx?: number[];
+  net_lan_rx?: number[];
+  net_lan_tx?: number[];
   disk_r?: number[];
   disk_w?: number[];
   disk_pct?: number[];

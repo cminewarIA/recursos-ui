@@ -681,13 +681,17 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           <section className="cockpit-auto-grid">
             {interfaces.map((nic) => {
               const hist2h = nic.history_2h ?? [];
-              const rxData = hist2h.map((b) => Math.round((b.rx / (1024 * 1024)) * 100) / 100);
-              const txData = hist2h.map((b) => Math.round((b.tx / (1024 * 1024)) * 100) / 100);
+              const wanRxData = hist2h.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100);
+              const wanTxData = hist2h.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100);
+              const lanRxData = hist2h.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100);
+              const lanTxData = hist2h.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100);
               const nicTimestamps = hist2h.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale));
               const nicEpochTs = hist2h.map((b) => Math.round(b.t / 1000));
               const nicSeries: ChartSeries[] = [
-                { id: 'rx', metricKey: 'net_rx', label: t('hardware.net.download'), data: rxData, color: '#0284c7', unit: 'MB/s', decimals: 2 },
-                { id: 'tx', metricKey: 'net_tx', label: t('hardware.net.upload'), data: txData, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0 },
+                { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: '#0284c7', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
+                { id: 'wan_tx', metricKey: 'net_wan_tx', label: t('hardware.net.wan_upload'), data: wanTxData, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
+                { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.10 },
+                { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.06 },
               ];
               const expandNicSpec: ExpandChartSpec = {
                 title: t('hardware.net.iface_full_title', { name: nic.name }),
@@ -699,6 +703,10 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 chartKind: 'net',
                 nicName: nic.name,
               };
+              const wanRxNow = nic.wan_rx_bytes_sec ?? nic.rx_bytes_sec;
+              const wanTxNow = nic.wan_tx_bytes_sec ?? nic.tx_bytes_sec;
+              const lanRxNow = nic.lan_rx_bytes_sec ?? 0;
+              const lanTxNow = nic.lan_tx_bytes_sec ?? 0;
               return (
                 <div
                   key={nic.name}
@@ -714,9 +722,23 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="text-right font-mono text-xs tabular-nums">
-                        <div className="text-sky-600 dark:text-sky-400">↓ {formatSpeed(nic.rx_bytes_sec)}</div>
-                        <div className="text-emerald-600 dark:text-emerald-400">↑ {formatSpeed(nic.tx_bytes_sec)}</div>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-right font-mono text-[11px] tabular-nums">
+                        <div className="text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
+                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+                          ↓ {formatSpeed(wanRxNow)}
+                        </div>
+                        <div className="text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
+                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+                          ↓ {formatSpeed(lanRxNow)}
+                        </div>
+                        <div className="text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
+                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+                          ↑ {formatSpeed(wanTxNow)}
+                        </div>
+                        <div className="text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
+                          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+                          ↑ {formatSpeed(lanTxNow)}
+                        </div>
                       </div>
                       {onExpandChart && (
                         <button

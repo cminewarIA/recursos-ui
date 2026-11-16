@@ -419,37 +419,64 @@ export function App() {
     const dbRx = dbSeries?.net_rx ?? [];
     const dbTx = dbSeries?.net_tx ?? [];
     const useFallbackLive = dbRx.length < 2 && (metrics?.history?.net_rx?.length ?? 0) >= 2;
-    const rxData = useFallbackLive ? (metrics?.history?.net_rx ?? []) : dbRx;
-    const txData = useFallbackLive ? (metrics?.history?.net_tx ?? []) : dbTx;
-    const timestamps = useFallbackLive ? (metrics?.history?.timestamps ?? []) : (dbSeries?.timestamps ?? []);
-    const dateTimestamps = useFallbackLive ? (metrics?.history?.date_timestamps ?? []) : (dbSeries?.date_timestamps ?? []);
-    const epochTs = useFallbackLive ? (metrics?.history?.epoch_ts ?? []) : (dbSeries?.epoch_ts ?? []);
+    const sourceSeries = useFallbackLive ? metrics?.history : dbSeries;
 
-    const peakRxMb = rxData.length > 0 ? Math.max(...rxData) : 0;
-    const peakTxMb = txData.length > 0 ? Math.max(...txData) : 0;
-    const avgRxMb = rxData.length > 0 ? rxData.reduce((acc, v) => acc + v, 0) / rxData.length : 0;
-    const avgTxMb = txData.length > 0 ? txData.reduce((acc, v) => acc + v, 0) / txData.length : 0;
+    const rxTotal = sourceSeries?.net_rx ?? [];
+    const txTotal = sourceSeries?.net_tx ?? [];
+    const wanRxData = sourceSeries?.net_wan_rx?.length ? sourceSeries.net_wan_rx : rxTotal;
+    const wanTxData = sourceSeries?.net_wan_tx?.length ? sourceSeries.net_wan_tx : txTotal;
+    const lanRxData = sourceSeries?.net_lan_rx?.length ? sourceSeries.net_lan_rx : rxTotal.map(() => 0);
+    const lanTxData = sourceSeries?.net_lan_tx?.length ? sourceSeries.net_lan_tx : txTotal.map(() => 0);
+
+    const timestamps = sourceSeries?.timestamps ?? [];
+    const dateTimestamps = sourceSeries?.date_timestamps ?? [];
+    const epochTs = sourceSeries?.epoch_ts ?? [];
+
+    const peakWanRxMb = wanRxData.length > 0 ? Math.max(...wanRxData) : 0;
+    const peakWanTxMb = wanTxData.length > 0 ? Math.max(...wanTxData) : 0;
+    const peakLanRxMb = lanRxData.length > 0 ? Math.max(...lanRxData) : 0;
+    const peakLanTxMb = lanTxData.length > 0 ? Math.max(...lanTxData) : 0;
 
     const series: ChartSeries[] = [
       {
-        id: 'net_rx_24h',
-        metricKey: 'net_rx',
-        label: t('hardware.net.download'),
-        data: rxData,
+        id: 'net_wan_rx_24h',
+        metricKey: 'net_wan_rx',
+        label: t('hardware.net.wan_download'),
+        data: wanRxData,
         color: '#0284c7',
         unit: 'MB/s',
         decimals: 2,
-        fillAlpha: 0.18,
+        fillAlpha: 0.16,
       },
       {
-        id: 'net_tx_24h',
-        metricKey: 'net_tx',
-        label: t('hardware.net.upload'),
-        data: txData,
+        id: 'net_wan_tx_24h',
+        metricKey: 'net_wan_tx',
+        label: t('hardware.net.wan_upload'),
+        data: wanTxData,
         color: '#10b981',
         unit: 'MB/s',
         decimals: 2,
         fillAlpha: 0.08,
+      },
+      {
+        id: 'net_lan_rx_24h',
+        metricKey: 'net_lan_rx',
+        label: t('hardware.net.lan_download'),
+        data: lanRxData,
+        color: '#6366f1',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.10,
+      },
+      {
+        id: 'net_lan_tx_24h',
+        metricKey: 'net_lan_tx',
+        label: t('hardware.net.lan_upload'),
+        data: lanTxData,
+        color: '#f59e0b',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.06,
       },
     ];
 
@@ -458,11 +485,11 @@ export function App() {
       timestamps,
       dateTimestamps,
       epochTs,
-      sampleCount: Math.max(rxData.length, txData.length),
-      peakRxMb,
-      peakTxMb,
-      avgRxMb,
-      avgTxMb,
+      sampleCount: Math.max(wanRxData.length, wanTxData.length, lanRxData.length, lanTxData.length),
+      peakWanRxMb,
+      peakWanTxMb,
+      peakLanRxMb,
+      peakLanTxMb,
     };
   }, [netHistory24h, metrics?.history, t]);
 
@@ -741,14 +768,22 @@ export function App() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3 shrink-0">
-                <div className="flex items-center gap-3 text-xs font-medium text-slate-600 dark:text-slate-300">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
                   <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                     <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
-                    <span>{t('hardware.net.download')}</span>
+                    <span>{t('hardware.net.wan_download')}</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                     <span className="h-2 w-2 rounded-full bg-[#10b981]" />
-                    <span>{t('hardware.net.upload')}</span>
+                    <span>{t('hardware.net.wan_upload')}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#6366f1]" />
+                    <span>{t('hardware.net.lan_download')}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
+                    <span>{t('hardware.net.lan_upload')}</span>
                   </span>
                 </div>
 
@@ -779,34 +814,34 @@ export function App() {
             <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200/80 pt-4 sm:grid-cols-4 dark:border-slate-800">
               <div>
                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  {t('overview.net_history_24h_peak_rx')}
+                  {t('hardware.net.wan_download')} ({t('overview.net_history_24h_peak_wan')})
                 </p>
                 <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-sky-700 dark:text-sky-300">
-                  ↓ {formatSpeed(network24hView.peakRxMb * 1024 * 1024)}
+                  ↓ {formatSpeed(network24hView.peakWanRxMb * 1024 * 1024)}
                 </p>
               </div>
               <div>
                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  {t('overview.net_history_24h_avg_rx')}
-                </p>
-                <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-slate-900 dark:text-white">
-                  ↓ {formatSpeed(network24hView.avgRxMb * 1024 * 1024)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  {t('overview.net_history_24h_peak_tx')}
+                  {t('hardware.net.wan_upload')} ({t('overview.net_history_24h_peak_wan')})
                 </p>
                 <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-                  ↑ {formatSpeed(network24hView.peakTxMb * 1024 * 1024)}
+                  ↑ {formatSpeed(network24hView.peakWanTxMb * 1024 * 1024)}
                 </p>
               </div>
               <div>
                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  {t('overview.net_history_24h_avg_tx')}
+                  {t('hardware.net.lan_download')} ({t('overview.net_history_24h_peak_lan')})
                 </p>
-                <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-slate-900 dark:text-white">
-                  ↑ {formatSpeed(network24hView.avgTxMb * 1024 * 1024)}
+                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-indigo-700 dark:text-indigo-300">
+                  ↓ {formatSpeed(network24hView.peakLanRxMb * 1024 * 1024)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {t('hardware.net.lan_upload')} ({t('overview.net_history_24h_peak_lan')})
+                </p>
+                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                  ↑ {formatSpeed(network24hView.peakLanTxMb * 1024 * 1024)}
                 </p>
               </div>
             </div>

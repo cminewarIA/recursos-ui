@@ -146,6 +146,8 @@ if [ -f "${DEB_OUT}.asc" ]; then
     ln -sf "${PKG_NAME}_${VERSION}_${ARCH}.deb.asc" "${PKG_NAME}.deb.asc"
 fi
 
+rm -rf "$BUILD_DIR"
+
 echo "============================================================"
 echo "✅ Paquete generado y firmado exitosamente:"
 echo "   -> $DEB_OUT"

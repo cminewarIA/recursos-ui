@@ -776,3 +776,14 @@ more.auto_in_progress,"Vista Más, ajustes y DeX",Actualización en curso...
 more.update_restarting,"Vista Más, ajustes y DeX",Actualización aplicada. Reiniciando panel...
 native_ubuntu.auto_perm_pending,App nativa Ubuntu (GTK),Nueva versión v{ver} lista en GitHub (requiere clic para confirmar instalación).
 native_ubuntu.auto_synced_web,App nativa Ubuntu (GTK),Web del servidor sincronizada automáticamente a v{ver}.
+hardware.net.wan_download,Vista Equipo y Red,Bajada Externa (WAN)
+hardware.net.wan_upload,Vista Equipo y Red,Subida Externa (WAN)
+hardware.net.lan_download,Vista Equipo y Red,Bajada Interna (LAN)
+hardware.net.lan_upload,Vista Equipo y Red,Subida Interna (LAN)
+hardware.net.wan_short,Vista Equipo y Red,Ext (WAN)
+hardware.net.lan_short,Vista Equipo y Red,Int (LAN)
+overview.net_history_24h_peak_wan,"Historial de tráfico de red 24h en App",Pico Externa (WAN)
+overview.net_history_24h_peak_lan,"Historial de tráfico de red 24h en App",Pico Interna (LAN)
+overview.net_history_24h_avg_wan,"Historial de tráfico de red 24h en App",Media Externa (WAN)
+overview.net_history_24h_avg_lan,"Historial de tráfico de red 24h en App",Media Interna (LAN)
+

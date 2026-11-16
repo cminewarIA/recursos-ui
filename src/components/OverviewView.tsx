@@ -256,7 +256,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const OVERVIEW_WINDOW_SECONDS = 300; // Ventana en vivo de 5 minutos en Inicio
 
   const hist = metrics?.history;
-  const { timestamps, epochTs, cpuHist, ramHist, gpuHist, netRxHist, netTxHist } = useMemo(() => {
+  const {
+    timestamps,
+    epochTs,
+    cpuHist,
+    ramHist,
+    gpuHist,
+    netWanRxHist,
+    netWanTxHist,
+    netLanRxHist,
+    netLanTxHist,
+  } = useMemo(() => {
     const rawTs = hist?.timestamps ?? [];
     const rawEpoch = hist?.epoch_ts ?? [];
     const rawCpu = hist?.cpu ?? [];
@@ -264,6 +274,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     const rawGpu = hist?.gpu ?? [];
     const rawNetRx = hist?.net_rx ?? [];
     const rawNetTx = hist?.net_tx ?? [];
+    const rawWanRx = hist?.net_wan_rx && hist.net_wan_rx.length > 0 ? hist.net_wan_rx : rawNetRx;
+    const rawWanTx = hist?.net_wan_tx && hist.net_wan_tx.length > 0 ? hist.net_wan_tx : rawNetTx;
+    const rawLanRx =
+      hist?.net_lan_rx && hist.net_lan_rx.length > 0 ? hist.net_lan_rx : rawNetRx.map(() => 0);
+    const rawLanTx =
+      hist?.net_lan_tx && hist.net_lan_tx.length > 0 ? hist.net_lan_tx : rawNetTx.map(() => 0);
 
     const totalLen = Math.max(
       rawTs.length,
@@ -271,8 +287,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       rawCpu.length,
       rawRam.length,
       rawGpu.length,
-      rawNetRx.length,
-      rawNetTx.length
+      rawWanRx.length,
+      rawWanTx.length,
+      rawLanRx.length,
+      rawLanTx.length
     );
 
     if (totalLen === 0) {
@@ -282,8 +300,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         cpuHist: rawCpu,
         ramHist: rawRam,
         gpuHist: rawGpu,
-        netRxHist: rawNetRx,
-        netTxHist: rawNetTx,
+        netWanRxHist: rawWanRx,
+        netWanTxHist: rawWanTx,
+        netLanRxHist: rawLanRx,
+        netLanTxHist: rawLanTx,
       };
     }
 
@@ -305,8 +325,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       cpuHist: rawCpu.slice(startIdx),
       ramHist: rawRam.slice(startIdx),
       gpuHist: rawGpu.slice(startIdx),
-      netRxHist: rawNetRx.slice(startIdx),
-      netTxHist: rawNetTx.slice(startIdx),
+      netWanRxHist: rawWanRx.slice(startIdx),
+      netWanTxHist: rawWanTx.slice(startIdx),
+      netLanRxHist: rawLanRx.slice(startIdx),
+      netLanTxHist: rawLanTx.slice(startIdx),
     };
   }, [hist]);
 
@@ -324,10 +346,48 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   );
   const netSeries: ChartSeries[] = useMemo(
     () => [
-      { id: 'net_rx', metricKey: 'net_rx', label: t('hardware.net.download'), data: netRxHist, color: '#0284c7', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
-      { id: 'net_tx', metricKey: 'net_tx', label: t('hardware.net.upload'), data: netTxHist, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
+      {
+        id: 'net_wan_rx',
+        metricKey: 'net_wan_rx',
+        label: t('hardware.net.wan_download'),
+        data: netWanRxHist,
+        color: '#0284c7',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.16,
+      },
+      {
+        id: 'net_wan_tx',
+        metricKey: 'net_wan_tx',
+        label: t('hardware.net.wan_upload'),
+        data: netWanTxHist,
+        color: '#10b981',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.08,
+      },
+      {
+        id: 'net_lan_rx',
+        metricKey: 'net_lan_rx',
+        label: t('hardware.net.lan_download'),
+        data: netLanRxHist,
+        color: '#6366f1',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.10,
+      },
+      {
+        id: 'net_lan_tx',
+        metricKey: 'net_lan_tx',
+        label: t('hardware.net.lan_upload'),
+        data: netLanTxHist,
+        color: '#f59e0b',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.06,
+      },
     ],
-    [netRxHist, netTxHist, t]
+    [netWanRxHist, netWanTxHist, netLanRxHist, netLanTxHist, t]
   );
 
   const cpuTone = getHealthTone(cpuPct);
@@ -763,12 +823,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     {activeInterfaces[0]?.name ? ` (${activeInterfaces.map((n) => n.name).slice(0, 2).join(', ')})` : ''}
                   </span>
                   <span aria-hidden="true">·</span>
-                  <span className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-sky-600" /> {t('hardware.net.download')}
+                  <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#0284c7]" /> {t('hardware.net.wan_download')}
                     </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" /> {t('hardware.net.upload')}
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#10b981]" /> {t('hardware.net.wan_upload')}
+                    </span>
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#6366f1]" /> {t('hardware.net.lan_download')}
+                    </span>
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#f59e0b]" /> {t('hardware.net.lan_upload')}
                     </span>
                   </span>
                 </div>

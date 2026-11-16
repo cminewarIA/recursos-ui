@@ -335,6 +335,18 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         );
         const sliced = liveNicHist.slice(startIdx);
         return spec.series.map((s) => {
+          if (s.metricKey === 'net_wan_rx') {
+            return { ...s, data: sliced.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100) };
+          }
+          if (s.metricKey === 'net_wan_tx') {
+            return { ...s, data: sliced.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100) };
+          }
+          if (s.metricKey === 'net_lan_rx') {
+            return { ...s, data: sliced.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100) };
+          }
+          if (s.metricKey === 'net_lan_tx') {
+            return { ...s, data: sliced.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100) };
+          }
           if (s.metricKey === 'net_rx') {
             return { ...s, data: sliced.map((b) => Math.round((b.rx / (1024 * 1024)) * 100) / 100) };
           }
@@ -425,6 +437,18 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       const startIdx = liveSliceWindow.filterByEpoch(liveNicHist.map((b) => Math.round(b.t / 1000)), 1200);
       const sliced = liveNicHist.slice(startIdx);
       return spec.series.map((s) => {
+        if (s.metricKey === 'net_wan_rx') {
+          return { ...s, data: sliced.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100) };
+        }
+        if (s.metricKey === 'net_wan_tx') {
+          return { ...s, data: sliced.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100) };
+        }
+        if (s.metricKey === 'net_lan_rx') {
+          return { ...s, data: sliced.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100) };
+        }
+        if (s.metricKey === 'net_lan_tx') {
+          return { ...s, data: sliced.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100) };
+        }
         if (s.metricKey === 'net_rx') {
           return { ...s, data: sliced.map((b) => Math.round((b.rx / (1024 * 1024)) * 100) / 100) };
         }
