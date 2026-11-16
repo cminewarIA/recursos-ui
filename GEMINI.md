@@ -29,28 +29,7 @@
 ## 4. Actualización Obligatoria del README (`README.md`)
 - **Regla obligatoria**: Cada vez que se realice cualquier modificación, corrección, nueva funcionalidad, cambio de diseño, ajuste de reglas o incremento de versión, se debe sincronizar inmediatamente `./README.md` con la versión activa (badges de versión, banner, enlaces de descarga y ejemplos), evitando nombrar o listar versiones anteriores salvo para comunicar diferencias relevantes de arquitectura o funcionamiento.
 
-## 5. Compilación e Instalación Local Obligatoria de la App Nativa Linux (.deb) y Android TV (.apk)
-- **Regla obligatoria**: Tras incrementar el número de versión en `./VERSION` y completar cualquier cambio:
-  1. **Compilación e Instalación Simultánea Canónica (Ordenador + Android TV)**: Ejecutar preferentemente el orquestador unificado que actualiza primero el ordenador (`.deb`) y de forma automática compila y despliega la nueva versión en cualquier dispositivo Android TV / Leanback accesible vía ADB en la red local (Zero-Hardcoding):
-     ```bash
-     bash packaging/install_all.sh
-     ```
-  2. **Compilación Individual (si se ejecuta paso a paso)**:
-     - Paquete Debian (`.deb` + `SHA256SUMS.txt` firmado):
-       ```bash
-       bash packaging/build_deb.sh
-       sudo apt-get install --reinstall -y ./dist/recursos-cockpit_${VERSION}_amd64.deb
-       /usr/bin/recursos-cockpit --test-mode
-       dpkg -l | grep recursos-cockpit
-       ```
-     - Paquete Android / Android TV (`.apk` firmado con keystore permanente + despliegue dinámico vía ADB):
-       ```bash
-       bash packaging/build_apk.sh
-       bash packaging/install_tv_apk.sh ./dist/recursos-cockpit_${VERSION}.apk
-       ```
-  3. **Verificación de la Instalación**: Comprobar que `/usr/bin/recursos-cockpit` esté instalado y operativo (`dpkg -l | grep recursos-cockpit` coincidente con `./VERSION`), y que todo televisor Android TV detectado por ADB en la LAN tenga instalada la APK con la misma versión (`versionName == ./VERSION`).
-
-## 6. Arquitectura Contractual de Aplicaciones Nativas (Linux & Android)
+## 5. Arquitectura Contractual de Aplicaciones Nativas (Linux & Android)
 - **Regla obligatoria**: El diseño y desarrollo de cualquier aplicación cliente nativa (Linux/Ubuntu y Android) debe ajustarse de forma estricta y permanente a los siguientes principios:
   1. **Motor de Interfaz HTML5 Unificado con Contenedores Nativos (Ubuntu WebKit2 & Android WebView)**:
      - Las aplicaciones nativas de Ubuntu Linux (`.deb`) y Android (`.apk`) renderizan directamente la interfaz canónica completa en HTML5, CSS3, D3.js v7 y OpenStreetMap/Leaflet mediante contenedores nativos acelerados por hardware (`WebKit2` integrado en GTK 3 en Linux, y `android.webkit.WebView` integrado en Kotlin/Jetpack Compose en Android).
@@ -66,20 +45,20 @@
      - **Conexión Inmediata al Abrir**: La app nativa se conecta instantánea y automáticamente al nodo enlazado sin solicitar credenciales repetitivas.
      - **Conmutación Inteligente LAN ↔ WAN**:
        - *En Red Local (Wi-Fi/LAN)*: Comunicación directa con la IP/puerto local a latencia mínima.
-       - *Desde el Exterior (Red Móvil / Internet / WAN)*: Conmutación automática hacia el nodo público / DDNS (`cminewar.duckdns.org` o dominio configurado) utilizando la credencial criptográfica del emparejamiento.
+       - *Desde el Exterior (Red Móvil / Internet / WAN)*: Conmutación automática exclusivamente hacia el dominio público / DDNS propio del servidor del usuario (aprendido dinámicamente tras emparejarse en su LAN local o configurado manualmente en la app), utilizando la credencial criptográfica del emparejamiento y sin ningún dominio ni dirección WAN/LAN fija del autor incluida en el código o en los instaladores.
   5. **Paridad Visual de Interfaz y Desbloqueo Exclusivo de DeX en Ubuntu**:
      - **Paridad Estética y Estructural Absoluta**: Al compartir el mismo motor de interfaz HTML5/CSS3/D3.js/Leaflet, todas las interfaces (web y nativas) mantienen idéntica identidad visual, filosofía de diseño (*Apple Liquid Glass + Tesla Touch Cockpit*), paleta de colores, tarjetas, gráficos vectoriales a 60 FPS e iconografía.
      - **Diferenciación Funcional Contractual (Desbloqueo de DeX)**:
        - *App Nativa de Ubuntu*: Al disponer de acceso directo a `/dev/uhid`, `scrcpy` y el subsistema USB a través de su puente nativo local, desbloquea dinámicamente el submenú de control DeX / Modo Escritorio Android (`/dex`) con todos sus controles de resolución, tasa de refresco (60 FPS), auto-conexión y modo pantalla completa.
        - *Versión Web y Clientes Externos (incluido Android)*: Todo submenú de DeX permanece estrictamente bloqueado y oculto en la navegación, mostrando únicamente el mensaje pasivo si se consulta: *"Esperando dispositivo para conectarse en su versión nativa"*.
 
-## 7. Principio de Simetría Total, Homogeneidad y Cohesión en Interfaces y Submenús (Web, Linux/Ubuntu y Android)
+## 6. Principio de Simetría Total, Homogeneidad y Cohesión en Interfaces y Submenús (Web, Linux/Ubuntu y Android)
 - **Regla obligatoria**:
   1. **Simetría y Homogeneidad Estricta en Todas las Interfaces**: Todos los componentes, vistas, tarjetas Bento, barras de herramientas, HUDs, paneles flotantes, modales y submenús (incluida la interfaz del mapa geoespacial, el catálogo de servicios, los selectores de subredes, gráficos y tablas) deben mantener una simetría visual y estructural rigurosa, limpia y equilibrada en cualquier resolución o factor de forma.
   2. **Ecosistema Homogéneo Universal**: La experiencia visual entre la aplicación web y las aplicaciones nativas de Ubuntu (GTK 3 + WebKit2 HTML5) y Android (Jetpack Compose + WebView HTML5) es 100% homogénea y coherente, compartiendo el mismo código HTML5/CSS3/D3.js/Leaflet, principios de espaciado simétrico, radios de curvatura, tratamiento de cristal (*Apple Liquid Glass*), contraste, tipografía monoespaciada tabular y ergonomía táctil (*Tesla Touch Cockpit*).
   3. **Simetría Contractual en Nuevas Funcionalidades**: Cualquier elemento, control, submenú o vista que se incorpore a futuro debe ceñirse sin excepción a esta simetría y homogeneidad, evitando componentes desalineados, estilos visuales dispares o menús secundarios asimétricos.
 
-## 8. Diccionario Tabular Centralizado del Proyecto, Traducciones y Lecturas de Hardware (`./i18n/dictionary.csv`)
+## 7. Diccionario Tabular Centralizado del Proyecto, Traducciones y Lecturas de Hardware (`./i18n/dictionary.csv`)
 - **Regla obligatoria**:
   1. **Diccionario Único en Formato Hoja de Cálculo (`./i18n/dictionary.csv`)**: Todo el texto mostrado al usuario en la interfaz web (`src/`), el manual interactivo (`static/manual.html` / `docs/index.html`), las respuestas de usuario del servidor (`server.py`), la aplicación nativa de Ubuntu (`desktop_app/recursos_app.py`) y la aplicación nativa Android/TV (`android_app/`) debe resolverse mediante claves desde el diccionario CSV único `./i18n/dictionary.csv` (estructura tabular `key,context,es,...`, con la traducción base marcada en la columna `es` y filas de metadatos `__locale_name__` y `__default_locale__`). Queda prohibido dispersar literales de interfaz sin clave en componentes o ventanas.
   2. **Extensibilidad Automática por Columnas (Cero Cambios de Código al Traducir)**: Todos los analizadores (`i18n_catalog.py`, `src/i18n/csvParser.ts`, `vite.config.ts`, `manual.html` y `I18nDictionary.kt`) deben autodetectar dinámicamente cualquier nueva columna de idioma (`en`, `fr`, `de`, `pt`, etc.) agregada a `./i18n/dictionary.csv` (admitiendo delimitador `,` o `;` y UTF-8 con/sin BOM) para activar traducciones futuras sin modificar código del proyecto.
