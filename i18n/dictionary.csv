@@ -604,7 +604,7 @@ status.notice_single,Estados globales y energía,aviso
 status.notice_plural,Estados globales y energía,avisos
 charts.sample_n,Gráficas e historial completo,Muestra {n}
 charts.sample_of,Gráficas e historial completo,Muestra {n} de {total}
-more.language_desc,"Vista Más, ajustes y DeX",Diccionario maestro en formato hoja de cálculo (./i18n/dictionary.csv): añade una columna nueva para sumar idiomas sin editar código
+more.language_desc,"Vista Más, ajustes y DeX",Diccionario maestro en hoja de cálculo (./i18n/dictionary.csv) sincronizado en vivo desde GitHub sin actualizar ni cambiar la versión de la app
 more.language_active,"Vista Más, ajustes y DeX",Columna activa
 more.language_columns_count,"Vista Más, ajustes y DeX",{count} idioma(s) en CSV
 charts.loading_history,Gráficas e historial completo,Cargando historial...
@@ -841,6 +841,10 @@ overview.bw_col_down,"Modal Inspección Dispositivos",↓ Descarga
 overview.bw_col_up,"Modal Inspección Dispositivos",↑ Subida
 overview.bw_col_lan,"Modal Inspección Dispositivos",LAN interna
 overview.router_global_badge,"Banner Principal Inicio",Router global
-
-
+more.language_sync_btn,"Vista Más, ajustes y DeX",Actualizar idiomas
+more.language_syncing,"Vista Más, ajustes y DeX",Sincronizando...
+more.language_synced,"Vista Más, ajustes y DeX",Diccionario actualizado ({count} idioma(s) disponibles)
+more.language_sync_error,"Vista Más, ajustes y DeX",No se pudo conectar con GitHub; usando diccionario local
+more.language_ota_github,"Vista Más, ajustes y DeX",GitHub OTA
+more.language_ota_local,"Vista Más, ajustes y DeX",Caché local
 

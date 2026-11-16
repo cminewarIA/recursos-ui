@@ -70,7 +70,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
   onVersionChange,
   onNotify,
 }) => {
-  const { locale, supportedLocales, localeNames, setLocale, t } = useI18n();
+  const { locale, supportedLocales, localeNames, otaSource, isSyncingLanguages, setLocale, syncFromGitHub, t } = useI18n();
   const { isUbuntuNative, isNativeApp } = detectNativeEnvironment();
   const [subTab, setSubTab] = useState<MoreSubTab>(() => resolveMoreSubTab(initialSubTab) || 'updates');
   const manualIframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -470,33 +470,55 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold">
                     {t('more.language_columns_count', { count: supportedLocales.length })}
                   </span>
+                  <span className="cockpit-pill-emerald rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold">
+                    {otaSource === 'github' ? t('more.language_ota_github') : t('more.language_ota_local')}
+                  </span>
                 </div>
                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   {t('more.language_desc')}
                 </p>
               </div>
-              <LayoutGroup id="lang-switcher">
-                <div className="cockpit-subtile inline-flex flex-wrap items-center gap-1 p-1 shrink-0">
-                  {supportedLocales.map((loc) => {
-                    const active = locale === loc;
-                    return (
-                      <button
-                        key={loc}
-                        type="button"
-                        onClick={() => setLocale(loc)}
-                        className={`relative inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold transition-colors ${
-                          active
-                            ? 'text-sky-700 dark:text-sky-300'
-                            : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-                        }`}
-                      >
-                        {active && <MorphPill layoutId="lang-switcher-pill" className="rounded-lg" />}
-                        <span className="relative z-10">{localeNames[loc] || loc.toUpperCase()}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </LayoutGroup>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  data-testid="sync-languages-btn"
+                  disabled={isSyncingLanguages}
+                  onClick={async () => {
+                    const res = await syncFromGitHub();
+                    if (res.ok) {
+                      onNotify(t('more.language_synced', { count: res.localesCount }));
+                    } else {
+                      onNotify(t('more.language_sync_error'), true);
+                    }
+                  }}
+                  className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-sky-700 disabled:opacity-60 dark:text-slate-200 dark:hover:text-sky-300 transition-colors"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isSyncingLanguages ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingLanguages ? t('more.language_syncing') : t('more.language_sync_btn')}</span>
+                </button>
+                <LayoutGroup id="lang-switcher">
+                  <div className="cockpit-subtile inline-flex flex-wrap items-center gap-1 p-1 shrink-0">
+                    {supportedLocales.map((loc) => {
+                      const active = locale === loc;
+                      return (
+                        <button
+                          key={loc}
+                          type="button"
+                          onClick={() => setLocale(loc)}
+                          className={`relative inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold transition-colors ${
+                            active
+                              ? 'text-sky-700 dark:text-sky-300'
+                              : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                          }`}
+                        >
+                          {active && <MorphPill layoutId="lang-switcher-pill" className="rounded-lg" />}
+                          <span className="relative z-10">{localeNames[loc] || loc.toUpperCase()}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </LayoutGroup>
+              </div>
             </div>
           </section>
 

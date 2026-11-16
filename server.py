@@ -34,6 +34,8 @@ try:
         get_hardware_disk_label,
         get_hardware_transport_label,
         get_systemd_role_label,
+        schedule_background_dictionary_sync,
+        sync_dictionary_from_github,
         t as i18n_t,
     )
 except ImportError:
@@ -64,6 +66,12 @@ except ImportError:
 
     def get_systemd_role_label(unit_name, lang=None, base_dir=None):
         return ""
+
+    def sync_dictionary_from_github(base_dir=None, force=False, timeout=5.0, min_interval=900.0):
+        return {"ok": False, "updated": False, "source": "local", "supported_locales": ["es"]}
+
+    def schedule_background_dictionary_sync(base_dir=None, interval_sec=1800.0):
+        return None
 
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -11740,7 +11748,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; "
             f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
             f"img-src 'self' data: blob: https: http:; "
-            f"connect-src 'self' https://api.github.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
+            f"connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
             f"frame-src 'self' https://*.duckdns.org https://{dom} https://*.{dom}; "
             f"frame-ancestors {csp_ancestors};"
         )
@@ -12000,12 +12008,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 1b-dict. DICCIONARIO TABULAR CENTRALIZADO (CSV Y JSON DERIVADO AL VUELO)
+        # 1b-dict. DICCIONARIO TABULAR CENTRALIZADO (CSV Y JSON DERIVADO AL VUELO + OTA GITHUB)
         elif clean_path == "/api/dictionary":
+            if ("refresh=1" in self.path or "refresh=true" in self.path or "sync=1" in self.path):
+                sync_dictionary_from_github(BASE_DIR, force=True, timeout=5.0)
             dict_bytes = get_dictionary_bytes(BASE_DIR)
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_security_headers()
             self.send_header('Content-Length', str(len(dict_bytes)))
             self.end_headers()
@@ -12013,6 +12023,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         elif clean_path == "/i18n/dictionary.csv":
+            if ("refresh=1" in self.path or "refresh=true" in self.path or "sync=1" in self.path):
+                sync_dictionary_from_github(BASE_DIR, force=True, timeout=5.0)
             csv_bytes = get_dictionary_csv_bytes(BASE_DIR)
             self.send_response(200)
             self.send_header('Content-Type', 'text/csv; charset=utf-8')
@@ -14207,6 +14219,7 @@ def run_server(port=None):
     threading.Thread(target=auto_install_watcher_worker, daemon=True, name="AutoInstallWatcher").start()
     threading.Thread(target=telegram_bot_polling_worker, daemon=True, name="TelegramBotPolling").start()
     threading.Thread(target=telegram_bot_monitor_worker, daemon=True, name="TelegramBotMonitor").start()
+    schedule_background_dictionary_sync(BASE_DIR, interval_sec=1800.0)
     
     bind_host = os.environ.get("HOST", "0.0.0.0")
     server_address = (bind_host, port)

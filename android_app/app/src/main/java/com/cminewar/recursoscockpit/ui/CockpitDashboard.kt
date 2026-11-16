@@ -147,7 +147,8 @@ fun CockpitDashboard(
     onRefresh: () -> Unit
 ) {
     val context = LocalContext.current
-    val isTvDevice = remember(context) { detectTelevisionMode(context) }
+    val dictRevision = I18nDictionary.catalogRevision
+    val isTvDevice = remember(context, dictRevision) { detectTelevisionMode(context) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
     var isPageLoading by remember { mutableStateOf(true) }

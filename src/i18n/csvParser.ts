@@ -4,6 +4,9 @@ export interface ParsedDictionaryCatalog {
     supported_locales: string[];
     locale_names: Record<string, string>;
     source_format?: string;
+    ota_source?: string;
+    ota_synced_at?: string;
+    github_raw_url?: string;
   };
   flat: Record<string, Record<string, string>>;
 }
@@ -185,6 +188,71 @@ export function parseCsvDictionary(rawCsv: string): ParsedDictionaryCatalog {
       supported_locales: supportedLocales,
       locale_names: localeNames,
       source_format: 'csv',
+    },
+    flat,
+  };
+}
+
+/**
+ * Fusiona el catálogo base (local o backend) con un catálogo descargado OTA desde GitHub.
+ * Mantiene claves locales existentes y añade columnas/idiomas nuevos automáticamente.
+ */
+export function mergeCsvDictionaries(
+  base: ParsedDictionaryCatalog,
+  incoming: ParsedDictionaryCatalog,
+  otaSource?: string,
+  otaSyncedAt?: string,
+  preferIncomingExisting = true
+): ParsedDictionaryCatalog {
+  const baseLocales = base?.meta?.supported_locales || ['es'];
+  const inLocales = incoming?.meta?.supported_locales || [];
+  if (inLocales.length === 0) return base;
+
+  const hasValidKeys = inLocales.some((loc) => Object.keys(incoming.flat?.[loc] || {}).length >= 10);
+  if (!hasValidKeys) return base;
+
+  const supportedLocales = [...baseLocales];
+  for (const loc of inLocales) {
+    if (!supportedLocales.includes(loc)) supportedLocales.push(loc);
+  }
+
+  const localeNames: Record<string, string> = { ...(base.meta.locale_names || {}) };
+  for (const loc of supportedLocales) {
+    const incomingName = incoming.meta?.locale_names?.[loc];
+    if (!localeNames[loc] || (incomingName && (preferIncomingExisting || !baseLocales.includes(loc)))) {
+      localeNames[loc] = incomingName || inferDisplayName(loc);
+    }
+  }
+
+  const flat: Record<string, Record<string, string>> = {};
+  for (const loc of supportedLocales) {
+    const mergedMap: Record<string, string> = { ...(base.flat?.[loc] || {}) };
+    const inMap = incoming.flat?.[loc] || {};
+    const isNewLocale = !baseLocales.includes(loc);
+    for (const [k, v] of Object.entries(inMap)) {
+      if (v && (preferIncomingExisting || isNewLocale || mergedMap[k] === undefined || mergedMap[k] === '')) {
+        mergedMap[k] = v;
+      }
+    }
+    flat[loc] = mergedMap;
+  }
+
+  const defaultLocale =
+    (incoming.meta?.default_locale && supportedLocales.includes(incoming.meta.default_locale)
+      ? incoming.meta.default_locale
+      : base.meta.default_locale) ||
+    supportedLocales[0] ||
+    'es';
+
+  return {
+    meta: {
+      default_locale: defaultLocale,
+      supported_locales: supportedLocales,
+      locale_names: localeNames,
+      source_format: 'csv',
+      ota_source: otaSource || incoming.meta?.ota_source || base.meta?.ota_source || 'github',
+      ota_synced_at: otaSyncedAt || incoming.meta?.ota_synced_at || base.meta?.ota_synced_at,
+      github_raw_url: incoming.meta?.github_raw_url || base.meta?.github_raw_url,
     },
     flat,
   };

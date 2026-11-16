@@ -91,14 +91,22 @@ from dex_controller import DexController
 try:
     from i18n_catalog import (
         get_canonical_version as _catalog_get_version,
+        get_dictionary_bytes as _catalog_dict_bytes,
+        get_dictionary_csv_bytes as _catalog_dict_csv_bytes,
         t as _catalog_t,
         resolve_catalog_base_dir as _catalog_base_dir,
+        schedule_background_dictionary_sync as _catalog_schedule_sync,
+        sync_dictionary_from_github as _catalog_sync_github,
     )
     HAS_I18N_CATALOG = True
 except Exception:
     HAS_I18N_CATALOG = False
     def _catalog_get_version(*_a, **_kw):
         return "0.0.0"
+    def _catalog_dict_bytes(*_a, **_kw):
+        return b"{}"
+    def _catalog_dict_csv_bytes(*_a, **_kw):
+        return b"key,context,es\n"
     def _catalog_t(key, locale=None, params=None, fallback=None, base_dir=None):
         text = fallback if fallback is not None else key
         if params and isinstance(params, dict):
@@ -107,11 +115,18 @@ except Exception:
         return text
     def _catalog_base_dir(*_a, **_kw):
         return os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+    def _catalog_schedule_sync(*_a, **_kw):
+        return None
+    def _catalog_sync_github(*_a, **_kw):
+        return {"ok": False, "updated": False, "source": "local", "supported_locales": ["es"]}
 
 
 def i18n_t(key, params=None, fallback=None, locale=None):
     base_dir = _catalog_base_dir(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
-    return _catalog_t(key, locale=locale, params=params, fallback=fallback, base_dir=base_dir)
+    kw = dict(params) if isinstance(params, dict) else {}
+    if HAS_I18N_CATALOG:
+        return _catalog_t(key, lang=locale, base_dir=base_dir, fallback=fallback, **kw)
+    return _catalog_t(key, locale=locale, params=kw, fallback=fallback, base_dir=base_dir)
 
 
 def get_app_version():
@@ -801,6 +816,10 @@ class ServerConnectionManager:
             self.auto_install_status = i18n_t(
                 "more.auto_enabled_status" if self.auto_install_enabled else "more.auto_paused_status"
             )
+        try:
+            _catalog_schedule_sync(_catalog_base_dir(os.path.abspath(os.path.join(SCRIPT_DIR, ".."))), interval_sec=1800.0)
+        except Exception:
+            pass
 
     def refresh_device_telemetry(self):
         self.device_telemetry = collect_native_device_telemetry()
@@ -2540,8 +2559,46 @@ class LocalHtmlBridgeServer:
                     self._send_json(out_payload)
                     return
 
+                if clean_path == "/api/dictionary":
+                    if "refresh=1" in self.path or "refresh=true" in self.path or "sync=1" in self.path:
+                        base_dir = _catalog_base_dir(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
+                        _catalog_sync_github(base_dir=base_dir, force=True, timeout=5.0)
+                        if self._proxy_to_remote("GET"):
+                            return
+                        raw_dict = _catalog_dict_bytes(base_dir)
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json; charset=utf-8")
+                        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                        self.send_header("Content-Length", str(len(raw_dict)))
+                        self.end_headers()
+                        self.wfile.write(raw_dict)
+                        return
+
+                if clean_path == "/i18n/dictionary.csv":
+                    base_dir = _catalog_base_dir(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
+                    if "refresh=1" in self.path or "refresh=true" in self.path or "sync=1" in self.path:
+                        _catalog_sync_github(base_dir=base_dir, force=True, timeout=5.0)
+                    csv_bytes = _catalog_dict_csv_bytes(base_dir)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/csv; charset=utf-8")
+                    self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                    self.send_header("Content-Length", str(len(csv_bytes)))
+                    self.end_headers()
+                    self.wfile.write(csv_bytes)
+                    return
+
                 if clean_path.startswith("/api/"):
                     if self._proxy_to_remote("GET"):
+                        return
+                    if clean_path == "/api/dictionary":
+                        base_dir = _catalog_base_dir(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
+                        raw_dict = _catalog_dict_bytes(base_dir)
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json; charset=utf-8")
+                        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                        self.send_header("Content-Length", str(len(raw_dict)))
+                        self.end_headers()
+                        self.wfile.write(raw_dict)
                         return
                     if clean_path.startswith("/api/maps/tile/"):
                         m_tile = re.match(r"^/api/maps/tile/(light|dark|osm)/(\d+)/(\d+)/(\d+)(?:\.(?:png|jpg|jpeg))?$", clean_path)

@@ -27,10 +27,11 @@ class MainActivity : ComponentActivity() {
         discoveryManager = DiscoveryManager(apiService, securePreferences)
 
         setContent {
+            val dictRevision = I18nDictionary.catalogRevision
             RecursosCockpitTheme {
                 var connectionMode by remember { mutableStateOf(ConnectionMode.CONNECTING) }
                 var activeUrl by remember { mutableStateOf("") }
-                var scanningMessage by remember {
+                var scanningMessage by remember(dictRevision) {
                     mutableStateOf(
                         I18nDictionary.t(this@MainActivity, "native_android.searching_wifi", "Buscando tu servidor en la red Wi-Fi...")
                     )
@@ -45,6 +46,9 @@ class MainActivity : ComponentActivity() {
                             ConnectionMode.REVOKED
                         } else {
                             endpoint.mode
+                        }
+                        lifecycleScope.launch {
+                            I18nDictionary.syncRemoteDictionary(applicationContext, endpoint.url)
                         }
                     } else {
                         activeUrl = endpoint.url
@@ -64,6 +68,9 @@ class MainActivity : ComponentActivity() {
 
                 // Autodescubrimiento LAN/WAN completamente automático sin intervención del usuario
                 LaunchedEffect(Unit) {
+                    launch {
+                        I18nDictionary.syncRemoteDictionary(applicationContext, null)
+                    }
                     connectionMode = ConnectionMode.SCANNING_LAN
                     val endpoint = discoveryManager.resolveActiveNode { msg ->
                         scanningMessage = msg

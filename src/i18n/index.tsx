@@ -1,13 +1,34 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import dictionaryCsvRaw from '../../i18n/dictionary.csv?raw';
-import { parseCsvDictionary, type ParsedDictionaryCatalog } from './csvParser';
+import { mergeCsvDictionaries, parseCsvDictionary, type ParsedDictionaryCatalog } from './csvParser';
 import type { DiskInfo, WifiClient } from '../types/telemetry';
 
 export type SupportedLocale = string;
 
 const STORAGE_KEY = 'recursos_lang';
+const OTA_CSV_STORAGE_KEY = 'recursos_i18n_github_csv';
+const OTA_TS_STORAGE_KEY = 'recursos_i18n_github_ts';
+const OTA_SYNC_TTL_MS = 15 * 60 * 1000;
+const GITHUB_DICTIONARY_RAW_URL = 'https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/i18n/dictionary.csv';
 
-let liveCatalog: ParsedDictionaryCatalog = parseCsvDictionary(dictionaryCsvRaw);
+const bundledCatalog: ParsedDictionaryCatalog = parseCsvDictionary(dictionaryCsvRaw);
+
+function loadInitialCatalog(): ParsedDictionaryCatalog {
+  if (typeof window === 'undefined') return bundledCatalog;
+  try {
+    const cachedCsv = window.localStorage.getItem(OTA_CSV_STORAGE_KEY);
+    const cachedTs = window.localStorage.getItem(OTA_TS_STORAGE_KEY) || undefined;
+    if (cachedCsv) {
+      const parsedOta = parseCsvDictionary(cachedCsv);
+      return mergeCsvDictionaries(bundledCatalog, parsedOta, 'github', cachedTs, true);
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return bundledCatalog;
+}
+
+let liveCatalog: ParsedDictionaryCatalog = loadInitialCatalog();
 
 function resolveInitialLocale(catalog: ParsedDictionaryCatalog): SupportedLocale {
   const defLoc = catalog.meta.default_locale || 'es';
@@ -170,7 +191,11 @@ interface I18nContextValue {
   locale: SupportedLocale;
   supportedLocales: SupportedLocale[];
   localeNames: Record<string, string>;
+  otaSource: string;
+  otaSyncedAt: string | null;
+  isSyncingLanguages: boolean;
   setLocale: (loc: SupportedLocale) => void;
+  syncFromGitHub: () => Promise<{ ok: boolean; localesCount: number; source: string }>;
   t: (key: string, params?: Record<string, string | number | null | undefined>, fallback?: string) => string;
 }
 
@@ -178,60 +203,168 @@ const I18nContext = createContext<I18nContextValue>({
   locale: liveCatalog.meta.default_locale || 'es',
   supportedLocales: liveCatalog.meta.supported_locales,
   localeNames: liveCatalog.meta.locale_names,
+  otaSource: liveCatalog.meta.ota_source || 'local',
+  otaSyncedAt: liveCatalog.meta.ota_synced_at || null,
+  isSyncingLanguages: false,
   setLocale: () => undefined,
+  syncFromGitHub: async () => ({ ok: false, localesCount: liveCatalog.meta.supported_locales.length, source: 'local' }),
   t: (key, params, fallback) => translateKey(liveCatalog.meta.default_locale || 'es', key, params, fallback, liveCatalog),
 });
+
+function readAuthHeaders(): Record<string, string> {
+  const dictHeaders: Record<string, string> = {};
+  try {
+    const tok = (
+      window.localStorage.getItem('recursos_device_token') ||
+      window.localStorage.getItem('sysmon_device_token') ||
+      window.__RECURSOS_DEVICE_TOKEN__ ||
+      window.RecursosAndroidBridge?.getDeviceToken?.() ||
+      ''
+    ).trim();
+    if (tok) {
+      dictHeaders['X-Device-Token'] = tok;
+      dictHeaders['Authorization'] = `Bearer ${tok}`;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return dictHeaders;
+}
 
 export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [catalog, setCatalog] = useState<ParsedDictionaryCatalog>(liveCatalog);
   const [locale, setLocaleState] = useState<SupportedLocale>(() => resolveInitialLocale(liveCatalog));
+  const [isSyncingLanguages, setIsSyncingLanguages] = useState(false);
 
-  // Sincronización en vivo con /api/dictionary (si se añade una nueva columna al CSV sin recompilar el frontend)
-  useEffect(() => {
-    let active = true;
-    const dictHeaders: Record<string, string> = {};
+  const applyResolvedCatalog = useCallback((nextCat: ParsedDictionaryCatalog) => {
+    liveCatalog = nextCat;
+    setCatalog(nextCat);
+    const def = nextCat.meta.default_locale || 'es';
     try {
-      const tok = (
-        window.localStorage.getItem('recursos_device_token') ||
-        window.localStorage.getItem('sysmon_device_token') ||
-        window.__RECURSOS_DEVICE_TOKEN__ ||
-        window.RecursosAndroidBridge?.getDeviceToken?.() ||
-        ''
-      ).trim();
-      if (tok) {
-        dictHeaders['X-Device-Token'] = tok;
-        dictHeaders['Authorization'] = `Bearer ${tok}`;
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved && nextCat.meta.supported_locales.includes(saved)) {
+        activeLocaleRuntime = saved;
+        setLocaleState(saved);
+        return;
       }
     } catch {
       // ignore storage errors
     }
-    fetch('/api/dictionary', { cache: 'no-store', credentials: 'same-origin', headers: dictHeaders })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((remote: ParsedDictionaryCatalog | null) => {
-        if (!active || !remote || !remote.meta?.supported_locales?.length || !remote.flat) return;
-        liveCatalog = remote;
-        setCatalog(remote);
-        const def = remote.meta.default_locale || 'es';
-        try {
-          const saved = window.localStorage.getItem(STORAGE_KEY);
-          if (saved && remote.meta.supported_locales.includes(saved)) {
-            activeLocaleRuntime = saved;
-            setLocaleState(saved);
-            return;
+    if (!nextCat.meta.supported_locales.includes(activeLocaleRuntime)) {
+      activeLocaleRuntime = def;
+      setLocaleState(def);
+    }
+  }, []);
+
+  const fetchDirectFromGitHub = useCallback(async (baseCatalog: ParsedDictionaryCatalog): Promise<ParsedDictionaryCatalog | null> => {
+    try {
+      const ghRes = await fetch(GITHUB_DICTIONARY_RAW_URL, { cache: 'no-store' });
+      if (!ghRes.ok) return null;
+      const csvText = await ghRes.text();
+      const parsedGh = parseCsvDictionary(csvText);
+      const defLoc = parsedGh.meta.default_locale || 'es';
+      if (Object.keys(parsedGh.flat?.[defLoc] || {}).length < 20) return null;
+      const syncedAt = new Date().toISOString();
+      try {
+        window.localStorage.setItem(OTA_CSV_STORAGE_KEY, csvText);
+        window.localStorage.setItem(OTA_TS_STORAGE_KEY, syncedAt);
+      } catch {
+        // ignore storage quota errors
+      }
+      return mergeCsvDictionaries(baseCatalog, parsedGh, 'github', syncedAt, true);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const syncFromGitHub = useCallback(async (): Promise<{ ok: boolean; localesCount: number; source: string }> => {
+    setIsSyncingLanguages(true);
+    try {
+      let nextCat = liveCatalog;
+      let serverSynced = false;
+      try {
+        const res = await fetch('/api/dictionary?refresh=1', {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: readAuthHeaders(),
+        });
+        if (res.ok) {
+          const remote: ParsedDictionaryCatalog | null = await res.json();
+          if (remote?.meta?.supported_locales?.length && remote.flat) {
+            nextCat = mergeCsvDictionaries(bundledCatalog, remote, remote.meta.ota_source, remote.meta.ota_synced_at, true);
+            serverSynced = remote.meta.ota_source === 'github';
           }
-        } catch {
-          // ignore
         }
-        if (!remote.meta.supported_locales.includes(activeLocaleRuntime)) {
-          activeLocaleRuntime = def;
-          setLocaleState(def);
+      } catch {
+        // fallback directo a GitHub si /api/dictionary no responde o no tiene salida OTA
+      }
+
+      if (!serverSynced) {
+        const direct = await fetchDirectFromGitHub(nextCat);
+        if (direct) {
+          nextCat = direct;
+          serverSynced = true;
         }
-      })
-      .catch(() => undefined);
+      }
+
+      applyResolvedCatalog(nextCat);
+      return {
+        ok: serverSynced,
+        localesCount: nextCat.meta.supported_locales.length,
+        source: nextCat.meta.ota_source || 'local',
+      };
+    } finally {
+      setIsSyncingLanguages(false);
+    }
+  }, [applyResolvedCatalog, fetchDirectFromGitHub]);
+
+  // Sincronización automática OTA al iniciar (/api/dictionary + respaldo directo GitHub cada >15 min)
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      let currentCat = liveCatalog;
+      let serverHasGitHubOta = false;
+      try {
+        const res = await fetch('/api/dictionary', {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: readAuthHeaders(),
+        });
+        if (res.ok) {
+          const remote: ParsedDictionaryCatalog | null = await res.json();
+          if (active && remote?.meta?.supported_locales?.length && remote.flat) {
+            currentCat = mergeCsvDictionaries(bundledCatalog, remote, remote.meta.ota_source, remote.meta.ota_synced_at, true);
+            serverHasGitHubOta = remote.meta.ota_source === 'github';
+            applyResolvedCatalog(currentCat);
+          }
+        }
+      } catch {
+        // ignore network errors during initial dictionary check
+      }
+
+      if (!active) return;
+      let shouldFetchDirect = !serverHasGitHubOta;
+      try {
+        const lastTsRaw = window.localStorage.getItem(OTA_TS_STORAGE_KEY);
+        const lastMs = lastTsRaw ? Date.parse(lastTsRaw) : 0;
+        if (Number.isFinite(lastMs) && lastMs > 0 && Date.now() - lastMs < OTA_SYNC_TTL_MS && !serverHasGitHubOta) {
+          shouldFetchDirect = false;
+        }
+      } catch {
+        // ignore
+      }
+
+      if (shouldFetchDirect) {
+        const direct = await fetchDirectFromGitHub(currentCat);
+        if (active && direct) {
+          applyResolvedCatalog(direct);
+        }
+      }
+    })();
     return () => {
       active = false;
     };
-  }, []);
+  }, [applyResolvedCatalog, fetchDirectFromGitHub]);
 
   const setLocale = useCallback(
     (next: SupportedLocale) => {
@@ -269,10 +402,14 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
       locale,
       supportedLocales: catalog.meta.supported_locales,
       localeNames: catalog.meta.locale_names,
+      otaSource: catalog.meta.ota_source || 'local',
+      otaSyncedAt: catalog.meta.ota_synced_at || null,
+      isSyncingLanguages,
       setLocale,
+      syncFromGitHub,
       t,
     }),
-    [locale, catalog, setLocale, t]
+    [locale, catalog, isSyncingLanguages, setLocale, syncFromGitHub, t]
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
