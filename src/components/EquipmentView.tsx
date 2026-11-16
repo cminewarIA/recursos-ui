@@ -100,7 +100,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
       }
     }
     const gHist = rawGpuHist.slice(sliceStart);
-    const gTimestamps = gHist.length >= 2 ? gHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES')) : timestamps;
+    const gTimestamps = gHist.length >= 2 ? gHist.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale)) : timestamps;
     const gEpochTs = gHist.length >= 2 ? gHist.map((b) => Math.round(b.t / 1000)) : epochTs;
 
     const pickNumeric = (vals: Array<number | null | undefined>, fallbackHist?: number[]): number[] => {

@@ -2298,15 +2298,26 @@ def _migrate_legacy_geoip_db_if_needed():
                 os.replace(src, dst)
         print("[+] Base de datos migrada de geoip_history.db a recursos_history.db")
     except Exception as e:
+        src_conn = None
+        dst_conn = None
         try:
             src_conn = sqlite3.connect(_LEGACY_GEOIP_HISTORY_DB_FILE, timeout=10.0)
             dst_conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
             src_conn.backup(dst_conn)
-            dst_conn.close()
-            src_conn.close()
             print(f"[+] Copia de seguridad migrada de geoip_history.db a recursos_history.db ({e})")
         except Exception as e2:
             print(f"[-] Aviso migrando geoip_history.db -> recursos_history.db: {e2}")
+        finally:
+            if dst_conn is not None:
+                try:
+                    dst_conn.close()
+                except Exception:
+                    pass
+            if src_conn is not None:
+                try:
+                    src_conn.close()
+                except Exception:
+                    pass
 
 def init_geoip_history_db():
     """Inicializa de forma incremental la base de datos SQLite unificada (recursos_history.db) sin sobrescribir datos existentes."""
@@ -2316,6 +2327,7 @@ def init_geoip_history_db():
     with GEOIP_HISTORY_DB_LOCK:
         if _TELEMETRY_HISTORY_INITIALIZED and os.path.isfile(RECURSOS_HISTORY_DB_FILE):
             return
+        conn = None
         try:
             parent_dir = os.path.dirname(RECURSOS_HISTORY_DB_FILE)
             if parent_dir:
@@ -2421,15 +2433,21 @@ def init_geoip_history_db():
                     conn.execute(f"ALTER TABLE telemetry_history ADD COLUMN {col_name} REAL DEFAULT 0;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_history_ts ON telemetry_history(ts DESC);")
             conn.commit()
-            conn.close()
             _TELEMETRY_HISTORY_INITIALIZED = True
         except Exception as e:
             print(f"[-] Error inicializando SQLite recursos_history.db: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 def preload_telemetry_history_from_sqlite():
     """Precarga las últimas muestras de consumo (últimos 20 minutos) desde recursos_history.db."""
     init_geoip_history_db()
     with GEOIP_HISTORY_DB_LOCK:
+        conn = None
         try:
             cutoff_ts = time.time() - HISTORY_WINDOW_SECONDS
             conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
@@ -2442,7 +2460,6 @@ def preload_telemetry_history_from_sqlite():
                 WHERE ts >= ?
                 ORDER BY ts ASC
             """, (cutoff_ts,)).fetchall()
-            conn.close()
             if not rows:
                 return
             _HISTORY_BUCKETS_20M.clear()
@@ -2478,6 +2495,12 @@ def preload_telemetry_history_from_sqlite():
             _sync_history_dict_from_buckets()
         except Exception as e:
             print(f"[-] Error precargando telemetry_history desde SQLite: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 def record_telemetry_sample_to_sqlite(
     now_ts,
@@ -2531,6 +2554,7 @@ def record_telemetry_sample_to_sqlite(
     _TELEMETRY_SQLITE_BUFFER.clear()
     _LAST_TELEMETRY_FLUSH_TS = now_ts
     with GEOIP_HISTORY_DB_LOCK:
+        conn = None
         try:
             conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
             conn.executemany("""
@@ -2566,9 +2590,14 @@ def record_telemetry_sample_to_sqlite(
                 """)
                 _LAST_TELEMETRY_PRUNE_TS = now_ts
             conn.commit()
-            conn.close()
         except Exception as e:
             print(f"[-] Error guardando telemetry_history en SQLite: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 def _format_telemetry_rows_payload(rows):
     timestamps = []
@@ -2672,6 +2701,7 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
 
     empty_series = _format_telemetry_rows_payload([])
     with GEOIP_HISTORY_DB_LOCK:
+        conn = None
         try:
             conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
             conn.row_factory = sqlite3.Row
@@ -2686,7 +2716,6 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
             newest_ts = float(meta_row["max_ts"]) if meta_row and meta_row["max_ts"] is not None else None
 
             if total_samples == 0:
-                conn.close()
                 return {
                     "ok": True,
                     "db_file": "recursos_history.db",
@@ -2788,7 +2817,6 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
             else:
                 rows = raw_rows
 
-            conn.close()
             series_obj = _format_telemetry_rows_payload(rows)
             win_start = series_obj["epoch_ts"][0] if series_obj["epoch_ts"] else None
             win_end = series_obj["epoch_ts"][-1] if series_obj["epoch_ts"] else None
@@ -2823,6 +2851,12 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
                 "has_newer": False,
                 "series": empty_series,
             }
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 def save_geoip_locations_to_sqlite(entries_dict):
     """Persiste un lote de ubicaciones GeoIP resueltas en la tabla SQLite geoip_locations."""
@@ -2850,6 +2884,7 @@ def save_geoip_locations_to_sqlite(entries_dict):
     if not rows:
         return
     with GEOIP_HISTORY_DB_LOCK:
+        conn = None
         try:
             conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
             conn.executemany("""
@@ -2883,9 +2918,14 @@ def save_geoip_locations_to_sqlite(entries_dict):
                     """)
                 _LAST_GEOIP_PRUNE_TS = now
             conn.commit()
-            conn.close()
         except Exception:
             pass
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 def record_connections_to_sqlite(connections_list):
     """Registra y actualiza en SQLite todas las conexiones públicas geolocalizadas catalogadas por servicio."""
@@ -2948,6 +2988,7 @@ def record_connections_to_sqlite(connections_list):
     if not rows:
         return
     with GEOIP_HISTORY_DB_LOCK:
+        conn = None
         try:
             conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
             conn.executemany("""
@@ -2985,9 +3026,14 @@ def record_connections_to_sqlite(connections_list):
                 """)
                 _LAST_SQLITE_PRUNE_TS = now
             conn.commit()
-            conn.close()
         except Exception as e:
             print(f"[-] Error guardando historial de conexiones en SQLite: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 def query_connection_history_from_sqlite(service_filter=None, device_filter=None, direction_filter=None, search_query=None, hours_filter=None, limit=300):
     """Consulta el historial de conexiones geolocalizadas y el catálogo agrupado por servicios desde SQLite."""
@@ -3016,6 +3062,7 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
             cutoff_ts = 0.0
 
     with GEOIP_HISTORY_DB_LOCK:
+        conn = None
         try:
             conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
             conn.row_factory = sqlite3.Row
@@ -3174,9 +3221,14 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
                     "is_history": True,
                     "geo_status": "cached"
                 })
-            conn.close()
         except Exception as e:
             print(f"[-] Error consultando historial SQLite: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     return {
         "status": "ok",
@@ -3190,14 +3242,20 @@ def clear_connection_history_sqlite():
     """Vacía el historial de conexiones en SQLite manteniendo la caché de ubicaciones GeoIP."""
     init_geoip_history_db()
     with GEOIP_HISTORY_DB_LOCK:
+        conn = None
         try:
             conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
             conn.execute("DELETE FROM connection_history;")
             conn.commit()
-            conn.close()
             return True
         except Exception:
             return False
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 def load_geoip_disk_cache():
     """Carga la caché persistente de GeoIP desde SQLite y disco al iniciar el worker."""
@@ -3209,6 +3267,7 @@ def load_geoip_disk_cache():
 
     # 1. Cargar ubicaciones exactas acotadas desde SQLite geoip_locations
     with GEOIP_HISTORY_DB_LOCK:
+        conn = None
         try:
             conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
             conn.row_factory = sqlite3.Row
@@ -3234,9 +3293,14 @@ def load_geoip_disk_cache():
                         "accuracy_source": str(r["accuracy_source"] or "ip-api"),
                         "ts": float(r["updated_at"] or now)
                     }
-            conn.close()
         except Exception:
             pass
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     # 2. Complementar con archivo JSON si existe (solo IPs ausentes en SQLite)
     json_only_loaded = {}
@@ -3595,6 +3659,7 @@ class PiholeDnsTranslator:
         # 2. /etc/pihole/pihole-FTL.db (arrendamientos DHCP dinámicos)
         dbpath = "/etc/pihole/pihole-FTL.db"
         if os.path.exists(dbpath):
+            con = None
             try:
                 con = sqlite3.connect(f"file:{dbpath}?mode=ro", uri=True, timeout=1.0)
                 cur = con.cursor()
@@ -3604,9 +3669,14 @@ class PiholeDnsTranslator:
                     name = name.strip()
                     if ip and name and ip not in new_map:
                         new_map[ip] = name
-                con.close()
             except Exception:
                 pass
+            finally:
+                if con is not None:
+                    try:
+                        con.close()
+                    except Exception:
+                        pass
 
         # 3. /etc/hosts
         hpath = "/etc/hosts"
@@ -3717,6 +3787,7 @@ class PiholeDnsTranslator:
         cutoff = int(now) - cutoff_seconds
         flows = []
         sync_dns_budget = 4  # Máximo 4 resoluciones DNS síncronas nuevas por ciclo
+        con = None
         try:
             con = sqlite3.connect(f"file:{dbpath}?mode=ro", uri=True, timeout=1.0)
             cur = con.cursor()
@@ -3768,11 +3839,16 @@ class PiholeDnsTranslator:
                     })
                     if len(flows) >= max_entries:
                         break
-            con.close()
             self.flows_cache = flows
             self.last_flows_refresh = now
         except Exception:
             pass
+        finally:
+            if con is not None:
+                try:
+                    con.close()
+                except Exception:
+                    pass
         return flows
 
 def fetch_connections_geo_worker():
@@ -8400,46 +8476,53 @@ def fetch_docker_worker():
                     emby_candidates.append("/home/servidor/servicios/emby/programdata/data/library.db")
                 emby_db = next((p for p in emby_candidates if p and os.path.isfile(p)), "")
                 if emby_db and os.path.exists(emby_db):
-                    conn_emby = sqlite3.connect(f"file:{emby_db}?mode=ro", uri=True, timeout=1.5)
-                    cur_emby = conn_emby.cursor()
-                    cur_emby.execute("SELECT count(*) FROM MediaItems WHERE type = 5")
-                    emby_data["movies_count"] = cur_emby.fetchone()[0]
-                    cur_emby.execute("SELECT count(*) FROM MediaItems WHERE type = 6")
-                    emby_data["series_count"] = cur_emby.fetchone()[0]
-                    cur_emby.execute("SELECT count(*) FROM MediaItems WHERE type = 8")
-                    emby_data["episodes_count"] = cur_emby.fetchone()[0]
-                    
-                    cur_emby.execute('''
-                        SELECT Id, Name, SeriesName, ParentIndexNumber, IndexNumber, ProductionYear, type, DateCreated, Path
-                        FROM MediaItems
-                        WHERE type IN (5, 8)
-                        ORDER BY DateCreated DESC
-                        LIMIT 12
-                    ''')
-                    recent = []
-                    for r in cur_emby.fetchall():
-                        m_type = "movie" if r[6] == 5 else "episode"
-                        title = f"{r[2]} - S{r[3]:02d}E{r[4]:02d}" if m_type == "episode" and r[2] and r[3] and r[4] else r[1]
-                        recent.append({
-                            "id": r[0],
-                            "title": title,
-                            "series_name": r[2] or "",
-                            "season": r[3],
-                            "episode": r[4],
-                            "year": r[5],
-                            "type": m_type,
-                            "date_created": r[7],
-                            "path": r[8] or ""
-                        })
-                    emby_data["recent_media"] = recent
-                    emby_data["available"] = True
-                    emby_data["online"] = True
-                    emby_data["library_counts"] = {
-                        "Películas": emby_data["movies_count"],
-                        "Series": emby_data["series_count"],
-                        "Episodios": emby_data["episodes_count"]
-                    }
-                    conn_emby.close()
+                    conn_emby = None
+                    try:
+                        conn_emby = sqlite3.connect(f"file:{emby_db}?mode=ro", uri=True, timeout=1.5)
+                        cur_emby = conn_emby.cursor()
+                        cur_emby.execute("SELECT count(*) FROM MediaItems WHERE type = 5")
+                        emby_data["movies_count"] = cur_emby.fetchone()[0]
+                        cur_emby.execute("SELECT count(*) FROM MediaItems WHERE type = 6")
+                        emby_data["series_count"] = cur_emby.fetchone()[0]
+                        cur_emby.execute("SELECT count(*) FROM MediaItems WHERE type = 8")
+                        emby_data["episodes_count"] = cur_emby.fetchone()[0]
+                        
+                        cur_emby.execute('''
+                            SELECT Id, Name, SeriesName, ParentIndexNumber, IndexNumber, ProductionYear, type, DateCreated, Path
+                            FROM MediaItems
+                            WHERE type IN (5, 8)
+                            ORDER BY DateCreated DESC
+                            LIMIT 12
+                        ''')
+                        recent = []
+                        for r in cur_emby.fetchall():
+                            m_type = "movie" if r[6] == 5 else "episode"
+                            title = f"{r[2]} - S{r[3]:02d}E{r[4]:02d}" if m_type == "episode" and r[2] and r[3] and r[4] else r[1]
+                            recent.append({
+                                "id": r[0],
+                                "title": title,
+                                "series_name": r[2] or "",
+                                "season": r[3],
+                                "episode": r[4],
+                                "year": r[5],
+                                "type": m_type,
+                                "date_created": r[7],
+                                "path": r[8] or ""
+                            })
+                        emby_data["recent_media"] = recent
+                        emby_data["available"] = True
+                        emby_data["online"] = True
+                        emby_data["library_counts"] = {
+                            "Películas": emby_data["movies_count"],
+                            "Series": emby_data["series_count"],
+                            "Episodios": emby_data["episodes_count"]
+                        }
+                    finally:
+                        if conn_emby is not None:
+                            try:
+                                conn_emby.close()
+                            except Exception:
+                                pass
             except Exception:
                 pass
 
@@ -8540,6 +8623,7 @@ def get_arp_and_pihole_names():
         pass
 
     # 3. Leer base de datos de Pi-hole FTL en modo solo lectura sin subprocesos ni bloqueos
+    conn_pi = None
     try:
         conn_pi = sqlite3.connect("file:/etc/pihole/pihole-FTL.db?mode=ro", uri=True, timeout=2.0)
         cur_pi = conn_pi.cursor()
@@ -8575,9 +8659,14 @@ def get_arp_and_pihole_names():
                         arp_map[mac]['name'] = name
                     elif vendor and arp_map[mac]['name'] == arp_map[mac]['ip']:
                         arp_map[mac]['name'] = f"{vendor} ({ip})"
-        conn_pi.close()
     except Exception:
         pass
+    finally:
+        if conn_pi is not None:
+            try:
+                conn_pi.close()
+            except Exception:
+                pass
     return arp_map
 
 def get_ip_to_device_name_map():
@@ -8748,6 +8837,7 @@ def get_dns_traffic_stats(client_filter=None, limit=50):
 
     ip_to_name = get_ip_to_device_name_map()
 
+    conn = None
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.5)
         cur = conn.cursor()
@@ -8800,7 +8890,11 @@ def get_dns_traffic_stats(client_filter=None, limit=50):
             )
             recent_rows = cur.execute(sql_recent, (limit,)).fetchall()
 
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
+        conn = None
 
         queries_list = []
         for q in recent_rows:
@@ -8833,6 +8927,12 @@ def get_dns_traffic_stats(client_filter=None, limit=50):
         }
     except Exception as e:
         return {"available": False, "error": str(e), "clients": [], "recent_queries": []}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 BRAND_DOMAINS_MAP = {
     "ubuntu": ("Ubuntu Linux", "ubuntu.com", "https://cdn.simpleicons.org/ubuntu/E95420"),
@@ -9094,6 +9194,7 @@ def _discover_gateway_upnp_info(gw_ip):
         return dict(_GATEWAY_UPNP_CACHE.get("data") or {})
 
     locs = []
+    sock = None
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.settimeout(0.75)
@@ -9115,9 +9216,14 @@ def _discover_gateway_upnp_info(gw_ip):
                             locs.append(loc)
             except Exception:
                 break
-        sock.close()
     except Exception:
         pass
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except Exception:
+                pass
 
     for fallback_port in (52869, 49152, 5000, 1900):
         cand = f"http://{gw_ip}:{fallback_port}/gatedesc.xml"
@@ -9184,6 +9290,7 @@ def _read_pihole_network_catalog(limit=2000, max_age=10.0):
 
     friendly_names = load_device_friendly_names()
     catalog = {}
+    conn_pi = None
     try:
         conn_pi = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=1.5)
         cur_pi = conn_pi.cursor()
@@ -9238,9 +9345,14 @@ def _read_pihole_network_catalog(limit=2000, max_age=10.0):
                 existing["last_query_ts"] = max(existing.get("last_query_ts", 0), last_query)
             if len(catalog) >= limit:
                 break
-        conn_pi.close()
     except Exception:
         pass
+    finally:
+        if conn_pi is not None:
+            try:
+                conn_pi.close()
+            except Exception:
+                pass
 
     _PIHOLE_CATALOG_CACHE["ts"] = now
     _PIHOLE_CATALOG_CACHE["data"] = catalog
@@ -10341,11 +10453,12 @@ def fetch_security_worker():
                     "percent_blocked": 0.0,
                     "top_blocked": []
                 }
+                conn_g = None
+                conn_f = None
                 try:
                     if now - last_gravity_check > 300 or cached_gravity == 0:
                         conn_g = sqlite3.connect("file:/etc/pihole/gravity.db?mode=ro", uri=True, timeout=2.0)
                         row_g = conn_g.execute("SELECT count(*) FROM gravity;").fetchone()
-                        conn_g.close()
                         if row_g and row_g[0]:
                             cached_gravity = int(row_g[0])
                             last_gravity_check = now
@@ -10359,7 +10472,6 @@ def fetch_security_worker():
 
                     sql_top = "SELECT domain, count(*) as c FROM queries WHERE status IN (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16) AND timestamp >= strftime('%s', 'now', 'start of day') GROUP BY domain ORDER BY c DESC LIMIT 5;"
                     top_blocked = [{"domain": r[0], "count": int(r[1])} for r in cur_f.execute(sql_top).fetchall() if r[0]]
-                    conn_f.close()
 
                     pct = round((blocked_q / total_q * 100), 1) if total_q > 0 else 0.0
                     pihole_data = {
@@ -10381,6 +10493,17 @@ def fetch_security_worker():
                 except Exception as pe:
                     pihole_data["error"] = str(pe)
                     last_pihole_query_ts = now
+                finally:
+                    if conn_f is not None:
+                        try:
+                            conn_f.close()
+                        except Exception:
+                            pass
+                    if conn_g is not None:
+                        try:
+                            conn_g.close()
+                        except Exception:
+                            pass
 
             # 2. Fail2ban Metrics & All-Time History
             f2b_data = {
@@ -10437,6 +10560,7 @@ def fetch_security_worker():
                 currently_banned_set = set(f2b_data["banned_ips"])
                 db_path = "/var/lib/fail2ban/fail2ban.sqlite3"
                 if os.path.exists(db_path):
+                    conn = None
                     try:
                         conn = sqlite3.connect(db_path, timeout=1.5)
                         cur = conn.cursor()
@@ -10458,9 +10582,14 @@ def fetch_security_worker():
                                 "is_active": (ip_val in currently_banned_set)
                             })
                             known_ips.add(ip_val)
-                        conn.close()
                     except Exception:
                         pass
+                    finally:
+                        if conn is not None:
+                            try:
+                                conn.close()
+                            except Exception:
+                                pass
 
                 # Incorporar IPs registradas en el log vivo si no estaban en bips (cacheado por st_mtime/st_size)
                 log_path = "/var/log/fail2ban.log"
@@ -11757,7 +11886,10 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                         if base_bytes and base_bytes.endswith(b"}"):
                             raw_v = base_bytes[:-1] + b', "auth_status": ' + json.dumps(auth_status_obj).encode('utf-8') + b'}'
                             gz_v = gzip.compress(raw_v, compresslevel=4) if wants_gzip else None
-                            _METRICS_SERIALIZED_CACHE.setdefault("variants", {})[auth_cache_key] = (raw_v, gz_v)
+                            variants_dict = _METRICS_SERIALIZED_CACHE.setdefault("variants", {})
+                            if len(variants_dict) >= 64:
+                                variants_dict.clear()
+                            variants_dict[auth_cache_key] = (raw_v, gz_v)
                             out_bytes = gz_v if wants_gzip else raw_v
                             is_gzipped = wants_gzip
 
@@ -13210,6 +13342,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             now_ts = int(time.time())
             db_path = "/var/lib/fail2ban/fail2ban.sqlite3"
             if os.path.exists(db_path):
+                conn = None
                 try:
                     conn = sqlite3.connect(db_path, timeout=5.0)
                     cur = conn.cursor()
@@ -13219,9 +13352,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                             VALUES (?, ?, ?, 172800, 1, '{"source": "manual_import"}')
                         """, (vip, jail, now_ts))
                     conn.commit()
-                    conn.close()
                 except Exception:
                     pass
+                finally:
+                    if conn is not None:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
 
             # Aplicar en fail2ban-client por lotes o llamadas
             for vip in valid_ips:

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutGroup, motion } from 'motion/react';
 import {
   Activity,
@@ -67,6 +67,14 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
 
   const [dbResponse, setDbResponse] = useState<NetworkDevicesDbResponse | null>(null);
   const [loadingDb, setLoadingDb] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -80,20 +88,25 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
-  const fetchDevicesDb = useCallback(async (forceRefresh = false) => {
-    setLoadingDb(true);
+  const fetchDevicesDb = useCallback(async (forceRefresh = false, silent = false) => {
+    if (!silent) {
+      setLoadingDb(true);
+    }
     const url = forceRefresh ? '/api/network/devices-db?refresh=1' : '/api/network/devices-db';
     const res = await apiFetchJson<NetworkDevicesDbResponse>(url);
+    if (!mountedRef.current) return;
     if (res.ok && res.data?.ok) {
       setDbResponse(res.data);
     }
-    setLoadingDb(false);
+    if (!silent) {
+      setLoadingDb(false);
+    }
   }, []);
 
   useEffect(() => {
-    void fetchDevicesDb(false);
+    void fetchDevicesDb(false, false);
     const timerId = window.setInterval(() => {
-      void fetchDevicesDb(false);
+      void fetchDevicesDb(false, true);
     }, 5500);
     return () => window.clearInterval(timerId);
   }, [fetchDevicesDb]);
@@ -225,8 +238,8 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
     const activePool = liveClients.filter((c) => {
       if (c.is_gateway) return false;
       const isOnline = c.online !== false && c.is_online !== false;
-      const wanD = Number(c.wan_speed_down ?? 0);
-      const wanU = Number(c.wan_speed_up ?? 0);
+      const wanD = Number(c.wan_speed_down ?? c.speed_down ?? 0);
+      const wanU = Number(c.wan_speed_up ?? c.speed_up ?? 0);
       const lanD = Number(c.lan_speed_down ?? 0);
       const lanU = Number(c.lan_speed_up ?? 0);
       const anyTraffic = wanD + wanU + lanD + lanU > 0;
@@ -527,12 +540,12 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                           )}
                           {srcs.includes('asus') && (
                             <span className="rounded-md bg-sky-500/10 px-1.5 py-0.5 text-sky-700 dark:text-sky-300">
-                              ASUS
+                              {summary.asus_model || t('overview.db_source_router_short')}
                             </span>
                           )}
                           {srcs.includes('gateway') && (
                             <span className="rounded-md bg-violet-500/10 px-1.5 py-0.5 text-violet-700 dark:text-violet-300">
-                              {summary.gateway_name || 'Gateway'}
+                              {summary.gateway_name || t('overview.db_source_gateway')}
                             </span>
                           )}
                           {(client.pihole_queries ?? 0) > 0 && (

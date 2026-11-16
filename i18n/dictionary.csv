@@ -817,8 +817,9 @@ overview.tab_bandwidth_live,"Modal Inspección Dispositivos",Descarga y carga
 overview.db_source_all,"Modal Inspección Dispositivos",Todas
 overview.db_source_online,"Modal Inspección Dispositivos",Conectados
 overview.db_source_pihole,"Modal Inspección Dispositivos",Pi-hole
-overview.db_source_asus,"Modal Inspección Dispositivos",Router ASUS
+overview.db_source_asus,"Modal Inspección Dispositivos",Router Wi-Fi / Mesh
 overview.db_source_gateway,"Modal Inspección Dispositivos",Puerta de enlace
+overview.db_source_router_short,"Modal Inspección Dispositivos",Router
 overview.db_search_placeholder,"Modal Inspección Dispositivos","Buscar dispositivo, IP, MAC o fabricante..."
 overview.db_queries_dns,"Modal Inspección Dispositivos",{count} consultas DNS
 overview.db_last_seen,"Modal Inspección Dispositivos",Último contacto: {time}

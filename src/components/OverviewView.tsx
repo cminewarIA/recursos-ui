@@ -1012,7 +1012,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 : [Math.round(writeMb * 100) / 100, Math.round(writeMb * 100) / 100];
             const diskTimestamps =
               ioHist.length >= 2
-                ? ioHist.map((b) => new Date(b.t).toLocaleTimeString('es-ES'))
+                ? ioHist.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale))
                 : timestamps.slice(-2);
             const diskEpochTs =
               ioHist.length >= 2

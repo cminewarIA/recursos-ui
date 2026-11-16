@@ -12,7 +12,6 @@ Arquitectura Híbrida Unificada:
 
 import argparse
 import base64
-import collections
 import hashlib
 import http.server
 import ipaddress
