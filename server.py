@@ -3536,8 +3536,190 @@ def delete_speedtest_history_from_sqlite(entry_id=None):
                     pass
 
 
+def _run_ookla_cli_speedtest():
+    """Ejecuta el binario oficial Ookla Speedtest CLI si está disponible en el sistema."""
+    ookla_bin = shutil.which("speedtest")
+    if not ookla_bin:
+        return None
+    try:
+        ver_proc = subprocess.run([ookla_bin, "--version"], capture_output=True, text=True, timeout=4.0)
+        ver_out = (ver_proc.stdout or "") + (ver_proc.stderr or "")
+        if "ookla" not in ver_out.lower():
+            return None
+    except Exception:
+        return None
+
+    proc = subprocess.Popen(
+        [ookla_bin, "--accept-license", "--accept-gdpr", "--progress=yes", "--format=jsonl"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    final_result = None
+    last_ping = 0.0
+    last_jitter = 0.0
+    try:
+        assert proc.stdout is not None
+        for raw_line in proc.stdout:
+            line = (raw_line or "").strip()
+            if not line or not line.startswith("{"):
+                continue
+            try:
+                evt = json.loads(line)
+            except Exception:
+                continue
+            etype = str(evt.get("type") or "")
+            if etype == "testStart":
+                srv = evt.get("server") or {}
+                iface = evt.get("interface") or {}
+                loc_parts = [str(srv.get("location") or ""), str(srv.get("country") or "")]
+                with SPEEDTEST_LOCK:
+                    SPEEDTEST_STATE.update({
+                        "server_name": f"Speedtest · {srv.get('name') or 'Ookla'}",
+                        "server_host": str(srv.get("host") or "speedtest.net"),
+                        "server_location": ", ".join(p for p in loc_parts if p),
+                        "isp": str(evt.get("isp") or SPEEDTEST_STATE.get("isp") or ""),
+                        "client_ip": str(iface.get("externalIp") or SPEEDTEST_STATE.get("client_ip") or ""),
+                        "scope": "wan",
+                    })
+            elif etype == "ping":
+                pobj = evt.get("ping") or {}
+                last_ping = round(float(pobj.get("latency") or 0.0), 2)
+                last_jitter = round(float(pobj.get("jitter") or 0.0), 2)
+                prog = float(pobj.get("progress") or 0.0)
+                with SPEEDTEST_LOCK:
+                    SPEEDTEST_STATE.update({
+                        "phase": "ping",
+                        "ping_ms": last_ping,
+                        "jitter_ms": last_jitter,
+                        "progress_pct": max(8, min(20, 8 + int(prog * 12))),
+                    })
+            elif etype == "download":
+                dobj = evt.get("download") or {}
+                mbps = round((float(dobj.get("bandwidth") or 0.0) * 8.0) / 1_000_000.0, 2)
+                prog = float(dobj.get("progress") or 0.0)
+                with SPEEDTEST_LOCK:
+                    SPEEDTEST_STATE.update({
+                        "phase": "download",
+                        "current_mbps": mbps,
+                        "download_mbps": mbps,
+                        "progress_pct": max(22, min(60, 22 + int(prog * 38))),
+                    })
+            elif etype == "upload":
+                uobj = evt.get("upload") or {}
+                mbps = round((float(uobj.get("bandwidth") or 0.0) * 8.0) / 1_000_000.0, 2)
+                prog = float(uobj.get("progress") or 0.0)
+                with SPEEDTEST_LOCK:
+                    SPEEDTEST_STATE.update({
+                        "phase": "upload",
+                        "current_mbps": mbps,
+                        "upload_mbps": mbps,
+                        "progress_pct": max(62, min(96, 62 + int(prog * 34))),
+                    })
+            elif etype == "result":
+                pobj = evt.get("ping") or {}
+                dobj = evt.get("download") or {}
+                uobj = evt.get("upload") or {}
+                srv = evt.get("server") or {}
+                iface = evt.get("interface") or {}
+                loc_parts = [str(srv.get("location") or ""), str(srv.get("country") or "")]
+                final_result = {
+                    "download_mbps": round((float(dobj.get("bandwidth") or 0.0) * 8.0) / 1_000_000.0, 2),
+                    "upload_mbps": round((float(uobj.get("bandwidth") or 0.0) * 8.0) / 1_000_000.0, 2),
+                    "ping_ms": round(float(pobj.get("latency") or last_ping), 2),
+                    "jitter_ms": round(float(pobj.get("jitter") or last_jitter), 2),
+                    "packet_loss_pct": round(float(evt.get("packetLoss") or 0.0), 1),
+                    "server_name": f"Speedtest · {srv.get('name') or 'Ookla'}",
+                    "server_host": str(srv.get("host") or "speedtest.net"),
+                    "server_location": ", ".join(p for p in loc_parts if p),
+                    "client_ip": str(iface.get("externalIp") or ""),
+                    "isp": str(evt.get("isp") or ""),
+                    "scope": "wan",
+                }
+        proc.wait(timeout=45)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    return final_result if (proc.returncode == 0 and final_result) else None
+
+
+def _run_speedtest_cli_python(default_client_ip="", default_isp=""):
+    """Ejecuta speedtest-cli (paquete Python/APT) si está instalado."""
+    import importlib.util
+    cli_bin = shutil.which("speedtest-cli")
+    cmd = None
+    if cli_bin:
+        cmd = [cli_bin, "--json"]
+    elif importlib.util.find_spec("speedtest") is not None:
+        import sys
+        cmd = [sys.executable, "-m", "speedtest", "--json"]
+    else:
+        st_bin = shutil.which("speedtest")
+        if st_bin:
+            try:
+                v = subprocess.run([st_bin, "--version"], capture_output=True, text=True, timeout=4.0)
+                if "ookla" not in ((v.stdout or "") + (v.stderr or "")).lower():
+                    cmd = [st_bin, "--json"]
+            except Exception:
+                pass
+    if not cmd:
+        return None
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    t_started = time.perf_counter()
+    try:
+        while proc.poll() is None:
+            el = time.perf_counter() - t_started
+            with SPEEDTEST_LOCK:
+                if el < 4.0:
+                    SPEEDTEST_STATE["phase"] = "ping"
+                    SPEEDTEST_STATE["progress_pct"] = min(20, 8 + int(el * 3))
+                elif el < 14.0:
+                    SPEEDTEST_STATE["phase"] = "download"
+                    SPEEDTEST_STATE["progress_pct"] = min(60, 22 + int((el - 4.0) * 3.8))
+                else:
+                    SPEEDTEST_STATE["phase"] = "upload"
+                    SPEEDTEST_STATE["progress_pct"] = min(94, 62 + int((el - 14.0) * 2.5))
+            if el > 50.0:
+                proc.kill()
+                return None
+            time.sleep(0.35)
+        out, _ = proc.communicate(timeout=2.0)
+        if proc.returncode != 0 or not out:
+            return None
+        data = json.loads(out)
+        srv = data.get("server") or {}
+        cli = data.get("client") or {}
+        sponsor = str(srv.get("sponsor") or srv.get("name") or "Speedtest.net")
+        loc_parts = [str(srv.get("name") or ""), str(srv.get("country") or "")]
+        return {
+            "download_mbps": round(float(data.get("download") or 0.0) / 1_000_000.0, 2),
+            "upload_mbps": round(float(data.get("upload") or 0.0) / 1_000_000.0, 2),
+            "ping_ms": round(float(data.get("ping") or 0.0), 2),
+            "jitter_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "server_name": f"Speedtest · {sponsor}",
+            "server_host": str(srv.get("host") or "speedtest.net"),
+            "server_location": ", ".join(p for p in loc_parts if p),
+            "client_ip": str(cli.get("ip") or default_client_ip or ""),
+            "isp": str(cli.get("isp") or default_isp or ""),
+            "scope": "wan",
+        }
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        return None
+
+
 def _run_speedtest_worker():
-    """Ejecuta medición real de Ping/Jitter, Descarga y Subida y persiste resultado en SQLite."""
+    """Ejecuta medición real Speedtest (Ookla CLI / speedtest-cli / protocolo nativo Speedtest.net) y guarda en SQLite."""
+    from concurrent.futures import ThreadPoolExecutor
+
     t_start = time.perf_counter()
     with SPEEDTEST_LOCK:
         SPEEDTEST_STATE.update({
@@ -3560,7 +3742,6 @@ def _run_speedtest_worker():
             "started_at": time.time(),
         })
     try:
-        wan_reachable = False
         server_name = HOSTNAME or socket.gethostname()
         server_host = "127.0.0.1"
         server_location = ""
@@ -3574,124 +3755,248 @@ def _run_speedtest_worker():
                 country_s = str(SERVER_SELF_GEO.get("country") or "")
                 server_location = ", ".join(x for x in (city_s, country_s) if x)
 
-        probe_url = "https://speed.cloudflare.com/__down?bytes=65536"
-        try:
-            req = urllib.request.Request(probe_url, headers={"User-Agent": f"RecursosCockpit/{get_app_version()}"})
-            with urllib.request.urlopen(req, timeout=3.0) as r:
-                r.read()
-                cf_ray = r.headers.get("cf-ray", "")
-                colo = cf_ray.split("-")[-1] if "-" in cf_ray else ""
-                wan_reachable = True
-                server_name = f"Cloudflare Edge ({colo})" if colo else "Cloudflare Speed Edge"
-                server_host = "speed.cloudflare.com"
-                if colo and not server_location:
-                    server_location = colo
-        except Exception:
-            wan_reachable = False
+        # Prioridad 1 & 2: Binario oficial Ookla Speedtest CLI o paquete speedtest-cli
+        cli_result = _run_ookla_cli_speedtest()
+        if cli_result is None:
+            cli_result = _run_speedtest_cli_python(client_ip, isp_name)
 
-        scope = "wan" if wan_reachable else "local_node"
-        local_base = f"http://127.0.0.1:{ACTIVE_SERVER_PORT}/api/net/speedtest/payload"
+        if cli_result is not None:
+            download_mbps = cli_result["download_mbps"]
+            upload_mbps = cli_result["upload_mbps"]
+            ping_ms = cli_result["ping_ms"]
+            jitter_ms = cli_result["jitter_ms"]
+            loss_pct = cli_result["packet_loss_pct"]
+            server_name = cli_result["server_name"]
+            server_host = cli_result["server_host"]
+            server_location = cli_result["server_location"] or server_location
+            client_ip = cli_result["client_ip"] or client_ip
+            isp_name = cli_result["isp"] or isp_name
+            scope = cli_result["scope"]
+        else:
+            # Prioridad 3: Motor nativo multi-hilo sobre protocolo oficial Speedtest.net (cero dependencias externas)
+            st_headers = {
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Referer": "https://www.speedtest.net/",
+                "Accept": "application/json,text/plain,*/*",
+            }
+            selected_base = None
+            selected_upload_url = None
+            wan_provider = None
 
-        # 1. Ping & Jitter
-        ping_samples = []
-        ping_fails = 0
-        for idx in range(6):
-            p_url = "https://speed.cloudflare.com/__down?bytes=1024" if wan_reachable else f"{local_base}?bytes=1024"
-            p_t0 = time.perf_counter()
+            # Obtener ISP/IP desde speedtest-config.php si es accesible
             try:
-                req = urllib.request.Request(p_url, headers={"User-Agent": f"RecursosCockpit/{get_app_version()}"})
-                with urllib.request.urlopen(req, timeout=2.5) as r:
-                    r.read()
-                ping_samples.append((time.perf_counter() - p_t0) * 1000.0)
-            except Exception:
-                ping_fails += 1
-            with SPEEDTEST_LOCK:
-                SPEEDTEST_STATE["progress_pct"] = 8 + int(((idx + 1) / 6.0) * 12)
-        ping_ms = round(sorted(ping_samples)[len(ping_samples) // 2], 2) if ping_samples else 0.0
-        jitter_ms = round(
-            sum(abs(ping_samples[i] - ping_samples[i - 1]) for i in range(1, len(ping_samples))) / float(len(ping_samples) - 1),
-            2,
-        ) if len(ping_samples) >= 2 else 0.0
-        loss_pct = round((ping_fails / 6.0) * 100.0, 1)
-
-        with SPEEDTEST_LOCK:
-            SPEEDTEST_STATE.update({
-                "phase": "download",
-                "progress_pct": 22,
-                "ping_ms": ping_ms,
-                "jitter_ms": jitter_ms,
-                "packet_loss_pct": loss_pct,
-                "server_name": server_name,
-                "server_host": server_host,
-                "server_location": server_location,
-                "client_ip": client_ip,
-                "isp": isp_name,
-                "scope": scope,
-            })
-
-        # 2. Download Mbps
-        dl_bytes_total = 0
-        dl_t0 = time.perf_counter()
-        dl_sizes = [8_000_000, 12_000_000] if wan_reachable else [16_000_000, 16_000_000]
-        for s_idx, sz in enumerate(dl_sizes):
-            d_url = f"https://speed.cloudflare.com/__down?bytes={sz}" if wan_reachable else f"{local_base}?bytes={sz}"
-            try:
-                req = urllib.request.Request(d_url, headers={"User-Agent": f"RecursosCockpit/{get_app_version()}"})
-                with urllib.request.urlopen(req, timeout=12.0) as r:
-                    while True:
-                        chunk = r.read(131072)
-                        if not chunk:
-                            break
-                        dl_bytes_total += len(chunk)
-                        el = max(0.05, time.perf_counter() - dl_t0)
-                        live_dl = round((dl_bytes_total * 8.0) / (el * 1_000_000.0), 2)
-                        with SPEEDTEST_LOCK:
-                            SPEEDTEST_STATE["current_mbps"] = live_dl
-                            SPEEDTEST_STATE["download_mbps"] = live_dl
-                            SPEEDTEST_STATE["progress_pct"] = min(60, 22 + int((s_idx * 19) + (dl_bytes_total / float(sum(dl_sizes))) * 19))
+                cfg_req = urllib.request.Request("https://www.speedtest.net/speedtest-config.php", headers=st_headers)
+                with urllib.request.urlopen(cfg_req, timeout=3.0) as cr:
+                    cfg_root = ET.fromstring(cr.read().decode("utf-8", errors="ignore"))
+                    cli_node = cfg_root.find("client")
+                    if cli_node is not None:
+                        client_ip = str(cli_node.attrib.get("ip") or client_ip)
+                        isp_name = str(cli_node.attrib.get("isp") or isp_name)
             except Exception:
                 pass
-        dl_elapsed = max(0.05, time.perf_counter() - dl_t0)
-        download_mbps = round((dl_bytes_total * 8.0) / (dl_elapsed * 1_000_000.0), 2)
 
-        with SPEEDTEST_LOCK:
-            SPEEDTEST_STATE.update({
-                "phase": "upload",
-                "progress_pct": 62,
-                "download_mbps": download_mbps,
-                "current_mbps": 0.0,
-            })
+            # Descubrir servidores cercanos de Speedtest.net y elegir el de menor latencia
+            candidates = []
+            for api_url in (
+                "https://www.speedtest.net/api/js/servers?engine=js&https_functional=true&limit=8",
+                "https://www.speedtest.net/api/js/servers?engine=js&limit=8",
+            ):
+                try:
+                    srv_req = urllib.request.Request(api_url, headers=st_headers)
+                    with urllib.request.urlopen(srv_req, timeout=4.0) as sr:
+                        data = json.loads(sr.read().decode("utf-8", errors="ignore"))
+                    if isinstance(data, list) and data:
+                        candidates = data
+                        break
+                except Exception:
+                    continue
 
-        # 3. Upload Mbps
-        ul_chunk = b"\x00" * (2_500_000 if wan_reachable else 8_000_000)
-        ul_bytes_total = 0
-        ul_t0 = time.perf_counter()
-        for u_idx in range(2):
-            u_url = "https://speed.cloudflare.com/__up" if wan_reachable else local_base
-            try:
-                req = urllib.request.Request(
-                    u_url,
-                    data=ul_chunk,
-                    method="POST",
-                    headers={
-                        "Content-Type": "application/octet-stream",
-                        "Content-Length": str(len(ul_chunk)),
-                        "User-Agent": f"RecursosCockpit/{get_app_version()}",
-                    },
-                )
-                with urllib.request.urlopen(req, timeout=12.0) as r:
-                    r.read()
-                ul_bytes_total += len(ul_chunk)
-                el = max(0.05, time.perf_counter() - ul_t0)
-                live_ul = round((ul_bytes_total * 8.0) / (el * 1_000_000.0), 2)
+            best_probe = None
+            for srv in candidates[:6]:
+                raw_up = str(srv.get("url") or "").strip()
+                if not raw_up or "/" not in raw_up:
+                    continue
+                try_urls = [raw_up]
+                if raw_up.startswith("http://") and srv.get("https_functional"):
+                    try_urls.insert(0, "https://" + raw_up[7:])
+                for up_cand in try_urls:
+                    base_cand = up_cand.rsplit("/", 1)[0]
+                    lat_url = f"{base_cand}/latency.txt?x={int(time.time() * 1000)}"
+                    try:
+                        p0 = time.perf_counter()
+                        with urllib.request.urlopen(urllib.request.Request(lat_url, headers=st_headers), timeout=2.0) as lr:
+                            lr.read(64)
+                        ms = (time.perf_counter() - p0) * 1000.0
+                        if best_probe is None or ms < best_probe[0]:
+                            best_probe = (ms, srv, base_cand, up_cand)
+                        break
+                    except Exception:
+                        continue
+
+            if best_probe is not None:
+                _, srv_obj, selected_base, selected_upload_url = best_probe
+                wan_provider = "speedtest"
+                sponsor = str(srv_obj.get("sponsor") or srv_obj.get("name") or "Speedtest.net")
+                city_s = str(srv_obj.get("name") or "")
+                country_s = str(srv_obj.get("country") or "")
+                server_name = f"Speedtest · {sponsor}"
+                server_host = urllib.parse.urlparse(selected_upload_url).hostname or "speedtest.net"
+                server_location = ", ".join(p for p in (city_s, country_s) if p) or server_location
+            else:
+                # Respaldo WAN Cloudflare Edge si Speedtest.net estuviera bloqueado
+                try:
+                    cf_req = urllib.request.Request("https://speed.cloudflare.com/__down?bytes=32768", headers=st_headers)
+                    with urllib.request.urlopen(cf_req, timeout=2.5) as cr:
+                        cr.read()
+                        cf_ray = cr.headers.get("cf-ray", "")
+                        colo = cf_ray.split("-")[-1] if "-" in cf_ray else ""
+                    wan_provider = "cloudflare"
+                    server_name = f"Cloudflare Edge ({colo})" if colo else "Cloudflare Speed Edge"
+                    server_host = "speed.cloudflare.com"
+                except Exception:
+                    wan_provider = None
+
+            scope = "wan" if wan_provider else "local_node"
+            local_base = f"http://127.0.0.1:{ACTIVE_SERVER_PORT}/api/net/speedtest/payload"
+
+            # 1. Ping & Jitter (6 muestras)
+            ping_samples = []
+            ping_fails = 0
+            for idx in range(6):
+                if wan_provider == "speedtest" and selected_base:
+                    p_url = f"{selected_base}/latency.txt?r={idx}_{int(time.time() * 1000)}"
+                elif wan_provider == "cloudflare":
+                    p_url = "https://speed.cloudflare.com/__down?bytes=1024"
+                else:
+                    p_url = f"{local_base}?bytes=1024"
+                p_t0 = time.perf_counter()
+                try:
+                    with urllib.request.urlopen(urllib.request.Request(p_url, headers=st_headers), timeout=2.5) as r:
+                        r.read(256)
+                    ping_samples.append((time.perf_counter() - p_t0) * 1000.0)
+                except Exception:
+                    ping_fails += 1
                 with SPEEDTEST_LOCK:
-                    SPEEDTEST_STATE["current_mbps"] = live_ul
-                    SPEEDTEST_STATE["upload_mbps"] = live_ul
-                    SPEEDTEST_STATE["progress_pct"] = 62 + int(((u_idx + 1) / 2.0) * 33)
-            except Exception:
-                pass
-        ul_elapsed = max(0.05, time.perf_counter() - ul_t0)
-        upload_mbps = round((ul_bytes_total * 8.0) / (ul_elapsed * 1_000_000.0), 2)
+                    SPEEDTEST_STATE["progress_pct"] = 8 + int(((idx + 1) / 6.0) * 12)
+            ping_ms = round(sorted(ping_samples)[len(ping_samples) // 2], 2) if ping_samples else 0.0
+            jitter_ms = round(
+                sum(abs(ping_samples[i] - ping_samples[i - 1]) for i in range(1, len(ping_samples))) / float(len(ping_samples) - 1),
+                2,
+            ) if len(ping_samples) >= 2 else 0.0
+            loss_pct = round((ping_fails / 6.0) * 100.0, 1)
+
+            with SPEEDTEST_LOCK:
+                SPEEDTEST_STATE.update({
+                    "phase": "download",
+                    "progress_pct": 22,
+                    "ping_ms": ping_ms,
+                    "jitter_ms": jitter_ms,
+                    "packet_loss_pct": loss_pct,
+                    "server_name": server_name,
+                    "server_host": server_host,
+                    "server_location": server_location,
+                    "client_ip": client_ip,
+                    "isp": isp_name,
+                    "scope": scope,
+                })
+
+            # 2. Descarga multi-hilo (3 streams en paralelo, máx ~5.5s)
+            dl_lock = threading.Lock()
+            dl_bytes = [0]
+            dl_t0 = time.perf_counter()
+            dl_deadline = dl_t0 + (5.5 if wan_provider else 2.5)
+
+            def _dl_worker(worker_idx):
+                urls = (
+                    [
+                        f"{selected_base}/random2000x2000.jpg?x={worker_idx}",
+                        f"{selected_base}/random3000x3000.jpg?x={worker_idx}",
+                    ]
+                    if wan_provider == "speedtest" and selected_base
+                    else (
+                        ["https://speed.cloudflare.com/__down?bytes=8000000"]
+                        if wan_provider == "cloudflare"
+                        else [f"{local_base}?bytes=16000000"]
+                    )
+                )
+                for u_i, u in enumerate(urls):
+                    if time.perf_counter() >= dl_deadline:
+                        break
+                    try:
+                        with urllib.request.urlopen(urllib.request.Request(f"{u}&t={int(time.time()*1000)}_{u_i}", headers=st_headers), timeout=6.0) as r:
+                            while time.perf_counter() < dl_deadline:
+                                chunk = r.read(131072)
+                                if not chunk:
+                                    break
+                                with dl_lock:
+                                    dl_bytes[0] += len(chunk)
+                                    el = max(0.05, time.perf_counter() - dl_t0)
+                                    live_dl = round((dl_bytes[0] * 8.0) / (el * 1_000_000.0), 2)
+                                with SPEEDTEST_LOCK:
+                                    SPEEDTEST_STATE["current_mbps"] = live_dl
+                                    SPEEDTEST_STATE["download_mbps"] = live_dl
+                                    SPEEDTEST_STATE["progress_pct"] = min(60, 22 + int((min(5.5, el) / 5.5) * 38))
+                    except Exception:
+                        continue
+
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                list(pool.map(_dl_worker, range(3)))
+            dl_elapsed = max(0.05, time.perf_counter() - dl_t0)
+            download_mbps = round((dl_bytes[0] * 8.0) / (dl_elapsed * 1_000_000.0), 2)
+
+            with SPEEDTEST_LOCK:
+                SPEEDTEST_STATE.update({
+                    "phase": "upload",
+                    "progress_pct": 62,
+                    "download_mbps": download_mbps,
+                    "current_mbps": 0.0,
+                })
+
+            # 3. Subida multi-hilo (2 streams, chunks incompresibles de 512 KB, máx ~4.5s)
+            ul_lock = threading.Lock()
+            ul_bytes = [0]
+            ul_chunk = os.urandom(512 * 1024) if wan_provider else (b"\x00" * (4 * 1024 * 1024))
+            ul_t0 = time.perf_counter()
+            ul_deadline = ul_t0 + (4.5 if wan_provider else 2.2)
+
+            def _ul_worker(worker_idx):
+                target_u = (
+                    selected_upload_url
+                    if wan_provider == "speedtest" and selected_upload_url
+                    else ("https://speed.cloudflare.com/__up" if wan_provider == "cloudflare" else local_base)
+                )
+                iter_idx = 0
+                while time.perf_counter() < ul_deadline and iter_idx < 8:
+                    iter_idx += 1
+                    try:
+                        req = urllib.request.Request(
+                            target_u,
+                            data=ul_chunk,
+                            method="POST",
+                            headers={
+                                **st_headers,
+                                "Content-Type": "application/octet-stream",
+                                "Content-Length": str(len(ul_chunk)),
+                            },
+                        )
+                        with urllib.request.urlopen(req, timeout=5.0) as r:
+                            r.read(256)
+                        with ul_lock:
+                            ul_bytes[0] += len(ul_chunk)
+                            el = max(0.05, time.perf_counter() - ul_t0)
+                            live_ul = round((ul_bytes[0] * 8.0) / (el * 1_000_000.0), 2)
+                        with SPEEDTEST_LOCK:
+                            SPEEDTEST_STATE["current_mbps"] = live_ul
+                            SPEEDTEST_STATE["upload_mbps"] = live_ul
+                            SPEEDTEST_STATE["progress_pct"] = min(96, 62 + int((min(4.5, el) / 4.5) * 34))
+                    except Exception:
+                        break
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                list(pool.map(_ul_worker, range(2)))
+            ul_elapsed = max(0.05, time.perf_counter() - ul_t0)
+            upload_mbps = round((ul_bytes[0] * 8.0) / (ul_elapsed * 1_000_000.0), 2)
+
         duration_ms = int((time.perf_counter() - t_start) * 1000)
         now_ts = time.time()
         created_at = datetime.fromtimestamp(now_ts).strftime("%Y-%m-%d %H:%M:%S")
@@ -3748,9 +4053,19 @@ def _run_speedtest_worker():
                 "running": False,
                 "phase": "done",
                 "progress_pct": 100,
-                "current_mbps": download_mbps,
+                "current_mbps": upload_mbps,
                 "download_mbps": download_mbps,
                 "upload_mbps": upload_mbps,
+                "ping_ms": ping_ms,
+                "jitter_ms": jitter_ms,
+                "packet_loss_pct": loss_pct,
+                "server_name": server_name,
+                "server_host": server_host,
+                "server_location": server_location,
+                "client_ip": client_ip,
+                "isp": isp_name,
+                "scope": scope,
+                "completed_at": now_ts,
                 "last_result": result_obj,
             })
     except Exception as exc:
@@ -7664,7 +7979,10 @@ def get_locked_page_html(client_ip):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <title>Acceso protegido · Recursos CMineWar</title>
-  <link rel="icon" type="image/png" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="shortcut icon" href="/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -12980,7 +13298,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         elif clean_path == "/api/net/speedtest/payload":
-            if client_ip not in ("127.0.0.1", "::1") and not auth["is_trusted"]:
+            if c_ip not in ("127.0.0.1", "::1", "::ffff:127.0.0.1") and not auth["is_trusted"]:
                 self.send_response(403)
                 self.send_security_headers()
                 self.end_headers()
@@ -14731,9 +15049,26 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 return
             with SPEEDTEST_LOCK:
                 already_running = bool(SPEEDTEST_STATE.get("running"))
+                if not already_running:
+                    SPEEDTEST_STATE.update({
+                        "running": True,
+                        "phase": "ping",
+                        "progress_pct": 4,
+                        "current_mbps": 0.0,
+                        "error": "",
+                        "started_at": time.time(),
+                    })
+                st_copy = dict(SPEEDTEST_STATE)
             if not already_running:
                 threading.Thread(target=_run_speedtest_worker, daemon=True, name="SpeedTestWorker").start()
-            resp = json.dumps({"ok": True, "success": True, "running": True}).encode('utf-8')
+            resp = json.dumps({
+                "ok": True,
+                "success": True,
+                "started": not already_running,
+                "already_running": already_running,
+                "running": True,
+                "status": st_copy,
+            }).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_security_headers()
@@ -14762,7 +15097,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         elif clean_path == "/api/net/speedtest/payload":
-            if client_ip not in ("127.0.0.1", "::1") and not auth["is_trusted"]:
+            auth = check_trust_status(self)
+            if client_ip not in ("127.0.0.1", "::1", "::ffff:127.0.0.1") and not auth["is_trusted"]:
                 self.send_response(403)
                 self.send_security_headers()
                 self.end_headers()

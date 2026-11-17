@@ -234,59 +234,59 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
         exit={{ opacity: 0, y: -12, scale: 0.94 }}
         transition={{ duration: 0.36, ease: COCKPIT_EASE }}
         whileHover={{ y: -2, transition: { duration: 0.2 } }}
-        className="cockpit-bento flex flex-col justify-between p-5"
+        className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
       >
         <div>
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-2.5">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                <span className={`${pillClass} inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg`}>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span className={`${pillClass} inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md`}>
                   {isRem ? (
-                    <Usb className="h-3.5 w-3.5" />
+                    <Usb className="h-3 w-3" />
                   ) : isNet ? (
-                    <Server className="h-3.5 w-3.5" />
+                    <Server className="h-3 w-3" />
                   ) : (
-                    <HardDrive className="h-3.5 w-3.5" />
+                    <HardDrive className="h-3 w-3" />
                   )}
                 </span>
                 <span className="truncate font-semibold text-slate-700 dark:text-slate-200">
                   {widgetTitle}
                 </span>
                 <span aria-hidden="true">·</span>
-                <span className={`shrink-0 ${statusClass}`}>{statusText}</span>
+                <span className={`shrink-0 text-[11px] ${statusClass}`}>{statusText}</span>
               </div>
 
-              <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
+              <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
                 {isMounted ? (
                   <AnimatedMetricValue
                     value={pct}
                     decimals={1}
                     suffix=" %"
-                    className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white"
+                    className="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white"
                   />
                 ) : (
-                  <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white sm:text-3xl">
+                  <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white">
                     {formatBytes(d.total_bytes)}
                   </span>
                 )}
-                <span className={`${pillClass} rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums`}>
+                <span className={`${pillClass} rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums`}>
                   {isMounted
                     ? `${formatBytes(d.used_bytes)} / ${formatBytes(d.total_bytes)}`
                     : resolvedTransport || t('hardware.storage.connected_badge')}
                 </span>
                 {d.temp_c !== null && d.temp_c !== undefined && (
-                  <span className="cockpit-pill-amber rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                  <span className="cockpit-pill-amber rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums">
                     {formatTemp(d.temp_c)}
                   </span>
                 )}
               </div>
 
-              <div className="mt-1.5 flex items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+              <div className="mt-1 flex items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                 <span className="min-w-0 truncate" title={subtitleText}>
                   {subtitleText}
                 </span>
                 <span aria-hidden="true" className="shrink-0">·</span>
-                <span className="shrink-0 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
+                <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-slate-600 dark:text-slate-300">
                   {t('hardware.storage.read_short')} {formatMbRate(readMb)} · {t('hardware.storage.write_short')} {formatMbRate(writeMb)}
                 </span>
               </div>
@@ -297,13 +297,13 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
               type="button"
               aria-label={t('hardware.storage.expand_aria', { name: widgetTitle })}
               onClick={() => onExpandChart(expandSpec)}
-              className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-amber-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-amber-300"
+              className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-amber-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-amber-300"
             >
-              <Maximize2 className="h-4 w-4" />
+              <Maximize2 className="h-3.5 w-3.5" />
             </motion.button>
           </div>
 
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${isMounted ? Math.max(2, pct) : 100}%` }}
@@ -314,12 +314,12 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-2.5">
           <TelemetryChart
             series={diskSeries}
             timestamps={diskTimestamps}
             epochTs={diskEpochTs}
-            height={160}
+            height={112}
             leftUnit="MB/s"
             theme={theme}
             onExpandClick={() => onExpandChart(expandSpec)}
@@ -793,31 +793,31 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.42, delay: 0.04, ease: COCKPIT_EASE }}
           whileHover={{ y: -2, transition: { duration: 0.2 } }}
-          className="cockpit-bento flex flex-col justify-between p-5"
+          className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                  <span className="cockpit-pill-cyan inline-flex h-6 w-6 items-center justify-center rounded-lg">
-                    <Cpu className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span className="cockpit-pill-cyan inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
+                    <Cpu className="h-3 w-3" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">{t('hardware.cpu.title')}</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">{t('hardware.cpu.title')}</span>
                   <span aria-hidden="true">·</span>
-                  <span className={cpuTone.textClass}>{cpuTone.label}</span>
+                  <span className={`shrink-0 text-[11px] ${cpuTone.textClass}`}>{cpuTone.label}</span>
                 </div>
-                <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
+                <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
                   <AnimatedMetricValue
                     value={cpuPct}
                     decimals={1}
                     suffix=" %"
-                    className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white"
+                    className="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white"
                   />
-                  <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                  <span className="cockpit-pill-cyan rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums">
                     {formatTemp(cpuTemp)}
                   </span>
                 </div>
-                <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400">
                   {t('hardware.cpu.cores_summary', {
                     model: metrics?.cpu?.model || t('hardware.cpu.main_fallback'),
                     cores: metrics?.cpu?.logical_cores || 0,
@@ -840,14 +840,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     chartKind: 'cpu',
                   })
                 }
-                className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
               >
-                <Maximize2 className="h-4 w-4" />
+                <Maximize2 className="h-3.5 w-3.5" />
               </motion.button>
             </div>
 
             {/* Sleek spring horizontal progress bar */}
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(2, Math.min(100, cpuPct))}%` }}
@@ -857,12 +857,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-2.5">
             <TelemetryChart
               series={cpuSeries}
               timestamps={timestamps}
               epochTs={epochTs}
-              height={160}
+              height={112}
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -888,31 +888,31 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.42, delay: 0.08, ease: COCKPIT_EASE }}
           whileHover={{ y: -2, transition: { duration: 0.2 } }}
-          className="cockpit-bento flex flex-col justify-between p-5"
+          className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                  <span className="cockpit-pill-emerald inline-flex h-6 w-6 items-center justify-center rounded-lg">
-                    <MemoryStick className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span className="cockpit-pill-emerald inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
+                    <MemoryStick className="h-3 w-3" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">{t('hardware.ram.title')}</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">{t('hardware.ram.title')}</span>
                   <span aria-hidden="true">·</span>
-                  <span className={ramTone.textClass}>{ramTone.label}</span>
+                  <span className={`shrink-0 text-[11px] ${ramTone.textClass}`}>{ramTone.label}</span>
                 </div>
-                <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
+                <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
                   <AnimatedMetricValue
                     value={ramPct}
                     decimals={1}
                     suffix=" %"
-                    className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white"
+                    className="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white"
                   />
-                  <span className="cockpit-pill-emerald rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                  <span className="cockpit-pill-emerald rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums">
                     {formatBytes(ramUsed)} / {formatBytes(ramTotal)}
                   </span>
                 </div>
-                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400">
                   {t('overview.ram_free_ready', { avail: formatBytes(metrics?.ram?.available_bytes) })}
                 </p>
               </div>
@@ -935,13 +935,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     chartKind: 'ram',
                   })
                 }
-                className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-emerald-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
+                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-emerald-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
               >
-                <Maximize2 className="h-4 w-4" />
+                <Maximize2 className="h-3.5 w-3.5" />
               </motion.button>
             </div>
 
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(2, Math.min(100, ramPct))}%` }}
@@ -951,12 +951,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-2.5">
             <TelemetryChart
               series={ramSeries}
               timestamps={timestamps}
               epochTs={epochTs}
-              height={160}
+              height={112}
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -985,33 +985,33 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.42, delay: 0.12, ease: COCKPIT_EASE }}
           whileHover={{ y: -2, transition: { duration: 0.2 } }}
-          className="cockpit-bento flex flex-col justify-between p-5"
+          className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                  <span className="cockpit-pill-violet inline-flex h-6 w-6 items-center justify-center rounded-lg">
-                    <Monitor className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span className="cockpit-pill-violet inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
+                    <Monitor className="h-3 w-3" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">{t('hardware.gpu.title')}</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">{t('hardware.gpu.title')}</span>
                   <span aria-hidden="true">·</span>
-                  <span className={gpuAvail ? gpuTone.textClass : 'text-slate-500 dark:text-slate-400'}>
+                  <span className={`shrink-0 text-[11px] ${gpuAvail ? gpuTone.textClass : 'text-slate-500 dark:text-slate-400'}`}>
                     {gpuAvail ? gpuTone.label : t('hardware.gpu.idle')}
                   </span>
                 </div>
-                <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
+                <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
                   <AnimatedMetricValue
                     value={gpuAvail ? gpuPct : 0}
                     decimals={gpuAvail ? 1 : 0}
                     suffix=" %"
-                    className="font-mono text-3xl font-bold tracking-tight text-slate-900 dark:text-white"
+                    className="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white"
                   />
-                  <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                  <span className="cockpit-pill-violet rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums">
                     {gpuAvail ? formatTemp(gpuTemp) : t('hardware.gpu.integrated_label')}
                   </span>
                 </div>
-                <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400">
                   {gpuAvail
                     ? `${metrics?.gpu?.name || t('hardware.gpu.short_title')}${
                         gpuVramTotal > 0
@@ -1037,13 +1037,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     chartKind: 'gpu',
                   })
                 }
-                className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-violet-300"
+                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-violet-300"
               >
-                <Maximize2 className="h-4 w-4" />
+                <Maximize2 className="h-3.5 w-3.5" />
               </motion.button>
             </div>
 
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(gpuAvail ? 2 : 0, Math.min(100, gpuPct))}%` }}
@@ -1053,12 +1053,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-2.5">
             <TelemetryChart
               series={gpuSeries}
               timestamps={timestamps}
               epochTs={epochTs}
-              height={160}
+              height={112}
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -1084,18 +1084,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.42, delay: 0.16, ease: COCKPIT_EASE }}
           whileHover={{ y: -2, transition: { duration: 0.2 } }}
-          className="cockpit-bento flex flex-col justify-between p-5"
+          className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                  <span className="cockpit-pill-cyan inline-flex h-6 w-6 items-center justify-center rounded-lg">
-                    <ArrowDownUp className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span className="cockpit-pill-cyan inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
+                    <ArrowDownUp className="h-3 w-3" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">{t('hardware.net.title')}</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">{t('hardware.net.title')}</span>
                   <span aria-hidden="true">·</span>
-                  <span className="text-emerald-600 dark:text-emerald-400">
+                  <span className="shrink-0 text-[11px] text-emerald-600 dark:text-emerald-400">
                     {activeInterfaces.length > 0
                       ? activeInterfaces.length === 1
                         ? t('hardware.net.active_link_single', { count: activeInterfaces.length })
@@ -1103,32 +1103,32 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       : t('hardware.net.active')}
                   </span>
                 </div>
-                <div className="mt-2.5 flex flex-wrap items-baseline gap-2.5">
-                  <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white sm:text-3xl">
+                <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
+                  <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white">
                     ↓ {formatSpeed(netRxBytes)}
                   </span>
-                  <span className="cockpit-pill-emerald rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                  <span className="cockpit-pill-emerald rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums">
                     ↑ {formatSpeed(netTxBytes)}
                   </span>
                 </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                  <span className="font-mono tabular-nums">
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span className="font-mono tabular-nums truncate">
                     {metrics?.net?.local_ip || activeInterfaces[0]?.ip || t('hardware.net.lan_tag')}
                     {activeInterfaces[0]?.name ? ` (${activeInterfaces.map((n) => n.name).slice(0, 2).join(', ')})` : ''}
                   </span>
                   <span aria-hidden="true">·</span>
-                  <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-2 w-2 rounded-full bg-[#0284c7]" /> {t('hardware.net.wan_download')}
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#0284c7]" /> {t('hardware.net.wan_download')}
                     </span>
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-2 w-2 rounded-full bg-[#10b981]" /> {t('hardware.net.wan_upload')}
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#10b981]" /> {t('hardware.net.wan_upload')}
                     </span>
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-2 w-2 rounded-full bg-[#6366f1]" /> {t('hardware.net.lan_download')}
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6366f1]" /> {t('hardware.net.lan_download')}
                     </span>
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-2 w-2 rounded-full bg-[#f59e0b]" /> {t('hardware.net.lan_upload')}
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#f59e0b]" /> {t('hardware.net.lan_upload')}
                     </span>
                   </span>
                 </div>
@@ -1148,13 +1148,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     chartKind: 'net',
                   })
                 }
-                className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
               >
-                <Maximize2 className="h-4 w-4" />
+                <Maximize2 className="h-3.5 w-3.5" />
               </motion.button>
             </div>
 
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{
@@ -1166,12 +1166,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-2.5">
             <TelemetryChart
               series={netSeries}
               timestamps={timestamps}
               epochTs={epochTs}
-              height={160}
+              height={112}
               leftUnit="MB/s"
               theme={theme}
               emptyMessage={t('hardware.net.recording_traffic')}

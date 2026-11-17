@@ -198,6 +198,16 @@
     animation: cockpitModalPop 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
+  /* Evita encadenar el scroll al documento de fondo al llegar al final de una ventana modal o desplegable */
+  html:has([aria-modal="true"]),
+  body:has([aria-modal="true"]) {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+  }
+  [aria-modal="true"] {
+    overscroll-behavior: contain;
+  }
+
   .cockpit-toast-enter {
     animation: cockpitToastIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
@@ -459,32 +469,32 @@
     padding-right: max(1.5rem, 2.5vw);
   }
 
-  /* Rejilla automática multi-columna para widgets con gráficas */
+  /* Rejilla automática multi-columna compacta y legible para widgets con gráficas */
   .cockpit-auto-grid {
-    --cockpit-grid-min: 315px;
+    --cockpit-grid-min: 245px;
     display: grid;
-    gap: 1rem;
+    gap: 0.75rem;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cockpit-grid-min)), 1fr));
     align-items: stretch;
   }
   @media (min-width: 1024px) {
     .cockpit-auto-grid {
-      --cockpit-grid-min: 360px;
-      gap: 1.125rem;
+      --cockpit-grid-min: 265px;
+      gap: 0.875rem;
     }
   }
 
   /* Rejilla automática multi-columna para tarjetas compactas de red, contenedores y dispositivos */
   .cockpit-auto-grid-cards {
-    --cockpit-card-min: 340px;
+    --cockpit-card-min: 280px;
     display: grid;
-    gap: 0.75rem;
+    gap: 0.625rem;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cockpit-card-min)), 1fr));
     align-items: stretch;
   }
   @media (min-width: 1280px) {
     .cockpit-auto-grid-cards {
-      --cockpit-card-min: 390px;
+      --cockpit-card-min: 310px;
     }
   }
 

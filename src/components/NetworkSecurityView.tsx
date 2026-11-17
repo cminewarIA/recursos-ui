@@ -23,7 +23,7 @@ import {
   Unlock,
   Wifi,
 } from 'lucide-react';
-import { COCKPIT_SPRING, MorphPill, ViewStage } from './MotionPrimitives';
+import { COCKPIT_EASE, COCKPIT_SPRING, MorphPill, ViewStage } from './MotionPrimitives';
 import { ExpandChartSpec } from './OverviewView';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
@@ -425,6 +425,15 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const [logoResults, setLogoResults] = useState<LogoSearchResult[]>([]);
   const [logoSaving, setLogoSaving] = useState(false);
 
+  useEffect(() => {
+    if (!logoModalClient) return;
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') setLogoModalClient(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [logoModalClient]);
+
   // Map & GeoIP
   const [mapContainerEl, setMapContainerEl] = useState<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -714,9 +723,30 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
   const handleStartSpeedtest = async () => {
     if (speedtestStatus?.running) return;
-    const res = await apiFetchJson<{ status?: SpeedTestStatus }>('/api/net/speedtest/run', { method: 'POST' });
+    const res = await apiFetchJson<{ ok?: boolean; running?: boolean; status?: SpeedTestStatus }>('/api/net/speedtest/run', { method: 'POST' });
     if (res.ok && res.data?.status) {
       setSpeedtestStatus(res.data.status);
+    } else if (res.ok && (res.data?.running || res.data?.ok)) {
+      setSpeedtestStatus((prev) => ({
+        ok: true,
+        running: true,
+        phase: 'ping',
+        progress_pct: 6,
+        current_mbps: 0,
+        ping_ms: prev?.ping_ms ?? 0,
+        jitter_ms: prev?.jitter_ms ?? 0,
+        packet_loss_pct: prev?.packet_loss_pct ?? 0,
+        download_mbps: 0,
+        upload_mbps: 0,
+        server_name: prev?.server_name ?? '',
+        server_host: prev?.server_host ?? '',
+        server_location: prev?.server_location ?? '',
+        client_ip: prev?.client_ip ?? '',
+        isp: prev?.isp ?? '',
+        scope: prev?.scope ?? 'wan',
+        error: '',
+      }));
+      void loadSpeedtestData(false);
     } else {
       onNotify(res.error || t('status.signal_error'), true);
     }
@@ -2769,17 +2799,19 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0.16, ease: COCKPIT_EASE } }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+            data-cockpit-scroll-contain="true"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm overscroll-contain"
             onClick={() => setLogoModalClient(null)}
           >
             <motion.div
               role="dialog"
               aria-modal="true"
+              data-cockpit-scroll-contain="true"
               initial={{ opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.16, ease: COCKPIT_EASE } }}
               transition={COCKPIT_SPRING}
               className="cockpit-bento cockpit-modal-enter w-full max-w-md p-5"
               onClick={(e) => e.stopPropagation()}
@@ -2805,7 +2837,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 placeholder={t('network.search_brand')}
                 className="cockpit-subtile mt-3 min-h-[42px] w-full px-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
               />
-              <div className="mt-3 grid max-h-60 grid-cols-3 gap-2 overflow-y-auto">
+              <div className="mt-3 grid max-h-60 grid-cols-3 gap-2 overflow-y-auto overscroll-contain">
                 {logoResults.map((res, idx) => (
                   <button
                     key={`${res.logo_url}-${idx}`}

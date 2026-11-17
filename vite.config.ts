@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { exec, execSync } from 'child_process';
+import { exec, execSync, spawn } from 'child_process';
+import crypto from 'crypto';
 import dns from 'dns';
 import fs from 'fs';
 import http from 'http';
@@ -1849,50 +1850,192 @@ const speedtestState = {
   last_result: null as SpeedTestResultEntry | null,
 };
 
-function fetchUrlBytes(targetUrl: string, method: 'GET' | 'POST' = 'GET', bodyBuf?: Buffer, timeoutMs = 4500): Promise<{ ok: boolean; bytes: number; headers: http.IncomingHttpHeaders; ms: number }> {
+const SPEEDTEST_HTTP_HEADERS: Record<string, string> = {
+  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  Referer: 'https://www.speedtest.net/',
+  Accept: 'application/json,text/plain,*/*',
+};
+
+function fetchUrlBytes(
+  targetUrl: string,
+  method: 'GET' | 'POST' = 'GET',
+  bodyBuf?: Buffer,
+  timeoutMs = 4500,
+  onChunk?: (chunkLen: number) => void,
+  deadlineMs?: number,
+  extraHeaders?: Record<string, string>
+): Promise<{ ok: boolean; bytes: number; headers: http.IncomingHttpHeaders; ms: number; text?: string }> {
   return new Promise((resolve) => {
     const t0 = performance.now();
     const isHttps = targetUrl.startsWith('https://');
     const mod = isHttps ? https : http;
+    let settled = false;
+    const finish = (ok: boolean, bytes: number, headers: http.IncomingHttpHeaders, text?: string) => {
+      if (settled) return;
+      settled = true;
+      resolve({ ok, bytes, headers, ms: Math.max(0.1, performance.now() - t0), text });
+    };
     try {
-      const req = mod.request(
-        targetUrl,
-        {
-          method,
-          timeout: timeoutMs,
-          headers: bodyBuf
-            ? {
-                'Content-Type': 'application/octet-stream',
-                'Content-Length': bodyBuf.byteLength,
-                'User-Agent': `RecursosCockpit/${readAppVersion()}`,
-              }
-            : { 'User-Agent': `RecursosCockpit/${readAppVersion()}` },
-        },
-        (res) => {
-          let totalBytes = 0;
-          res.on('data', (chunk: Buffer) => {
-            totalBytes += chunk.byteLength;
-          });
-          res.on('end', () => {
-            resolve({
-              ok: (res.statusCode || 500) < 400,
-              bytes: totalBytes,
-              headers: res.headers,
-              ms: Math.max(0.1, performance.now() - t0),
-            });
-          });
-        }
-      );
-      req.on('error', () => resolve({ ok: false, bytes: 0, headers: {}, ms: Math.max(0.1, performance.now() - t0) }));
+      const hdrs: Record<string, string | number> = {
+        ...SPEEDTEST_HTTP_HEADERS,
+        ...(extraHeaders || {}),
+      };
+      if (bodyBuf) {
+        hdrs['Content-Type'] = 'application/octet-stream';
+        hdrs['Content-Length'] = bodyBuf.byteLength;
+      }
+      const req = mod.request(targetUrl, { method, timeout: timeoutMs, headers: hdrs }, (res) => {
+        let totalBytes = 0;
+        const textChunks: Buffer[] = [];
+        const collectText = !onChunk;
+        res.on('data', (chunk: Buffer) => {
+          totalBytes += chunk.byteLength;
+          if (onChunk) onChunk(chunk.byteLength);
+          else if (collectText && totalBytes <= 512 * 1024) textChunks.push(chunk);
+          if (deadlineMs && performance.now() >= deadlineMs) {
+            req.destroy();
+            finish((res.statusCode || 500) < 400, totalBytes, res.headers);
+          }
+        });
+        res.on('end', () => {
+          finish(
+            (res.statusCode || 500) < 400,
+            totalBytes,
+            res.headers,
+            collectText ? Buffer.concat(textChunks).toString('utf-8') : undefined
+          );
+        });
+      });
+      req.on('error', () => finish(false, 0, {}));
       req.on('timeout', () => {
         req.destroy();
-        resolve({ ok: false, bytes: 0, headers: {}, ms: Math.max(0.1, performance.now() - t0) });
+        finish(false, 0, {});
       });
       if (bodyBuf) req.write(bodyBuf);
       req.end();
     } catch {
-      resolve({ ok: false, bytes: 0, headers: {}, ms: 0 });
+      finish(false, 0, {});
     }
+  });
+}
+
+function tryRunOoklaCliDev(): Promise<{
+  download_mbps: number;
+  upload_mbps: number;
+  ping_ms: number;
+  jitter_ms: number;
+  packet_loss_pct: number;
+  server_name: string;
+  server_host: string;
+  server_location: string;
+  client_ip: string;
+  isp: string;
+} | null> {
+  return new Promise((resolve) => {
+    let binPath = '';
+    try {
+      binPath = execSync('which speedtest', { encoding: 'utf-8', timeout: 1500, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      const ver = execSync(`"${binPath}" --version`, { encoding: 'utf-8', timeout: 2500, stdio: ['ignore', 'pipe', 'pipe'] });
+      if (!ver.toLowerCase().includes('ookla')) binPath = '';
+    } catch {
+      binPath = '';
+    }
+    if (!binPath) {
+      resolve(null);
+      return;
+    }
+    const child = spawn(binPath, ['--accept-license', '--accept-gdpr', '--progress=yes', '--format=jsonl']);
+    let buf = '';
+    let result: {
+      download_mbps: number;
+      upload_mbps: number;
+      ping_ms: number;
+      jitter_ms: number;
+      packet_loss_pct: number;
+      server_name: string;
+      server_host: string;
+      server_location: string;
+      client_ip: string;
+      isp: string;
+    } | null = null;
+    const killTimer = setTimeout(() => {
+      try {
+        child.kill();
+      } catch {
+        // ignore
+      }
+      resolve(null);
+    }, 45000);
+    child.stdout.on('data', (d: Buffer) => {
+      buf += d.toString('utf-8');
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('{')) continue;
+        try {
+          const evt = JSON.parse(trimmed) as Record<string, unknown>;
+          const tp = String(evt.type || '');
+          if (tp === 'testStart') {
+            const srv = (evt.server as Record<string, unknown>) || {};
+            const iface = (evt.interface as Record<string, unknown>) || {};
+            speedtestState.server_name = `Speedtest · ${String(srv.name || 'Ookla')}`;
+            speedtestState.server_host = String(srv.host || 'speedtest.net');
+            speedtestState.server_location = [srv.location, srv.country].filter(Boolean).join(', ');
+            speedtestState.isp = String(evt.isp || speedtestState.isp || '');
+            speedtestState.client_ip = String(iface.externalIp || speedtestState.client_ip || '');
+          } else if (tp === 'ping') {
+            const p = (evt.ping as Record<string, unknown>) || {};
+            speedtestState.phase = 'ping';
+            speedtestState.ping_ms = Math.round(Number(p.latency || 0) * 100) / 100;
+            speedtestState.jitter_ms = Math.round(Number(p.jitter || 0) * 100) / 100;
+            speedtestState.progress_pct = Math.max(8, Math.min(20, 8 + Math.round(Number(p.progress || 0) * 12)));
+          } else if (tp === 'download') {
+            const dl = (evt.download as Record<string, unknown>) || {};
+            const mbps = Math.round(((Number(dl.bandwidth || 0) * 8) / 1_000_000) * 100) / 100;
+            speedtestState.phase = 'download';
+            speedtestState.current_mbps = mbps;
+            speedtestState.download_mbps = mbps;
+            speedtestState.progress_pct = Math.max(22, Math.min(60, 22 + Math.round(Number(dl.progress || 0) * 38)));
+          } else if (tp === 'upload') {
+            const ul = (evt.upload as Record<string, unknown>) || {};
+            const mbps = Math.round(((Number(ul.bandwidth || 0) * 8) / 1_000_000) * 100) / 100;
+            speedtestState.phase = 'upload';
+            speedtestState.current_mbps = mbps;
+            speedtestState.upload_mbps = mbps;
+            speedtestState.progress_pct = Math.max(62, Math.min(96, 62 + Math.round(Number(ul.progress || 0) * 34)));
+          } else if (tp === 'result') {
+            const p = (evt.ping as Record<string, unknown>) || {};
+            const dl = (evt.download as Record<string, unknown>) || {};
+            const ul = (evt.upload as Record<string, unknown>) || {};
+            const srv = (evt.server as Record<string, unknown>) || {};
+            const iface = (evt.interface as Record<string, unknown>) || {};
+            result = {
+              download_mbps: Math.round(((Number(dl.bandwidth || 0) * 8) / 1_000_000) * 100) / 100,
+              upload_mbps: Math.round(((Number(ul.bandwidth || 0) * 8) / 1_000_000) * 100) / 100,
+              ping_ms: Math.round(Number(p.latency || 0) * 100) / 100,
+              jitter_ms: Math.round(Number(p.jitter || 0) * 100) / 100,
+              packet_loss_pct: Math.round(Number(evt.packetLoss || 0) * 10) / 10,
+              server_name: `Speedtest · ${String(srv.name || 'Ookla')}`,
+              server_host: String(srv.host || 'speedtest.net'),
+              server_location: [srv.location, srv.country].filter(Boolean).join(', '),
+              client_ip: String(iface.externalIp || ''),
+              isp: String(evt.isp || ''),
+            };
+          }
+        } catch {
+          // ignore partial JSONL line
+        }
+      }
+    });
+    child.on('error', () => {
+      clearTimeout(killTimer);
+      resolve(null);
+    });
+    child.on('close', (code) => {
+      clearTimeout(killTimer);
+      resolve(code === 0 ? result : null);
+    });
   });
 }
 
@@ -1920,104 +2063,222 @@ async function runDevSpeedtestWorker(localBaseUrl: string) {
 
   try {
     const netSnap = sampleRealNetwork();
-    let wanReachable = false;
     let serverName = os.hostname();
     let serverHost = '127.0.0.1';
     let serverLocation = '';
-    const clientIp = serverSelfGeo?.ip || netSnap.local_ip || '127.0.0.1';
-    const ispName = serverSelfGeo?.isp || serverSelfGeo?.org || '';
+    let clientIp = serverSelfGeo?.ip || netSnap.local_ip || '127.0.0.1';
+    let ispName = serverSelfGeo?.isp || serverSelfGeo?.org || '';
     if (serverSelfGeo?.city || serverSelfGeo?.country) {
       serverLocation = [serverSelfGeo.city, serverSelfGeo.country].filter(Boolean).join(', ');
     }
 
-    const probe = await fetchUrlBytes('https://speed.cloudflare.com/__down?bytes=65536', 'GET', undefined, 3000);
-    if (probe.ok && probe.bytes > 0) {
-      wanReachable = true;
-      const cfRay = String(probe.headers['cf-ray'] || '');
-      const colo = cfRay.includes('-') ? cfRay.split('-').pop() || '' : '';
-      serverName = colo ? `Cloudflare Edge (${colo})` : 'Cloudflare Speed Edge';
-      serverHost = 'speed.cloudflare.com';
-      if (colo && !serverLocation) serverLocation = colo;
-    }
-
-    const scope: 'wan' | 'local_node' = wanReachable ? 'wan' : 'local_node';
-    const localPayloadUrl = `${localBaseUrl}/api/net/speedtest/payload`;
-
-    // 1. Ping & Jitter
-    const pingSamples: number[] = [];
-    let pingFails = 0;
-    for (let i = 0; i < 6; i++) {
-      const pUrl = wanReachable ? 'https://speed.cloudflare.com/__down?bytes=1024' : `${localPayloadUrl}?bytes=1024`;
-      const res = await fetchUrlBytes(pUrl, 'GET', undefined, 2500);
-      if (res.ok) pingSamples.push(res.ms);
-      else pingFails++;
-      speedtestState.progress_pct = 8 + Math.round(((i + 1) / 6) * 12);
-    }
-    const sortedPings = [...pingSamples].sort((a, b) => a - b);
-    const pingMs = sortedPings.length ? Math.round(sortedPings[Math.floor(sortedPings.length / 2)] * 100) / 100 : 0;
+    let downloadMbps = 0;
+    let uploadMbps = 0;
+    let pingMs = 0;
     let jitterMs = 0;
-    if (pingSamples.length >= 2) {
-      let diffSum = 0;
-      for (let i = 1; i < pingSamples.length; i++) diffSum += Math.abs(pingSamples[i] - pingSamples[i - 1]);
-      jitterMs = Math.round((diffSum / (pingSamples.length - 1)) * 100) / 100;
+    let lossPct = 0;
+    let scope: 'wan' | 'local_node' = 'wan';
+
+    const ooklaCli = await tryRunOoklaCliDev();
+    if (ooklaCli) {
+      downloadMbps = ooklaCli.download_mbps;
+      uploadMbps = ooklaCli.upload_mbps;
+      pingMs = ooklaCli.ping_ms;
+      jitterMs = ooklaCli.jitter_ms;
+      lossPct = ooklaCli.packet_loss_pct;
+      serverName = ooklaCli.server_name;
+      serverHost = ooklaCli.server_host;
+      serverLocation = ooklaCli.server_location || serverLocation;
+      clientIp = ooklaCli.client_ip || clientIp;
+      ispName = ooklaCli.isp || ispName;
+      scope = 'wan';
+    } else {
+      // Built-in Speedtest.net protocol (servers -> latency.txt -> multi-stream download -> multi-stream upload)
+      const cfgResp = await fetchUrlBytes('https://www.speedtest.net/speedtest-config.php', 'GET', undefined, 2500);
+      if (cfgResp.ok && cfgResp.text) {
+        const ipMatch = cfgResp.text.match(/<client[^>]*\sip="([^"]+)"/);
+        const ispMatch = cfgResp.text.match(/<client[^>]*\sisp="([^"]+)"/);
+        if (ipMatch?.[1]) clientIp = ipMatch[1];
+        if (ispMatch?.[1]) ispName = ispMatch[1];
+      }
+
+      let stServers: Array<{ url?: string; sponsor?: string; name?: string; country?: string; https_functional?: number | boolean }> = [];
+      for (const apiUrl of [
+        'https://www.speedtest.net/api/js/servers?engine=js&https_functional=true&limit=8',
+        'https://www.speedtest.net/api/js/servers?engine=js&limit=8',
+      ]) {
+        const sr = await fetchUrlBytes(apiUrl, 'GET', undefined, 3500);
+        if (sr.ok && sr.text) {
+          try {
+            const parsed = JSON.parse(sr.text);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              stServers = parsed;
+              break;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      let selectedBase = '';
+      let selectedUploadUrl = '';
+      let wanProvider = null as 'speedtest' | 'cloudflare' | null;
+      let bestProbeMs = Infinity;
+
+      for (const srv of stServers.slice(0, 6)) {
+        const rawUp = String(srv.url || '').trim();
+        if (!rawUp || !rawUp.includes('/')) continue;
+        const candidates: string[] = [rawUp];
+        if (rawUp.startsWith('http://') && srv.https_functional) {
+          candidates.unshift(`https://${rawUp.slice(7)}`);
+        }
+        for (const upCand of candidates) {
+          const baseCand = upCand.slice(0, upCand.lastIndexOf('/'));
+          const pr = await fetchUrlBytes(`${baseCand}/latency.txt?x=${Date.now()}`, 'GET', undefined, 2000);
+          if (pr.ok && pr.ms < bestProbeMs) {
+            bestProbeMs = pr.ms;
+            selectedBase = baseCand;
+            selectedUploadUrl = upCand;
+            wanProvider = 'speedtest';
+            const sponsor = String(srv.sponsor || srv.name || 'Speedtest.net');
+            serverName = `Speedtest · ${sponsor}`;
+            try {
+              serverHost = new URL(upCand).hostname || 'speedtest.net';
+            } catch {
+              serverHost = 'speedtest.net';
+            }
+            const loc = [srv.name, srv.country].filter(Boolean).join(', ');
+            if (loc) serverLocation = loc;
+            break;
+          }
+        }
+      }
+
+      if (!wanProvider) {
+        const cfProbe = await fetchUrlBytes('https://speed.cloudflare.com/__down?bytes=32768', 'GET', undefined, 2500);
+        if (cfProbe.ok && cfProbe.bytes > 0) {
+          wanProvider = 'cloudflare';
+          const cfRay = String(cfProbe.headers['cf-ray'] || '');
+          const colo = cfRay.includes('-') ? cfRay.split('-').pop() || '' : '';
+          serverName = colo ? `Cloudflare Edge (${colo})` : 'Cloudflare Speed Edge';
+          serverHost = 'speed.cloudflare.com';
+        }
+      }
+
+      const resolvedProvider: 'speedtest' | 'cloudflare' | null = wanProvider;
+      scope = resolvedProvider ? 'wan' : 'local_node';
+      const localPayloadUrl = `${localBaseUrl}/api/net/speedtest/payload`;
+
+      // 1. Ping & Jitter
+      const pingSamples: number[] = [];
+      let pingFails = 0;
+      for (let i = 0; i < 6; i++) {
+        const pUrl =
+          resolvedProvider === 'speedtest'
+            ? `${selectedBase}/latency.txt?r=${i}_${Date.now()}`
+            : resolvedProvider === 'cloudflare'
+              ? 'https://speed.cloudflare.com/__down?bytes=1024'
+              : `${localPayloadUrl}?bytes=1024`;
+        const res = await fetchUrlBytes(pUrl, 'GET', undefined, 2500);
+        if (res.ok) pingSamples.push(res.ms);
+        else pingFails++;
+        speedtestState.progress_pct = 8 + Math.round(((i + 1) / 6) * 12);
+      }
+      const sortedPings = [...pingSamples].sort((a, b) => a - b);
+      pingMs = sortedPings.length ? Math.round(sortedPings[Math.floor(sortedPings.length / 2)] * 100) / 100 : 0;
+      if (pingSamples.length >= 2) {
+        let diffSum = 0;
+        for (let i = 1; i < pingSamples.length; i++) diffSum += Math.abs(pingSamples[i] - pingSamples[i - 1]);
+        jitterMs = Math.round((diffSum / (pingSamples.length - 1)) * 100) / 100;
+      }
+      lossPct = Math.round((pingFails / 6) * 1000) / 10;
+
+      Object.assign(speedtestState, {
+        phase: 'download',
+        progress_pct: 22,
+        ping_ms: pingMs,
+        jitter_ms: jitterMs,
+        packet_loss_pct: lossPct,
+        server_name: serverName,
+        server_host: serverHost,
+        server_location: serverLocation,
+        client_ip: clientIp,
+        isp: ispName,
+        scope,
+      });
+
+      // 2. Multi-stream Download Mbps
+      let dlBytesTotal = 0;
+      const dlT0 = performance.now();
+      const dlWindowMs = resolvedProvider ? 5000 : 2200;
+      const dlDeadline = dlT0 + dlWindowMs;
+      const runDlStream = async (idx: number) => {
+        const urls =
+          resolvedProvider === 'speedtest'
+            ? [`${selectedBase}/random2000x2000.jpg?x=${idx}`, `${selectedBase}/random3000x3000.jpg?x=${idx}`]
+            : resolvedProvider === 'cloudflare'
+              ? ['https://speed.cloudflare.com/__down?bytes=8000000']
+              : [`${localPayloadUrl}?bytes=16000000`];
+        for (let ui = 0; ui < urls.length; ui++) {
+          if (performance.now() >= dlDeadline) break;
+          await fetchUrlBytes(
+            `${urls[ui]}&t=${Date.now()}_${ui}`,
+            'GET',
+            undefined,
+            6000,
+            (n) => {
+              dlBytesTotal += n;
+              const elSec = Math.max(0.05, (performance.now() - dlT0) / 1000);
+              const liveDl = Math.round(((dlBytesTotal * 8) / (elSec * 1_000_000)) * 100) / 100;
+              speedtestState.current_mbps = liveDl;
+              speedtestState.download_mbps = liveDl;
+              speedtestState.progress_pct = Math.min(60, 22 + Math.round((Math.min(dlWindowMs, performance.now() - dlT0) / dlWindowMs) * 38));
+            },
+            dlDeadline
+          );
+        }
+      };
+      await Promise.all([runDlStream(0), runDlStream(1), runDlStream(2)]);
+      const dlElapsedSec = Math.max(0.05, (performance.now() - dlT0) / 1000);
+      downloadMbps = Math.round(((dlBytesTotal * 8) / (dlElapsedSec * 1_000_000)) * 100) / 100;
+
+      Object.assign(speedtestState, {
+        phase: 'upload',
+        progress_pct: 62,
+        download_mbps: downloadMbps,
+        current_mbps: 0,
+      });
+
+      // 3. Multi-stream Upload Mbps
+      const ulBuf = resolvedProvider ? crypto.randomBytes(512 * 1024) : Buffer.alloc(4 * 1024 * 1024);
+      let ulBytesTotal = 0;
+      const ulT0 = performance.now();
+      const ulWindowMs = resolvedProvider ? 4200 : 2000;
+      const ulDeadline = ulT0 + ulWindowMs;
+      const runUlStream = async () => {
+        const uUrl =
+          resolvedProvider === 'speedtest'
+            ? selectedUploadUrl
+            : resolvedProvider === 'cloudflare'
+              ? 'https://speed.cloudflare.com/__up'
+              : localPayloadUrl;
+        for (let i = 0; i < 8; i++) {
+          if (performance.now() >= ulDeadline) break;
+          const r = await fetchUrlBytes(uUrl, 'POST', ulBuf, 4500);
+          if (!r.ok) break;
+          ulBytesTotal += ulBuf.byteLength;
+          const elSec = Math.max(0.05, (performance.now() - ulT0) / 1000);
+          const liveUl = Math.round(((ulBytesTotal * 8) / (elSec * 1_000_000)) * 100) / 100;
+          speedtestState.current_mbps = liveUl;
+          speedtestState.upload_mbps = liveUl;
+          speedtestState.progress_pct = Math.min(96, 62 + Math.round((Math.min(ulWindowMs, performance.now() - ulT0) / ulWindowMs) * 34));
+        }
+      };
+      await Promise.all([runUlStream(), runUlStream()]);
+      const ulElapsedSec = Math.max(0.05, (performance.now() - ulT0) / 1000);
+      uploadMbps = Math.round(((ulBytesTotal * 8) / (ulElapsedSec * 1_000_000)) * 100) / 100;
     }
-    const lossPct = Math.round((pingFails / 6) * 1000) / 10;
-
-    Object.assign(speedtestState, {
-      phase: 'download',
-      progress_pct: 22,
-      ping_ms: pingMs,
-      jitter_ms: jitterMs,
-      packet_loss_pct: lossPct,
-      server_name: serverName,
-      server_host: serverHost,
-      server_location: serverLocation,
-      client_ip: clientIp,
-      isp: ispName,
-      scope,
-    });
-
-    // 2. Download Mbps
-    const dlSizes = wanReachable ? [8_000_000, 12_000_000] : [16_000_000, 16_000_000];
-    let dlBytesTotal = 0;
-    const dlT0 = performance.now();
-    for (let i = 0; i < dlSizes.length; i++) {
-      const sz = dlSizes[i];
-      const dUrl = wanReachable ? `https://speed.cloudflare.com/__down?bytes=${sz}` : `${localPayloadUrl}?bytes=${sz}`;
-      const r = await fetchUrlBytes(dUrl, 'GET', undefined, 12000);
-      dlBytesTotal += r.bytes;
-      const elSec = Math.max(0.05, (performance.now() - dlT0) / 1000);
-      const liveDl = Math.round(((dlBytesTotal * 8) / (elSec * 1_000_000)) * 100) / 100;
-      speedtestState.current_mbps = liveDl;
-      speedtestState.download_mbps = liveDl;
-      speedtestState.progress_pct = 22 + Math.round(((i + 1) / dlSizes.length) * 38);
-    }
-    const dlElapsedSec = Math.max(0.05, (performance.now() - dlT0) / 1000);
-    const downloadMbps = Math.round(((dlBytesTotal * 8) / (dlElapsedSec * 1_000_000)) * 100) / 100;
-
-    Object.assign(speedtestState, {
-      phase: 'upload',
-      progress_pct: 62,
-      download_mbps: downloadMbps,
-      current_mbps: 0,
-    });
-
-    // 3. Upload Mbps
-    const ulBuf = Buffer.alloc(wanReachable ? 2_500_000 : 8_000_000);
-    let ulBytesTotal = 0;
-    const ulT0 = performance.now();
-    for (let i = 0; i < 2; i++) {
-      const uUrl = wanReachable ? 'https://speed.cloudflare.com/__up' : localPayloadUrl;
-      const r = await fetchUrlBytes(uUrl, 'POST', ulBuf, 12000);
-      if (r.ok) ulBytesTotal += ulBuf.byteLength;
-      const elSec = Math.max(0.05, (performance.now() - ulT0) / 1000);
-      const liveUl = Math.round(((ulBytesTotal * 8) / (elSec * 1_000_000)) * 100) / 100;
-      speedtestState.current_mbps = liveUl;
-      speedtestState.upload_mbps = liveUl;
-      speedtestState.progress_pct = 62 + Math.round(((i + 1) / 2) * 34);
-    }
-    const ulElapsedSec = Math.max(0.05, (performance.now() - ulT0) / 1000);
-    const uploadMbps = Math.round(((ulBytesTotal * 8) / (ulElapsedSec * 1_000_000)) * 100) / 100;
 
     const nowTs = Math.round((Date.now() / 1000) * 1000) / 1000;
     const dObj = new Date(nowTs * 1000);
@@ -2052,6 +2313,15 @@ async function runDevSpeedtestWorker(localBaseUrl: string) {
       current_mbps: uploadMbps,
       download_mbps: downloadMbps,
       upload_mbps: uploadMbps,
+      ping_ms: pingMs,
+      jitter_ms: jitterMs,
+      packet_loss_pct: lossPct,
+      server_name: serverName,
+      server_host: serverHost,
+      server_location: serverLocation,
+      client_ip: clientIp,
+      isp: ispName,
+      scope,
       completed_at: nowTs,
       last_result: entry,
     });

@@ -552,6 +552,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   <AnimatePresence>
                     {langPickerOpen && (
                       <motion.div
+                        data-cockpit-scroll-contain="true"
                         initial={{ opacity: 0, y: 6, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 4, scale: 0.98 }}
@@ -573,11 +574,11 @@ export const MoreView: React.FC<MoreViewProps> = ({
                         <div
                           role="listbox"
                           aria-label={t('more.language_label')}
-                          className="mt-2 max-h-64 space-y-1 overflow-y-auto pr-0.5"
+                          className="mt-2 max-h-64 space-y-1 overflow-y-auto overscroll-contain pr-0.5"
                         >
                           {filteredLocales.length === 0 ? (
                             <p className="py-5 text-center text-xs text-slate-500 dark:text-slate-400">
-                              {t('more.language_no_results')}
+                              {t('more.language_no_results', { query: langSearch })}
                             </p>
                           ) : (
                             filteredLocales.map((loc) => {

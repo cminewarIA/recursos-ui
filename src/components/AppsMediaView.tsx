@@ -93,7 +93,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <LayoutGroup id="apps-subtabs">
-          <div className="cockpit-segmented flex items-center gap-1.5 p-1.5">
+          <div className="cockpit-segmented flex max-w-full items-center gap-1.5 overflow-x-auto p-1.5 no-scrollbar">
           {subTabs.map((tab) => {
             const active = subTab === tab.id;
             return (
@@ -102,7 +102,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setSubTab(tab.id)}
-                className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+                className={`relative inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
                   active
                     ? 'text-sky-700 dark:text-sky-300'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'

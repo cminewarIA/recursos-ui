@@ -227,6 +227,75 @@ export function App() {
     return () => document.removeEventListener('focusin', handleFocusIn);
   }, []);
 
+  // Close shutdown confirmation dialog on Escape
+  useEffect(() => {
+    if (!confirmShutdownClient) return;
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') setConfirmShutdownClient(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [confirmShutdownClient]);
+
+  // Prevent mouse-wheel scroll chaining to the background document when an open modal or scrollable popover reaches its boundary
+  useEffect(() => {
+    const normalizeDeltaY = (ev: WheelEvent): number => {
+      if (ev.deltaMode === 1) return ev.deltaY * 16;
+      if (ev.deltaMode === 2) return ev.deltaY * window.innerHeight;
+      return ev.deltaY;
+    };
+
+    const canElScrollY = (el: HTMLElement, dy: number): boolean => {
+      if (el.scrollHeight <= el.clientHeight + 1) return false;
+      const oy = window.getComputedStyle(el).overflowY;
+      if (oy !== 'auto' && oy !== 'scroll' && oy !== 'overlay') return false;
+      if (dy > 0) return el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+      if (dy < 0) return el.scrollTop > 0;
+      return false;
+    };
+
+    const handleWheel = (ev: WheelEvent) => {
+      const target = ev.target instanceof Element ? ev.target : null;
+      const hasOpenModal = Boolean(document.querySelector('[aria-modal="true"]'));
+      const containRoot = target
+        ? (target.closest('[data-cockpit-scroll-contain="true"], [aria-modal="true"]') as HTMLElement | null)
+        : null;
+
+      if (!hasOpenModal && !containRoot) return;
+
+      const dy = normalizeDeltaY(ev);
+
+      // If an aria-modal is open and wheel lands outside any modal dialog, block background scroll
+      if (hasOpenModal && (!target || !target.closest('[aria-modal="true"]'))) {
+        ev.preventDefault();
+        return;
+      }
+
+      if (dy === 0) return;
+
+      const boundary =
+        (target?.closest('[aria-modal="true"]') as HTMLElement | null) ??
+        containRoot;
+
+      if (!boundary) return;
+
+      let cur: HTMLElement | null = target as HTMLElement | null;
+      while (cur) {
+        if (canElScrollY(cur, dy)) {
+          return;
+        }
+        if (cur === boundary) break;
+        cur = cur.parentElement;
+      }
+
+      // Reached boundary of modal or floating scrollable popover: block chaining to background page
+      ev.preventDefault();
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
+
   // Register current browser/native session periodically on first mount
   useEffect(() => {
     const env = detectNativeEnvironment();
@@ -864,7 +933,7 @@ export function App() {
           <LayoutGroup id="dock-nav">
             <nav
               aria-label={t('nav.bottom_aria')}
-              className="cockpit-dock pointer-events-auto grid w-full max-w-[540px] grid-cols-5 items-center gap-1 p-1.5"
+              className="cockpit-dock pointer-events-auto grid w-full max-w-[560px] grid-cols-5 items-stretch gap-0.5 sm:gap-1 p-1.5"
             >
               {navItems.map((item) => {
                 const active = activeTab === item.id;
@@ -873,8 +942,9 @@ export function App() {
                     whileTap={{ scale: 0.94 }}
                     key={item.id}
                     type="button"
+                    title={item.label}
                     onClick={() => navigateTo(item.id)}
-                    className={`relative flex min-h-[46px] min-w-[44px] flex-col items-center justify-center gap-0.5 rounded-[14px] px-1 transition-colors ${
+                    className={`relative flex min-h-[48px] min-w-0 w-full flex-col items-center justify-center gap-0.5 rounded-[14px] px-0.5 sm:px-1.5 py-1 transition-colors ${
                       active
                         ? 'text-sky-700 dark:text-sky-300 font-semibold'
                         : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
@@ -882,13 +952,13 @@ export function App() {
                   >
                     {active && <MorphPill layoutId="dock-active-pill" className="rounded-[14px]" />}
                     <motion.span
-                      animate={{ scale: active ? 1.1 : 1, y: active ? -1 : 0 }}
+                      animate={{ scale: active ? 1.08 : 1, y: active ? -1 : 0 }}
                       transition={COCKPIT_SPRING}
-                      className="relative z-10 inline-flex"
+                      className="relative z-10 inline-flex shrink-0"
                     >
                       {item.icon}
                     </motion.span>
-                    <span className="relative z-10 text-[11px] font-semibold tracking-tight whitespace-nowrap">
+                    <span className="relative z-10 w-full max-w-full text-center text-[9.5px] sm:text-[11px] font-semibold leading-[1.1] sm:leading-tight tracking-tight line-clamp-2 break-words sm:whitespace-nowrap sm:truncate">
                       {item.label}
                     </span>
                   </motion.button>
@@ -916,17 +986,19 @@ export function App() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.16, ease: COCKPIT_EASE } }}
               transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+              data-cockpit-scroll-contain="true"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm overscroll-contain"
               onClick={() => setConfirmShutdownClient(null)}
             >
               <motion.div
                 role="dialog"
                 aria-modal="true"
+                data-cockpit-scroll-contain="true"
                 initial={{ opacity: 0, scale: 0.94, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                exit={{ opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.16, ease: COCKPIT_EASE } }}
                 transition={COCKPIT_SPRING}
                 className="cockpit-bento cockpit-modal-enter w-full max-w-sm p-5"
                 onClick={(e) => e.stopPropagation()}

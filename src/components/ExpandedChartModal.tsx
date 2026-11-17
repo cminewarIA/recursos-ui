@@ -11,7 +11,7 @@ import {
   Rewind,
   X,
 } from 'lucide-react';
-import { COCKPIT_SPRING, MorphPill } from './MotionPrimitives';
+import { COCKPIT_EASE, COCKPIT_SPRING, MorphPill } from './MotionPrimitives';
 import { ChartSeries, TelemetryChart } from './TelemetryChart';
 import { ExpandChartSpec } from './OverviewView';
 import { ResourceProcessesPanel } from './ResourceProcessesPanel';
@@ -162,6 +162,18 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         window.clearTimeout(sliderDebounceRef.current);
       }
     };
+  }, []);
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Cerrar inspección táctil con Escape (sin re-suscribir durante actualizaciones en vivo)
+  useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') onCloseRef.current();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   const oldestTs = metaBounds.oldestTs;
@@ -619,20 +631,22 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-5 backdrop-blur-sm"
+      exit={{ opacity: 0, transition: { duration: 0.16, ease: COCKPIT_EASE } }}
+      transition={{ duration: 0.18 }}
+      data-cockpit-scroll-contain="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-5 backdrop-blur-sm overscroll-contain"
       onClick={onClose}
     >
       <motion.div
         role="dialog"
         aria-modal="true"
         aria-label={spec.title}
+        data-cockpit-scroll-contain="true"
         initial={{ opacity: 0, scale: 0.94, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        exit={{ opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.16, ease: COCKPIT_EASE } }}
         transition={COCKPIT_SPRING}
-        className="cockpit-bento cockpit-modal-enter w-full max-w-6xl max-h-[94vh] overflow-y-auto p-4 sm:p-5"
+        className="cockpit-bento cockpit-modal-enter w-full max-w-6xl max-h-[94vh] overflow-y-auto overscroll-contain p-4 sm:p-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera */}
