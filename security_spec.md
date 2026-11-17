@@ -2,11 +2,11 @@
 
 ## 1. Data Invariants
 
-1. **Workspace Ownership & Verified Identity**: Every user-scoped resource under `/users/{userId}` and its subcollections (`private`, `preferences`, `speedtests`, `nodes`) requires `request.auth != null && request.auth.uid == userId` and `request.auth.token.email_verified == true` for all writes.
-2. **Master Gate Parent Integrity**: No document inside `/users/{userId}/private`, `/users/{userId}/preferences`, `/users/{userId}/speedtests`, or `/users/{userId}/nodes` can exist unless the parent workspace `/users/{userId}` exists (`exists(/databases/$(database)/documents/users/$(userId))`) and belongs to `userId`.
+1. **Workspace Ownership & Verified Identity**: Every user-scoped resource under `/users/{userId}` and its subcollections (`private`, `preferences`, `speedtests`, `nodes`, `pingHistory`) requires `request.auth != null && request.auth.uid == userId` and `request.auth.token.email_verified == true` for all writes.
+2. **Master Gate Parent Integrity**: No document inside `/users/{userId}/private`, `/users/{userId}/preferences`, `/users/{userId}/speedtests`, `/users/{userId}/nodes`, or `/users/{userId}/pingHistory` can exist unless the parent workspace `/users/{userId}` exists (`exists(/databases/$(database)/documents/users/$(userId))`) and belongs to `userId`.
 3. **PII Isolation**: User email addresses are isolated in `/users/{userId}/private/{docId}` (`isOwner(userId)` strict `get`/`list`/`create`/`update`/`delete` access only) and never exposed in `/users/{userId}` or shared paths.
-4. **Immutable Ownership & Creation Timestamps**: `uid`, `createdAt`, `testId`, and `nodeId` are immutable after document creation (`incoming().field == existing().field`). All `createdAt` (on create) and `updatedAt` (on create/update) values MUST equal `request.time`.
-5. **Volumetric & Regex Boundaries**: All path IDs (`userId`, `docId`, `prefId`, `speedtestId`, `nodeId`) MUST pass `isValidId()` (`^[a-zA-Z0-9_-]+$`, `1..128` chars), and every string/number/enum property enforces strict schema keys (`hasAll` + `hasOnly` on create, `affectedKeys().hasOnly(...)` on update) and explicit `size()` / range limits.
+4. **Immutable Ownership & Creation Timestamps**: `uid`, `createdAt`, `testId`, `nodeId`, `sampleId`, and `targetId` are immutable after document creation (`incoming().field == existing().field`). All `createdAt` (on create) and `updatedAt` (on create/update) values MUST equal `request.time`.
+5. **Volumetric & Regex Boundaries**: All path IDs (`userId`, `docId`, `prefId`, `speedtestId`, `nodeId`, `sampleId`) MUST pass `isValidId()` (`^[a-zA-Z0-9_-]+$`, `1..128` chars), and every string/number/enum property enforces strict schema keys (`hasAll` + `hasOnly` on create, `affectedKeys().hasOnly(...)` on update) and explicit `size()` / range limits.
 6. **Secure List Queries**: No blanket `allow list: if isSignedIn()`. Every `list` rule evaluates `isOwner(userId) && existing().uid == request.auth.uid` on the queried documents without extra `get()` lookups.
 
 ## 2. The "Dirty Dozen" Adversarial Payloads (Expected: `PERMISSION_DENIED`)

@@ -78,7 +78,7 @@ Toda la plataforma se organiza en **5 vistas simétricas** conectadas por una ba
 
 1. **Cabecera Despejada sin Barra de Navegación Superior, Logotipo Ampliado y Tema**: Presenta el logotipo oficial **CMineWar** de gran formato (`80px` en móvil y `112px` en escritorio) con transparencia RGBA real directa sobre el lienzo (y favicon *edge-to-edge* de contraste optimizado para llenar al máximo la pestaña del navegador), el modo de conexión (`LAN` directa o `WAN` cifrada TLS), transiciones animadas solapadas (`MorphPill`, `ViewStage` `popLayout`, valores tabulares animados) unificadas en las 4 interfaces (Web, Ubuntu GTK 3, Android Compose y Manual) y el botón para alternar entre diseño **Claro Minimalista** y **Modo Oscuro** (`recursos_theme`).
 2. **Tarjetas KPI y Widgets Compactos en Paralelo Automático (`auto-fit`)**: Rejilla fluida simétrica (`--cockpit-grid-min: 245px / 265px`) que aprovecha cada pantalla agrupando más widgets compactos y legibles en paralelo con gráficas HiDPI de **5 minutos** (`112px` en tablero, ampliables al detalle al tocar en la **Inspección Táctil**) para **Procesador (CPU)**, **Memoria RAM + ZRAM**, **GPU / Gráficos**, **Red e Internet** (4 curvas simultáneas segmentadas en tiempo real por IP destino/origen RFC1918: **Bajada Externa WAN**, **Subida Externa WAN**, **Bajada Interna LAN** y **Subida Interna LAN**) y **cada unidad de almacenamiento por separado**.
-3. **Gráficas HiDPI de 5 Minutos en Inicio con Curvas Limpias y Escalas X/Y**: Todas las gráficas de `/inicio` muestran los últimos **5 minutos** en cubetas de `5s` que preservan picos reales mediante interpolación monótona Fritsch–Carlson; mantienen la **curva fluida sin saturación de puntos**, mostrando el marcador vivo al final y el punto exacto de muestreo al inspeccionar **siempre encima de la línea**, con ejes X/Y visibles y la **Pantalla de Inspección Táctil** (con bloqueo de desplazamiento de la página trasera mediante `overscroll-contain`) para ampliar o retroceder (`En vivo · 5 min`, `20 min`, `1 h`, `6 h`, `24 h`, `Todo`) por todo `recursos_history.db`.
+3. **Gráficas HiDPI de 5 Minutos en Inicio con Curvas Limpias y Escalas X/Y**: Todas las gráficas de `/inicio` muestran los últimos **5 minutos** en cubetas de `5s` que preservan picos reales mediante interpolación monótona Fritsch–Carlson; mantienen la **curva fluida sin saturación de puntos**, mostrando el marcador vivo al final y el punto exacto de muestreo al inspeccionar **siempre encima de la línea**, con ejes X/Y visibles y la **Pantalla de Inspección Táctil** (con bloqueo hermético de desplazamiento de fondo mediante captura de rueda, sujeción de borde y `overscroll-contain`) para ampliar o retroceder (`En vivo · 5 min`, `20 min`, `1 h`, `6 h`, `24 h`, `Todo`) por todo `recursos_history.db`.
 4. **Encendido y Apagado Simétrico de Equipos**: Junto a cada equipo detectado dinámicamente en la LAN dispones de dos botones simétricos:
    - **`Encender`**: envía paquetes mágicos **Wake-on-LAN (WoL)** a todas las subredes activas.
    - **`Apagar`**: abre confirmación segura y lanza señal remota **Sleep-on-LAN / SSH `BatchMode` / RPC / Webhook**, protegiendo automáticamente al propio servidor anfitrión frente a auto-apagados accidentales.
@@ -97,7 +97,7 @@ Toda la plataforma se organiza en **5 vistas simétricas** conectadas por una ba
 <details>
 <summary><b>🟣 Vista 3 · <code>/red</code> — Router en Vivo, Latencia Ping, Test Speedtest.net, Mapa GeoIP y Escudo Fail2ban</b></summary>
 
-1. **Tarjetas en Vivo del Router, Latencia Ping y Consumo Independiente por Dispositivo**: En **Aparatos en casa** convive la tarjeta de **Tráfico del router** junto a las interfaces físicas, la nueva **gráfica en tiempo real de latencia media (ping)** hacia la puerta de enlace y los nodos externos más activos, y tarjetas individuales por equipo con su propio **consumo WAN/LAN y ordenado en directo** (*Descarga*, *Subida*, *LAN*, *Nombre*).
+1. **Tarjetas en Vivo del Router, Latencia Ping con Historial Persistente y Consumo Independiente por Dispositivo**: En **Aparatos en casa** convive la tarjeta de **Tráfico del router** junto a las interfaces físicas, la gráfica en tiempo real de **latencia media (ping)** hacia la puerta de enlace y nodos externos —con persistencia de hasta 7 días en SQLite (`ping_history`), sincronización en **Cloud Firestore** (`pingHistory`) y navegación histórica completa en Inspección Táctil (`GET /api/net/ping-history`)—, y tarjetas individuales por equipo con su propio **consumo WAN/LAN y ordenado en directo** (*Descarga*, *Subida*, *LAN*, *Nombre*).
 2. **Test de Velocidad Oficial (`Speedtest.net`) e Historial SQLite + Nube**: Subpestaña dedicada **Test de velocidad** (`/api/net/speedtest/*`) con medición completa de **Descarga**, **Subida**, **Ping**, **Jitter** y pérdida de paquetes mediante motor `Speedtest.net` (CLI oficial Ookla / `speedtest-cli` / protocolo multi-flujo) e **historial persistente en SQLite (`speedtest_history`) sincronizado en tiempo real con Cloud Firestore**.
 3. **Mapa OpenStreetMap + Leaflet y Auditoría ASUS AiMesh**: Agrupa y desagrupa dinámicamente conexiones remotas públicas (`latLngToLayerPoint < 48px`), mantiene popups abiertos en vivo, distingue **`Cable LAN`**, **`Wi-Fi 5 GHz / 6 GHz`** y **`Wi-Fi 2.4 GHz`**, integra estadísticas **Pi-hole** (caché TTL `18s`), sincronización **DuckDNS** y baneo directo **Fail2ban**.
 
@@ -115,7 +115,7 @@ Toda la plataforma se organiza en **5 vistas simétricas** conectadas por una ba
 <details>
 <summary><b>⚙️ Vista 5 · <code>/mas</code> — Actualizador GitHub OTA, Salud del Sistema, Dispositivos HMAC, Manual y DeX USB</b></summary>
 
-1. **Actualizador GitHub OTA Resiliente, Nube Firebase y Salud del Sistema**: Compara la versión y el commit local/remoto de forma asíncrona (`get_version_info_cached_async()`), registra automáticamente `safe.directory` en Git, filtra artefactos de compilación (`static/index.html`, `dist/`, bases de datos SQLite y bóvedas JSON) para no bloquear jamás la auto-actualización local, y aplica un respaldo directo por tarball HTTPS (`codeload.github.com`) + reconstrucción del frontend si `git pull` falla o no existe `.git`; integra la tarjeta de **Nube y Sincronización Firebase** (autenticación Google + Cloud Firestore con reglas `firestore.rules` y esquema `firebase-blueprint.json` para sincronizar preferencias, nodos en vivo y tests de velocidad vía `onSnapshot`) y la tarjeta de **Salud y avisos del sistema** con detalle de unidades `systemd` fallidas, bitácora `journalctl` y marcado persistente de revisión (`POST /api/system/logs/ack`).
+1. **Actualizador GitHub OTA Resiliente, Nube Firebase y Salud del Sistema**: Compara la versión y el commit local/remoto de forma asíncrona (`get_version_info_cached_async()`), registra automáticamente `safe.directory` en Git, filtra artefactos de compilación (`static/index.html`, `dist/`, bases de datos SQLite y bóvedas JSON) para no bloquear jamás la auto-actualización local, y aplica un respaldo directo por tarball HTTPS (`codeload.github.com`) + reconstrucción del frontend si `git pull` falla o no existe `.git`; integra la tarjeta de **Nube y Sincronización Firebase** (autenticación Google + Cloud Firestore con reglas `firestore.rules` y esquema `firebase-blueprint.json` para sincronizar preferencias, nodos en vivo, muestras de latencia ping y tests de velocidad vía `onSnapshot`) y la tarjeta de **Salud y avisos del sistema** con detalle de unidades `systemd` fallidas, bitácora `journalctl` y marcado persistente de revisión (`POST /api/system/logs/ack`).
 2. **Inventario Agrupado de Dispositivos (`HMAC`)**: Agrupa clientes navegadores y apps nativas bajo el mismo dispositivo físico (`MAC` / `hardware_id`) mostrando su certificado vigente y nivel de acceso (`FULL_NATIVE_ACCESS` vs `WEB_SANDBOX`).
 3. **Manual Interactivo Embebido**: Integra directamente `/manual` dentro del panel sin salir de la sesión y sincronizando el tema Claro/Oscuro vía `postMessage`.
 4. **Pantalla Móvil USB (`DeX` — Exclusivo Ubuntu `.deb`)**: Desbloquea resolución, tasa a `60 FPS`, auto-conexión USB y pantalla completa únicamente en la aplicación nativa de Ubuntu Linux.
@@ -291,6 +291,23 @@ curl -fsS -H "X-Device-Token: $TOKEN" "http://127.0.0.1:8085/api/metrics/history
   "total_samples": 18420,
   "returned_samples": 240,
   "has_older": true
+}
+```
+
+</details>
+
+<details>
+<summary><b><code>GET /api/net/ping-history?window_sec=3600&amp;limit=240</code></b> — Historial persistente de latencia ping multi-destino</summary>
+
+```bash
+curl -fsS -H "X-Device-Token: $TOKEN" "http://127.0.0.1:8085/api/net/ping-history?window_sec=3600&limit=240" | jq '{ok, total_samples, returned_samples, targets: (.series.targets | length)}'
+```
+```json
+{
+  "ok": true,
+  "total_samples": 4200,
+  "returned_samples": 240,
+  "targets": 4
 }
 ```
 

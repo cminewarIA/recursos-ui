@@ -198,14 +198,19 @@
     animation: cockpitModalPop 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  /* Evita encadenar el scroll al documento de fondo al llegar al final de una ventana modal o desplegable */
+  /* Evita encadenar el scroll al documento de fondo al llegar al final de una ventana modal o desplegable sin reiniciar scrollY */
   html:has([aria-modal="true"]),
-  body:has([aria-modal="true"]) {
-    overflow: hidden !important;
+  body:has([aria-modal="true"]),
+  html[data-cockpit-modal-open="true"],
+  html[data-cockpit-modal-open="true"] body {
     overscroll-behavior: none !important;
+    touch-action: none;
   }
-  [aria-modal="true"] {
+  [aria-modal="true"],
+  [data-cockpit-scroll-contain="true"] {
     overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
   }
 
   .cockpit-toast-enter {

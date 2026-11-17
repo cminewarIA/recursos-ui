@@ -132,6 +132,35 @@ service cloud.firestore {
         && data.updatedAt is timestamp && data.updatedAt == request.time;
     }
 
+    function isValidPingSample(data, userId, sampleId) {
+      return data.keys().hasAll([
+          'uid', 'sampleId', 'hostname', 'targetId', 'targetIp', 'targetLabel', 'kind',
+          'avgMs', 'minMs', 'maxMs', 'lastMs', 'jitterMs', 'lossPct', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'sampleId', 'hostname', 'targetId', 'targetIp', 'targetLabel', 'kind',
+          'avgMs', 'minMs', 'maxMs', 'lastMs', 'jitterMs', 'lossPct', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && isValidId(data.sampleId)
+        && data.sampleId == sampleId
+        && isValidId(data.targetId)
+        && data.hostname is string && data.hostname.size() >= 1 && data.hostname.size() <= 120
+        && data.targetIp is string && data.targetIp.size() >= 1 && data.targetIp.size() <= 64
+        && data.targetLabel is string && data.targetLabel.size() <= 120
+        && data.kind is string && data.kind in ['gateway', 'external', 'dns']
+        && data.avgMs is number && data.avgMs >= 0 && data.avgMs <= 60000
+        && data.minMs is number && data.minMs >= 0 && data.minMs <= 60000
+        && data.maxMs is number && data.maxMs >= 0 && data.maxMs <= 60000
+        && data.lastMs is number && data.lastMs >= 0 && data.lastMs <= 60000
+        && data.jitterMs is number && data.jitterMs >= 0 && data.jitterMs <= 60000
+        && data.lossPct is number && data.lossPct >= 0 && data.lossPct <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
     // 1. Root User Workspace (Non-PII)
     match /users/{userId} {
       allow get: if isValidId(userId) && isOwner(userId);
@@ -248,6 +277,33 @@ service cloud.firestore {
             'wanRxBps', 'wanTxBps', 'onlineDevices', 'healthStatus', 'updatedAt'
           ]);
         allow delete: if isValidId(userId) && isValidId(nodeId) && isOwner(userId);
+      }
+
+      // 6. Real-Time Synced Ping Latency History Samples
+      match /pingHistory/{sampleId} {
+        allow get: if isValidId(userId) && isValidId(sampleId) && isOwner(userId);
+        allow list: if isOwner(userId) && existing().uid == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(sampleId)
+          && isVerifiedUser()
+          && isOwner(userId)
+          && isValidPingSample(incoming(), userId, sampleId)
+          && incoming().createdAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if isValidId(userId)
+          && isValidId(sampleId)
+          && isVerifiedUser()
+          && isOwner(userId)
+          && isValidPingSample(incoming(), userId, sampleId)
+          && incoming().uid == existing().uid
+          && incoming().sampleId == existing().sampleId
+          && incoming().targetId == existing().targetId
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'hostname', 'targetIp', 'targetLabel', 'kind',
+            'avgMs', 'minMs', 'maxMs', 'lastMs', 'jitterMs', 'lossPct', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(sampleId) && isOwner(userId);
       }
     }
   }

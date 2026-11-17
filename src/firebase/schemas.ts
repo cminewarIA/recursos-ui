@@ -169,3 +169,46 @@ export function buildHostSnapshotMutableFields(input: {
     healthStatus,
   };
 }
+
+export interface PingSampleMutableFields {
+  hostname: string;
+  targetIp: string;
+  targetLabel: string;
+  kind: 'gateway' | 'external' | 'dns';
+  avgMs: number;
+  minMs: number;
+  maxMs: number;
+  lastMs: number;
+  jitterMs: number;
+  lossPct: number;
+}
+
+export function buildPingSampleMutableFields(input: {
+  hostname?: unknown;
+  targetIp?: unknown;
+  targetLabel?: unknown;
+  kind?: unknown;
+  avgMs?: unknown;
+  minMs?: unknown;
+  maxMs?: unknown;
+  lastMs?: unknown;
+  jitterMs?: unknown;
+  lossPct?: unknown;
+}): PingSampleMutableFields {
+  const rawKind = String(input.kind || '');
+  const kind: 'gateway' | 'external' | 'dns' =
+    rawKind === 'gateway' || rawKind === 'dns' ? rawKind : 'external';
+  return {
+    hostname: sanitizeBoundedString(input.hostname, FIREBASE_SCHEMA_LIMITS.HOSTNAME_MAX_LEN, 'host'),
+    targetIp: sanitizeBoundedString(input.targetIp, 64, '0.0.0.0'),
+    targetLabel: sanitizeBoundedString(input.targetLabel, 120, ''),
+    kind,
+    avgMs: clampNumber(input.avgMs, 0, FIREBASE_SCHEMA_LIMITS.MAX_MS, 2),
+    minMs: clampNumber(input.minMs, 0, FIREBASE_SCHEMA_LIMITS.MAX_MS, 2),
+    maxMs: clampNumber(input.maxMs, 0, FIREBASE_SCHEMA_LIMITS.MAX_MS, 2),
+    lastMs: clampNumber(input.lastMs, 0, FIREBASE_SCHEMA_LIMITS.MAX_MS, 2),
+    jitterMs: clampNumber(input.jitterMs, 0, FIREBASE_SCHEMA_LIMITS.MAX_MS, 2),
+    lossPct: clampNumber(input.lossPct, 0, 100, 1),
+  };
+}
+

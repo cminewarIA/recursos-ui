@@ -87,11 +87,13 @@ export const MoreView: React.FC<MoreViewProps> = ({
     lastSyncAt,
     syncedNodes,
     syncedSpeedtests,
+    syncedPingHistory,
     signInWithGoogle,
     signOutFirebase,
     setAutoSyncEnabled,
     syncPreferences,
     syncHostSnapshot,
+    syncPingSnapshot,
   } = useFirebase();
   const { isUbuntuNative, isNativeApp } = detectNativeEnvironment();
   const [subTab, setSubTab] = useState<MoreSubTab>(() => resolveMoreSubTab(initialSubTab) || 'updates');
@@ -595,6 +597,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                         <div
                           role="listbox"
                           aria-label={t('more.language_label')}
+                          data-cockpit-scroll-contain="true"
                           className="mt-2 max-h-64 space-y-1 overflow-y-auto overscroll-contain pr-0.5"
                         >
                           {filteredLocales.length === 0 ? (
@@ -678,6 +681,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                         try {
                           await syncPreferences({ theme, locale });
                           await syncHostSnapshot(metrics, true, false);
+                          await syncPingSnapshot(metrics);
                           onNotify(t('firebase.sync_ok'));
                         } catch {
                           onNotify(t('firebase.error_boundary_title'), true);
@@ -733,6 +737,9 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     </span>
                     <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-[10.5px] font-semibold">
                       {t('firebase.synced_speedtests_title', { count: syncedSpeedtests.length })}
+                    </span>
+                    <span className="cockpit-pill-emerald rounded-full px-2.5 py-0.5 font-mono text-[10.5px] font-semibold">
+                      {t('firebase.synced_ping_title', { count: syncedPingHistory.length })}
                     </span>
                     {lastSyncAt && (
                       <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
@@ -957,12 +964,18 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   })}
                 </div>
                 {updateOutput && (
-                  <pre className="cockpit-subtile max-h-40 overflow-y-auto whitespace-pre-wrap p-3 text-[11px]">
+                  <pre
+                    data-cockpit-scroll-contain="true"
+                    className="cockpit-subtile max-h-40 overflow-y-auto overscroll-contain whitespace-pre-wrap p-3 text-[11px]"
+                  >
                     {updateOutput}
                   </pre>
                 )}
                 {sysLogs.length > 0 && (
-                  <div className="cockpit-subtile max-h-40 overflow-y-auto p-3 text-[11px]">
+                  <div
+                    data-cockpit-scroll-contain="true"
+                    className="cockpit-subtile max-h-40 overflow-y-auto overscroll-contain p-3 text-[11px]"
+                  >
                     <p className="mb-1 font-semibold">{t('more.system_warnings_title')}</p>
                     {sysLogs.slice(0, 12).map((log, idx) => (
                       <div key={idx} className="truncate">
@@ -1051,7 +1064,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 )}
 
                 {sysLogs.length > 0 ? (
-                  <div className="mt-4 max-h-60 space-y-1.5 overflow-y-auto pr-1 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                  <div
+                    data-cockpit-scroll-contain="true"
+                    className="mt-4 max-h-60 space-y-1.5 overflow-y-auto overscroll-contain pr-1 font-mono text-[11px] text-slate-600 dark:text-slate-300"
+                  >
                     {sysLogs.slice(0, 20).map((log, idx) => (
                       <div key={log.id || `${log.ts || idx}`} className="cockpit-subtile px-3 py-1.5">
                         <span className="text-slate-400 dark:text-slate-500">[{log.time_str || '--'}]</span>{' '}

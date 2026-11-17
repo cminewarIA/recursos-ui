@@ -2949,6 +2949,317 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
                 except Exception:
                     pass
 
+def _format_ping_history_targets(ordered_ts, rows_by_ts, target_meta):
+    target_palette = ["#0284c7", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4"]
+    kind_order = {"gateway": 0, "external": 1, "dns": 2}
+    freq_counts = {}
+    for ts_val in ordered_ts:
+        for tid in rows_by_ts.get(ts_val, {}).keys():
+            freq_counts[tid] = freq_counts.get(tid, 0) + 1
+    ranked_ids = sorted(
+        target_meta.keys(),
+        key=lambda tid: (
+            kind_order.get(target_meta[tid].get("kind") or "external", 1),
+            -freq_counts.get(tid, 0),
+            tid,
+        ),
+    )[:5]
+
+    targets_out = []
+    for idx, tid in enumerate(ranked_ids):
+        meta = target_meta[tid]
+        raw_vals = [rows_by_ts.get(ts_val, {}).get(tid) for ts_val in ordered_ts]
+        valid_vals = [float(v) for v in raw_vals if isinstance(v, (int, float)) and v >= 0]
+        total_pts = max(1, len(raw_vals))
+        loss_pct = round(((len(raw_vals) - len(valid_vals)) / float(total_pts)) * 100.0, 1)
+        avg_ms = round(sum(valid_vals) / float(len(valid_vals)), 2) if valid_vals else None
+        min_ms = round(min(valid_vals), 2) if valid_vals else None
+        max_ms = round(max(valid_vals), 2) if valid_vals else None
+        last_ms = (
+            round(float(raw_vals[-1]), 2)
+            if raw_vals and isinstance(raw_vals[-1], (int, float)) and raw_vals[-1] >= 0
+            else None
+        )
+        jitter_ms = 0.0
+        if len(valid_vals) >= 2:
+            diffs = [abs(valid_vals[i] - valid_vals[i - 1]) for i in range(1, len(valid_vals))]
+            jitter_ms = round(sum(diffs) / float(len(diffs)), 2)
+        data_clean = [round(float(v), 2) if isinstance(v, (int, float)) and v >= 0 else 0.0 for v in raw_vals]
+        targets_out.append({
+            "id": tid,
+            "ip": meta.get("ip") or "",
+            "label": meta.get("label") or tid,
+            "kind": meta.get("kind") or "external",
+            "avg_ms": avg_ms,
+            "last_ms": last_ms,
+            "min_ms": min_ms,
+            "max_ms": max_ms,
+            "jitter_ms": jitter_ms,
+            "loss_pct": loss_pct,
+            "color": target_palette[idx % len(target_palette)],
+            "data": data_clean,
+        })
+    return targets_out
+
+def preload_ping_history_from_sqlite():
+    """Precarga las últimas muestras de latencia ping (últimos 20 minutos) desde recursos_history.db."""
+    global PING_LATENCY_CACHE
+    init_geoip_history_db()
+    cutoff_20m = time.time() - 1200.0
+    rows = []
+    with GEOIP_HISTORY_DB_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT ts, target_id, target_ip, label, kind, rtt_ms
+                FROM ping_history
+                WHERE ts >= ?
+                ORDER BY ts ASC
+            """, (cutoff_20m,)).fetchall()
+        except Exception as e:
+            print(f"[-] Error precargando ping_history desde SQLite: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+    if not rows:
+        return
+    rows_by_ts = {}
+    target_meta = {}
+    for r in rows:
+        ts_val = round(float(r["ts"] or 0.0), 2)
+        tid = str(r["target_id"] or "")
+        if not tid:
+            continue
+        rows_by_ts.setdefault(ts_val, {})[tid] = float(r["rtt_ms"] if r["rtt_ms"] is not None else -1.0)
+        target_meta[tid] = {
+            "ip": str(r["target_ip"] or ""),
+            "label": str(r["label"] or tid),
+            "kind": str(r["kind"] or "external"),
+        }
+    ordered_ts = sorted(rows_by_ts.keys())
+    with PING_LATENCY_LOCK:
+        _PING_HISTORY_POINTS.clear()
+        for ts_val in ordered_ts:
+            t_str = datetime.fromtimestamp(ts_val).strftime("%H:%M:%S")
+            _PING_HISTORY_POINTS.append({
+                "ts": ts_val,
+                "time_str": t_str,
+                "values": {k: (v if v >= 0 else None) for k, v in rows_by_ts[ts_val].items()},
+            })
+        timestamps = [pt["time_str"] for pt in _PING_HISTORY_POINTS]
+        epoch_ts = [pt["ts"] for pt in _PING_HISTORY_POINTS]
+        targets_out = _format_ping_history_targets(ordered_ts, {
+            ts_val: {k: (v if v >= 0 else None) for k, v in vals.items()}
+            for ts_val, vals in rows_by_ts.items()
+        }, target_meta)
+        PING_LATENCY_CACHE = {
+            "updated_at": timestamps[-1] if timestamps else "--",
+            "timestamps": timestamps,
+            "epoch_ts": epoch_ts,
+            "targets": targets_out,
+        }
+
+def query_ping_history_from_sqlite(before_ts=None, after_ts=None, window_sec=None, limit=180):
+    """Consulta el historial persistente de latencia ping desde recursos_history.db."""
+    if not _TELEMETRY_HISTORY_INITIALIZED:
+        init_geoip_history_db()
+    try:
+        limit_val = max(20, min(int(limit or 180), 600))
+    except Exception:
+        limit_val = 180
+
+    b_ts = None
+    a_ts = None
+    w_sec = None
+    try:
+        if before_ts not in (None, "", "null", "undefined"):
+            b_ts = float(before_ts)
+    except Exception:
+        b_ts = None
+    try:
+        if after_ts not in (None, "", "null", "undefined"):
+            a_ts = float(after_ts)
+    except Exception:
+        a_ts = None
+    if window_sec not in (None, "", "live", "all", "null", "undefined"):
+        try:
+            w_val = float(window_sec)
+            if w_val > 0:
+                w_sec = w_val
+        except Exception:
+            w_sec = None
+    is_all_window = str(window_sec or "").strip().lower() == "all"
+
+    empty_series = {
+        "timestamps": [],
+        "date_timestamps": [],
+        "epoch_ts": [],
+        "targets": [],
+    }
+    with GEOIP_HISTORY_DB_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            meta_row = cur.execute("""
+                SELECT COUNT(DISTINCT ts) AS cnt, MIN(ts) AS min_ts, MAX(ts) AS max_ts
+                FROM ping_history
+            """).fetchone()
+            total_samples = int(meta_row["cnt"] or 0) if meta_row else 0
+            oldest_ts = float(meta_row["min_ts"]) if meta_row and meta_row["min_ts"] is not None else None
+            newest_ts = float(meta_row["max_ts"]) if meta_row and meta_row["max_ts"] is not None else None
+
+            if total_samples == 0 or oldest_ts is None or newest_ts is None:
+                return {
+                    "ok": True,
+                    "db_file": "recursos_history.db",
+                    "oldest_ts": None,
+                    "newest_ts": None,
+                    "window_start_ts": None,
+                    "window_end_ts": None,
+                    "total_samples": 0,
+                    "returned_samples": 0,
+                    "has_older": False,
+                    "has_newer": False,
+                    "series": empty_series,
+                }
+
+            if is_all_window:
+                raw_rows = cur.execute("""
+                    SELECT ts, target_id, target_ip, label, kind, rtt_ms
+                    FROM ping_history
+                    ORDER BY ts ASC
+                """).fetchall()
+            elif w_sec is not None:
+                end_ref = b_ts if b_ts is not None else newest_ts
+                start_ref = max(oldest_ts, float(end_ref) - w_sec)
+                raw_rows = cur.execute("""
+                    SELECT ts, target_id, target_ip, label, kind, rtt_ms
+                    FROM ping_history
+                    WHERE ts >= ? AND ts <= ?
+                    ORDER BY ts ASC
+                """, (start_ref, end_ref)).fetchall()
+            else:
+                clauses = []
+                params = []
+                if a_ts is not None:
+                    clauses.append("ts >= ?")
+                    params.append(a_ts)
+                if b_ts is not None:
+                    clauses.append("ts <= ?")
+                    params.append(b_ts)
+                where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+                raw_rows = cur.execute(f"""
+                    SELECT ts, target_id, target_ip, label, kind, rtt_ms
+                    FROM ping_history
+                    {where_sql}
+                    ORDER BY ts ASC
+                """, tuple(params)).fetchall()
+
+            rows_by_ts = {}
+            target_meta = {}
+            for r in raw_rows:
+                ts_val = round(float(r["ts"] or 0.0), 2)
+                tid = str(r["target_id"] or "")
+                if not tid:
+                    continue
+                rtt_val = float(r["rtt_ms"] if r["rtt_ms"] is not None else -1.0)
+                rows_by_ts.setdefault(ts_val, {})[tid] = rtt_val if rtt_val >= 0 else None
+                target_meta[tid] = {
+                    "ip": str(r["target_ip"] or ""),
+                    "label": str(r["label"] or tid),
+                    "kind": str(r["kind"] or "external"),
+                }
+
+            all_ts = sorted(rows_by_ts.keys())
+            if len(all_ts) > limit_val:
+                bucket_size = len(all_ts) / float(limit_val)
+                sampled_ts = []
+                last_ts = None
+                for idx in range(limit_val):
+                    start_i = int(idx * bucket_size)
+                    end_i = min(len(all_ts), max(start_i + 1, int((idx + 1) * bucket_size)))
+                    chunk = all_ts[start_i:end_i]
+                    if not chunk:
+                        continue
+                    if idx == 0:
+                        rep_ts = all_ts[0]
+                    elif idx == limit_val - 1:
+                        rep_ts = all_ts[-1]
+                    elif len(chunk) == 1:
+                        rep_ts = chunk[0]
+                    else:
+                        rep_ts = max(
+                            chunk,
+                            key=lambda tv: max((v for v in rows_by_ts.get(tv, {}).values() if isinstance(v, (int, float))), default=0.0),
+                        )
+                    if last_ts is not None and rep_ts <= last_ts:
+                        continue
+                    sampled_ts.append(rep_ts)
+                    last_ts = rep_ts
+                if all_ts and sampled_ts and sampled_ts[-1] < all_ts[-1]:
+                    if len(sampled_ts) >= 2:
+                        sampled_ts[-1] = all_ts[-1]
+                    else:
+                        sampled_ts.append(all_ts[-1])
+                ordered_ts = sampled_ts
+            else:
+                ordered_ts = all_ts
+
+            timestamps = [datetime.fromtimestamp(ts_val).strftime("%H:%M:%S") for ts_val in ordered_ts]
+            date_timestamps = [datetime.fromtimestamp(ts_val).strftime("%d/%m %H:%M:%S") for ts_val in ordered_ts]
+            targets_out = _format_ping_history_targets(ordered_ts, rows_by_ts, target_meta)
+            win_start = ordered_ts[0] if ordered_ts else None
+            win_end = ordered_ts[-1] if ordered_ts else None
+            has_older = bool(win_start is not None and oldest_ts is not None and win_start > (oldest_ts + 0.5))
+            has_newer = bool(win_end is not None and newest_ts is not None and win_end < (newest_ts - 0.5))
+            return {
+                "ok": True,
+                "db_file": "recursos_history.db",
+                "oldest_ts": oldest_ts,
+                "newest_ts": newest_ts,
+                "window_start_ts": win_start,
+                "window_end_ts": win_end,
+                "total_samples": total_samples,
+                "returned_samples": len(ordered_ts),
+                "has_older": has_older,
+                "has_newer": has_newer,
+                "series": {
+                    "timestamps": timestamps,
+                    "date_timestamps": date_timestamps,
+                    "epoch_ts": ordered_ts,
+                    "targets": targets_out,
+                },
+            }
+        except Exception as e:
+            print(f"[-] Error consultando ping_history en SQLite: {e}")
+            return {
+                "ok": False,
+                "error": str(e),
+                "db_file": "recursos_history.db",
+                "oldest_ts": None,
+                "newest_ts": None,
+                "window_start_ts": None,
+                "window_end_ts": None,
+                "total_samples": 0,
+                "returned_samples": 0,
+                "has_older": False,
+                "has_newer": False,
+                "series": empty_series,
+            }
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
 def _push_router_history_bucket(now_ts, wan_rx, wan_tx, lan_rx, lan_tx):
     """Mantiene cubetas de 5s durante los últimos 20 minutos para el tráfico agregado del router."""
     now_ms = int(now_ts * 1000)
@@ -3446,7 +3757,7 @@ def fetch_ping_latency_worker():
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, db_rows)
                         if now_ts - last_db_prune > 120.0:
-                            conn.execute("DELETE FROM ping_history WHERE ts < ?", (now_ts - 86400.0,))
+                            conn.execute("DELETE FROM ping_history WHERE ts < ?", (now_ts - (7 * 86400.0),))
                             last_db_prune = now_ts
                         conn.commit()
                     except Exception:
@@ -13238,6 +13549,43 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # 1a-ter. HISTORIAL PERSISTENTE DE LATENCIA PING DESDE SQLITE (recursos_history.db)
+        elif clean_path == "/api/net/ping-history":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            query_str = self.path.split('?', 1)[1] if '?' in self.path else ''
+            params = urllib.parse.parse_qs(query_str)
+            before_ts = params.get('before_ts', [None])[0]
+            after_ts = params.get('after_ts', [None])[0]
+            window_sec = params.get('window_sec', params.get('window', [None]))[0]
+            limit_param = params.get('limit', [180])[0]
+            ping_hist_payload = query_ping_history_from_sqlite(
+                before_ts=before_ts,
+                after_ts=after_ts,
+                window_sec=window_sec,
+                limit=limit_param,
+            )
+            resp = json.dumps(ping_hist_payload).encode('utf-8')
+            wants_gz = 'gzip' in (self.headers.get('Accept-Encoding') or '').lower() and len(resp) > 2048
+            if wants_gz:
+                resp = gzip.compress(resp, compresslevel=4)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Vary', 'Accept-Encoding')
+            if wants_gz:
+                self.send_header('Content-Encoding', 'gzip')
+            self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # 1a-quater. HISTORIAL DE PROCESOS 24H EN SQLITE (recursos_history.db)
         elif clean_path == "/api/metrics/process-history":
             if not auth["is_trusted"]:
@@ -15635,6 +15983,7 @@ def run_server(port=None):
             port = 8085
     ACTIVE_SERVER_PORT = port
     preload_telemetry_history_from_sqlite()
+    preload_ping_history_from_sqlite()
     threading.Thread(target=fetch_gpu_worker, daemon=True).start()
     threading.Thread(target=fetch_disks_worker, daemon=True).start()
     threading.Thread(target=fetch_docker_worker, daemon=True).start()

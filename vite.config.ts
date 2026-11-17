@@ -1651,6 +1651,22 @@ function probeHostRttMs(ip: string, tcpPort?: number): Promise<number | null> {
 }
 
 const PING_TARGET_PALETTE = ['#0284c7', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
+const pingHistoryDevPath = path.resolve(ROOT_DIR, 'ping_history_dev.json');
+interface DevPingTargetMeta {
+  id: string;
+  ip: string;
+  label: string;
+  kind: 'gateway' | 'external' | 'dns';
+}
+interface DevPingRow {
+  ts: number;
+  time_str: string;
+  values: Record<string, number | null>;
+  targets: Record<string, DevPingTargetMeta>;
+}
+let devPingSamples: DevPingRow[] = [];
+let lastPingDevSaveMs = 0;
+
 const pingHistoryPoints: Array<{ ts: number; time_str: string; values: Record<string, number | null> }> = [];
 let pingLatencyCache: {
   updated_at: string;
@@ -1673,6 +1689,241 @@ let pingLatencyCache: {
 } = { updated_at: '--', timestamps: [], epoch_ts: [], targets: [] };
 let pingWorkerStarted = false;
 let pingSampleInFlight = false;
+
+function formatPingTargetsDev(
+  samples: Array<{ ts: number; values: Record<string, number | null> }>,
+  targetMeta: Record<string, DevPingTargetMeta>
+) {
+  const kindOrder: Record<string, number> = { gateway: 0, external: 1, dns: 2 };
+  const freqCounts: Record<string, number> = {};
+  for (const s of samples) {
+    for (const tid of Object.keys(s.values || {})) {
+      freqCounts[tid] = (freqCounts[tid] || 0) + 1;
+    }
+  }
+  const rankedIds = Object.keys(targetMeta)
+    .sort((a, b) => {
+      const ka = kindOrder[targetMeta[a]?.kind || 'external'] ?? 1;
+      const kb = kindOrder[targetMeta[b]?.kind || 'external'] ?? 1;
+      if (ka !== kb) return ka - kb;
+      const fa = freqCounts[a] || 0;
+      const fb = freqCounts[b] || 0;
+      if (fa !== fb) return fb - fa;
+      return a.localeCompare(b);
+    })
+    .slice(0, 5);
+
+  return rankedIds.map((tid, idx) => {
+    const meta = targetMeta[tid];
+    const rawVals = samples.map((pt) => pt.values?.[tid] ?? null);
+    const validVals = rawVals.filter((v): v is number => typeof v === 'number' && v >= 0);
+    const totalPts = Math.max(1, rawVals.length);
+    const loss_pct = Math.round(((rawVals.length - validVals.length) / totalPts) * 1000) / 10;
+    const avg_ms = validVals.length ? Math.round((validVals.reduce((a, b) => a + b, 0) / validVals.length) * 100) / 100 : null;
+    const min_ms = validVals.length ? Math.round(Math.min(...validVals) * 100) / 100 : null;
+    const max_ms = validVals.length ? Math.round(Math.max(...validVals) * 100) / 100 : null;
+    const lastRaw = rawVals[rawVals.length - 1];
+    const last_ms = typeof lastRaw === 'number' && lastRaw >= 0 ? Math.round(lastRaw * 100) / 100 : null;
+    let jitter_ms = 0;
+    if (validVals.length >= 2) {
+      let diffSum = 0;
+      for (let i = 1; i < validVals.length; i++) diffSum += Math.abs(validVals[i] - validVals[i - 1]);
+      jitter_ms = Math.round((diffSum / (validVals.length - 1)) * 100) / 100;
+    }
+    const data = rawVals.map((v) => (typeof v === 'number' && v >= 0 ? Math.round(v * 100) / 100 : 0));
+    return {
+      id: tid,
+      ip: meta.ip || '',
+      label: meta.label || tid,
+      kind: meta.kind || 'external',
+      avg_ms,
+      last_ms,
+      min_ms,
+      max_ms,
+      jitter_ms,
+      loss_pct,
+      color: PING_TARGET_PALETTE[idx % PING_TARGET_PALETTE.length],
+      data,
+    };
+  });
+}
+
+function loadPingHistoryDev() {
+  try {
+    if (fs.existsSync(pingHistoryDevPath)) {
+      const parsed = JSON.parse(fs.readFileSync(pingHistoryDevPath, 'utf-8'));
+      if (Array.isArray(parsed)) {
+        const cutoff7d = Date.now() / 1000 - 7 * 86400;
+        devPingSamples = parsed
+          .filter((r): r is DevPingRow => Boolean(r && typeof r.ts === 'number' && r.values))
+          .filter((r) => r.ts >= cutoff7d)
+          .slice(-50000);
+        const cutoff20m = Date.now() / 1000 - 1200;
+        const recent = devPingSamples.filter((r) => r.ts >= cutoff20m);
+        if (recent.length > 0) {
+          pingHistoryPoints.length = 0;
+          const targetMeta: Record<string, DevPingTargetMeta> = {};
+          for (const r of recent) {
+            pingHistoryPoints.push({ ts: r.ts, time_str: r.time_str, values: r.values });
+            for (const [tid, meta] of Object.entries(r.targets || {})) {
+              targetMeta[tid] = meta;
+            }
+          }
+          const timestamps = pingHistoryPoints.map((pt) => pt.time_str);
+          const epoch_ts = pingHistoryPoints.map((pt) => pt.ts);
+          pingLatencyCache = {
+            updated_at: timestamps[timestamps.length - 1] || '--',
+            timestamps,
+            epoch_ts,
+            targets: formatPingTargetsDev(pingHistoryPoints, targetMeta),
+          };
+        }
+      }
+    }
+  } catch {
+    // Ignore corrupt ping history file
+  }
+}
+
+function appendPingSampleDev(row: DevPingRow) {
+  const cutoff7d = row.ts - 7 * 86400;
+  devPingSamples.push(row);
+  if (devPingSamples.length > 50000) {
+    devPingSamples = devPingSamples.slice(-50000);
+  }
+  while (devPingSamples.length > 0 && devPingSamples[0].ts < cutoff7d) {
+    devPingSamples.shift();
+  }
+  const nowMs = Date.now();
+  if (nowMs - lastPingDevSaveMs >= 3000) {
+    lastPingDevSaveMs = nowMs;
+    try {
+      const tmp = `${pingHistoryDevPath}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(devPingSamples), 'utf-8');
+      fs.renameSync(tmp, pingHistoryDevPath);
+    } catch {
+      // Ignore write error
+    }
+  }
+}
+
+function queryPingHistoryDev(params: URLSearchParams) {
+  const beforeTsRaw = params.get('before_ts');
+  const afterTsRaw = params.get('after_ts');
+  const windowRaw = params.get('window_sec') || params.get('window') || '';
+  const limit = Math.max(20, Math.min(600, Number.parseInt(params.get('limit') || '180', 10) || 180));
+  const beforeTs = beforeTsRaw ? Number.parseFloat(beforeTsRaw) : null;
+  const afterTs = afterTsRaw ? Number.parseFloat(afterTsRaw) : null;
+  const isAll = windowRaw.trim().toLowerCase() === 'all';
+  const windowSec = !isAll && windowRaw && windowRaw !== 'live' ? Number.parseFloat(windowRaw) : null;
+
+  const totalSamples = devPingSamples.length;
+  const oldestTs = totalSamples > 0 ? devPingSamples[0].ts : null;
+  const newestTs = totalSamples > 0 ? devPingSamples[totalSamples - 1].ts : null;
+
+  if (totalSamples === 0 || oldestTs === null || newestTs === null) {
+    return {
+      ok: true,
+      db_file: 'recursos_history.db',
+      oldest_ts: null,
+      newest_ts: null,
+      window_start_ts: null,
+      window_end_ts: null,
+      total_samples: 0,
+      returned_samples: 0,
+      has_older: false,
+      has_newer: false,
+      series: { timestamps: [], date_timestamps: [], epoch_ts: [], targets: [] },
+    };
+  }
+
+  let filtered = devPingSamples;
+  if (isAll) {
+    filtered = devPingSamples;
+  } else if (windowSec && Number.isFinite(windowSec) && windowSec > 0) {
+    const endRef = beforeTs !== null && Number.isFinite(beforeTs) ? beforeTs : newestTs;
+    const startRef = Math.max(oldestTs, endRef - windowSec);
+    filtered = devPingSamples.filter((s) => s.ts >= startRef && s.ts <= endRef);
+  } else if (afterTs !== null && Number.isFinite(afterTs) && beforeTs === null) {
+    filtered = devPingSamples.filter((s) => s.ts >= afterTs).slice(0, limit);
+  } else {
+    filtered = devPingSamples.filter((s) => {
+      if (beforeTs !== null && Number.isFinite(beforeTs) && s.ts > beforeTs) return false;
+      if (afterTs !== null && Number.isFinite(afterTs) && s.ts < afterTs) return false;
+      return true;
+    });
+    filtered = filtered.slice(-limit);
+  }
+
+  let sampled = filtered;
+  if (filtered.length > limit) {
+    const bucketSize = filtered.length / limit;
+    const out: DevPingRow[] = [];
+    for (let i = 0; i < limit; i++) {
+      const sIdx = Math.floor(i * bucketSize);
+      const eIdx = Math.min(filtered.length, Math.max(sIdx + 1, Math.floor((i + 1) * bucketSize)));
+      const chunk = filtered.slice(sIdx, eIdx);
+      if (chunk.length === 0) continue;
+      if (i === 0) out.push(filtered[0]);
+      else if (i === limit - 1) out.push(filtered[filtered.length - 1]);
+      else if (chunk.length === 1) out.push(chunk[0]);
+      else {
+        let rep = chunk[0];
+        let repPeak = Math.max(...Object.values(rep.values || {}).map((v) => (typeof v === 'number' ? v : 0)), 0);
+        for (const item of chunk) {
+          const pk = Math.max(...Object.values(item.values || {}).map((v) => (typeof v === 'number' ? v : 0)), 0);
+          if (pk > repPeak) {
+            rep = item;
+            repPeak = pk;
+          }
+        }
+        out.push(rep);
+      }
+    }
+    if (filtered.length > 0 && out.length > 0 && out[out.length - 1].ts !== filtered[filtered.length - 1].ts) {
+      out[out.length - 1] = filtered[filtered.length - 1];
+    }
+    sampled = out;
+  }
+
+  const targetMeta: Record<string, DevPingTargetMeta> = {};
+  for (const s of sampled) {
+    for (const [tid, meta] of Object.entries(s.targets || {})) {
+      targetMeta[tid] = meta;
+    }
+  }
+  const fmtDt = (ts: number) => {
+    const d = new Date(ts * 1000);
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm} ${d.toLocaleTimeString('es-ES')}`;
+  };
+
+  const epoch_ts = sampled.map((s) => Math.round(s.ts * 100) / 100);
+  const winStart = epoch_ts[0] ?? null;
+  const winEnd = epoch_ts[epoch_ts.length - 1] ?? null;
+
+  return {
+    ok: true,
+    db_file: 'recursos_history.db',
+    oldest_ts: oldestTs,
+    newest_ts: newestTs,
+    window_start_ts: winStart,
+    window_end_ts: winEnd,
+    total_samples: totalSamples,
+    returned_samples: sampled.length,
+    has_older: Boolean(winStart !== null && winStart > oldestTs + 0.5),
+    has_newer: Boolean(winEnd !== null && winEnd < newestTs - 0.5),
+    series: {
+      timestamps: sampled.map((s) => s.time_str),
+      date_timestamps: sampled.map((s) => fmtDt(s.ts)),
+      epoch_ts,
+      targets: formatPingTargetsDev(sampled, targetMeta),
+    },
+  };
+}
+
+loadPingHistoryDev();
 
 async function samplePingLatencyOnce() {
   if (pingSampleInFlight) return;
@@ -1716,11 +1967,14 @@ async function samplePingLatencyOnce() {
     const nowSec = Math.round((Date.now() / 1000) * 100) / 100;
     const timeStr = new Date().toLocaleTimeString('es-ES', { hour12: false });
     const vals: Record<string, number | null> = {};
+    const tgtMap: Record<string, DevPingTargetMeta> = {};
     specs.forEach((sp, i) => {
       vals[sp.id] = rtts[i];
+      tgtMap[sp.id] = { id: sp.id, ip: sp.ip, label: sp.label, kind: sp.kind };
     });
 
     pingHistoryPoints.push({ ts: nowSec, time_str: timeStr, values: vals });
+    appendPingSampleDev({ ts: nowSec, time_str: timeStr, values: vals, targets: tgtMap });
     const cutoff = nowSec - 1200;
     while (pingHistoryPoints.length > 0 && pingHistoryPoints[0].ts < cutoff) {
       pingHistoryPoints.shift();
@@ -3470,6 +3724,13 @@ function realOsTelemetryMiddleware(): Plugin {
               series,
             })
           );
+          return;
+        }
+
+        if (url === '/api/net/ping-history' && req.method === 'GET') {
+          const params = new URLSearchParams(queryStr || '');
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(queryPingHistoryDev(params)));
           return;
         }
 

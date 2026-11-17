@@ -265,6 +265,95 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "SyncedPingSample": {
+      "title": "SyncedPingSample",
+      "description": "Persisted network ping latency history snapshot synchronized across devices via Cloud Firestore.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sampleId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "targetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "targetIp": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "targetLabel": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 120
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["gateway", "external", "dns"],
+          "minLength": 3,
+          "maxLength": 16
+        },
+        "avgMs": {
+          "type": "number"
+        },
+        "minMs": {
+          "type": "number"
+        },
+        "maxMs": {
+          "type": "number"
+        },
+        "lastMs": {
+          "type": "number"
+        },
+        "jitterMs": {
+          "type": "number"
+        },
+        "lossPct": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "sampleId",
+        "hostname",
+        "targetId",
+        "targetIp",
+        "targetLabel",
+        "kind",
+        "avgMs",
+        "minMs",
+        "maxMs",
+        "lastMs",
+        "jitterMs",
+        "lossPct",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -287,6 +376,10 @@
     "/users/{userId}/nodes/{nodeId}": {
       "schema": { "$ref": "#/entities/SyncedHostSnapshot" },
       "description": "Real-time synchronized host node health and throughput snapshots."
+    },
+    "/users/{userId}/pingHistory/{sampleId}": {
+      "schema": { "$ref": "#/entities/SyncedPingSample" },
+      "description": "Persisted network ping latency samples for multi-device historical inspection."
     }
   }
 }

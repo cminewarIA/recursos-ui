@@ -37,6 +37,7 @@ import {
 import {
   buildCockpitPreferencesMutableFields,
   buildHostSnapshotMutableFields,
+  buildPingSampleMutableFields,
   buildSpeedTestMutableFields,
   buildUserWorkspaceMutableFields,
   FIREBASE_SCHEMA_LIMITS,
@@ -85,6 +86,24 @@ export interface SyncedSpeedTestDoc {
   updatedAt?: Timestamp | null;
 }
 
+export interface SyncedPingSampleDoc {
+  uid: string;
+  sampleId: string;
+  hostname: string;
+  targetId: string;
+  targetIp: string;
+  targetLabel: string;
+  kind: 'gateway' | 'external' | 'dns';
+  avgMs: number;
+  minMs: number;
+  maxMs: number;
+  lastMs: number;
+  jitterMs: number;
+  lossPct: number;
+  createdAt?: Timestamp | null;
+  updatedAt?: Timestamp | null;
+}
+
 interface FirebaseContextValue {
   user: User | null;
   authReady: boolean;
@@ -96,11 +115,13 @@ interface FirebaseContextValue {
   syncedPreferences: SyncedPreferencesDoc | null;
   syncedNodes: SyncedHostSnapshotDoc[];
   syncedSpeedtests: SyncedSpeedTestDoc[];
+  syncedPingHistory: SyncedPingSampleDoc[];
   signInWithGoogle: () => Promise<boolean>;
   signOutFirebase: () => Promise<void>;
   setAutoSyncEnabled: (enabled: boolean, currentTheme: ThemeMode, currentLocale: string) => Promise<void>;
   syncPreferences: (next: { theme: ThemeMode; locale: string; autoSync?: boolean }) => Promise<void>;
   syncHostSnapshot: (metrics: MetricsPayload | null, isHealthy: boolean, connError: boolean) => Promise<void>;
+  syncPingSnapshot: (metrics: MetricsPayload | null) => Promise<void>;
   syncSpeedTestRecord: (result: SpeedTestResult, hostname: string) => Promise<void>;
   deleteSyncedSpeedTestRecord: (testId: string) => Promise<void>;
 }
@@ -124,6 +145,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [syncedPreferences, setSyncedPreferences] = useState<SyncedPreferencesDoc | null>(null);
   const [syncedNodes, setSyncedNodes] = useState<SyncedHostSnapshotDoc[]>([]);
   const [syncedSpeedtests, setSyncedSpeedtests] = useState<SyncedSpeedTestDoc[]>([]);
+  const [syncedPingHistory, setSyncedPingHistory] = useState<SyncedPingSampleDoc[]>([]);
 
   const workspaceReadyUidRef = useRef<string | null>(null);
   const workspacePromiseRef = useRef<Promise<void> | null>(null);
@@ -148,6 +170,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setSyncedPreferences(null);
         setSyncedNodes([]);
         setSyncedSpeedtests([]);
+        setSyncedPingHistory([]);
       }
     });
     return () => unsub();
@@ -317,10 +340,26 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     );
 
+    const pingHistoryPath = `users/${uid}/pingHistory`;
+    const unsubPingHistory = onSnapshot(
+      query(collection(db, 'users', uid, 'pingHistory'), where('uid', '==', uid)),
+      (snap) => {
+        const list = snap.docs
+          .map((d) => d.data() as SyncedPingSampleDoc)
+          .sort((a, b) => tsToMillis(b.createdAt) - tsToMillis(a.createdAt));
+        setSyncedPingHistory(list);
+        setLastSyncAt(new Date().toLocaleTimeString());
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, pingHistoryPath);
+      }
+    );
+
     return () => {
       unsubPref();
       unsubNodes();
       unsubSpeedtests();
+      unsubPingHistory();
     };
   }, [authReady, user]);
 
@@ -474,6 +513,69 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [authReady, user, ensureWorkspaceReady]
   );
 
+  const syncPingSnapshot = useCallback(
+    async (metrics: MetricsPayload | null) => {
+      const targets = metrics?.net?.ping_latency?.targets ?? [];
+      if (!authReady || !user || !user.emailVerified || !metrics || targets.length === 0) return;
+      const hostname = metrics.system?.hostname || 'host';
+      await ensureWorkspaceReady(user, hostname);
+      const minuteBucket = Math.floor(Date.now() / 60_000);
+
+      for (const tgt of targets.slice(0, 5)) {
+        const targetId = sanitizeFirebaseId(tgt.id || tgt.ip || 'target', 'target');
+        const sampleId = sanitizeFirebaseId(`ping_${targetId}_${minuteBucket}`, `ping_${minuteBucket}`);
+        const path = `users/${user.uid}/pingHistory/${sampleId}`;
+        const ref = doc(db, 'users', user.uid, 'pingHistory', sampleId);
+        const mutableFields = buildPingSampleMutableFields({
+          hostname,
+          targetIp: tgt.ip || '0.0.0.0',
+          targetLabel: tgt.label || tgt.ip || targetId,
+          kind: tgt.kind,
+          avgMs: tgt.avg_ms ?? tgt.last_ms ?? 0,
+          minMs: tgt.min_ms ?? tgt.last_ms ?? 0,
+          maxMs: tgt.max_ms ?? tgt.last_ms ?? 0,
+          lastMs: tgt.last_ms ?? tgt.avg_ms ?? 0,
+          jitterMs: tgt.jitter_ms ?? 0,
+          lossPct: tgt.loss_pct ?? 0,
+        });
+
+        let exists = false;
+        try {
+          const snap = await getDoc(ref);
+          exists = snap.exists();
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
+
+        if (!exists) {
+          try {
+            await setDoc(ref, {
+              uid: user.uid,
+              sampleId,
+              targetId,
+              ...mutableFields,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          } catch (error) {
+            handleFirestoreError(error, OperationType.CREATE, path);
+          }
+        } else {
+          try {
+            await updateDoc(ref, {
+              ...mutableFields,
+              updatedAt: serverTimestamp(),
+            });
+          } catch (error) {
+            handleFirestoreError(error, OperationType.UPDATE, path);
+          }
+        }
+      }
+      setLastSyncAt(new Date().toLocaleTimeString());
+    },
+    [authReady, user, ensureWorkspaceReady]
+  );
+
   const syncSpeedTestRecord = useCallback(
     async (result: SpeedTestResult, hostname: string) => {
       if (!authReady || !user || !user.emailVerified) return;
@@ -556,11 +658,13 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       syncedPreferences,
       syncedNodes,
       syncedSpeedtests,
+      syncedPingHistory,
       signInWithGoogle,
       signOutFirebase,
       setAutoSyncEnabled,
       syncPreferences,
       syncHostSnapshot,
+      syncPingSnapshot,
       syncSpeedTestRecord,
       deleteSyncedSpeedTestRecord,
     }),
@@ -575,11 +679,13 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       syncedPreferences,
       syncedNodes,
       syncedSpeedtests,
+      syncedPingHistory,
       signInWithGoogle,
       signOutFirebase,
       setAutoSyncEnabled,
       syncPreferences,
       syncHostSnapshot,
+      syncPingSnapshot,
       syncSpeedTestRecord,
       deleteSyncedSpeedTestRecord,
     ]

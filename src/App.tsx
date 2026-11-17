@@ -42,6 +42,7 @@ export function App() {
     syncedPreferences: fbPrefs,
     syncPreferences: fbSyncPreferences,
     syncHostSnapshot: fbSyncHostSnapshot,
+    syncPingSnapshot: fbSyncPingSnapshot,
   } = useFirebase();
   const [theme, setTheme] = useState<ThemeMode>(() => {
     try {
@@ -52,6 +53,7 @@ export function App() {
   });
   const applyingRemotePrefRef = useRef(false);
   const lastNodeSyncMsRef = useRef(0);
+  const lastPingSyncMsRef = useRef(0);
 
   const [activeTab, setActiveTab] = useState<MainTabId>(() => {
     if (typeof window !== 'undefined') {
@@ -271,63 +273,146 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [confirmShutdownClient]);
 
-  // Prevent mouse-wheel scroll chaining to the background document when an open modal or scrollable popover reaches its boundary
+  // Prevent mouse-wheel & touch scroll chaining to the background document when any modal or scrollable panel reaches its boundary
   useEffect(() => {
+    const syncModalDomAttr = () => {
+      const hasModal = Boolean(document.querySelector('[aria-modal="true"]'));
+      if (hasModal) {
+        document.documentElement.setAttribute('data-cockpit-modal-open', 'true');
+      } else {
+        document.documentElement.removeAttribute('data-cockpit-modal-open');
+      }
+    };
+
+    syncModalDomAttr();
+    const observer = new MutationObserver(syncModalDomAttr);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-modal'],
+    });
+
     const normalizeDeltaY = (ev: WheelEvent): number => {
       if (ev.deltaMode === 1) return ev.deltaY * 16;
       if (ev.deltaMode === 2) return ev.deltaY * window.innerHeight;
       return ev.deltaY;
     };
 
-    const canElScrollY = (el: HTMLElement, dy: number): boolean => {
+    const isScrollContainerY = (el: HTMLElement): boolean => {
+      if (el === document.body || el === document.documentElement) return false;
       if (el.scrollHeight <= el.clientHeight + 1) return false;
       const oy = window.getComputedStyle(el).overflowY;
-      if (oy !== 'auto' && oy !== 'scroll' && oy !== 'overlay') return false;
-      if (dy > 0) return el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-      if (dy < 0) return el.scrollTop > 0;
-      return false;
+      return oy === 'auto' || oy === 'scroll' || oy === 'overlay';
     };
 
     const handleWheel = (ev: WheelEvent) => {
-      const target = ev.target instanceof Element ? ev.target : null;
+      const target = ev.target instanceof Element ? (ev.target as HTMLElement) : null;
       const hasOpenModal = Boolean(document.querySelector('[aria-modal="true"]'));
+      const modalEl = target ? (target.closest('[aria-modal="true"]') as HTMLElement | null) : null;
       const containRoot = target
         ? (target.closest('[data-cockpit-scroll-contain="true"], [aria-modal="true"]') as HTMLElement | null)
         : null;
 
-      if (!hasOpenModal && !containRoot) return;
-
-      const dy = normalizeDeltaY(ev);
-
-      // If an aria-modal is open and wheel lands outside any modal dialog, block background scroll
-      if (hasOpenModal && (!target || !target.closest('[aria-modal="true"]'))) {
+      // If an aria-modal is open and wheel lands outside any modal dialog, block background scroll unconditionally
+      if (hasOpenModal && !modalEl) {
         ev.preventDefault();
+        ev.stopPropagation();
         return;
       }
 
-      if (dy === 0) return;
-
-      const boundary =
-        (target?.closest('[aria-modal="true"]') as HTMLElement | null) ??
-        containRoot;
-
-      if (!boundary) return;
-
-      let cur: HTMLElement | null = target as HTMLElement | null;
-      while (cur) {
-        if (canElScrollY(cur, dy)) {
-          return;
+      // Find nearest scrollable box (excluding document root/body) along ancestors
+      let cur: HTMLElement | null = target;
+      let scrollableAncestor: HTMLElement | null = null;
+      while (cur && cur !== document.body && cur !== document.documentElement) {
+        if (isScrollContainerY(cur)) {
+          scrollableAncestor = cur;
+          break;
         }
-        if (cur === boundary) break;
+        if (cur === containRoot) break;
         cur = cur.parentElement;
+      }
+
+      if (!hasOpenModal && !containRoot && !scrollableAncestor) return;
+
+      const dy = normalizeDeltaY(ev);
+      if (dy === 0) {
+        if (hasOpenModal) {
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+        return;
+      }
+
+      // Walk scrollable ancestors within the modal/contain boundary to absorb or block boundary spillover
+      let checkEl: HTMLElement | null = scrollableAncestor ?? target;
+      const stopAt = modalEl ?? containRoot ?? scrollableAncestor;
+      while (checkEl && checkEl !== document.body && checkEl !== document.documentElement) {
+        if (isScrollContainerY(checkEl)) {
+          if (dy > 0) {
+            const remainingDown = checkEl.scrollHeight - checkEl.clientHeight - checkEl.scrollTop;
+            if (remainingDown <= 1) {
+              // At bottom: if checkEl is an explicit contain-box/modal boundary, stop cleanly and never chain to background
+              if (checkEl === stopAt || checkEl.hasAttribute('data-cockpit-scroll-contain') || checkEl === scrollableAncestor) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                return;
+              }
+            } else if (remainingDown <= dy + 4) {
+              // Final wheel tick before bottom: clamp cleanly without letting excess delta escape to background page
+              ev.preventDefault();
+              ev.stopPropagation();
+              checkEl.scrollTop = checkEl.scrollHeight - checkEl.clientHeight;
+              return;
+            } else {
+              // Comfortably inside scrollable bounds
+              return;
+            }
+          } else {
+            const remainingUp = checkEl.scrollTop;
+            if (remainingUp <= 1) {
+              if (checkEl === stopAt || checkEl.hasAttribute('data-cockpit-scroll-contain') || checkEl === scrollableAncestor) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                return;
+              }
+            } else if (remainingUp <= Math.abs(dy) + 4) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              checkEl.scrollTop = 0;
+              return;
+            } else {
+              return;
+            }
+          }
+        }
+        if (checkEl === stopAt) break;
+        checkEl = checkEl.parentElement;
       }
 
       // Reached boundary of modal or floating scrollable popover: block chaining to background page
       ev.preventDefault();
+      ev.stopPropagation();
     };
 
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
+    const handleTouchMove = (ev: TouchEvent) => {
+      const target = ev.target instanceof Element ? (ev.target as HTMLElement) : null;
+      const hasOpenModal = Boolean(document.querySelector('[aria-modal="true"]'));
+      if (!hasOpenModal) return;
+      const modalEl = target ? (target.closest('[aria-modal="true"]') as HTMLElement | null) : null;
+      if (!modalEl) {
+        ev.preventDefault();
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('wheel', handleWheel, { capture: true });
+      window.removeEventListener('touchmove', handleTouchMove, { capture: true });
+      document.documentElement.removeAttribute('data-cockpit-modal-open');
+    };
   }, []);
 
   // Register current browser/native session periodically on first mount
@@ -520,6 +605,17 @@ export function App() {
       // Structured Firestore error logged by handleFirestoreError
     });
   }, [fbUser?.emailVerified, fbAutoSync, metrics, isHealthy, connError, fbSyncHostSnapshot]);
+
+  // Throttled ping latency history snapshot sync to Cloud Firestore (every 60s when autoSync enabled)
+  useEffect(() => {
+    if (!fbUser?.emailVerified || !fbAutoSync || !metrics?.net?.ping_latency?.targets?.length) return;
+    const nowMs = Date.now();
+    if (nowMs - lastPingSyncMsRef.current < 60_000) return;
+    lastPingSyncMsRef.current = nowMs;
+    void fbSyncPingSnapshot(metrics).catch(() => {
+      // Structured Firestore error logged by handleFirestoreError
+    });
+  }, [fbUser?.emailVerified, fbAutoSync, metrics, fbSyncPingSnapshot]);
 
   const navItems: Array<{ id: MainTabId; label: string; icon: React.ReactNode }> = [
     { id: 'inicio', label: t('nav.inicio'), icon: <Home className="h-5 w-5" /> },

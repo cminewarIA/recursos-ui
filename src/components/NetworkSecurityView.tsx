@@ -405,6 +405,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
     user: fbUser,
     autoSync: fbAutoSync,
     syncedSpeedtests,
+    syncedPingHistory,
     syncSpeedTestRecord,
   } = useFirebase();
   const fbSyncRef = useRef({
@@ -1779,6 +1780,12 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                       {pingLatency.updated_at}
                     </span>
                   )}
+                  {fbUser && syncedPingHistory.length > 0 && (
+                    <span className="cockpit-pill-violet inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                      <Cloud className="h-3 w-3" />
+                      <span>{t('firebase.synced_ping_title', { count: syncedPingHistory.length })}</span>
+                    </span>
+                  )}
                 </div>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {t('network.ping_latency_sub')}
@@ -2794,7 +2801,10 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             </div>
 
             {duckLogs.length > 0 && (
-              <div className="cockpit-subtile mt-4 max-h-36 overflow-y-auto p-3 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+              <div
+                data-cockpit-scroll-contain="true"
+                className="cockpit-subtile mt-4 max-h-36 overflow-y-auto overscroll-contain p-3 font-mono text-[11px] text-slate-600 dark:text-slate-300"
+              >
                 {duckLogs.slice(-6).map((l, idx) => (
                   <div key={idx}>{l}</div>
                 ))}
@@ -2881,7 +2891,10 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 placeholder={t('network.search_brand')}
                 className="cockpit-subtile mt-3 min-h-[42px] w-full px-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
               />
-              <div className="mt-3 grid max-h-60 grid-cols-3 gap-2 overflow-y-auto overscroll-contain">
+              <div
+                data-cockpit-scroll-contain="true"
+                className="mt-3 grid max-h-60 grid-cols-3 gap-2 overflow-y-auto overscroll-contain"
+              >
                 {logoResults.map((res, idx) => (
                   <button
                     key={`${res.logo_url}-${idx}`}

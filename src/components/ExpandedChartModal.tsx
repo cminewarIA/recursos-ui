@@ -15,7 +15,14 @@ import { COCKPIT_EASE, COCKPIT_SPRING, MorphPill } from './MotionPrimitives';
 import { ChartSeries, TelemetryChart } from './TelemetryChart';
 import { ExpandChartSpec } from './OverviewView';
 import { ResourceProcessesPanel } from './ResourceProcessesPanel';
-import { GpuHistorySample, HistorySeries, MetricsPayload, TelemetryHistoryResponse, ThemeMode } from '../types/telemetry';
+import {
+  GpuHistorySample,
+  HistorySeries,
+  MetricsPayload,
+  PingHistoryResponse,
+  TelemetryHistoryResponse,
+  ThemeMode,
+} from '../types/telemetry';
 import { apiFetchJson } from '../utils/api';
 import { useI18n } from '../i18n';
 
@@ -73,11 +80,14 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
 }) => {
   const { locale, t } = useI18n();
   const hasMetricKeys = useMemo(() => spec.series.some((s) => Boolean(s.metricKey)), [spec.series]);
+  const isPingHistoryMode = spec.chartKind === 'ping';
+  const hasDatabaseHistory = hasMetricKeys || isPingHistoryMode;
 
   const [preset, setPreset] = useState<HistoryPresetKey>('live');
   const [interactionMode, setInteractionMode] = useState<'inspect' | 'pan'>('inspect');
   const [cursorEndTs, setCursorEndTs] = useState<number | null>(null);
   const [historyData, setHistoryData] = useState<TelemetryHistoryResponse | null>(null);
+  const [pingHistoryData, setPingHistoryData] = useState<PingHistoryResponse | null>(null);
   const [metaBounds, setMetaBounds] = useState<{
     oldestTs: number | null;
     newestTs: number | null;
@@ -105,7 +115,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       limit?: number;
       metaOnly?: boolean;
     }) => {
-      if (!hasMetricKeys) return;
+      if (!hasDatabaseHistory) return;
       // Las consultas solo-metadatos nunca deben invalidar la secuencia de ventanas históricas pedidas por el usuario
       const seq = opts.metaOnly ? fetchSeqRef.current : ++fetchSeqRef.current;
       if (!opts.metaOnly) setLoadingHistory(true);
@@ -122,38 +132,53 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         q.set('window_sec', String(opts.windowParam));
       }
 
-      const res = await apiFetchJson<TelemetryHistoryResponse>(`/api/metrics/history?${q.toString()}`);
-      if (!opts.metaOnly && seq !== fetchSeqRef.current) return;
+      if (isPingHistoryMode) {
+        const res = await apiFetchJson<PingHistoryResponse>(`/api/net/ping-history?${q.toString()}`);
+        if (!opts.metaOnly && seq !== fetchSeqRef.current) return;
+        if (res.ok && res.data?.ok) {
+          setMetaBounds({
+            oldestTs: res.data.oldest_ts,
+            newestTs: res.data.newest_ts,
+            totalSamples: res.data.total_samples,
+          });
+          if (!opts.metaOnly) {
+            setPingHistoryData(res.data);
+          }
+        }
+      } else {
+        const res = await apiFetchJson<TelemetryHistoryResponse>(`/api/metrics/history?${q.toString()}`);
+        if (!opts.metaOnly && seq !== fetchSeqRef.current) return;
 
-      if (res.ok && res.data?.ok) {
-        setMetaBounds({
-          oldestTs: res.data.oldest_ts,
-          newestTs: res.data.newest_ts,
-          totalSamples: res.data.total_samples,
-        });
-        if (!opts.metaOnly) {
-          setHistoryData(res.data);
+        if (res.ok && res.data?.ok) {
+          setMetaBounds({
+            oldestTs: res.data.oldest_ts,
+            newestTs: res.data.newest_ts,
+            totalSamples: res.data.total_samples,
+          });
+          if (!opts.metaOnly) {
+            setHistoryData(res.data);
+          }
         }
       }
       if (!opts.metaOnly) setLoadingHistory(false);
     },
-    [hasMetricKeys]
+    [hasDatabaseHistory, isPingHistoryMode]
   );
 
   // Obtener límites temporales totales de la BD una sola vez al abrir la inspección
   useEffect(() => {
-    if (!hasMetricKeys) return;
+    if (!hasDatabaseHistory) return;
     void fetchHistoricalSlice({ limit: 2, metaOnly: true });
-  }, [hasMetricKeys, fetchHistoricalSlice]);
+  }, [hasDatabaseHistory, fetchHistoricalSlice]);
 
   // Refresco periódico de metadatos únicamente mientras el usuario está en modo en vivo
   useEffect(() => {
-    if (!hasMetricKeys || preset !== 'live') return;
+    if (!hasDatabaseHistory || preset !== 'live') return;
     const id = window.setInterval(() => {
       void fetchHistoricalSlice({ limit: 2, metaOnly: true });
     }, 6000);
     return () => window.clearInterval(id);
-  }, [hasMetricKeys, preset, fetchHistoricalSlice]);
+  }, [hasDatabaseHistory, preset, fetchHistoricalSlice]);
 
   // Limpiar debounce al desmontar
   useEffect(() => {
@@ -185,6 +210,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     if (nextPreset === 'live') {
       setCursorEndTs(null);
       setHistoryData(null);
+      setPingHistoryData(null);
       return;
     }
     if (nextPreset === 'all') {
@@ -211,6 +237,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       if (clampedEnd >= newestTs - 1.5 && preset === 'live') {
         setCursorEndTs(null);
         setHistoryData(null);
+        setPingHistoryData(null);
         return;
       }
       if (preset === 'live' || preset === 'all') {
@@ -229,7 +256,8 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   const handleStepBackward = () => {
     if (!oldestTs || !newestTs) return;
     const span = preset === 'all' ? Math.max(1200, Math.min(3600, (newestTs - oldestTs) / 6)) : activeWindowSec;
-    const currentEnd = cursorEndTs ?? historyData?.window_end_ts ?? newestTs;
+    const activeWinEnd = isPingHistoryMode ? pingHistoryData?.window_end_ts : historyData?.window_end_ts;
+    const currentEnd = cursorEndTs ?? activeWinEnd ?? newestTs;
     const nextEnd = currentEnd - Math.max(60, span * 0.6);
     jumpToTimestampEnd(nextEnd, span);
   };
@@ -237,13 +265,15 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   const handleStepForward = () => {
     if (!oldestTs || !newestTs) return;
     const span = activeWindowSec;
-    const currentEnd = cursorEndTs ?? historyData?.window_end_ts ?? newestTs;
+    const activeWinEnd = isPingHistoryMode ? pingHistoryData?.window_end_ts : historyData?.window_end_ts;
+    const currentEnd = cursorEndTs ?? activeWinEnd ?? newestTs;
     const nextEnd = currentEnd + Math.max(60, span * 0.6);
     if (nextEnd >= newestTs - 2) {
       setCursorEndTs(null);
       setSliderDraftTs(null);
       if (preset === 'live') {
         setHistoryData(null);
+        setPingHistoryData(null);
       } else {
         void fetchHistoricalSlice({ windowParam: span, beforeTs: newestTs, limit: 240 });
       }
@@ -263,20 +293,33 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
 
   const handlePanDeltaSteps = useCallback(
     (deltaSteps: number) => {
-      if (!hasMetricKeys || !oldestTs || !newestTs) return;
+      if (!hasDatabaseHistory || !oldestTs || !newestTs) return;
       const span = preset === 'live' || preset === 'all' ? 1200 : activeWindowSec;
       const secPerStep = Math.max(2, span / 40);
-      const currentEnd = cursorEndTs ?? historyData?.window_end_ts ?? newestTs;
+      const activeWinEnd = isPingHistoryMode ? pingHistoryData?.window_end_ts : historyData?.window_end_ts;
+      const currentEnd = cursorEndTs ?? activeWinEnd ?? newestTs;
       const nextEnd = currentEnd + deltaSteps * secPerStep;
       if (nextEnd >= newestTs - 1.5) {
         setPreset('live');
         setCursorEndTs(null);
         setHistoryData(null);
+        setPingHistoryData(null);
         return;
       }
       jumpToTimestampEnd(nextEnd, span);
     },
-    [hasMetricKeys, oldestTs, newestTs, preset, activeWindowSec, cursorEndTs, historyData?.window_end_ts, jumpToTimestampEnd]
+    [
+      hasDatabaseHistory,
+      isPingHistoryMode,
+      oldestTs,
+      newestTs,
+      preset,
+      activeWindowSec,
+      cursorEndTs,
+      historyData?.window_end_ts,
+      pingHistoryData?.window_end_ts,
+      jumpToTimestampEnd,
+    ]
   );
 
   // Construir series activas (En vivo desde liveMetrics vs Histórica desde recursos_history.db)
@@ -386,9 +429,9 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       };
     }
 
-    if (spec.chartKind === 'ping' && livePingLatency && livePingLatency.targets.length > 0) {
+    if (isLiveHead && spec.chartKind === 'ping' && livePingLatency && livePingLatency.targets.length > 0) {
       const epochsAll = livePingLatency.epoch_ts ?? [];
-      const startIdx = liveSliceWindow.filterByEpoch(epochsAll, isLiveHead ? LIVE_WINDOW_SECONDS : 1200);
+      const startIdx = liveSliceWindow.filterByEpoch(epochsAll, LIVE_WINDOW_SECONDS);
       return {
         kind: 'ping' as const,
         livePingLatency,
@@ -538,6 +581,20 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       return spec.series;
     }
 
+    if (isPingHistoryMode) {
+      const targets = pingHistoryData?.series?.targets ?? [];
+      if (targets.length === 0) return spec.series;
+      return targets.map((tgt) => ({
+        id: tgt.id,
+        label: tgt.label,
+        data: tgt.data || [],
+        color: tgt.color,
+        unit: 'ms',
+        decimals: 2,
+        fillAlpha: 0.12,
+      }));
+    }
+
     const sqlHist: HistorySeries | undefined = historyData?.series;
     if (!sqlHist) return spec.series;
     return spec.series.map((s) => {
@@ -546,7 +603,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       return s;
     });
-  }, [liveBucketWindow, preset, cursorEndTs, spec.series, historyData]);
+  }, [liveBucketWindow, preset, cursorEndTs, spec.series, isPingHistoryMode, pingHistoryData, historyData]);
 
   const resolvedTimestamps = useMemo(() => {
     if (liveBucketWindow) {
@@ -555,14 +612,30 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     if (preset === 'live' && cursorEndTs === null) {
       return spec.timestamps;
     }
+    if (isPingHistoryMode) {
+      return pingHistoryData?.series?.timestamps ?? spec.timestamps;
+    }
     return historyData?.series?.timestamps ?? spec.timestamps;
-  }, [liveBucketWindow, preset, cursorEndTs, spec.timestamps, historyData]);
+  }, [liveBucketWindow, preset, cursorEndTs, isPingHistoryMode, pingHistoryData, spec.timestamps, historyData]);
 
   const resolvedDateTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) return undefined;
-    if (useLocal20mGpu || useLocal20mStorage || useLocal20mNet || useLocal20mRouter || spec.chartKind === 'ping') return undefined;
+    if (useLocal20mGpu || useLocal20mStorage || useLocal20mNet || useLocal20mRouter) return undefined;
+    if (isPingHistoryMode) {
+      return pingHistoryData?.series?.date_timestamps;
+    }
     return historyData?.series?.date_timestamps;
-  }, [preset, cursorEndTs, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, useLocal20mRouter, spec.chartKind, historyData]);
+  }, [
+    preset,
+    cursorEndTs,
+    useLocal20mGpu,
+    useLocal20mStorage,
+    useLocal20mNet,
+    useLocal20mRouter,
+    isPingHistoryMode,
+    pingHistoryData,
+    historyData,
+  ]);
 
   const resolvedEpochTs = useMemo(() => {
     if (liveBucketWindow) {
@@ -571,8 +644,11 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     if (preset === 'live' && cursorEndTs === null) {
       return spec.epochTs;
     }
+    if (isPingHistoryMode) {
+      return pingHistoryData?.series?.epoch_ts ?? spec.epochTs;
+    }
     return historyData?.series?.epoch_ts ?? spec.epochTs;
-  }, [liveBucketWindow, preset, cursorEndTs, spec.epochTs, historyData]);
+  }, [liveBucketWindow, preset, cursorEndTs, isPingHistoryMode, pingHistoryData, spec.epochTs, historyData]);
 
   // Para velocidades/flujos delegamos en TelemetryChart el autoajuste exacto al pico visible en la ventana
   const dynamicMaxLeft = useMemo(() => {
@@ -620,8 +696,9 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   }, [resolvedSeries, spec.leftUnit]);
 
   const isLiveNow = preset === 'live' && cursorEndTs === null;
-  const activeStartTs = historyData?.window_start_ts;
-  const activeEndTs = sliderDraftTs ?? cursorEndTs ?? historyData?.window_end_ts ?? newestTs;
+  const activeStartTs = isPingHistoryMode ? pingHistoryData?.window_start_ts : historyData?.window_start_ts;
+  const activeWinEndTs = isPingHistoryMode ? pingHistoryData?.window_end_ts : historyData?.window_end_ts;
+  const activeEndTs = sliderDraftTs ?? cursorEndTs ?? activeWinEndTs ?? newestTs;
   const canStepBack = Boolean(oldestTs && newestTs && (isLiveNow ? metaBounds.totalSamples > 10 : (activeStartTs ?? activeEndTs ?? 0) > oldestTs + 2));
   const canStepForward = Boolean(!isLiveNow && newestTs && (activeEndTs ?? 0) < newestTs - 2);
 
@@ -692,11 +769,11 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         </div>
 
         {/* Barra simétrica de ventanas temporales y modo táctil */}
-        {(hasMetricKeys || hasGpuSubHist) && (
+        {(hasDatabaseHistory || hasGpuSubHist) && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <LayoutGroup id="expanded-presets">
               <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('charts.window_aria')}>
-                {(hasMetricKeys ? WINDOW_PRESETS : GPU_SUB_PRESETS).map((p) => {
+                {(hasDatabaseHistory ? WINDOW_PRESETS : GPU_SUB_PRESETS).map((p) => {
                   const active = preset === p.key;
                   return (
                     <button
@@ -717,7 +794,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
               </div>
             </LayoutGroup>
 
-            {hasMetricKeys && (
+            {hasDatabaseHistory && (
               <div className="flex items-center gap-1.5" role="group" aria-label={t('charts.touch_mode_aria')}>
                 <motion.button
                   whileTap={{ scale: 0.95 }}
@@ -767,28 +844,28 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
             maxLeft={dynamicMaxLeft}
             maxRight={spec.maxRight}
             theme={theme}
-            interactionMode={hasMetricKeys ? interactionMode : 'inspect'}
-            onPanDeltaSteps={hasMetricKeys ? handlePanDeltaSteps : undefined}
+            interactionMode={hasDatabaseHistory ? interactionMode : 'inspect'}
+            onPanDeltaSteps={hasDatabaseHistory ? handlePanDeltaSteps : undefined}
           />
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
             <span>
-              {isLiveNow || !historyData?.window_start_ts
+              {isLiveNow || !activeStartTs
                 ? t('charts.window_start', { time: resolvedTimestamps[0] || '--' })
-                : t('charts.from_time', { time: formatEpochDateTime(historyData.window_start_ts, locale) })}
+                : t('charts.from_time', { time: formatEpochDateTime(activeStartTs, locale) })}
             </span>
             <span className="text-center text-slate-400 dark:text-slate-500">
               {interactionMode === 'pan' ? t('charts.pan_help_drag') : t('charts.pan_help_hover')}
             </span>
             <span>
-              {isLiveNow || !historyData?.window_end_ts
+              {isLiveNow || !activeWinEndTs
                 ? t('time.last_sample', { time: resolvedTimestamps[resolvedTimestamps.length - 1] || '--' })
-                : t('charts.until_time', { time: formatEpochDateTime(historyData.window_end_ts, locale) })}
+                : t('charts.until_time', { time: formatEpochDateTime(activeWinEndTs, locale) })}
             </span>
           </div>
         </div>
 
         {/* Controles táctiles de retroceso, avance y deslizador de línea de tiempo */}
-        {hasMetricKeys && (
+        {hasDatabaseHistory && (
           <div className="cockpit-subtile mt-3 p-3 space-y-3">
             {/* Deslizador cronológico completo */}
             {oldestTs !== null && newestTs !== null && totalSpanSec > 5 && (

@@ -313,6 +313,26 @@ export interface PingLatencyPayload {
   targets: PingTargetSeries[];
 }
 
+export interface PingHistoryResponse {
+  ok: boolean;
+  error?: string;
+  db_file?: string;
+  oldest_ts: number | null;
+  newest_ts: number | null;
+  window_start_ts: number | null;
+  window_end_ts: number | null;
+  total_samples: number;
+  returned_samples: number;
+  has_older: boolean;
+  has_newer: boolean;
+  series: {
+    timestamps: string[];
+    date_timestamps: string[];
+    epoch_ts: number[];
+    targets: PingTargetSeries[];
+  };
+}
+
 export type ProcessHistoryMetric = 'cpu' | 'ram' | 'vram' | 'io';
 
 export interface ProcessHistorySeriesItem {
