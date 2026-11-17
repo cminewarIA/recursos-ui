@@ -26,6 +26,7 @@ import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/a
 import { extractInitialSubTabFromRoute, formatSpeed, normalizeExternalRoute } from './utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion, isRemoteVersionHigher } from './utils/version';
 import { useI18n } from './i18n';
+import { useFirebase } from './firebase/FirebaseProvider';
 
 interface ToastState {
   id: number;
@@ -34,7 +35,14 @@ interface ToastState {
 }
 
 export function App() {
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
+  const {
+    user: fbUser,
+    autoSync: fbAutoSync,
+    syncedPreferences: fbPrefs,
+    syncPreferences: fbSyncPreferences,
+    syncHostSnapshot: fbSyncHostSnapshot,
+  } = useFirebase();
   const [theme, setTheme] = useState<ThemeMode>(() => {
     try {
       return localStorage.getItem('recursos_theme') === 'dark' ? 'dark' : 'light';
@@ -42,6 +50,8 @@ export function App() {
       return 'light';
     }
   });
+  const applyingRemotePrefRef = useRef(false);
+  const lastNodeSyncMsRef = useRef(0);
 
   const [activeTab, setActiveTab] = useState<MainTabId>(() => {
     if (typeof window !== 'undefined') {
@@ -103,6 +113,30 @@ export function App() {
   useEffect(() => {
     applyTheme(theme);
   }, [applyTheme, theme]);
+
+  // Apply remote Cloud Firestore preferences when received via real-time onSnapshot
+  useEffect(() => {
+    if (!fbUser?.emailVerified || !fbPrefs) return;
+    applyingRemotePrefRef.current = true;
+    if (fbPrefs.theme && fbPrefs.theme !== theme) {
+      applyTheme(fbPrefs.theme);
+    }
+    if (fbPrefs.locale && fbPrefs.locale !== locale) {
+      setLocale(fbPrefs.locale);
+    }
+    const id = window.setTimeout(() => {
+      applyingRemotePrefRef.current = false;
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [fbUser?.emailVerified, fbPrefs, theme, locale, applyTheme, setLocale]);
+
+  // Persist local theme/locale changes to Cloud Firestore when authenticated
+  useEffect(() => {
+    if (!fbUser?.emailVerified || applyingRemotePrefRef.current) return;
+    void fbSyncPreferences({ theme, locale }).catch(() => {
+      // Structured Firestore error already logged by handleFirestoreError
+    });
+  }, [fbUser?.emailVerified, theme, locale, fbSyncPreferences]);
 
   // Fetch telemetry
   const fetchMetrics = useCallback(async () => {
@@ -475,6 +509,17 @@ export function App() {
   const cpuNow = Number(metrics?.cpu?.usage_percent ?? 0);
   const ramNow = Number(metrics?.ram?.percent ?? 0);
   const isHealthy = !connError && topbarErrors === 0 && cpuNow < 88 && ramNow < 90;
+
+  // Throttled live host telemetry snapshot sync to Cloud Firestore (every 20s when autoSync enabled)
+  useEffect(() => {
+    if (!fbUser?.emailVerified || !fbAutoSync || !metrics) return;
+    const nowMs = Date.now();
+    if (nowMs - lastNodeSyncMsRef.current < 20_000) return;
+    lastNodeSyncMsRef.current = nowMs;
+    void fbSyncHostSnapshot(metrics, isHealthy, Boolean(connError)).catch(() => {
+      // Structured Firestore error logged by handleFirestoreError
+    });
+  }, [fbUser?.emailVerified, fbAutoSync, metrics, isHealthy, connError, fbSyncHostSnapshot]);
 
   const navItems: Array<{ id: MainTabId; label: string; icon: React.ReactNode }> = [
     { id: 'inicio', label: t('nav.inicio'), icon: <Home className="h-5 w-5" /> },

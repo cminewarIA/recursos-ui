@@ -16,5 +16,8 @@
    - Transiciones `ViewStage` solapadas (`popLayout` con entrada y salida cruzada suave).
    - Contención de scroll y bloqueo del documento de fondo (`html:has([aria-modal="true"])`, `overscroll-contain`) en todos los modales y desplegables (`ExpandedChartModal`, `NetworkDevicesModal`, `AppsMediaView`, `MoreView`, `App`).
    - Optimización *edge-to-edge* del favicon en `/public/` y `/static/` para máxima visibilidad en la pestaña del navegador y barras móviles.
-5. **Validación en 3 Ciclos Consecutivos Limpios**:
-   - Compilación Python + esquema SQLite + pruebas reales Speedtest/History, TypeScript estricto, paridad CSV de 31 idiomas, empaquetado `.deb`, auditoría Chromium E2E completa (Desktop + Mobile × 31 idiomas + bloqueo de scroll modal) y `compile_applet` + `lint_applet`.
+5. **Sincronización Persistente y en Tiempo Real con Firebase (Cloud Firestore + Google Auth)**:
+   - Esquema estructurado en `firebase-blueprint.json`, aislamiento de PII en `/users/{uid}/private/account` y reglas validadas con ESLint en `firestore.rules` desplegadas en `europe-west1`.
+   - `FirebaseProvider`, `FirestoreErrorBoundary`, saneamiento estricto en `src/firebase/schemas.ts`, sincronización `onSnapshot` de preferencias (`theme`, `locale`, `autoSync`), instantáneas de nodos (`/users/{uid}/nodes/{nodeId}`), resultados Speedtest (`/users/{uid}/speedtests/{testId}`) y tarjeta de control en `MoreView` (`Más → Actualizaciones`) + claves traducidas a 31 idiomas.
+6. **Validación en Ciclos Consecutivos Limpios**:
+   - Compilación Python + esquema SQLite + pruebas reales Speedtest/History, TypeScript estricto, ESLint de reglas Firebase (`firestore.rules`), paridad CSV de 31 idiomas, empaquetado `.deb`, auditoría Chromium E2E completa (Desktop + Mobile × 31 idiomas + bloqueo de scroll modal + Escape + tarjeta Firebase) y `compile_applet` + `lint_applet`.

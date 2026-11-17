@@ -5,6 +5,7 @@ import {
   Bell,
   ChevronDown,
   ChevronUp,
+  Cloud,
   Gauge,
   Globe,
   Image as ImageIcon,
@@ -33,11 +34,13 @@ import {
   NetInterfaceInfo,
   NicHistoryBucket,
   SpeedTestHistoryResponse,
+  SpeedTestResult,
   SpeedTestStatus,
   TelegramBotStatusPayload,
   ThemeMode,
   WifiClient,
 } from '../types/telemetry';
+import { useFirebase } from '../firebase/FirebaseProvider';
 import { apiFetchJson } from '../utils/api';
 import { formatBytes, formatSpeed } from '../utils/formatters';
 import { formatBandLabel, formatClientVendor, useI18n } from '../i18n';
@@ -398,6 +401,26 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   onNotify,
 }) => {
   const { t, locale } = useI18n();
+  const {
+    user: fbUser,
+    autoSync: fbAutoSync,
+    syncedSpeedtests,
+    syncSpeedTestRecord,
+  } = useFirebase();
+  const fbSyncRef = useRef({
+    user: fbUser,
+    autoSync: fbAutoSync,
+    hostname: metrics?.system?.hostname || 'host',
+    syncSpeedTestRecord,
+  });
+  fbSyncRef.current = {
+    user: fbUser,
+    autoSync: fbAutoSync,
+    hostname: metrics?.system?.hostname || 'host',
+    syncSpeedTestRecord,
+  };
+  const lastSyncedSpeedtestIdRef = useRef<string | null>(null);
+
   const [subTab, setSubTab] = useState<RedSubTab>(() => resolveRedSubTab(initialSubTab) || 'home');
   const [clientQuery, setClientQuery] = useState('');
   const [clientSort, setClientSort] = useState<ClientSortMode>('down');
@@ -709,6 +732,21 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         if (!r.data.running) {
           void apiFetchJson<SpeedTestHistoryResponse>('/api/net/speedtest/history?limit=100').then((hr) => {
             if (hr.ok && hr.data) setSpeedtestHistory(hr.data);
+            if (r.data?.phase === 'done') {
+              const latestResult: SpeedTestResult | null | undefined =
+                r.data.last_result ?? hr.data?.items?.[0];
+              const { user: activeFbUser, autoSync: isAuto, hostname, syncSpeedTestRecord: pushRecord } =
+                fbSyncRef.current;
+              if (latestResult && activeFbUser && isAuto) {
+                const dedupKey = `${latestResult.id}_${latestResult.ts}`;
+                if (lastSyncedSpeedtestIdRef.current !== dedupKey) {
+                  lastSyncedSpeedtestIdRef.current = dedupKey;
+                  void pushRecord(latestResult, hostname).catch((err) => {
+                    console.error('Firebase speedtest sync error:', err);
+                  });
+                }
+              }
+            }
           });
           if (r.data.phase === 'done') {
             onNotify(t('network.speedtest_completed'));
@@ -2452,6 +2490,12 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   <span className="cockpit-subtile rounded-full px-2.5 py-0.5 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
                     {speedtestHistory?.total ?? 0}
                   </span>
+                  {fbUser && syncedSpeedtests.length > 0 && (
+                    <span className="cockpit-pill-violet inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                      <Cloud className="h-3 w-3" />
+                      <span>{t('firebase.synced_speedtests_title', { count: syncedSpeedtests.length })}</span>
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   {t('network.speedtest_history_sub')}
