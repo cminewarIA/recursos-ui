@@ -186,6 +186,44 @@ SECURITY_CACHE = {
 }
 SECURITY_LOCK = threading.Lock()
 
+PING_LATENCY_LOCK = threading.Lock()
+PING_LATENCY_CACHE = {
+    "updated_at": "",
+    "timestamps": [],
+    "epoch_ts": [],
+    "targets": [],
+}
+_PING_HISTORY_POINTS = []
+
+ROUTER_HISTORY_LOCK = threading.Lock()
+_ROUTER_HISTORY_BUCKETS_20M = []
+
+PROCESS_HISTORY_LOCK = threading.Lock()
+_LAST_PROC_HISTORY_RECORD_TS = 0.0
+
+SPEEDTEST_LOCK = threading.Lock()
+SPEEDTEST_STATE = {
+    "running": False,
+    "phase": "idle",
+    "progress_pct": 0,
+    "current_mbps": 0.0,
+    "ping_ms": 0.0,
+    "jitter_ms": 0.0,
+    "packet_loss_pct": 0.0,
+    "download_mbps": 0.0,
+    "upload_mbps": 0.0,
+    "server_name": "",
+    "server_host": "",
+    "server_location": "",
+    "client_ip": "",
+    "isp": "",
+    "scope": "wan",
+    "error": "",
+    "started_at": 0.0,
+    "last_result": None,
+}
+ACTIVE_SERVER_PORT = 8085
+
 def _detect_default_gateway_ip():
     """Detecta dinámicamente la IP de la puerta de enlace por defecto desde /proc/net/route."""
     try:
@@ -2440,6 +2478,51 @@ def init_geoip_history_db():
                 if col_name not in existing_cols:
                     conn.execute(f"ALTER TABLE telemetry_history ADD COLUMN {col_name} REAL DEFAULT 0;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_history_ts ON telemetry_history(ts DESC);")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS ping_history (
+                    ts REAL NOT NULL,
+                    target_id TEXT NOT NULL,
+                    target_ip TEXT NOT NULL,
+                    label TEXT DEFAULT '',
+                    kind TEXT DEFAULT 'external',
+                    rtt_ms REAL DEFAULT -1,
+                    loss_pct REAL DEFAULT 0,
+                    PRIMARY KEY (ts, target_id)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ping_history_ts ON ping_history(ts DESC);")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS process_history (
+                    ts REAL NOT NULL,
+                    proc_name TEXT NOT NULL,
+                    cpu_pct REAL DEFAULT 0,
+                    ram_mb REAL DEFAULT 0,
+                    vram_mb REAL DEFAULT 0,
+                    io_bps REAL DEFAULT 0,
+                    PRIMARY KEY (ts, proc_name)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_process_history_ts ON process_history(ts DESC);")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS speedtest_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    created_at TEXT NOT NULL,
+                    download_mbps REAL NOT NULL,
+                    upload_mbps REAL NOT NULL,
+                    ping_ms REAL DEFAULT 0,
+                    jitter_ms REAL DEFAULT 0,
+                    packet_loss_pct REAL DEFAULT 0,
+                    server_name TEXT DEFAULT '',
+                    server_host TEXT DEFAULT '',
+                    server_location TEXT DEFAULT '',
+                    client_ip TEXT DEFAULT '',
+                    isp TEXT DEFAULT '',
+                    duration_ms INTEGER DEFAULT 0,
+                    scope TEXT DEFAULT 'wan'
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_speedtest_history_ts ON speedtest_history(ts DESC);")
             conn.commit()
             _TELEMETRY_HISTORY_INITIALIZED = True
         except Exception as e:
@@ -2865,6 +2948,819 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
                     conn.close()
                 except Exception:
                     pass
+
+def _push_router_history_bucket(now_ts, wan_rx, wan_tx, lan_rx, lan_tx):
+    """Mantiene cubetas de 5s durante los últimos 20 minutos para el tráfico agregado del router."""
+    now_ms = int(now_ts * 1000)
+    bucket_ms = (now_ms // NIC_BUCKET_INTERVAL_MS) * NIC_BUCKET_INTERVAL_MS
+    cutoff_ms = bucket_ms - (MAX_NIC_HISTORY_SECONDS * 1000)
+    w_rx = round(float(wan_rx or 0.0), 1)
+    w_tx = round(float(wan_tx or 0.0), 1)
+    l_rx = round(float(lan_rx or 0.0), 1)
+    l_tx = round(float(lan_tx or 0.0), 1)
+    tot_rx = round(w_rx + l_rx, 1)
+    tot_tx = round(w_tx + l_tx, 1)
+    with ROUTER_HISTORY_LOCK:
+        if not _ROUTER_HISTORY_BUCKETS_20M or _ROUTER_HISTORY_BUCKETS_20M[-1]["t"] < bucket_ms:
+            _ROUTER_HISTORY_BUCKETS_20M.append({
+                "t": bucket_ms,
+                "rx": tot_rx,
+                "tx": tot_tx,
+                "wan_rx": w_rx,
+                "wan_tx": w_tx,
+                "lan_rx": l_rx,
+                "lan_tx": l_tx,
+            })
+        else:
+            last_b = _ROUTER_HISTORY_BUCKETS_20M[-1]
+            last_b["rx"] = max(last_b["rx"], tot_rx)
+            last_b["tx"] = max(last_b["tx"], tot_tx)
+            last_b["wan_rx"] = max(last_b.get("wan_rx", 0.0), w_rx)
+            last_b["wan_tx"] = max(last_b.get("wan_tx", 0.0), w_tx)
+            last_b["lan_rx"] = max(last_b.get("lan_rx", 0.0), l_rx)
+            last_b["lan_tx"] = max(last_b.get("lan_tx", 0.0), l_tx)
+        while _ROUTER_HISTORY_BUCKETS_20M and _ROUTER_HISTORY_BUCKETS_20M[0]["t"] < cutoff_ms:
+            _ROUTER_HISTORY_BUCKETS_20M.pop(0)
+        return list(_ROUTER_HISTORY_BUCKETS_20M)
+
+
+def record_process_snapshot_to_sqlite(now_ts, procs_list, force=False):
+    """Guarda instantáneas agrupadas por nombre de proceso cada ~60s en recursos_history.db (retención 24h)."""
+    global _LAST_PROC_HISTORY_RECORD_TS
+    if not force and (now_ts - _LAST_PROC_HISTORY_RECORD_TS) < 55.0:
+        return
+    if not procs_list:
+        return
+    if not _TELEMETRY_HISTORY_INITIALIZED:
+        init_geoip_history_db()
+    _LAST_PROC_HISTORY_RECORD_TS = now_ts
+    grouped = {}
+    for p in procs_list:
+        raw_name = str(p.get("name") or "").strip()
+        if not raw_name:
+            continue
+        pname = raw_name[:64]
+        slot = grouped.setdefault(pname, {"cpu": 0.0, "ram": 0.0, "vram": 0.0, "io": 0.0})
+        slot["cpu"] += float(p.get("cpu_norm_percent") if p.get("cpu_norm_percent") is not None else (p.get("cpu_percent") or 0.0))
+        slot["ram"] += float(p.get("priv_mb") if p.get("priv_mb") is not None else (p.get("mem_mb") or 0.0))
+        slot["vram"] += float(p.get("vram_mb") or 0.0)
+        slot["io"] += float(p.get("io_total_bps") or 0.0)
+    if not grouped:
+        return
+    ranked = sorted(
+        grouped.items(),
+        key=lambda kv: (kv[1]["cpu"] * 2.0) + (kv[1]["ram"] / 128.0) + (kv[1]["vram"] / 64.0) + (kv[1]["io"] / (1024 * 1024)),
+        reverse=True,
+    )[:20]
+    ts_round = round(float(now_ts), 1)
+    rows = [
+        (
+            ts_round,
+            name,
+            round(min(100.0, vals["cpu"]), 2),
+            round(vals["ram"], 2),
+            round(vals["vram"], 2),
+            round(vals["io"], 1),
+        )
+        for name, vals in ranked
+    ]
+    with PROCESS_HISTORY_LOCK:
+        with GEOIP_HISTORY_DB_LOCK:
+            conn = None
+            try:
+                conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+                conn.executemany("""
+                    INSERT INTO process_history (ts, proc_name, cpu_pct, ram_mb, vram_mb, io_bps)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(ts, proc_name) DO UPDATE SET
+                        cpu_pct=excluded.cpu_pct,
+                        ram_mb=excluded.ram_mb,
+                        vram_mb=excluded.vram_mb,
+                        io_bps=excluded.io_bps
+                """, rows)
+                cutoff_24h = now_ts - 86400.0
+                conn.execute("DELETE FROM process_history WHERE ts < ?", (cutoff_24h,))
+                conn.commit()
+            except Exception as e:
+                print(f"[-] Error guardando process_history en SQLite: {e}")
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+
+
+_PROC_HIST_COLORS = [
+    "#0284c7",
+    "#10b981",
+    "#f59e0b",
+    "#8b5cf6",
+    "#ef4444",
+    "#06b6d4",
+]
+
+
+def query_process_history_from_sqlite(hours=24, metric="cpu"):
+    """Consulta la evolución histórica de procesos agrupados en las últimas 24h (Top 6 + Otros)."""
+    if not _TELEMETRY_HISTORY_INITIALIZED:
+        init_geoip_history_db()
+    try:
+        hours_val = max(1, min(int(hours or 24), 24))
+    except Exception:
+        hours_val = 24
+    metric_key = str(metric or "cpu").strip().lower()
+    if metric_key not in ("cpu", "ram", "vram", "io"):
+        metric_key = "cpu"
+    unit_map = {"cpu": "%", "ram": "MB", "vram": "MB", "io": "MB/s"}
+    unit = unit_map[metric_key]
+    now_ts = time.time()
+    cutoff_ts = now_ts - (hours_val * 3600.0)
+
+    with GEOIP_HISTORY_DB_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT ts, proc_name, cpu_pct, ram_mb, vram_mb, io_bps
+                FROM process_history
+                WHERE ts >= ?
+                ORDER BY ts ASC
+            """, (cutoff_ts,)).fetchall()
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": str(e),
+                "metric": metric_key,
+                "unit": unit,
+                "hours": hours_val,
+                "bucket_count": 0,
+                "total_snapshots": 0,
+                "oldest_ts": None,
+                "newest_ts": None,
+                "timestamps": [],
+                "date_timestamps": [],
+                "epoch_ts": [],
+                "series": [],
+            }
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    if not rows:
+        return {
+            "ok": True,
+            "metric": metric_key,
+            "unit": unit,
+            "hours": hours_val,
+            "bucket_count": 0,
+            "total_snapshots": 0,
+            "oldest_ts": None,
+            "newest_ts": None,
+            "timestamps": [],
+            "date_timestamps": [],
+            "epoch_ts": [],
+            "series": [],
+        }
+
+    # Agrupar snapshots por ts y construir cubetas adaptativas (hasta ~96 cubetas para legibilidad)
+    snapshots_by_ts = {}
+    proc_scores = {}
+    for r in rows:
+        ts_v = float(r["ts"] or 0.0)
+        pname = str(r["proc_name"] or "")
+        if not pname:
+            continue
+        if metric_key == "cpu":
+            val = float(r["cpu_pct"] or 0.0)
+        elif metric_key == "ram":
+            val = float(r["ram_mb"] or 0.0)
+        elif metric_key == "vram":
+            val = float(r["vram_mb"] or 0.0)
+        else:
+            val = float(r["io_bps"] or 0.0) / (1024.0 * 1024.0)
+        snap = snapshots_by_ts.setdefault(ts_v, {})
+        snap[pname] = snap.get(pname, 0.0) + max(0.0, val)
+        proc_scores[pname] = proc_scores.get(pname, 0.0) + max(0.0, val)
+
+    sorted_ts = sorted(snapshots_by_ts.keys())
+    if not sorted_ts:
+        return {
+            "ok": True,
+            "metric": metric_key,
+            "unit": unit,
+            "hours": hours_val,
+            "bucket_count": 0,
+            "total_snapshots": 0,
+            "oldest_ts": None,
+            "newest_ts": None,
+            "timestamps": [],
+            "date_timestamps": [],
+            "epoch_ts": [],
+            "series": [],
+        }
+
+    top_procs = [
+        name for name, _ in sorted(proc_scores.items(), key=lambda kv: kv[1], reverse=True)[:6]
+    ]
+    top_set = set(top_procs)
+
+    max_buckets = 96
+    buckets = []
+    if len(sorted_ts) <= max_buckets:
+        for ts_v in sorted_ts:
+            buckets.append((ts_v, snapshots_by_ts[ts_v]))
+    else:
+        span_total = max(1.0, sorted_ts[-1] - sorted_ts[0])
+        step = span_total / float(max_buckets)
+        for idx in range(max_buckets):
+            b_start = sorted_ts[0] + idx * step
+            b_end = sorted_ts[0] + (idx + 1) * step + (0.01 if idx == max_buckets - 1 else 0.0)
+            chunk_ts = [t for t in sorted_ts if b_start <= t < b_end]
+            if not chunk_ts:
+                continue
+            avg_map = {}
+            all_names = set()
+            for t in chunk_ts:
+                all_names.update(snapshots_by_ts[t].keys())
+            for pname in all_names:
+                avg_map[pname] = sum(snapshots_by_ts[t].get(pname, 0.0) for t in chunk_ts) / float(len(chunk_ts))
+            buckets.append((chunk_ts[-1], avg_map))
+
+    timestamps = []
+    date_timestamps = []
+    epoch_ts = []
+    series_arrays = {p: [] for p in top_procs}
+    others_arr = []
+
+    for b_ts, b_map in buckets:
+        dt_obj = datetime.fromtimestamp(b_ts)
+        timestamps.append(dt_obj.strftime("%H:%M"))
+        date_timestamps.append(dt_obj.strftime("%d/%m %H:%M"))
+        epoch_ts.append(round(b_ts, 1))
+        for p in top_procs:
+            series_arrays[p].append(round(float(b_map.get(p, 0.0)), 2))
+        other_sum = sum(v for k, v in b_map.items() if k not in top_set)
+        others_arr.append(round(float(other_sum), 2))
+
+    series_out = []
+    for idx, p in enumerate(top_procs):
+        arr = series_arrays[p]
+        n = max(1, len(arr))
+        series_out.append({
+            "id": p,
+            "label": p,
+            "is_others": False,
+            "color": _PROC_HIST_COLORS[idx % len(_PROC_HIST_COLORS)],
+            "avg": round(sum(arr) / float(n), 2),
+            "peak": round(max(arr) if arr else 0.0, 2),
+            "last": round(arr[-1] if arr else 0.0, 2),
+            "data": arr,
+        })
+
+    if any(v > 0 for v in others_arr):
+        n = max(1, len(others_arr))
+        series_out.append({
+            "id": "__others__",
+            "label": "",
+            "is_others": True,
+            "color": "#64748b",
+            "avg": round(sum(others_arr) / float(n), 2),
+            "peak": round(max(others_arr) if others_arr else 0.0, 2),
+            "last": round(others_arr[-1] if others_arr else 0.0, 2),
+            "data": others_arr,
+        })
+
+    return {
+        "ok": True,
+        "metric": metric_key,
+        "unit": unit,
+        "hours": hours_val,
+        "bucket_count": len(buckets),
+        "total_snapshots": len(sorted_ts),
+        "oldest_ts": round(sorted_ts[0], 1),
+        "newest_ts": round(sorted_ts[-1], 1),
+        "timestamps": timestamps,
+        "date_timestamps": date_timestamps,
+        "epoch_ts": epoch_ts,
+        "series": series_out,
+    }
+
+
+def _read_resolv_nameservers():
+    servers = []
+    try:
+        with open("/etc/resolv.conf", "r", encoding="utf-8") as f:
+            for line in f:
+                ln = line.strip()
+                if not ln or ln.startswith("#"):
+                    continue
+                parts = ln.split()
+                if len(parts) >= 2 and parts[0].lower() == "nameserver":
+                    ip = parts[1].strip()
+                    if re.match(r"^\d+\.\d+\.\d+\.\d+$", ip) and not ip.startswith("127.") and ip not in servers:
+                        servers.append(ip)
+    except Exception:
+        pass
+    return servers
+
+
+def _probe_host_rtt_ms(ip, tcp_port=None):
+    """Mide latencia real ICMP o handshake TCP en milisegundos hacia un nodo activo."""
+    try:
+        proc = subprocess.run(
+            ["ping", "-n", "-c", "1", "-W", "1", ip],
+            capture_output=True,
+            text=True,
+            timeout=1.8,
+        )
+        if proc.returncode == 0 and proc.stdout:
+            m = re.search(r"time[=<]([0-9.]+)\s*ms", proc.stdout)
+            if m:
+                return round(float(m.group(1)), 2)
+    except Exception:
+        pass
+    ports = [int(tcp_port)] if tcp_port and int(tcp_port) > 0 else [443, 53, 80]
+    for port in ports:
+        sock = None
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1.2)
+            t0 = time.perf_counter()
+            err = sock.connect_ex((ip, port))
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            if err in (0, 111, 10061) and elapsed_ms < 1150.0:
+                return round(elapsed_ms, 2)
+        except Exception:
+            pass
+        finally:
+            if sock is not None:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+    return None
+
+
+def fetch_ping_latency_worker():
+    """Sondea dinámicamente la puerta de enlace y nodos externos activos cada 5s (Zero-Hardcoding)."""
+    global PING_LATENCY_CACHE
+    target_palette = ["#0284c7", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4"]
+    time.sleep(2.0)
+    last_db_prune = 0.0
+    while True:
+        try:
+            targets_spec = []
+            seen_ips = set()
+            gw_ip = _detect_default_gateway_ip()
+            with WIFI_LOCK:
+                wifi_sum = dict(WIFI_CACHE.get("summary", {}))
+            if gw_ip:
+                gw_label = wifi_sum.get("gateway_name") or wifi_sum.get("router_model") or gw_ip
+                targets_spec.append({
+                    "id": f"gw_{gw_ip}",
+                    "ip": gw_ip,
+                    "label": str(gw_label),
+                    "kind": "gateway",
+                    "port": 80,
+                })
+                seen_ips.add(gw_ip)
+
+            with CONNECTIONS_MAP_LOCK:
+                conns = list(CONNECTIONS_MAP_CACHE.get("connections", []))
+            for c in conns:
+                if len(targets_spec) >= 4:
+                    break
+                if c.get("is_server_node") or c.get("is_lan"):
+                    continue
+                rip = str(c.get("remote_ip") or c.get("ip") or "").strip()
+                if not rip or rip in seen_ips or not re.match(r"^\d+\.\d+\.\d+\.\d+$", rip):
+                    continue
+                seen_ips.add(rip)
+                lbl = str(c.get("domain") or c.get("isp") or c.get("org") or c.get("service") or rip).strip()
+                if len(lbl) > 26:
+                    lbl = f"{lbl[:23]}..."
+                targets_spec.append({
+                    "id": f"ext_{rip}",
+                    "ip": rip,
+                    "label": lbl,
+                    "kind": "external",
+                    "port": int(c.get("remote_port") or c.get("port") or 443),
+                })
+
+            for dns_ip in _read_resolv_nameservers():
+                if len(targets_spec) >= 5:
+                    break
+                if dns_ip in seen_ips:
+                    continue
+                seen_ips.add(dns_ip)
+                targets_spec.append({
+                    "id": f"dns_{dns_ip}",
+                    "ip": dns_ip,
+                    "label": f"DNS {dns_ip}",
+                    "kind": "dns",
+                    "port": 53,
+                })
+
+            now_ts = time.time()
+            time_str = datetime.fromtimestamp(now_ts).strftime("%H:%M:%S")
+            results_map = {}
+            for spec in targets_spec:
+                rtt = _probe_host_rtt_ms(spec["ip"], spec.get("port"))
+                results_map[spec["id"]] = (spec, rtt)
+
+            with PING_LATENCY_LOCK:
+                _PING_HISTORY_POINTS.append({
+                    "ts": round(now_ts, 2),
+                    "time_str": time_str,
+                    "values": {tid: rtt for tid, (_, rtt) in results_map.items()},
+                })
+                cutoff_20m = now_ts - 1200.0
+                while _PING_HISTORY_POINTS and _PING_HISTORY_POINTS[0]["ts"] < cutoff_20m:
+                    _PING_HISTORY_POINTS.pop(0)
+
+                timestamps = [pt["time_str"] for pt in _PING_HISTORY_POINTS]
+                epoch_ts = [pt["ts"] for pt in _PING_HISTORY_POINTS]
+                targets_out = []
+                for idx, spec in enumerate(targets_spec):
+                    tid = spec["id"]
+                    raw_vals = [pt["values"].get(tid) for pt in _PING_HISTORY_POINTS]
+                    valid_vals = [float(v) for v in raw_vals if isinstance(v, (int, float)) and v >= 0]
+                    total_pts = max(1, len(raw_vals))
+                    loss_pct = round(((len(raw_vals) - len(valid_vals)) / float(total_pts)) * 100.0, 1)
+                    avg_ms = round(sum(valid_vals) / float(len(valid_vals)), 2) if valid_vals else None
+                    min_ms = round(min(valid_vals), 2) if valid_vals else None
+                    max_ms = round(max(valid_vals), 2) if valid_vals else None
+                    last_ms = round(float(raw_vals[-1]), 2) if raw_vals and isinstance(raw_vals[-1], (int, float)) and raw_vals[-1] >= 0 else None
+                    jitter_ms = 0.0
+                    if len(valid_vals) >= 2:
+                        diffs = [abs(valid_vals[i] - valid_vals[i - 1]) for i in range(1, len(valid_vals))]
+                        jitter_ms = round(sum(diffs) / float(len(diffs)), 2)
+                    data_clean = [round(float(v), 2) if isinstance(v, (int, float)) and v >= 0 else 0.0 for v in raw_vals]
+                    targets_out.append({
+                        "id": tid,
+                        "ip": spec["ip"],
+                        "label": spec["label"],
+                        "kind": spec["kind"],
+                        "avg_ms": avg_ms,
+                        "last_ms": last_ms,
+                        "min_ms": min_ms,
+                        "max_ms": max_ms,
+                        "jitter_ms": jitter_ms,
+                        "loss_pct": loss_pct,
+                        "color": target_palette[idx % len(target_palette)],
+                        "data": data_clean,
+                    })
+                PING_LATENCY_CACHE = {
+                    "updated_at": time_str,
+                    "timestamps": timestamps,
+                    "epoch_ts": epoch_ts,
+                    "targets": targets_out,
+                }
+
+            if results_map:
+                if not _TELEMETRY_HISTORY_INITIALIZED:
+                    init_geoip_history_db()
+                db_rows = [
+                    (
+                        round(now_ts, 2),
+                        tid,
+                        spec["ip"],
+                        spec["label"],
+                        spec["kind"],
+                        float(rtt) if rtt is not None else -1.0,
+                        0.0 if rtt is not None else 100.0,
+                    )
+                    for tid, (spec, rtt) in results_map.items()
+                ]
+                with GEOIP_HISTORY_DB_LOCK:
+                    conn = None
+                    try:
+                        conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+                        conn.executemany("""
+                            INSERT OR REPLACE INTO ping_history (ts, target_id, target_ip, label, kind, rtt_ms, loss_pct)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, db_rows)
+                        if now_ts - last_db_prune > 120.0:
+                            conn.execute("DELETE FROM ping_history WHERE ts < ?", (now_ts - 86400.0,))
+                            last_db_prune = now_ts
+                        conn.commit()
+                    except Exception:
+                        pass
+                    finally:
+                        if conn is not None:
+                            try:
+                                conn.close()
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+        time.sleep(5.0)
+
+
+def query_speedtest_history_from_sqlite(limit=100):
+    """Consulta el historial de tests de velocidad persistido en recursos_history.db."""
+    if not _TELEMETRY_HISTORY_INITIALIZED:
+        init_geoip_history_db()
+    with GEOIP_HISTORY_DB_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT id, ts, created_at, download_mbps, upload_mbps, ping_ms, jitter_ms,
+                       packet_loss_pct, server_name, server_host, server_location,
+                       client_ip, isp, duration_ms, scope
+                FROM speedtest_history
+                ORDER BY ts DESC, id DESC
+                LIMIT ?
+            """, (max(1, min(int(limit or 100), 500)),)).fetchall()
+            items = [dict(r) for r in rows]
+            best_dl = max((float(x.get("download_mbps") or 0.0) for x in items), default=0.0)
+            best_ul = max((float(x.get("upload_mbps") or 0.0) for x in items), default=0.0)
+            avg_ping = round(sum(float(x.get("ping_ms") or 0.0) for x in items) / float(len(items)), 2) if items else 0.0
+            return {
+                "ok": True,
+                "db_file": "recursos_history.db",
+                "total": len(items),
+                "best_download_mbps": round(best_dl, 2),
+                "best_upload_mbps": round(best_ul, 2),
+                "avg_ping_ms": avg_ping,
+                "items": items,
+            }
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": str(e),
+                "db_file": "recursos_history.db",
+                "total": 0,
+                "best_download_mbps": 0.0,
+                "best_upload_mbps": 0.0,
+                "avg_ping_ms": 0.0,
+                "items": [],
+            }
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+
+def delete_speedtest_history_from_sqlite(entry_id=None):
+    """Elimina uno o todos los registros de speedtest_history en recursos_history.db."""
+    if not _TELEMETRY_HISTORY_INITIALIZED:
+        init_geoip_history_db()
+    with GEOIP_HISTORY_DB_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+            if entry_id is not None:
+                cur = conn.execute("DELETE FROM speedtest_history WHERE id = ?", (int(entry_id),))
+            else:
+                cur = conn.execute("DELETE FROM speedtest_history")
+            deleted = cur.rowcount or 0
+            conn.commit()
+            return True, deleted
+        except Exception:
+            return False, 0
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+
+def _run_speedtest_worker():
+    """Ejecuta medición real de Ping/Jitter, Descarga y Subida y persiste resultado en SQLite."""
+    t_start = time.perf_counter()
+    with SPEEDTEST_LOCK:
+        SPEEDTEST_STATE.update({
+            "running": True,
+            "phase": "ping",
+            "progress_pct": 6,
+            "current_mbps": 0.0,
+            "ping_ms": 0.0,
+            "jitter_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "download_mbps": 0.0,
+            "upload_mbps": 0.0,
+            "server_name": "",
+            "server_host": "",
+            "server_location": "",
+            "client_ip": "",
+            "isp": "",
+            "scope": "wan",
+            "error": "",
+            "started_at": time.time(),
+        })
+    try:
+        wan_reachable = False
+        server_name = HOSTNAME or socket.gethostname()
+        server_host = "127.0.0.1"
+        server_location = ""
+        client_ip = SERVER_LOCAL_IP
+        isp_name = ""
+        with GEOIP_LOCK:
+            if SERVER_SELF_GEO:
+                client_ip = str(SERVER_SELF_GEO.get("ip") or SERVER_LOCAL_IP)
+                isp_name = str(SERVER_SELF_GEO.get("isp") or SERVER_SELF_GEO.get("org") or "")
+                city_s = str(SERVER_SELF_GEO.get("city") or "")
+                country_s = str(SERVER_SELF_GEO.get("country") or "")
+                server_location = ", ".join(x for x in (city_s, country_s) if x)
+
+        probe_url = "https://speed.cloudflare.com/__down?bytes=65536"
+        try:
+            req = urllib.request.Request(probe_url, headers={"User-Agent": f"RecursosCockpit/{get_app_version()}"})
+            with urllib.request.urlopen(req, timeout=3.0) as r:
+                r.read()
+                cf_ray = r.headers.get("cf-ray", "")
+                colo = cf_ray.split("-")[-1] if "-" in cf_ray else ""
+                wan_reachable = True
+                server_name = f"Cloudflare Edge ({colo})" if colo else "Cloudflare Speed Edge"
+                server_host = "speed.cloudflare.com"
+                if colo and not server_location:
+                    server_location = colo
+        except Exception:
+            wan_reachable = False
+
+        scope = "wan" if wan_reachable else "local_node"
+        local_base = f"http://127.0.0.1:{ACTIVE_SERVER_PORT}/api/net/speedtest/payload"
+
+        # 1. Ping & Jitter
+        ping_samples = []
+        ping_fails = 0
+        for idx in range(6):
+            p_url = "https://speed.cloudflare.com/__down?bytes=1024" if wan_reachable else f"{local_base}?bytes=1024"
+            p_t0 = time.perf_counter()
+            try:
+                req = urllib.request.Request(p_url, headers={"User-Agent": f"RecursosCockpit/{get_app_version()}"})
+                with urllib.request.urlopen(req, timeout=2.5) as r:
+                    r.read()
+                ping_samples.append((time.perf_counter() - p_t0) * 1000.0)
+            except Exception:
+                ping_fails += 1
+            with SPEEDTEST_LOCK:
+                SPEEDTEST_STATE["progress_pct"] = 8 + int(((idx + 1) / 6.0) * 12)
+        ping_ms = round(sorted(ping_samples)[len(ping_samples) // 2], 2) if ping_samples else 0.0
+        jitter_ms = round(
+            sum(abs(ping_samples[i] - ping_samples[i - 1]) for i in range(1, len(ping_samples))) / float(len(ping_samples) - 1),
+            2,
+        ) if len(ping_samples) >= 2 else 0.0
+        loss_pct = round((ping_fails / 6.0) * 100.0, 1)
+
+        with SPEEDTEST_LOCK:
+            SPEEDTEST_STATE.update({
+                "phase": "download",
+                "progress_pct": 22,
+                "ping_ms": ping_ms,
+                "jitter_ms": jitter_ms,
+                "packet_loss_pct": loss_pct,
+                "server_name": server_name,
+                "server_host": server_host,
+                "server_location": server_location,
+                "client_ip": client_ip,
+                "isp": isp_name,
+                "scope": scope,
+            })
+
+        # 2. Download Mbps
+        dl_bytes_total = 0
+        dl_t0 = time.perf_counter()
+        dl_sizes = [8_000_000, 12_000_000] if wan_reachable else [16_000_000, 16_000_000]
+        for s_idx, sz in enumerate(dl_sizes):
+            d_url = f"https://speed.cloudflare.com/__down?bytes={sz}" if wan_reachable else f"{local_base}?bytes={sz}"
+            try:
+                req = urllib.request.Request(d_url, headers={"User-Agent": f"RecursosCockpit/{get_app_version()}"})
+                with urllib.request.urlopen(req, timeout=12.0) as r:
+                    while True:
+                        chunk = r.read(131072)
+                        if not chunk:
+                            break
+                        dl_bytes_total += len(chunk)
+                        el = max(0.05, time.perf_counter() - dl_t0)
+                        live_dl = round((dl_bytes_total * 8.0) / (el * 1_000_000.0), 2)
+                        with SPEEDTEST_LOCK:
+                            SPEEDTEST_STATE["current_mbps"] = live_dl
+                            SPEEDTEST_STATE["download_mbps"] = live_dl
+                            SPEEDTEST_STATE["progress_pct"] = min(60, 22 + int((s_idx * 19) + (dl_bytes_total / float(sum(dl_sizes))) * 19))
+            except Exception:
+                pass
+        dl_elapsed = max(0.05, time.perf_counter() - dl_t0)
+        download_mbps = round((dl_bytes_total * 8.0) / (dl_elapsed * 1_000_000.0), 2)
+
+        with SPEEDTEST_LOCK:
+            SPEEDTEST_STATE.update({
+                "phase": "upload",
+                "progress_pct": 62,
+                "download_mbps": download_mbps,
+                "current_mbps": 0.0,
+            })
+
+        # 3. Upload Mbps
+        ul_chunk = b"\x00" * (2_500_000 if wan_reachable else 8_000_000)
+        ul_bytes_total = 0
+        ul_t0 = time.perf_counter()
+        for u_idx in range(2):
+            u_url = "https://speed.cloudflare.com/__up" if wan_reachable else local_base
+            try:
+                req = urllib.request.Request(
+                    u_url,
+                    data=ul_chunk,
+                    method="POST",
+                    headers={
+                        "Content-Type": "application/octet-stream",
+                        "Content-Length": str(len(ul_chunk)),
+                        "User-Agent": f"RecursosCockpit/{get_app_version()}",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=12.0) as r:
+                    r.read()
+                ul_bytes_total += len(ul_chunk)
+                el = max(0.05, time.perf_counter() - ul_t0)
+                live_ul = round((ul_bytes_total * 8.0) / (el * 1_000_000.0), 2)
+                with SPEEDTEST_LOCK:
+                    SPEEDTEST_STATE["current_mbps"] = live_ul
+                    SPEEDTEST_STATE["upload_mbps"] = live_ul
+                    SPEEDTEST_STATE["progress_pct"] = 62 + int(((u_idx + 1) / 2.0) * 33)
+            except Exception:
+                pass
+        ul_elapsed = max(0.05, time.perf_counter() - ul_t0)
+        upload_mbps = round((ul_bytes_total * 8.0) / (ul_elapsed * 1_000_000.0), 2)
+        duration_ms = int((time.perf_counter() - t_start) * 1000)
+        now_ts = time.time()
+        created_at = datetime.fromtimestamp(now_ts).strftime("%Y-%m-%d %H:%M:%S")
+
+        if not _TELEMETRY_HISTORY_INITIALIZED:
+            init_geoip_history_db()
+        inserted_id = 0
+        with GEOIP_HISTORY_DB_LOCK:
+            conn = None
+            try:
+                conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+                cur = conn.execute("""
+                    INSERT INTO speedtest_history (
+                        ts, created_at, download_mbps, upload_mbps, ping_ms, jitter_ms,
+                        packet_loss_pct, server_name, server_host, server_location,
+                        client_ip, isp, duration_ms, scope
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    round(now_ts, 3), created_at, download_mbps, upload_mbps, ping_ms, jitter_ms,
+                    loss_pct, server_name, server_host, server_location, client_ip, isp_name, duration_ms, scope,
+                ))
+                inserted_id = cur.lastrowid or 0
+                conn.execute("""
+                    DELETE FROM speedtest_history
+                    WHERE id NOT IN (SELECT id FROM speedtest_history ORDER BY ts DESC, id DESC LIMIT 500)
+                """)
+                conn.commit()
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+
+        result_obj = {
+            "id": inserted_id,
+            "ts": round(now_ts, 3),
+            "created_at": created_at,
+            "download_mbps": download_mbps,
+            "upload_mbps": upload_mbps,
+            "ping_ms": ping_ms,
+            "jitter_ms": jitter_ms,
+            "packet_loss_pct": loss_pct,
+            "server_name": server_name,
+            "server_host": server_host,
+            "server_location": server_location,
+            "client_ip": client_ip,
+            "isp": isp_name,
+            "duration_ms": duration_ms,
+            "scope": scope,
+        }
+        with SPEEDTEST_LOCK:
+            SPEEDTEST_STATE.update({
+                "running": False,
+                "phase": "done",
+                "progress_pct": 100,
+                "current_mbps": download_mbps,
+                "download_mbps": download_mbps,
+                "upload_mbps": upload_mbps,
+                "last_result": result_obj,
+            })
+    except Exception as exc:
+        with SPEEDTEST_LOCK:
+            SPEEDTEST_STATE.update({
+                "running": False,
+                "phase": "error",
+                "progress_pct": 0,
+                "error": str(exc),
+            })
 
 def save_geoip_locations_to_sqlite(entries_dict):
     """Persiste un lote de ubicaciones GeoIP resueltas en la tabla SQLite geoip_locations."""
@@ -11209,12 +12105,28 @@ def background_collector():
             
             with WIFI_LOCK:
                 wifi_data = dict(WIFI_CACHE)
-            
+
+            wifi_summary_copy = dict(wifi_data.get("summary", {}))
+            router_wan_rx_live = float(wifi_summary_copy.get("router_wan_rx_bytes_sec", wan_rx_bytes_sec) or 0.0)
+            router_wan_tx_live = float(wifi_summary_copy.get("router_wan_tx_bytes_sec", wan_tx_bytes_sec) or 0.0)
+            router_lan_rx_live = float(wifi_summary_copy.get("router_lan_rx_bytes_sec", lan_rx_bytes_sec) or 0.0)
+            router_lan_tx_live = float(wifi_summary_copy.get("router_lan_tx_bytes_sec", lan_tx_bytes_sec) or 0.0)
+            router_hist_20m = _push_router_history_bucket(
+                now, router_wan_rx_live, router_wan_tx_live, router_lan_rx_live, router_lan_tx_live
+            )
+            wifi_summary_copy["router_history_20m"] = router_hist_20m
+
+            if cached_procs:
+                record_process_snapshot_to_sqlite(now, cached_procs)
+
             with SECURITY_LOCK:
                 security_data = dict(SECURITY_CACHE)
             
             with CONNECTIONS_MAP_LOCK:
                 conn_map_data = dict(CONNECTIONS_MAP_CACHE)
+
+            with PING_LATENCY_LOCK:
+                ping_latency_data = dict(PING_LATENCY_CACHE)
 
             net_info = {
                 "rx_bytes_sec": rx_bytes_sec,
@@ -11228,6 +12140,8 @@ def background_collector():
                 "local_ip": SERVER_LOCAL_IP,
                 "interfaces": interfaces,
                 "interfaces_list": interfaces_list,
+                "router_history_20m": router_hist_20m,
+                "ping_latency": ping_latency_data,
                 "connections_map": conn_map_data
             }
             
@@ -11345,7 +12259,7 @@ def background_collector():
                 "parental_control": parental_acts,
                 "system_processes": cached_procs,
                 "wifi_clients": wifi_data.get("clients", []),
-                "wifi_summary": wifi_data.get("summary", {}),
+                "wifi_summary": wifi_summary_copy,
                 "security": security_data,
                 "history": HISTORY,
                 "telegram_bot": telegram_bot_act,
@@ -11762,13 +12676,38 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_DELETE(self):
+        auth = check_trust_status(self)
+        clean_path = self.path.split('?')[0].rstrip('/') or '/'
+        if clean_path == "/api/net/speedtest/history":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            entry_id = None
+            if "?" in self.path:
+                try:
+                    q_params = urllib.parse.parse_qs(self.path.split("?", 1)[1])
+                    if "id" in q_params:
+                        entry_id = int(q_params["id"][0])
+                except Exception:
+                    entry_id = None
+            ok, deleted = delete_speedtest_history_from_sqlite(entry_id)
+            resp = json.dumps({"ok": ok, "success": ok, "deleted": deleted}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
         self.send_response(405)
         self.send_security_headers()
         self.end_headers()
 
     def do_OPTIONS(self):
         self.send_response(204)
-        self.send_header('Allow', 'GET, POST, HEAD')
+        self.send_header('Allow', 'GET, POST, DELETE, HEAD')
         self.send_security_headers()
         self.end_headers()
 
@@ -11979,6 +12918,91 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(resp)))
             self.end_headers()
             self.wfile.write(resp)
+            return
+
+        # 1a-quater. HISTORIAL DE PROCESOS 24H EN SQLITE (recursos_history.db)
+        elif clean_path == "/api/metrics/process-history":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            query_str = self.path.split('?', 1)[1] if '?' in self.path else ''
+            params = urllib.parse.parse_qs(query_str)
+            hours_p = params.get('hours', ['24'])[0]
+            metric_p = params.get('metric', ['cpu'])[0]
+            proc_hist = query_process_history_from_sqlite(hours=hours_p, metric=metric_p)
+            resp = json.dumps(proc_hist).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 1a-quinquies. TEST DE VELOCIDAD Y SU HISTORIAL SQLITE
+        elif clean_path == "/api/net/speedtest/status":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            with SPEEDTEST_LOCK:
+                st_copy = dict(SPEEDTEST_STATE)
+            st_copy["ok"] = True
+            resp = json.dumps(st_copy).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        elif clean_path == "/api/net/speedtest/history":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            hist_st = query_speedtest_history_from_sqlite(limit=100)
+            resp = json.dumps(hist_st).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        elif clean_path == "/api/net/speedtest/payload":
+            if client_ip not in ("127.0.0.1", "::1") and not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            query_str = self.path.split('?', 1)[1] if '?' in self.path else ''
+            params = urllib.parse.parse_qs(query_str)
+            try:
+                nbytes = max(1024, min(int(params.get('bytes', [1048576])[0]), 33554432))
+            except Exception:
+                nbytes = 1048576
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(nbytes))
+            self.send_security_headers()
+            self.end_headers()
+            zero_block = b"\x00" * 65536
+            remaining = nbytes
+            while remaining > 0:
+                chunk_len = min(remaining, len(zero_block))
+                self.wfile.write(zero_block[:chunk_len])
+                remaining -= chunk_len
             return
 
         # 1a-ter. BASE DE DATOS UNIFICADA DE DISPOSITIVOS DE RED (Pi-hole + ASUS + Puerta de Enlace)
@@ -13698,6 +14722,70 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        elif clean_path == "/api/net/speedtest/run":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            with SPEEDTEST_LOCK:
+                already_running = bool(SPEEDTEST_STATE.get("running"))
+            if not already_running:
+                threading.Thread(target=_run_speedtest_worker, daemon=True, name="SpeedTestWorker").start()
+            resp = json.dumps({"ok": True, "success": True, "running": True}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        elif clean_path == "/api/net/speedtest/history/clear":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            body, _ = self._read_json_body(max_bytes=2048)
+            entry_id = (body or {}).get("id")
+            ok, deleted = delete_speedtest_history_from_sqlite(int(entry_id) if entry_id is not None else None)
+            resp = json.dumps({"ok": ok, "success": ok, "deleted": deleted}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        elif clean_path == "/api/net/speedtest/payload":
+            if client_ip not in ("127.0.0.1", "::1") and not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            try:
+                content_len = min(int(self.headers.get('Content-Length') or 0), 67108864)
+            except Exception:
+                content_len = 0
+            drained = 0
+            while drained < content_len:
+                chunk = self.rfile.read(min(131072, content_len - drained))
+                if not chunk:
+                    break
+                drained += len(chunk)
+            resp = json.dumps({"ok": True, "received_bytes": drained}).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # Gestión de Contenedores Docker y Servicios Systemd (Iniciar / Reiniciar)
         elif clean_path in ("/api/service/action", "/api/service/restart"):
             auth = check_trust_status(self)
@@ -14202,12 +15290,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         return
 
 def run_server(port=None):
+    global ACTIVE_SERVER_PORT
     if port is None:
         raw_port = os.environ.get("RECURSOS_PORT") or os.environ.get("PORT") or "8085"
         try:
             port = int(raw_port)
         except (TypeError, ValueError):
             port = 8085
+    ACTIVE_SERVER_PORT = port
     preload_telemetry_history_from_sqlite()
     threading.Thread(target=fetch_gpu_worker, daemon=True).start()
     threading.Thread(target=fetch_disks_worker, daemon=True).start()
@@ -14215,6 +15305,7 @@ def run_server(port=None):
     threading.Thread(target=fetch_wifi_worker, daemon=True).start()
     threading.Thread(target=fetch_security_worker, daemon=True).start()
     threading.Thread(target=fetch_connections_geo_worker, daemon=True).start()
+    threading.Thread(target=fetch_ping_latency_worker, daemon=True, name="PingLatencyWorker").start()
     threading.Thread(target=background_collector, daemon=True).start()
     threading.Thread(target=auto_install_watcher_worker, daemon=True, name="AutoInstallWatcher").start()
     threading.Thread(target=telegram_bot_polling_worker, daemon=True, name="TelegramBotPolling").start()

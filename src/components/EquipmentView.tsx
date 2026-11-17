@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { AccordionBody, AnimatedMetricValue, MorphPill, ViewStage } from './MotionPrimitives';
 import { ExpandChartSpec } from './OverviewView';
+import { ProcessHistoryStackedChart } from './ProcessHistoryStackedChart';
 import { ResourceProcessesPanel } from './ResourceProcessesPanel';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
@@ -1086,7 +1087,10 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
 
       {/* Subview: Programas en marcha */}
       {subTab === 'processes' && (
-        <div className="cockpit-bento p-5">
+        <div className="space-y-4">
+          <ProcessHistoryStackedChart theme={theme} />
+
+          <div className="cockpit-bento p-5">
           <div className="flex flex-col gap-3 pb-4 border-b border-slate-200/70 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
@@ -1187,6 +1191,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
       </ViewStage>

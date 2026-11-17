@@ -274,6 +274,16 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     return iface?.history_2h ?? null;
   }, [spec.chartKind, spec.nicName, liveMetrics?.net?.interfaces_list]);
 
+  const liveRouterHist = useMemo(() => {
+    if (spec.chartKind !== 'router') return null;
+    return liveMetrics?.wifi_summary?.router_history_20m ?? liveMetrics?.net?.router_history_20m ?? null;
+  }, [spec.chartKind, liveMetrics?.wifi_summary?.router_history_20m, liveMetrics?.net?.router_history_20m]);
+
+  const livePingLatency = useMemo(() => {
+    if (spec.chartKind !== 'ping') return null;
+    return liveMetrics?.net?.ping_latency ?? null;
+  }, [spec.chartKind, liveMetrics?.net?.ping_latency]);
+
   const liveDiskHist = useMemo(() => {
     if (spec.chartKind !== 'storage' || !spec.diskMountpoint) return null;
     const matched = (liveMetrics?.disks || []).find(
@@ -326,6 +336,16 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         !(historyData?.series?.net_rx?.length))
   );
 
+  const useLocal20mRouter = Boolean(
+    preset === '1200' &&
+      cursorEndTs === null &&
+      spec.chartKind === 'router' &&
+      liveRouterHist &&
+      liveRouterHist.length > 10 &&
+      ((liveRouterHist[liveRouterHist.length - 1].t - liveRouterHist[0].t) >= 1020_000 ||
+        !(historyData?.series?.net_wan_rx?.length))
+  );
+
   const liveBucketWindow = useMemo(() => {
     const isLiveHead = preset === 'live' && cursorEndTs === null;
     const spanSec = isLiveHead ? LIVE_WINDOW_SECONDS : 1200;
@@ -339,6 +359,30 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         sliced,
         epochs: epochsAll.slice(startIdx),
         timestamps: sliced.map((b) => new Date(b.t).toLocaleTimeString(locale)),
+      };
+    }
+
+    if ((isLiveHead && spec.chartKind === 'router' && liveRouterHist) || (!isLiveHead && useLocal20mRouter && liveRouterHist)) {
+      const epochsAll = liveRouterHist.map((b) => Math.round(b.t / 1000));
+      const startIdx = liveSliceWindow.filterByEpoch(epochsAll, spanSec);
+      const sliced = liveRouterHist.slice(startIdx);
+      return {
+        kind: 'nic' as const,
+        sliced,
+        epochs: epochsAll.slice(startIdx),
+        timestamps: sliced.map((b) => new Date(b.t).toLocaleTimeString(locale)),
+      };
+    }
+
+    if (spec.chartKind === 'ping' && livePingLatency && livePingLatency.targets.length > 0) {
+      const epochsAll = livePingLatency.epoch_ts ?? [];
+      const startIdx = liveSliceWindow.filterByEpoch(epochsAll, isLiveHead ? LIVE_WINDOW_SECONDS : 1200);
+      return {
+        kind: 'ping' as const,
+        livePingLatency,
+        startIdx,
+        epochs: epochsAll.slice(startIdx),
+        timestamps: (livePingLatency.timestamps ?? []).slice(startIdx),
       };
     }
 
@@ -366,7 +410,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       };
     }
 
-    if (isLiveHead && liveMetrics?.history && (spec.chartKind !== 'net' || !spec.nicName) && !spec.gpuSubmetric) {
+    if (isLiveHead && liveMetrics?.history && (spec.chartKind !== 'net' || !spec.nicName) && spec.chartKind !== 'router' && spec.chartKind !== 'ping' && !spec.gpuSubmetric) {
       const liveHist = liveMetrics.history;
       const epochsAll = liveHist.epoch_ts ?? [];
       const startIdx = liveSliceWindow.filterByEpoch(epochsAll, LIVE_WINDOW_SECONDS);
@@ -387,10 +431,13 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     spec.nicName,
     spec.gpuSubmetric,
     liveNicHist,
+    liveRouterHist,
+    livePingLatency,
     liveDiskHist,
     liveGpuHist,
     hasGpuSubHist,
     useLocal20mNet,
+    useLocal20mRouter,
     useLocal20mStorage,
     useLocal20mGpu,
     liveMetrics?.history,
@@ -399,6 +446,19 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   ]);
 
   const resolvedSeries: ChartSeries[] = useMemo(() => {
+    if (liveBucketWindow?.kind === 'ping') {
+      const { livePingLatency: pingP, startIdx } = liveBucketWindow;
+      return pingP.targets.map((tgt) => ({
+        id: tgt.id,
+        label: tgt.label,
+        data: (tgt.data || []).slice(startIdx),
+        color: tgt.color,
+        unit: 'ms',
+        decimals: 2,
+        fillAlpha: 0.12,
+      }));
+    }
+
     if (liveBucketWindow?.kind === 'nic') {
       const { sliced } = liveBucketWindow;
       return spec.series.map((s) => {
@@ -488,9 +548,9 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
 
   const resolvedDateTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) return undefined;
-    if (useLocal20mGpu || useLocal20mStorage || useLocal20mNet) return undefined;
+    if (useLocal20mGpu || useLocal20mStorage || useLocal20mNet || useLocal20mRouter || spec.chartKind === 'ping') return undefined;
     return historyData?.series?.date_timestamps;
-  }, [preset, cursorEndTs, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, historyData]);
+  }, [preset, cursorEndTs, useLocal20mGpu, useLocal20mStorage, useLocal20mNet, useLocal20mRouter, spec.chartKind, historyData]);
 
   const resolvedEpochTs = useMemo(() => {
     if (liveBucketWindow) {
@@ -833,7 +893,11 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
 
         {/* Procesos activos consumidores del recurso inspeccionado */}
         {spec.chartKind && (
-          <ResourceProcessesPanel kind={spec.chartKind} metrics={liveMetrics} compact />
+          <ResourceProcessesPanel
+            kind={spec.chartKind === 'router' || spec.chartKind === 'ping' ? 'net' : spec.chartKind}
+            metrics={liveMetrics}
+            compact
+          />
         )}
       </motion.div>
     </motion.div>

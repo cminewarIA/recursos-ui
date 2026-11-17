@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import {
+  Activity,
   Bell,
   ChevronDown,
   ChevronUp,
+  Gauge,
   Globe,
   Image as ImageIcon,
   Lock,
@@ -12,6 +14,7 @@ import {
   Power,
   PowerOff,
   RefreshCw,
+  Router,
   Search,
   Send,
   Shield,
@@ -28,6 +31,9 @@ import {
   GeoConnectionItem,
   MetricsPayload,
   NetInterfaceInfo,
+  NicHistoryBucket,
+  SpeedTestHistoryResponse,
+  SpeedTestStatus,
   TelegramBotStatusPayload,
   ThemeMode,
   WifiClient,
@@ -173,6 +179,133 @@ const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, on
   );
 });
 
+interface RouterTrafficCardProps {
+  metrics: MetricsPayload | null;
+  theme: ThemeMode;
+  locale: string;
+  onExpandChart?: (spec: ExpandChartSpec) => void;
+}
+
+const RouterTrafficCard = React.memo<RouterTrafficCardProps>(({ metrics, theme, locale, onExpandChart }) => {
+  const { t } = useI18n();
+  const wifiSum = metrics?.wifi_summary;
+  const routerHist: NicHistoryBucket[] = useMemo(
+    () => wifiSum?.router_history_20m ?? metrics?.net?.router_history_20m ?? [],
+    [wifiSum?.router_history_20m, metrics?.net?.router_history_20m]
+  );
+
+  const routerTitle =
+    wifiSum?.router_traffic_source ||
+    wifiSum?.router_model ||
+    wifiSum?.gateway_name ||
+    t('network.router_widget_title');
+  const routerIp = wifiSum?.router_ip || wifiSum?.gateway_ip || metrics?.net?.local_ip || t('hardware.net.local_net');
+  const wanRxNow = wifiSum?.router_wan_rx_bytes_sec ?? metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0;
+  const wanTxNow = wifiSum?.router_wan_tx_bytes_sec ?? metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0;
+  const lanRxNow = wifiSum?.router_lan_rx_bytes_sec ?? metrics?.net?.lan_rx_bytes_sec ?? 0;
+  const lanTxNow = wifiSum?.router_lan_tx_bytes_sec ?? metrics?.net?.lan_tx_bytes_sec ?? 0;
+
+  const { routerSeries, routerTimestamps, routerEpochTs, expandRouterSpec } = useMemo(() => {
+    const wanRxData = routerHist.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100);
+    const wanTxData = routerHist.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100);
+    const lanRxData = routerHist.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100);
+    const lanTxData = routerHist.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100);
+    const timestamps = routerHist.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale));
+    const epochTs = routerHist.map((b) => Math.round(b.t / 1000));
+    const series: ChartSeries[] = [
+      { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: '#0284c7', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
+      { id: 'wan_tx', metricKey: 'net_wan_tx', label: t('hardware.net.wan_upload'), data: wanTxData, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
+      { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.10 },
+      { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.06 },
+    ];
+    const spec: ExpandChartSpec = {
+      title: `${t('network.router_widget_title')} · ${routerTitle}`,
+      subtitle: t('hardware.net.iface_20m_subtitle', { ip: routerIp }),
+      series,
+      timestamps,
+      epochTs,
+      leftUnit: 'MB/s',
+      chartKind: 'router',
+    };
+    return { routerSeries: series, routerTimestamps: timestamps, routerEpochTs: epochTs, expandRouterSpec: spec };
+  }, [routerHist, routerTitle, routerIp, locale, t]);
+
+  const formatRouterLabel = useCallback(
+    (idx: number) => {
+      const bucket = routerHist[idx];
+      return bucket
+        ? new Date(bucket.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale)
+        : t('charts.sample_n', { n: idx + 1 });
+    },
+    [routerHist, locale, t]
+  );
+
+  const handleExpand = useCallback(() => {
+    if (onExpandChart) onExpandChart(expandRouterSpec);
+  }, [onExpandChart, expandRouterSpec]);
+
+  return (
+    <div className="cockpit-bento p-4" data-testid="router-traffic-widget">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Router className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+              {t('network.router_widget_title')}
+            </p>
+          </div>
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+            {routerTitle} · {routerIp}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-right font-mono text-[11px] tabular-nums">
+            <div className="text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
+              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+              ↓ {formatSpeed(wanRxNow)}
+            </div>
+            <div className="text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
+              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+              ↓ {formatSpeed(lanRxNow)}
+            </div>
+            <div className="text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
+              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+              ↑ {formatSpeed(wanTxNow)}
+            </div>
+            <div className="text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
+              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+              ↑ {formatSpeed(lanTxNow)}
+            </div>
+          </div>
+          {onExpandChart && (
+            <button
+              type="button"
+              aria-label={t('hardware.net.inspect_aria', { name: routerTitle })}
+              onClick={handleExpand}
+              className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="mt-3">
+        <TelemetryChart
+          series={routerSeries}
+          timestamps={routerTimestamps}
+          epochTs={routerEpochTs}
+          height={112}
+          leftUnit="MB/s"
+          theme={theme}
+          emptyMessage={t('network.router_accumulating')}
+          onExpandClick={onExpandChart ? handleExpand : undefined}
+          formatLabel={formatRouterLabel}
+        />
+      </div>
+    </div>
+  );
+});
+
 interface DynamicGeoCluster {
   key: string;
   lat: number;
@@ -211,7 +344,8 @@ function inferDefaultJail(c: GeoConnectionItem): string {
   return 'all';
 }
 
-type RedSubTab = 'home' | 'map' | 'security' | 'dns';
+type RedSubTab = 'home' | 'map' | 'speedtest' | 'security' | 'dns';
+type ClientSortMode = 'down' | 'up' | 'lan' | 'name';
 
 function resolveRedSubTab(hint?: string): RedSubTab | undefined {
   if (!hint) return undefined;
@@ -219,6 +353,7 @@ function resolveRedSubTab(hint?: string): RedSubTab | undefined {
   if (h === 'security' || h === 'seguridad') return 'security';
   if (h === 'dns' || h === 'duckdns') return 'dns';
   if (h === 'map' || h === 'mapa') return 'map';
+  if (h === 'speedtest' || h === 'velocidad') return 'speedtest';
   if (h === 'home' || h === 'red') return 'home';
   return undefined;
 }
@@ -265,7 +400,14 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const { t, locale } = useI18n();
   const [subTab, setSubTab] = useState<RedSubTab>(() => resolveRedSubTab(initialSubTab) || 'home');
   const [clientQuery, setClientQuery] = useState('');
+  const [clientSort, setClientSort] = useState<ClientSortMode>('down');
   const [showTechNet, setShowTechNet] = useState(false);
+
+  // Speed Test state
+  const [speedtestStatus, setSpeedtestStatus] = useState<SpeedTestStatus | null>(null);
+  const [speedtestHistory, setSpeedtestHistory] = useState<SpeedTestHistoryResponse | null>(null);
+  const [speedtestLoadingHistory, setSpeedtestLoadingHistory] = useState(false);
+  const [speedtestClearing, setSpeedtestClearing] = useState(false);
 
   // Map filters & search (v4.13.0)
   const [mapFilter, setMapFilter] = useState<MapConnFilter>('all');
@@ -345,19 +487,84 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const wifiClients = useMemo(() => {
     const q = clientQuery.trim().toLowerCase();
     const list = metrics?.wifi_clients ?? [];
-    if (!q) return list;
-    return list.filter(
-      (c) =>
-        String(c.name || '').toLowerCase().includes(q) ||
-        String(c.hostname || '').toLowerCase().includes(q) ||
-        String(c.ip || '').toLowerCase().includes(q) ||
-        String(c.vendor || '').toLowerCase().includes(q)
-    );
-  }, [metrics?.wifi_clients, clientQuery]);
+    const filtered = !q
+      ? [...list]
+      : list.filter(
+          (c) =>
+            String(c.name || '').toLowerCase().includes(q) ||
+            String(c.hostname || '').toLowerCase().includes(q) ||
+            String(c.ip || '').toLowerCase().includes(q) ||
+            String(c.vendor || '').toLowerCase().includes(q)
+        );
+    filtered.sort((a, b) => {
+      if (clientSort === 'name') {
+        const na = String(a.name || a.hostname || a.ip || '').toLowerCase();
+        const nb = String(b.name || b.hostname || b.ip || '').toLowerCase();
+        return na.localeCompare(nb);
+      }
+      if (clientSort === 'up') {
+        const ua = a.wan_speed_up ?? a.speed_up ?? 0;
+        const ub = b.wan_speed_up ?? b.speed_up ?? 0;
+        return ub - ua;
+      }
+      if (clientSort === 'lan') {
+        const la = (a.lan_speed_down ?? 0) + (a.lan_speed_up ?? 0);
+        const lb = (b.lan_speed_down ?? 0) + (b.lan_speed_up ?? 0);
+        return lb - la;
+      }
+      const da = a.wan_speed_down ?? a.speed_down ?? 0;
+      const db = b.wan_speed_down ?? b.speed_down ?? 0;
+      return db - da;
+    });
+    return filtered;
+  }, [metrics?.wifi_clients, clientQuery, clientSort]);
+
+  const maxClientTotalBps = useMemo(() => {
+    let peak = 1;
+    for (const c of wifiClients) {
+      const wanDown = c.wan_speed_down ?? c.speed_down ?? 0;
+      const wanUp = c.wan_speed_up ?? c.speed_up ?? 0;
+      const lanTotal = (c.lan_speed_down ?? 0) + (c.lan_speed_up ?? 0);
+      const tot = wanDown + wanUp + lanTotal;
+      if (tot > peak) peak = tot;
+    }
+    return peak;
+  }, [wifiClients]);
+
+  const pingLatency = metrics?.net?.ping_latency;
+  const pingChartView = useMemo(() => {
+    const targets = pingLatency?.targets ?? [];
+    const timestamps = pingLatency?.timestamps ?? [];
+    const epochTs = pingLatency?.epoch_ts ?? [];
+    const series: ChartSeries[] = targets.map((tgt) => ({
+      id: tgt.id,
+      label: tgt.label,
+      data: tgt.data ?? [],
+      color: tgt.color,
+      unit: 'ms',
+      decimals: 2,
+      fillAlpha: 0.12,
+    }));
+    const spec: ExpandChartSpec = {
+      title: t('network.ping_latency_title'),
+      subtitle: t('network.ping_latency_sub'),
+      series,
+      timestamps,
+      epochTs,
+      leftUnit: 'ms',
+      chartKind: 'ping',
+    };
+    return { targets, timestamps, epochTs, series, expandSpec: spec };
+  }, [pingLatency, t]);
 
   const interfaces: NetInterfaceInfo[] = useMemo(
     () => metrics?.net?.interfaces_list ?? Object.values(metrics?.net?.interfaces ?? {}),
     [metrics?.net?.interfaces_list, metrics?.net?.interfaces]
+  );
+
+  const nonRouterInterfaces = useMemo(
+    () => interfaces.filter((nic) => nic.name.toLowerCase() !== 'router'),
+    [interfaces]
   );
 
   const serverLocalIp = metrics?.net?.connections_map?.server_node?.ip || metrics?.net?.local_ip || metrics?.system?.local_ip || '';
@@ -449,9 +656,22 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       .map(([name, count], idx) => ({ name, count, color: palette[idx % palette.length] }));
   }, [geoConnections, t]);
 
-  // Load Telegram & DuckDNS on tab switch
+  const loadSpeedtestData = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setSpeedtestLoadingHistory(true);
+    const [stRes, histRes] = await Promise.all([
+      apiFetchJson<SpeedTestStatus>('/api/net/speedtest/status'),
+      apiFetchJson<SpeedTestHistoryResponse>('/api/net/speedtest/history?limit=100'),
+    ]);
+    if (stRes.ok && stRes.data) setSpeedtestStatus(stRes.data);
+    if (histRes.ok && histRes.data) setSpeedtestHistory(histRes.data);
+    if (showSpinner) setSpeedtestLoadingHistory(false);
+  }, []);
+
+  // Load Speedtest, Telegram & DuckDNS on tab switch
   useEffect(() => {
-    if (subTab === 'security') {
+    if (subTab === 'speedtest') {
+      void loadSpeedtestData(true);
+    } else if (subTab === 'security') {
       void apiFetchJson<TelegramBotStatusPayload>('/api/telegram_bot').then((r) => {
         if (r.ok && r.data) setTelegramData(r.data);
       });
@@ -468,7 +688,52 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         }
       });
     }
-  }, [subTab]);
+  }, [subTab, loadSpeedtestData]);
+
+  // Poll speedtest status smoothly while test is active
+  useEffect(() => {
+    if (!speedtestStatus?.running) return;
+    const id = window.setInterval(() => {
+      void apiFetchJson<SpeedTestStatus>('/api/net/speedtest/status').then((r) => {
+        if (!r.ok || !r.data) return;
+        setSpeedtestStatus(r.data);
+        if (!r.data.running) {
+          void apiFetchJson<SpeedTestHistoryResponse>('/api/net/speedtest/history?limit=100').then((hr) => {
+            if (hr.ok && hr.data) setSpeedtestHistory(hr.data);
+          });
+          if (r.data.phase === 'done') {
+            onNotify(t('network.speedtest_completed'));
+          } else if (r.data.phase === 'error' && r.data.error) {
+            onNotify(r.data.error, true);
+          }
+        }
+      });
+    }, 450);
+    return () => window.clearInterval(id);
+  }, [speedtestStatus?.running, onNotify, t]);
+
+  const handleStartSpeedtest = async () => {
+    if (speedtestStatus?.running) return;
+    const res = await apiFetchJson<{ status?: SpeedTestStatus }>('/api/net/speedtest/run', { method: 'POST' });
+    if (res.ok && res.data?.status) {
+      setSpeedtestStatus(res.data.status);
+    } else {
+      onNotify(res.error || t('status.signal_error'), true);
+    }
+  };
+
+  const handleClearSpeedtestHistory = async (entryId?: number) => {
+    setSpeedtestClearing(true);
+    const url = entryId !== undefined ? `/api/net/speedtest/history?id=${entryId}` : '/api/net/speedtest/history';
+    const res = await apiFetchJson<{ ok?: boolean }>(url, { method: 'DELETE' });
+    setSpeedtestClearing(false);
+    if (res.ok) {
+      if (entryId === undefined) onNotify(t('network.speedtest_cleared'));
+      await loadSpeedtestData(false);
+    } else {
+      onNotify(res.error || t('status.signal_error'), true);
+    }
+  };
 
   // Generador de HTML Maestro-Detalle para Popups de Grupos y Conexiones (v4.10.0, v4.11.0, v4.12.0, v10.4.0)
   const renderPopupHtmlForCluster = (cluster: DynamicGeoCluster, selectedConnKey: string | null): string => {
@@ -1369,6 +1634,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const tabs: Array<{ id: RedSubTab; label: string; icon: React.ReactNode }> = [
     { id: 'home', label: t('network.subtabs.home'), icon: <Wifi className="h-4 w-4" /> },
     { id: 'map', label: t('network.subtabs.map'), icon: <MapPin className="h-4 w-4" /> },
+    { id: 'speedtest', label: t('network.subtabs.speedtest'), icon: <Gauge className="h-4 w-4" /> },
     { id: 'security', label: t('network.subtabs.security'), icon: <Shield className="h-4 w-4" /> },
     { id: 'dns', label: t('network.subtabs.dns'), icon: <Globe className="h-4 w-4" /> },
   ];
@@ -1410,9 +1676,9 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       {/* 1. Aparatos en casa */}
       {subTab === 'home' && (
         <div className="space-y-4">
-          {/* Network Interfaces with 20m Sparkline + Tooltip */}
+          {/* Network Interfaces + Router Traffic (3rd top widget) */}
           <section className="cockpit-auto-grid">
-            {interfaces.map((nic) => (
+            {nonRouterInterfaces.map((nic) => (
               <NicHistoryCard
                 key={nic.name}
                 nic={nic}
@@ -1421,12 +1687,102 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 onExpandChart={onExpandChart}
               />
             ))}
+            <RouterTrafficCard
+              metrics={metrics}
+              theme={theme}
+              locale={locale}
+              onExpandChart={onExpandChart}
+            />
           </section>
 
-          {/* Connected Devices with Custom Logo + WoL + Shutdown */}
+          {/* Real-Time Ping Latency Chart (Default Gateway + External Nodes) */}
+          <section className="cockpit-bento p-5" data-testid="ping-latency-section">
+            <div className="flex flex-col gap-3 pb-3 border-b border-slate-200/70 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="cockpit-pill-cyan inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+                    <Activity className="h-4 w-4" />
+                  </span>
+                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                    {t('network.ping_latency_title')}
+                  </h2>
+                  {pingLatency?.updated_at && pingLatency.updated_at !== '--' && (
+                    <span className="cockpit-subtile rounded-full px-2.5 py-0.5 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
+                      {pingLatency.updated_at}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {t('network.ping_latency_sub')}
+                </p>
+              </div>
+              {onExpandChart && (
+                <button
+                  type="button"
+                  aria-label={t('network.ping_expand_aria')}
+                  onClick={() => onExpandChart(pingChartView.expandSpec)}
+                  className="cockpit-subtile flex min-h-[38px] min-w-[38px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {pingChartView.targets.length > 0 && (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {pingChartView.targets.map((tgt) => {
+                  const badgeLabel =
+                    tgt.kind === 'gateway'
+                      ? t('network.ping_gateway_badge')
+                      : tgt.kind === 'dns'
+                        ? t('network.ping_dns_badge')
+                        : t('network.ping_external_badge');
+                  return (
+                    <div key={tgt.id} className="cockpit-subtile flex flex-col gap-1 px-3 py-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-1.5 font-semibold text-slate-900 dark:text-white">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: tgt.color }} />
+                          <span className="truncate">{tgt.label}</span>
+                        </span>
+                        <span className="cockpit-pill-cyan shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
+                          {badgeLabel}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline justify-between gap-2 font-mono text-[11px] tabular-nums">
+                        <span className="text-slate-400 dark:text-slate-500 truncate">{tgt.ip}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {tgt.last_ms !== null ? `${tgt.last_ms.toFixed(1)} ms` : t('network.ping_unreachable')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 font-mono text-[10px] tabular-nums text-slate-500 dark:text-slate-400">
+                        <span>{t('network.ping_avg_short', { val: tgt.avg_ms !== null ? `${tgt.avg_ms.toFixed(1)}` : '--' })}</span>
+                        <span>{t('network.ping_jitter_short', { val: `${tgt.jitter_ms.toFixed(1)}` })}</span>
+                        <span>{t('network.ping_loss_short', { val: `${tgt.loss_pct.toFixed(0)}` })}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-3">
+              <TelemetryChart
+                series={pingChartView.series}
+                timestamps={pingChartView.timestamps}
+                epochTs={pingChartView.epochTs}
+                height={152}
+                leftUnit="ms"
+                theme={theme}
+                emptyMessage={t('network.ping_accumulating')}
+                onExpandClick={onExpandChart ? () => onExpandChart(pingChartView.expandSpec) : undefined}
+              />
+            </div>
+          </section>
+
+          {/* Connected Devices with Independent Live Consumption + Sort + Custom Logo + WoL + Shutdown */}
           <section className="cockpit-bento p-5">
-            <div className="flex flex-col gap-3 pb-4 border-b border-slate-200/70 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-              <div>
+            <div className="flex flex-col gap-3 pb-4 border-b border-slate-200/70 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
                 <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                   {t('network.router_devices_title')}
                 </h2>
@@ -1437,15 +1793,46 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   })}
                 </p>
               </div>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={clientQuery}
-                  onChange={(e) => setClientQuery(e.target.value)}
-                  placeholder={t('network.search_devices')}
-                  className="cockpit-subtile min-h-[40px] pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
-                />
+              <div className="flex flex-wrap items-center gap-2">
+                <LayoutGroup id="home-client-sort">
+                  <div className="cockpit-subtile flex flex-wrap items-center gap-1 p-1">
+                    {(
+                      [
+                        { id: 'down', label: t('overview.bw_sort_down') },
+                        { id: 'up', label: t('overview.bw_sort_up') },
+                        { id: 'lan', label: t('overview.bw_sort_lan') },
+                        { id: 'name', label: t('overview.bw_sort_name') },
+                      ] as const
+                    ).map((sOpt) => {
+                      const active = clientSort === sOpt.id;
+                      return (
+                        <button
+                          key={sOpt.id}
+                          type="button"
+                          onClick={() => setClientSort(sOpt.id)}
+                          className={`relative min-h-[34px] rounded-lg px-2.5 text-xs font-semibold transition-colors whitespace-nowrap ${
+                            active
+                              ? 'text-sky-700 dark:text-sky-300'
+                              : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                          }`}
+                        >
+                          {active && <MorphPill layoutId="home-client-sort-pill" className="rounded-lg" />}
+                          <span className="relative z-10">{sOpt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </LayoutGroup>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    value={clientQuery}
+                    onChange={(e) => setClientQuery(e.target.value)}
+                    placeholder={t('network.search_devices')}
+                    className="cockpit-subtile min-h-[40px] pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1464,73 +1851,105 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   const imgSrc = customLogo || client.logo_url;
                   const title = client.name || client.hostname || client.ip || t('network.device_fallback_alt');
 
+                  const wanDown = client.wan_speed_down ?? client.speed_down ?? 0;
+                  const wanUp = client.wan_speed_up ?? client.speed_up ?? 0;
+                  const lanTotal = (client.lan_speed_down ?? 0) + (client.lan_speed_up ?? 0);
+                  const clientTotal = wanDown + wanUp + lanTotal;
+                  const barPct = clientTotal > 0 ? Math.min(100, Math.max(4, Math.round((clientTotal / maxClientTotalBps) * 100))) : 0;
+
                   return (
                     <div
                       key={`${mac}-${idx}`}
-                      className="cockpit-subtile flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between"
+                      className="cockpit-subtile flex flex-col gap-3 p-3.5"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLogoModalClient(client);
-                            setLogoSearchQ(client.brand || client.vendor || client.name || '');
-                          }}
-                          title={t('network.change_icon_title')}
-                          className="cockpit-subtile flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden hover:border-sky-400 dark:hover:border-sky-500"
-                        >
-                          {imgSrc ? (
-                            <img
-                              src={imgSrc}
-                              alt={title}
-                              referrerPolicy="no-referrer"
-                              className="h-6 w-6 object-contain"
-                            />
-                          ) : (
-                            <ImageIcon className="h-4 w-4 text-slate-400" />
-                          )}
-                        </button>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{title}</p>
-                            <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">·</span>
-                            <span
-                              className={`text-xs font-medium ${
-                                isOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
-                              }`}
-                            >
-                              {isOnline ? t('network.status_connected') : t('network.status_idle')}
-                            </span>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLogoModalClient(client);
+                              setLogoSearchQ(client.brand || client.vendor || client.name || '');
+                            }}
+                            title={t('network.change_icon_title')}
+                            className="cockpit-subtile flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden hover:border-sky-400 dark:hover:border-sky-500"
+                          >
+                            {imgSrc ? (
+                              <img
+                                src={imgSrc}
+                                alt={title}
+                                referrerPolicy="no-referrer"
+                                className="h-6 w-6 object-contain"
+                              />
+                            ) : (
+                              <ImageIcon className="h-4 w-4 text-slate-400" />
+                            )}
+                          </button>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{title}</p>
+                              <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">·</span>
+                              <span
+                                className={`text-xs font-medium ${
+                                  isOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                                }`}
+                              >
+                                {isOnline ? t('network.status_connected') : t('network.status_idle')}
+                              </span>
+                            </div>
+                            <p className="truncate text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+                              {client.ip || '--'} {client.band ? `· ${formatBandLabel(client, locale)}` : ''}{' '}
+                              {client.vendor ? `· ${formatClientVendor(client, locale)}` : ''}
+                            </p>
                           </div>
-                          <p className="truncate text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                            {client.ip || '--'} {client.band ? `· ${formatBandLabel(client, locale)}` : ''}{' '}
-                            {client.vendor ? `· ${formatClientVendor(client, locale)}` : ''}
-                          </p>
                         </div>
+
+                        {!client.is_server && !client.is_gateway && (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              disabled={busy || !client.mac}
+                              onClick={() => onPowerAction('wake', client)}
+                              className="cockpit-btn-wol inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-45"
+                            >
+                              <Power className="h-3.5 w-3.5" />
+                              <span>{t('overview.wake_btn')}</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy || (!client.ip && !client.mac)}
+                              onClick={() => onPowerAction('shutdown', client)}
+                              className="cockpit-btn-off inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-45"
+                            >
+                              <PowerOff className="h-3.5 w-3.5" />
+                              <span>{t('overview.sleep_btn')}</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      {!client.is_server && !client.is_gateway && (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            disabled={busy || !client.mac}
-                            onClick={() => onPowerAction('wake', client)}
-                            className="cockpit-btn-wol inline-flex min-h-[42px] items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-45"
-                          >
-                            <Power className="h-3.5 w-3.5" />
-                            <span>{t('overview.wake_btn')}</span>
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy || (!client.ip && !client.mac)}
-                            onClick={() => onPowerAction('shutdown', client)}
-                            className="cockpit-btn-off inline-flex min-h-[42px] items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-45"
-                          >
-                            <PowerOff className="h-3.5 w-3.5" />
-                            <span>{t('overview.sleep_btn')}</span>
-                          </button>
+                      {/* Independent Live Device Consumption Strip (matching top banner) */}
+                      <div className="space-y-1.5 border-t border-slate-200/70 pt-2.5 dark:border-slate-800">
+                        <div className="grid grid-cols-3 gap-1.5 font-mono text-[11px] tabular-nums">
+                          <div className="flex min-w-0 items-center justify-between gap-1">
+                            <span className="truncate font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('overview.bw_wan_dl')}</span>
+                            <span className="shrink-0 font-semibold text-sky-600 dark:text-sky-400">↓ {formatSpeed(wanDown)}</span>
+                          </div>
+                          <div className="flex min-w-0 items-center justify-between gap-1 border-x border-slate-200/70 px-1.5 dark:border-slate-800">
+                            <span className="truncate font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('overview.bw_wan_ul')}</span>
+                            <span className="shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">↑ {formatSpeed(wanUp)}</span>
+                          </div>
+                          <div className="flex min-w-0 items-center justify-between gap-1">
+                            <span className="truncate font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('hardware.net.lan_short')}</span>
+                            <span className="shrink-0 font-semibold text-indigo-600 dark:text-indigo-400">{formatSpeed(lanTotal)}</span>
+                          </div>
                         </div>
-                      )}
+                        <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 transition-[width] duration-300"
+                            style={{ width: `${barPct}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -1865,6 +2284,241 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 </p>
               )}
             </div>
+          </section>
+        </div>
+      )}
+
+      {/* 2b. Test de Velocidad (Speed Test + Historial SQLite) */}
+      {subTab === 'speedtest' && (
+        <div className="space-y-4">
+          <section className="cockpit-bento p-5" data-testid="speedtest-runner-card">
+            <div className="flex flex-col gap-4 pb-4 border-b border-slate-200/70 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="cockpit-pill-cyan inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                    <Gauge className="h-4 w-4" />
+                  </span>
+                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                    {t('network.speedtest_title')}
+                  </h2>
+                  {speedtestStatus?.scope && (
+                    <span className="cockpit-pill-emerald rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
+                      {speedtestStatus.scope === 'local_node'
+                        ? t('network.speedtest_scope_local')
+                        : t('network.speedtest_scope_wan')}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {t('network.speedtest_sub')}
+                </p>
+              </div>
+              <button
+                type="button"
+                data-testid="speedtest-start-btn"
+                disabled={Boolean(speedtestStatus?.running)}
+                onClick={() => void handleStartSpeedtest()}
+                className="cockpit-btn-accent inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-2 text-xs font-semibold transition-all disabled:opacity-60"
+              >
+                {speedtestStatus?.running ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>{t('network.speedtest_running')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Gauge className="h-4 w-4" />
+                    <span>{t('network.speedtest_start')}</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Live Phase & Progress Bar */}
+            <div className="cockpit-subtile mt-4 p-4 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-slate-800 dark:text-slate-100">
+                  {speedtestStatus?.phase === 'ping'
+                    ? t('network.speedtest_phase_ping')
+                    : speedtestStatus?.phase === 'download'
+                      ? t('network.speedtest_phase_download')
+                      : speedtestStatus?.phase === 'upload'
+                        ? t('network.speedtest_phase_upload')
+                        : speedtestStatus?.phase === 'done'
+                          ? t('network.speedtest_phase_done')
+                          : speedtestStatus?.phase === 'error'
+                            ? t('network.speedtest_phase_error')
+                            : t('network.speedtest_phase_idle')}
+                </span>
+                <span className="font-mono font-bold tabular-nums text-sky-600 dark:text-sky-400">
+                  {Math.round(speedtestStatus?.progress_pct ?? 0)}%
+                  {(speedtestStatus?.running && speedtestStatus.current_mbps > 0)
+                    ? ` · ${speedtestStatus.current_mbps.toFixed(1)} Mbps`
+                    : ''}
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+                <div
+                  className="cockpit-progress-fill h-full rounded-full bg-gradient-to-r from-sky-500 via-cyan-400 to-emerald-500 transition-[width] duration-300"
+                  style={{ width: `${Math.min(100, Math.max(0, speedtestStatus?.progress_pct ?? 0))}%` }}
+                />
+              </div>
+              {(speedtestStatus?.server_name || speedtestStatus?.isp) && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                  {speedtestStatus.server_name && (
+                    <span>
+                      {t('network.speedtest_server')}: <strong className="text-slate-700 dark:text-slate-200">{speedtestStatus.server_name}</strong>
+                      {speedtestStatus.server_location ? ` (${speedtestStatus.server_location})` : ''}
+                    </span>
+                  )}
+                  {speedtestStatus.isp && (
+                    <span>
+                      {t('network.speedtest_isp')}: <strong className="text-slate-700 dark:text-slate-200">{speedtestStatus.isp}</strong>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 4 Symmetric KPI Tiles */}
+            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="cockpit-subtile rounded-xl p-3.5">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t('network.speedtest_download')}</span>
+                <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-sky-600 dark:text-sky-400">
+                  {(speedtestStatus?.download_mbps ?? 0).toFixed(1)} <span className="text-xs font-medium opacity-80">Mbps</span>
+                </p>
+              </div>
+              <div className="cockpit-subtile rounded-xl p-3.5">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t('network.speedtest_upload')}</span>
+                <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  {(speedtestStatus?.upload_mbps ?? 0).toFixed(1)} <span className="text-xs font-medium opacity-80">Mbps</span>
+                </p>
+              </div>
+              <div className="cockpit-subtile rounded-xl p-3.5">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t('network.speedtest_ping')}</span>
+                <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
+                  {(speedtestStatus?.ping_ms ?? 0).toFixed(1)} <span className="text-xs font-medium text-slate-500">ms</span>
+                </p>
+              </div>
+              <div className="cockpit-subtile rounded-xl p-3.5">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  {t('network.speedtest_jitter')} · {t('network.speedtest_loss')}
+                </span>
+                <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
+                  {(speedtestStatus?.jitter_ms ?? 0).toFixed(1)} <span className="text-xs font-medium text-slate-500">ms · {(speedtestStatus?.packet_loss_pct ?? 0).toFixed(0)}%</span>
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Persisted SQLite Speed Test History */}
+          <section className="cockpit-bento p-5" data-testid="speedtest-history-card">
+            <div className="flex flex-col gap-3 pb-4 border-b border-slate-200/70 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                    {t('network.speedtest_history_title')}
+                  </h2>
+                  <span className="cockpit-subtile rounded-full px-2.5 py-0.5 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
+                    {speedtestHistory?.total ?? 0}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {t('network.speedtest_history_sub')}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {(speedtestHistory?.total ?? 0) > 0 && (
+                  <>
+                    <span className="cockpit-pill-cyan rounded-full px-2.5 py-1 font-mono text-[11px] font-semibold tabular-nums">
+                      {t('network.speedtest_best_dl')}: {(speedtestHistory?.best_download_mbps ?? 0).toFixed(1)} Mbps
+                    </span>
+                    <span className="cockpit-pill-emerald rounded-full px-2.5 py-1 font-mono text-[11px] font-semibold tabular-nums">
+                      {t('network.speedtest_best_ul')}: {(speedtestHistory?.best_upload_mbps ?? 0).toFixed(1)} Mbps
+                    </span>
+                    <button
+                      type="button"
+                      disabled={speedtestClearing}
+                      onClick={() => void handleClearSpeedtestHistory()}
+                      className="cockpit-btn-off inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>{t('network.speedtest_clear_history')}</span>
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  aria-label={t('network.refresh')}
+                  onClick={() => void loadSpeedtestData(true)}
+                  className="cockpit-subtile flex min-h-[38px] min-w-[38px] items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                >
+                  <RefreshCw className={`h-4 w-4 ${speedtestLoadingHistory ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {(!speedtestHistory?.items || speedtestHistory.items.length === 0) ? (
+              <p className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
+                {t('network.speedtest_history_empty')}
+              </p>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200/70 text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                      <th className="py-2.5 pr-3 font-medium">{t('network.speedtest_col_date')}</th>
+                      <th className="py-2.5 px-3 font-medium">{t('network.speedtest_col_server')}</th>
+                      <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_dl')}</th>
+                      <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_ul')}</th>
+                      <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_ping')}</th>
+                      <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_jitter')}</th>
+                      <th className="py-2.5 pl-2 text-right font-medium"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
+                    {speedtestHistory.items.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                        <td className="py-2.5 pr-3 font-mono text-[11px] tabular-nums text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                          {item.created_at}
+                        </td>
+                        <td className="py-2.5 px-3 min-w-[140px]">
+                          <p className="font-medium text-slate-900 dark:text-white truncate max-w-[220px]">
+                            {item.server_name}
+                          </p>
+                          <p className="font-mono text-[10px] text-slate-400 truncate max-w-[220px]">
+                            {item.scope === 'local_node' ? t('network.speedtest_scope_local') : t('network.speedtest_scope_wan')}
+                            {item.isp ? ` · ${item.isp}` : ''}
+                          </p>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold tabular-nums text-sky-600 dark:text-sky-400 whitespace-nowrap">
+                          {item.download_mbps.toFixed(1)} Mbps
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold tabular-nums text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                          {item.upload_mbps.toFixed(1)} Mbps
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                          {item.ping_ms.toFixed(1)} ms
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                          {item.jitter_ms.toFixed(1)} ms
+                        </td>
+                        <td className="py-2.5 pl-2 text-right">
+                          <button
+                            type="button"
+                            aria-label={t('network.speedtest_delete_row')}
+                            onClick={() => void handleClearSpeedtestHistory(item.id)}
+                            className="cockpit-subtile inline-flex min-h-[32px] min-w-[32px] items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         </div>
       )}

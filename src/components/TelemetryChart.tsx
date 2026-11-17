@@ -61,6 +61,9 @@ function getSensorSignificantThreshold(
   }
   if (unit === '%') return 0.5;
   if (unit === '°C' || unit === 'C') return 0.5;
+  if (unit === 'ms') {
+    return Math.max(0.2, Math.min(2, scalePeak * 0.02));
+  }
   if (unit === 'MB/s') {
     return Math.min(0.5, Math.max(0.02, scalePeak * 0.015));
   }

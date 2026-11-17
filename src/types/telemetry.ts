@@ -291,6 +291,108 @@ export interface ConnectionsMapPayload {
   };
 }
 
+export interface PingTargetSeries {
+  id: string;
+  ip: string;
+  label: string;
+  kind: 'gateway' | 'external' | 'dns' | string;
+  avg_ms: number | null;
+  last_ms: number | null;
+  min_ms: number | null;
+  max_ms: number | null;
+  jitter_ms: number;
+  loss_pct: number;
+  color: string;
+  data: number[];
+}
+
+export interface PingLatencyPayload {
+  updated_at?: string;
+  timestamps: string[];
+  epoch_ts: number[];
+  targets: PingTargetSeries[];
+}
+
+export type ProcessHistoryMetric = 'cpu' | 'ram' | 'vram' | 'io';
+
+export interface ProcessHistorySeriesItem {
+  id: string;
+  label: string;
+  is_others?: boolean;
+  color: string;
+  avg: number;
+  peak: number;
+  last: number;
+  data: number[];
+}
+
+export interface ProcessHistoryResponse {
+  ok: boolean;
+  error?: string;
+  metric: ProcessHistoryMetric;
+  unit: string;
+  hours: number;
+  bucket_count: number;
+  total_snapshots: number;
+  oldest_ts: number | null;
+  newest_ts: number | null;
+  timestamps: string[];
+  date_timestamps: string[];
+  epoch_ts: number[];
+  series: ProcessHistorySeriesItem[];
+}
+
+export interface SpeedTestResult {
+  id: number;
+  ts: number;
+  created_at: string;
+  download_mbps: number;
+  upload_mbps: number;
+  ping_ms: number;
+  jitter_ms: number;
+  packet_loss_pct: number;
+  server_name: string;
+  server_host: string;
+  server_location: string;
+  client_ip: string;
+  isp: string;
+  duration_ms: number;
+  scope: 'wan' | 'local_node' | string;
+}
+
+export interface SpeedTestStatus {
+  ok?: boolean;
+  running: boolean;
+  phase: 'idle' | 'ping' | 'download' | 'upload' | 'done' | 'error' | string;
+  progress_pct: number;
+  current_mbps: number;
+  ping_ms: number;
+  jitter_ms: number;
+  packet_loss_pct: number;
+  download_mbps: number;
+  upload_mbps: number;
+  server_name: string;
+  server_host: string;
+  server_location: string;
+  client_ip: string;
+  isp: string;
+  scope: 'wan' | 'local_node' | string;
+  error?: string;
+  started_at?: number | null;
+  completed_at?: number | null;
+  last_result?: SpeedTestResult | null;
+}
+
+export interface SpeedTestHistoryResponse {
+  ok: boolean;
+  db_file?: string;
+  total: number;
+  best_download_mbps: number;
+  best_upload_mbps: number;
+  avg_ping_ms: number;
+  items: SpeedTestResult[];
+}
+
 export interface NetInfo {
   rx_bytes_sec?: number;
   tx_bytes_sec?: number;
@@ -303,6 +405,8 @@ export interface NetInfo {
   local_ip?: string;
   interfaces?: Record<string, NetInterfaceInfo>;
   interfaces_list?: NetInterfaceInfo[];
+  router_history_20m?: NicHistoryBucket[];
+  ping_latency?: PingLatencyPayload;
   connections_map?: ConnectionsMapPayload;
 }
 
@@ -380,6 +484,7 @@ export interface WifiSummary {
   router_lan_rx_bytes_sec?: number;
   router_lan_tx_bytes_sec?: number;
   router_traffic_source?: string;
+  router_history_20m?: NicHistoryBucket[];
   sources_status?: {
     pihole?: WifiSourceStatus;
     asus?: WifiSourceStatus;

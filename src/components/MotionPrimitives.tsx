@@ -169,17 +169,20 @@ interface ViewStageProps {
 export const ViewStage: React.FC<ViewStageProps> = ({ tabKey, children }) => {
   const prefersReduced = useReducedMotion();
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={tabKey}
-        initial={prefersReduced ? false : { opacity: 0, y: 10, scale: 0.994 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={prefersReduced ? undefined : { opacity: 0, y: -6, scale: 0.996 }}
-        transition={{ duration: 0.24, ease: COCKPIT_EASE }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <div className="relative overflow-x-clip">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.div
+          key={tabKey}
+          initial={prefersReduced ? false : { opacity: 0, y: 10, scale: 0.996 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={prefersReduced ? undefined : { opacity: 0, y: -6, scale: 0.996, transition: { duration: 0.2, ease: COCKPIT_EASE } }}
+          transition={{ duration: 0.28, ease: COCKPIT_EASE }}
+          className="w-full"
+        >
+          {children}
+        </motion.div>
+      </AnimatePresence>
+    </div>
   );
 };
 

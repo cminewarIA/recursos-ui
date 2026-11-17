@@ -4,6 +4,7 @@ import { exec, execSync } from 'child_process';
 import dns from 'dns';
 import fs from 'fs';
 import http from 'http';
+import https from 'https';
 import nodeNet from 'net';
 import os from 'os';
 import path from 'path';
@@ -640,13 +641,39 @@ function sampleRealNetwork() {
     interfacesList.push(nicObj);
   }
 
-  saveNicHistory2hToDiskIfNeeded(now);
-  triggerAsyncGeoSync();
-
   const sumWanRx = (interfacesList as Array<{ wan_rx_bytes_sec?: number }>).reduce((a, b) => a + (b.wan_rx_bytes_sec || 0), 0);
   const sumWanTx = (interfacesList as Array<{ wan_tx_bytes_sec?: number }>).reduce((a, b) => a + (b.wan_tx_bytes_sec || 0), 0);
   const sumLanRx = (interfacesList as Array<{ lan_rx_bytes_sec?: number }>).reduce((a, b) => a + (b.lan_rx_bytes_sec || 0), 0);
   const sumLanTx = (interfacesList as Array<{ lan_tx_bytes_sec?: number }>).reduce((a, b) => a + (b.lan_tx_bytes_sec || 0), 0);
+
+  const routerHist = nicHistory2h['__router__'] || (nicHistory2h['__router__'] = []);
+  const rBucketMs = Math.floor(now / 5000) * 5000;
+  const rCutoffMs = rBucketMs - 1200 * 1000;
+  if (routerHist.length === 0 || routerHist[routerHist.length - 1].t < rBucketMs) {
+    routerHist.push({
+      t: rBucketMs,
+      rx: sumWanRx + sumLanRx,
+      tx: sumWanTx + sumLanTx,
+      wan_rx: sumWanRx,
+      wan_tx: sumWanTx,
+      lan_rx: sumLanRx,
+      lan_tx: sumLanTx,
+    });
+  } else {
+    const rLast = routerHist[routerHist.length - 1];
+    rLast.rx = Math.max(rLast.rx, sumWanRx + sumLanRx);
+    rLast.tx = Math.max(rLast.tx, sumWanTx + sumLanTx);
+    rLast.wan_rx = Math.max(rLast.wan_rx ?? 0, sumWanRx);
+    rLast.wan_tx = Math.max(rLast.wan_tx ?? 0, sumWanTx);
+    rLast.lan_rx = Math.max(rLast.lan_rx ?? 0, sumLanRx);
+    rLast.lan_tx = Math.max(rLast.lan_tx ?? 0, sumLanTx);
+  }
+  while (routerHist.length > 0 && routerHist[0].t < rCutoffMs) {
+    routerHist.shift();
+  }
+
+  saveNicHistory2hToDiskIfNeeded(now);
+  triggerAsyncGeoSync();
 
   return {
     local_ip: localIp,
@@ -661,6 +688,8 @@ function sampleRealNetwork() {
     interfaces,
     interfaces_list: interfacesList,
     interfaces_history_2h: nicHistory2h,
+    router_history_20m: [...routerHist],
+    ping_latency: pingLatencyCache,
     connections_map: buildLiveConnectionsMap(localIp, Math.round(totalRxSec), Math.round(totalTxSec), totalRx, totalTx),
   };
 }
@@ -1291,6 +1320,748 @@ function startGeoIpBackgroundWorker() {
   }, 6000);
   if (typeof timer.unref === 'function') {
     timer.unref();
+  }
+}
+
+// ---------- Process 24h Grouped History (Dev persistence) ----------
+const processHistoryDevPath = path.resolve(ROOT_DIR, 'process_history_dev.json');
+interface ProcessSnapshotEntry {
+  ts: number;
+  procs: Record<string, { cpu: number; ram: number; vram: number; io: number }>;
+}
+let devProcessSnapshots: ProcessSnapshotEntry[] = [];
+let lastProcSnapshotTs = 0;
+let lastProcSaveMs = 0;
+
+function loadProcessHistoryDev() {
+  try {
+    if (fs.existsSync(processHistoryDevPath)) {
+      const parsed = JSON.parse(fs.readFileSync(processHistoryDevPath, 'utf-8'));
+      if (Array.isArray(parsed)) {
+        const cutoffSec = Date.now() / 1000 - 86400;
+        devProcessSnapshots = parsed.filter((x) => x && typeof x.ts === 'number' && x.ts >= cutoffSec).slice(-1600);
+        if (devProcessSnapshots.length > 0) {
+          lastProcSnapshotTs = devProcessSnapshots[devProcessSnapshots.length - 1].ts;
+        }
+      }
+    }
+  } catch {
+    // ignore corrupt disk cache
+  }
+}
+
+loadProcessHistoryDev();
+
+function recordProcessSnapshotDev(procsList: Array<Record<string, unknown>>, force = false) {
+  const nowSec = Math.round((Date.now() / 1000) * 10) / 10;
+  if (!force && devProcessSnapshots.length > 0 && nowSec - lastProcSnapshotTs < 55) return;
+  if (!Array.isArray(procsList) || procsList.length === 0) return;
+
+  const grouped: Record<string, { cpu: number; ram: number; vram: number; io: number }> = {};
+  for (const p of procsList) {
+    const rawName = String(p.name || '').trim();
+    if (!rawName) continue;
+    const pname = rawName.slice(0, 64);
+    if (!grouped[pname]) grouped[pname] = { cpu: 0, ram: 0, vram: 0, io: 0 };
+    const cpuV = Number(p.cpu_norm_percent ?? p.cpu_percent ?? 0) || 0;
+    const ramV = Number(p.priv_mb ?? p.mem_mb ?? 0) || 0;
+    const vramV = Number(p.vram_mb ?? 0) || 0;
+    const ioV = Number(p.io_total_bps ?? 0) || 0;
+    grouped[pname].cpu += cpuV;
+    grouped[pname].ram += ramV;
+    grouped[pname].vram += vramV;
+    grouped[pname].io += ioV;
+  }
+
+  const ranked = Object.entries(grouped)
+    .sort((a, b) => {
+      const sa = a[1].cpu * 2 + a[1].ram / 128 + a[1].vram / 64 + a[1].io / (1024 * 1024);
+      const sb = b[1].cpu * 2 + b[1].ram / 128 + b[1].vram / 64 + b[1].io / (1024 * 1024);
+      return sb - sa;
+    })
+    .slice(0, 20);
+
+  if (ranked.length === 0) return;
+  const compactProcs: Record<string, { cpu: number; ram: number; vram: number; io: number }> = {};
+  for (const [k, v] of ranked) {
+    compactProcs[k] = {
+      cpu: Math.round(Math.min(100, v.cpu) * 100) / 100,
+      ram: Math.round(v.ram * 100) / 100,
+      vram: Math.round(v.vram * 100) / 100,
+      io: Math.round(v.io * 10) / 10,
+    };
+  }
+
+  lastProcSnapshotTs = nowSec;
+  const cutoffSec = nowSec - 86400;
+  devProcessSnapshots.push({ ts: nowSec, procs: compactProcs });
+  devProcessSnapshots = devProcessSnapshots.filter((x) => x.ts >= cutoffSec);
+  if (devProcessSnapshots.length > 1600) {
+    devProcessSnapshots = devProcessSnapshots.slice(-1600);
+  }
+
+  const nowMs = Date.now();
+  if (force || nowMs - lastProcSaveMs >= 15000) {
+    lastProcSaveMs = nowMs;
+    try {
+      const tmp = `${processHistoryDevPath}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(devProcessSnapshots), 'utf-8');
+      fs.renameSync(tmp, processHistoryDevPath);
+    } catch {
+      // ignore disk write error
+    }
+  }
+}
+
+const PROC_HIST_COLORS = ['#0284c7', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
+
+function queryProcessHistoryDev(hours = 24, metric = 'cpu') {
+  const hoursVal = Math.max(1, Math.min(24, Number(hours) || 24));
+  const metricKey = ['cpu', 'ram', 'vram', 'io'].includes(metric) ? metric : 'cpu';
+  const unitMap: Record<string, string> = { cpu: '%', ram: 'MB', vram: 'MB', io: 'MB/s' };
+  const unit = unitMap[metricKey];
+  const cutoffSec = Date.now() / 1000 - hoursVal * 3600;
+  const rows = devProcessSnapshots.filter((s) => s.ts >= cutoffSec).sort((a, b) => a.ts - b.ts);
+
+  if (rows.length === 0) {
+    return {
+      ok: true,
+      metric: metricKey,
+      unit,
+      hours: hoursVal,
+      bucket_count: 0,
+      total_snapshots: 0,
+      oldest_ts: null,
+      newest_ts: null,
+      timestamps: [],
+      date_timestamps: [],
+      epoch_ts: [],
+      series: [],
+    };
+  }
+
+  const procScores: Record<string, number> = {};
+  const valFor = (item: { cpu: number; ram: number; vram: number; io: number }) => {
+    if (metricKey === 'cpu') return Math.max(0, item.cpu || 0);
+    if (metricKey === 'ram') return Math.max(0, item.ram || 0);
+    if (metricKey === 'vram') return Math.max(0, item.vram || 0);
+    return Math.max(0, (item.io || 0) / (1024 * 1024));
+  };
+
+  for (const snap of rows) {
+    for (const [pname, vals] of Object.entries(snap.procs)) {
+      procScores[pname] = (procScores[pname] || 0) + valFor(vals);
+    }
+  }
+
+  const topProcs = Object.entries(procScores)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name]) => name);
+  const topSet = new Set(topProcs);
+
+  const maxBuckets = 96;
+  const buckets: { ts: number; map: Record<string, number> }[] = [];
+  if (rows.length <= maxBuckets) {
+    for (const snap of rows) {
+      const m: Record<string, number> = {};
+      for (const [pname, vals] of Object.entries(snap.procs)) {
+        m[pname] = valFor(vals);
+      }
+      buckets.push({ ts: snap.ts, map: m });
+    }
+  } else {
+    const firstTs = rows[0].ts;
+    const span = Math.max(1, rows[rows.length - 1].ts - firstTs);
+    const step = span / maxBuckets;
+    for (let i = 0; i < maxBuckets; i++) {
+      const sTs = firstTs + i * step;
+      const eTs = firstTs + (i + 1) * step + (i === maxBuckets - 1 ? 0.01 : 0);
+      const chunk = rows.filter((r) => r.ts >= sTs && r.ts < eTs);
+      if (chunk.length === 0) continue;
+      const avgMap: Record<string, number> = {};
+      const names = new Set<string>();
+      for (const c of chunk) {
+        for (const k of Object.keys(c.procs)) names.add(k);
+      }
+      for (const k of names) {
+        let sumV = 0;
+        for (const c of chunk) {
+          if (c.procs[k]) sumV += valFor(c.procs[k]);
+        }
+        avgMap[k] = sumV / chunk.length;
+      }
+      buckets.push({ ts: chunk[chunk.length - 1].ts, map: avgMap });
+    }
+  }
+
+  const timestamps: string[] = [];
+  const dateTimestamps: string[] = [];
+  const epochTs: number[] = [];
+  const seriesArrays: Record<string, number[]> = {};
+  for (const p of topProcs) seriesArrays[p] = [];
+  const othersArr: number[] = [];
+
+  for (const b of buckets) {
+    const d = new Date(b.ts * 1000);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    timestamps.push(`${hh}:${mi}`);
+    dateTimestamps.push(`${dd}/${mm} ${hh}:${mi}`);
+    epochTs.push(Math.round(b.ts * 10) / 10);
+
+    for (const p of topProcs) {
+      seriesArrays[p].push(Math.round((b.map[p] || 0) * 100) / 100);
+    }
+    let otherSum = 0;
+    for (const [k, v] of Object.entries(b.map)) {
+      if (!topSet.has(k)) otherSum += v;
+    }
+    othersArr.push(Math.round(otherSum * 100) / 100);
+  }
+
+  const seriesOut = topProcs.map((p, idx) => {
+    const arr = seriesArrays[p];
+    const sum = arr.reduce((a, b) => a + b, 0);
+    return {
+      id: p,
+      label: p,
+      is_others: false,
+      color: PROC_HIST_COLORS[idx % PROC_HIST_COLORS.length],
+      avg: Math.round((sum / Math.max(1, arr.length)) * 100) / 100,
+      peak: Math.round(Math.max(0, ...arr) * 100) / 100,
+      last: Math.round((arr[arr.length - 1] || 0) * 100) / 100,
+      data: arr,
+    };
+  });
+
+  if (othersArr.some((v) => v > 0)) {
+    const sumO = othersArr.reduce((a, b) => a + b, 0);
+    seriesOut.push({
+      id: '__others__',
+      label: '',
+      is_others: true,
+      color: '#64748b',
+      avg: Math.round((sumO / Math.max(1, othersArr.length)) * 100) / 100,
+      peak: Math.round(Math.max(0, ...othersArr) * 100) / 100,
+      last: Math.round((othersArr[othersArr.length - 1] || 0) * 100) / 100,
+      data: othersArr,
+    });
+  }
+
+  return {
+    ok: true,
+    metric: metricKey,
+    unit,
+    hours: hoursVal,
+    bucket_count: buckets.length,
+    total_snapshots: rows.length,
+    oldest_ts: Math.round(rows[0].ts * 10) / 10,
+    newest_ts: Math.round(rows[rows.length - 1].ts * 10) / 10,
+    timestamps,
+    date_timestamps: dateTimestamps,
+    epoch_ts: epochTs,
+    series: seriesOut,
+  };
+}
+
+// ---------- Dynamic Ping Latency Probe Worker ----------
+function detectDefaultGatewayIp(): string | null {
+  try {
+    const raw = fs.readFileSync('/proc/net/route', 'utf-8');
+    for (const line of raw.split('\n').slice(1)) {
+      const cols = line.trim().split(/\s+/);
+      if (cols.length >= 3 && cols[1] === '00000000') {
+        const gw = decodeProcHexIp(cols[2]);
+        if (gw && gw !== '0.0.0.0') return gw;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function readResolvNameservers(): string[] {
+  const servers: string[] = [];
+  try {
+    const raw = fs.readFileSync('/etc/resolv.conf', 'utf-8');
+    for (const line of raw.split('\n')) {
+      const ln = line.trim();
+      if (!ln || ln.startsWith('#')) continue;
+      const parts = ln.split(/\s+/);
+      if (parts.length >= 2 && parts[0].toLowerCase() === 'nameserver') {
+        const ip = parts[1].trim();
+        if (nodeNet.isIP(ip) === 4 && !ip.startsWith('127.') && !servers.includes(ip)) {
+          servers.push(ip);
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return servers;
+}
+
+function probeHostRttMs(ip: string, tcpPort?: number): Promise<number | null> {
+  return new Promise((resolve) => {
+    exec(`ping -n -c 1 -W 1 ${ip}`, { timeout: 1600 }, (err, stdout) => {
+      if (!err && stdout) {
+        const m = stdout.match(/time[=<]([0-9.]+)\s*ms/);
+        if (m && m[1]) {
+          resolve(Math.round(parseFloat(m[1]) * 100) / 100);
+          return;
+        }
+      }
+      const candidatePorts = tcpPort && tcpPort > 0 ? [tcpPort, 443, 53, 80] : [443, 53, 80];
+      let idx = 0;
+      const tryTcp = () => {
+        if (idx >= candidatePorts.length) {
+          resolve(null);
+          return;
+        }
+        const port = candidatePorts[idx++];
+        const sock = new nodeNet.Socket();
+        const t0 = performance.now();
+        let settled = false;
+        const done = (ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          const elapsed = Math.round((performance.now() - t0) * 100) / 100;
+          sock.destroy();
+          if (ok && elapsed < 1150) resolve(elapsed);
+          else tryTcp();
+        };
+        sock.setTimeout(1000);
+        sock.once('connect', () => done(true));
+        sock.once('error', (e: NodeJS.ErrnoException) => done(e?.code === 'ECONNREFUSED'));
+        sock.once('timeout', () => done(false));
+        try {
+          sock.connect(port, ip);
+        } catch {
+          done(false);
+        }
+      };
+      tryTcp();
+    });
+  });
+}
+
+const PING_TARGET_PALETTE = ['#0284c7', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
+const pingHistoryPoints: Array<{ ts: number; time_str: string; values: Record<string, number | null> }> = [];
+let pingLatencyCache: {
+  updated_at: string;
+  timestamps: string[];
+  epoch_ts: number[];
+  targets: Array<{
+    id: string;
+    ip: string;
+    label: string;
+    kind: 'gateway' | 'external' | 'dns';
+    avg_ms: number | null;
+    last_ms: number | null;
+    min_ms: number | null;
+    max_ms: number | null;
+    jitter_ms: number;
+    loss_pct: number;
+    color: string;
+    data: number[];
+  }>;
+} = { updated_at: '--', timestamps: [], epoch_ts: [], targets: [] };
+let pingWorkerStarted = false;
+let pingSampleInFlight = false;
+
+async function samplePingLatencyOnce() {
+  if (pingSampleInFlight) return;
+  pingSampleInFlight = true;
+  try {
+    const specs: Array<{ id: string; ip: string; label: string; kind: 'gateway' | 'external' | 'dns'; port: number }> = [];
+    const seen = new Set<string>();
+    const gwIp = detectDefaultGatewayIp();
+    if (gwIp) {
+      specs.push({ id: `gw_${gwIp}`, ip: gwIp, label: gwIp, kind: 'gateway', port: 80 });
+      seen.add(gwIp);
+    }
+
+    const socks = parseProcNetSockets();
+    for (const s of socks) {
+      if (specs.length >= 4) break;
+      if (!s.remoteIp || isPrivateOrLinkLocalIp(s.remoteIp) || seen.has(s.remoteIp) || nodeNet.isIP(s.remoteIp) !== 4) continue;
+      seen.add(s.remoteIp);
+      const geo = geoIpCache[s.remoteIp];
+      let lbl = String(geo?.isp || geo?.org || s.service || s.remoteIp).trim();
+      if (lbl.length > 26) lbl = `${lbl.slice(0, 23)}...`;
+      specs.push({ id: `ext_${s.remoteIp}`, ip: s.remoteIp, label: lbl, kind: 'external', port: s.remotePort || 443 });
+    }
+
+    for (const ep of resolvedOutboundEndpoints.values()) {
+      if (specs.length >= 4) break;
+      if (!ep.ip || isPrivateOrLinkLocalIp(ep.ip) || seen.has(ep.ip) || nodeNet.isIP(ep.ip) !== 4) continue;
+      seen.add(ep.ip);
+      const lbl = ep.host.length > 26 ? `${ep.host.slice(0, 23)}...` : ep.host;
+      specs.push({ id: `ext_${ep.ip}`, ip: ep.ip, label: lbl, kind: 'external', port: ep.port || 443 });
+    }
+
+    for (const dnsIp of readResolvNameservers()) {
+      if (specs.length >= 5) break;
+      if (seen.has(dnsIp)) continue;
+      seen.add(dnsIp);
+      specs.push({ id: `dns_${dnsIp}`, ip: dnsIp, label: `DNS ${dnsIp}`, kind: 'dns', port: 53 });
+    }
+
+    const rtts = await Promise.all(specs.map((sp) => probeHostRttMs(sp.ip, sp.port)));
+    const nowSec = Math.round((Date.now() / 1000) * 100) / 100;
+    const timeStr = new Date().toLocaleTimeString('es-ES', { hour12: false });
+    const vals: Record<string, number | null> = {};
+    specs.forEach((sp, i) => {
+      vals[sp.id] = rtts[i];
+    });
+
+    pingHistoryPoints.push({ ts: nowSec, time_str: timeStr, values: vals });
+    const cutoff = nowSec - 1200;
+    while (pingHistoryPoints.length > 0 && pingHistoryPoints[0].ts < cutoff) {
+      pingHistoryPoints.shift();
+    }
+
+    const timestamps = pingHistoryPoints.map((pt) => pt.time_str);
+    const epoch_ts = pingHistoryPoints.map((pt) => pt.ts);
+    const targets = specs.map((sp, idx) => {
+      const rawVals = pingHistoryPoints.map((pt) => pt.values[sp.id] ?? null);
+      const validVals = rawVals.filter((v): v is number => typeof v === 'number' && v >= 0);
+      const totalPts = Math.max(1, rawVals.length);
+      const loss_pct = Math.round(((rawVals.length - validVals.length) / totalPts) * 1000) / 10;
+      const avg_ms = validVals.length ? Math.round((validVals.reduce((a, b) => a + b, 0) / validVals.length) * 100) / 100 : null;
+      const min_ms = validVals.length ? Math.round(Math.min(...validVals) * 100) / 100 : null;
+      const max_ms = validVals.length ? Math.round(Math.max(...validVals) * 100) / 100 : null;
+      const lastRaw = rawVals[rawVals.length - 1];
+      const last_ms = typeof lastRaw === 'number' && lastRaw >= 0 ? Math.round(lastRaw * 100) / 100 : null;
+      let jitter_ms = 0;
+      if (validVals.length >= 2) {
+        let diffSum = 0;
+        for (let i = 1; i < validVals.length; i++) diffSum += Math.abs(validVals[i] - validVals[i - 1]);
+        jitter_ms = Math.round((diffSum / (validVals.length - 1)) * 100) / 100;
+      }
+      const data = rawVals.map((v) => (typeof v === 'number' && v >= 0 ? Math.round(v * 100) / 100 : 0));
+      return {
+        id: sp.id,
+        ip: sp.ip,
+        label: sp.label,
+        kind: sp.kind,
+        avg_ms,
+        last_ms,
+        min_ms,
+        max_ms,
+        jitter_ms,
+        loss_pct,
+        color: PING_TARGET_PALETTE[idx % PING_TARGET_PALETTE.length],
+        data,
+      };
+    });
+
+    pingLatencyCache = { updated_at: timeStr, timestamps, epoch_ts, targets };
+  } catch {
+    // ignore ping probe error
+  } finally {
+    pingSampleInFlight = false;
+  }
+}
+
+function startPingLatencyWorker() {
+  if (pingWorkerStarted) return;
+  pingWorkerStarted = true;
+  void samplePingLatencyOnce();
+  const timer = setInterval(() => {
+    void samplePingLatencyOnce();
+  }, 5000);
+  if (typeof timer.unref === 'function') timer.unref();
+}
+
+// ---------- Speedtest Runner & Disk Persistence (Dev parity for recursos_history.db) ----------
+const speedtestHistoryDevPath = path.resolve(ROOT_DIR, 'speedtest_history_dev.json');
+interface SpeedTestResultEntry {
+  id: number;
+  ts: number;
+  created_at: string;
+  download_mbps: number;
+  upload_mbps: number;
+  ping_ms: number;
+  jitter_ms: number;
+  packet_loss_pct: number;
+  server_name: string;
+  server_host: string;
+  server_location: string;
+  client_ip: string;
+  isp: string;
+  duration_ms: number;
+  scope: 'wan' | 'local_node';
+}
+let devSpeedtestHistory: SpeedTestResultEntry[] = [];
+let nextSpeedtestId = 1;
+
+function loadSpeedtestHistoryDev() {
+  try {
+    if (fs.existsSync(speedtestHistoryDevPath)) {
+      const parsed = JSON.parse(fs.readFileSync(speedtestHistoryDevPath, 'utf-8'));
+      if (Array.isArray(parsed)) {
+        devSpeedtestHistory = parsed.slice(0, 500);
+        const maxId = devSpeedtestHistory.reduce((acc, x) => Math.max(acc, Number(x.id) || 0), 0);
+        nextSpeedtestId = maxId + 1;
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function saveSpeedtestHistoryDev() {
+  try {
+    const tmp = `${speedtestHistoryDevPath}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(devSpeedtestHistory), 'utf-8');
+    fs.renameSync(tmp, speedtestHistoryDevPath);
+  } catch {
+    // ignore
+  }
+}
+
+loadSpeedtestHistoryDev();
+
+const speedtestState = {
+  running: false,
+  phase: 'idle' as 'idle' | 'ping' | 'download' | 'upload' | 'done' | 'error',
+  progress_pct: 0,
+  current_mbps: 0,
+  ping_ms: 0,
+  jitter_ms: 0,
+  packet_loss_pct: 0,
+  download_mbps: 0,
+  upload_mbps: 0,
+  server_name: '',
+  server_host: '',
+  server_location: '',
+  client_ip: '',
+  isp: '',
+  scope: 'wan' as 'wan' | 'local_node',
+  error: '',
+  started_at: null as number | null,
+  completed_at: null as number | null,
+  last_result: null as SpeedTestResultEntry | null,
+};
+
+function fetchUrlBytes(targetUrl: string, method: 'GET' | 'POST' = 'GET', bodyBuf?: Buffer, timeoutMs = 4500): Promise<{ ok: boolean; bytes: number; headers: http.IncomingHttpHeaders; ms: number }> {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const isHttps = targetUrl.startsWith('https://');
+    const mod = isHttps ? https : http;
+    try {
+      const req = mod.request(
+        targetUrl,
+        {
+          method,
+          timeout: timeoutMs,
+          headers: bodyBuf
+            ? {
+                'Content-Type': 'application/octet-stream',
+                'Content-Length': bodyBuf.byteLength,
+                'User-Agent': `RecursosCockpit/${readAppVersion()}`,
+              }
+            : { 'User-Agent': `RecursosCockpit/${readAppVersion()}` },
+        },
+        (res) => {
+          let totalBytes = 0;
+          res.on('data', (chunk: Buffer) => {
+            totalBytes += chunk.byteLength;
+          });
+          res.on('end', () => {
+            resolve({
+              ok: (res.statusCode || 500) < 400,
+              bytes: totalBytes,
+              headers: res.headers,
+              ms: Math.max(0.1, performance.now() - t0),
+            });
+          });
+        }
+      );
+      req.on('error', () => resolve({ ok: false, bytes: 0, headers: {}, ms: Math.max(0.1, performance.now() - t0) }));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ ok: false, bytes: 0, headers: {}, ms: Math.max(0.1, performance.now() - t0) });
+      });
+      if (bodyBuf) req.write(bodyBuf);
+      req.end();
+    } catch {
+      resolve({ ok: false, bytes: 0, headers: {}, ms: 0 });
+    }
+  });
+}
+
+async function runDevSpeedtestWorker(localBaseUrl: string) {
+  const tStart = performance.now();
+  Object.assign(speedtestState, {
+    running: true,
+    phase: 'ping',
+    progress_pct: 6,
+    current_mbps: 0,
+    ping_ms: 0,
+    jitter_ms: 0,
+    packet_loss_pct: 0,
+    download_mbps: 0,
+    upload_mbps: 0,
+    server_name: '',
+    server_host: '',
+    server_location: '',
+    client_ip: '',
+    isp: '',
+    scope: 'wan' as const,
+    error: '',
+    started_at: Date.now() / 1000,
+  });
+
+  try {
+    const netSnap = sampleRealNetwork();
+    let wanReachable = false;
+    let serverName = os.hostname();
+    let serverHost = '127.0.0.1';
+    let serverLocation = '';
+    const clientIp = serverSelfGeo?.ip || netSnap.local_ip || '127.0.0.1';
+    const ispName = serverSelfGeo?.isp || serverSelfGeo?.org || '';
+    if (serverSelfGeo?.city || serverSelfGeo?.country) {
+      serverLocation = [serverSelfGeo.city, serverSelfGeo.country].filter(Boolean).join(', ');
+    }
+
+    const probe = await fetchUrlBytes('https://speed.cloudflare.com/__down?bytes=65536', 'GET', undefined, 3000);
+    if (probe.ok && probe.bytes > 0) {
+      wanReachable = true;
+      const cfRay = String(probe.headers['cf-ray'] || '');
+      const colo = cfRay.includes('-') ? cfRay.split('-').pop() || '' : '';
+      serverName = colo ? `Cloudflare Edge (${colo})` : 'Cloudflare Speed Edge';
+      serverHost = 'speed.cloudflare.com';
+      if (colo && !serverLocation) serverLocation = colo;
+    }
+
+    const scope: 'wan' | 'local_node' = wanReachable ? 'wan' : 'local_node';
+    const localPayloadUrl = `${localBaseUrl}/api/net/speedtest/payload`;
+
+    // 1. Ping & Jitter
+    const pingSamples: number[] = [];
+    let pingFails = 0;
+    for (let i = 0; i < 6; i++) {
+      const pUrl = wanReachable ? 'https://speed.cloudflare.com/__down?bytes=1024' : `${localPayloadUrl}?bytes=1024`;
+      const res = await fetchUrlBytes(pUrl, 'GET', undefined, 2500);
+      if (res.ok) pingSamples.push(res.ms);
+      else pingFails++;
+      speedtestState.progress_pct = 8 + Math.round(((i + 1) / 6) * 12);
+    }
+    const sortedPings = [...pingSamples].sort((a, b) => a - b);
+    const pingMs = sortedPings.length ? Math.round(sortedPings[Math.floor(sortedPings.length / 2)] * 100) / 100 : 0;
+    let jitterMs = 0;
+    if (pingSamples.length >= 2) {
+      let diffSum = 0;
+      for (let i = 1; i < pingSamples.length; i++) diffSum += Math.abs(pingSamples[i] - pingSamples[i - 1]);
+      jitterMs = Math.round((diffSum / (pingSamples.length - 1)) * 100) / 100;
+    }
+    const lossPct = Math.round((pingFails / 6) * 1000) / 10;
+
+    Object.assign(speedtestState, {
+      phase: 'download',
+      progress_pct: 22,
+      ping_ms: pingMs,
+      jitter_ms: jitterMs,
+      packet_loss_pct: lossPct,
+      server_name: serverName,
+      server_host: serverHost,
+      server_location: serverLocation,
+      client_ip: clientIp,
+      isp: ispName,
+      scope,
+    });
+
+    // 2. Download Mbps
+    const dlSizes = wanReachable ? [8_000_000, 12_000_000] : [16_000_000, 16_000_000];
+    let dlBytesTotal = 0;
+    const dlT0 = performance.now();
+    for (let i = 0; i < dlSizes.length; i++) {
+      const sz = dlSizes[i];
+      const dUrl = wanReachable ? `https://speed.cloudflare.com/__down?bytes=${sz}` : `${localPayloadUrl}?bytes=${sz}`;
+      const r = await fetchUrlBytes(dUrl, 'GET', undefined, 12000);
+      dlBytesTotal += r.bytes;
+      const elSec = Math.max(0.05, (performance.now() - dlT0) / 1000);
+      const liveDl = Math.round(((dlBytesTotal * 8) / (elSec * 1_000_000)) * 100) / 100;
+      speedtestState.current_mbps = liveDl;
+      speedtestState.download_mbps = liveDl;
+      speedtestState.progress_pct = 22 + Math.round(((i + 1) / dlSizes.length) * 38);
+    }
+    const dlElapsedSec = Math.max(0.05, (performance.now() - dlT0) / 1000);
+    const downloadMbps = Math.round(((dlBytesTotal * 8) / (dlElapsedSec * 1_000_000)) * 100) / 100;
+
+    Object.assign(speedtestState, {
+      phase: 'upload',
+      progress_pct: 62,
+      download_mbps: downloadMbps,
+      current_mbps: 0,
+    });
+
+    // 3. Upload Mbps
+    const ulBuf = Buffer.alloc(wanReachable ? 2_500_000 : 8_000_000);
+    let ulBytesTotal = 0;
+    const ulT0 = performance.now();
+    for (let i = 0; i < 2; i++) {
+      const uUrl = wanReachable ? 'https://speed.cloudflare.com/__up' : localPayloadUrl;
+      const r = await fetchUrlBytes(uUrl, 'POST', ulBuf, 12000);
+      if (r.ok) ulBytesTotal += ulBuf.byteLength;
+      const elSec = Math.max(0.05, (performance.now() - ulT0) / 1000);
+      const liveUl = Math.round(((ulBytesTotal * 8) / (elSec * 1_000_000)) * 100) / 100;
+      speedtestState.current_mbps = liveUl;
+      speedtestState.upload_mbps = liveUl;
+      speedtestState.progress_pct = 62 + Math.round(((i + 1) / 2) * 34);
+    }
+    const ulElapsedSec = Math.max(0.05, (performance.now() - ulT0) / 1000);
+    const uploadMbps = Math.round(((ulBytesTotal * 8) / (ulElapsedSec * 1_000_000)) * 100) / 100;
+
+    const nowTs = Math.round((Date.now() / 1000) * 1000) / 1000;
+    const dObj = new Date(nowTs * 1000);
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const createdAt = `${dObj.getFullYear()}-${pad2(dObj.getMonth() + 1)}-${pad2(dObj.getDate())} ${pad2(dObj.getHours())}:${pad2(dObj.getMinutes())}:${pad2(dObj.getSeconds())}`;
+    const entry: SpeedTestResultEntry = {
+      id: nextSpeedtestId++,
+      ts: nowTs,
+      created_at: createdAt,
+      download_mbps: downloadMbps,
+      upload_mbps: uploadMbps,
+      ping_ms: pingMs,
+      jitter_ms: jitterMs,
+      packet_loss_pct: lossPct,
+      server_name: serverName,
+      server_host: serverHost,
+      server_location: serverLocation,
+      client_ip: clientIp,
+      isp: ispName,
+      duration_ms: Math.round(performance.now() - tStart),
+      scope,
+    };
+
+    devSpeedtestHistory.unshift(entry);
+    devSpeedtestHistory = devSpeedtestHistory.slice(0, 500);
+    saveSpeedtestHistoryDev();
+
+    Object.assign(speedtestState, {
+      running: false,
+      phase: 'done',
+      progress_pct: 100,
+      current_mbps: uploadMbps,
+      download_mbps: downloadMbps,
+      upload_mbps: uploadMbps,
+      completed_at: nowTs,
+      last_result: entry,
+    });
+  } catch (err) {
+    Object.assign(speedtestState, {
+      running: false,
+      phase: 'error',
+      progress_pct: 0,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -2287,6 +3058,7 @@ function writeCustomLogos(logos: Record<string, string>) {
 function realOsTelemetryMiddleware(): Plugin {
   sampleRealCpuUsage();
   startGeoIpBackgroundWorker();
+  startPingLatencyWorker();
   return {
     name: 'real-os-telemetry-middleware',
     configureServer(server) {
@@ -2429,6 +3201,131 @@ function realOsTelemetryMiddleware(): Plugin {
             })
           );
           return;
+        }
+
+        if (url === '/api/metrics/process-history' && req.method === 'GET') {
+          const params = new URLSearchParams(queryStr || '');
+          const hours = Number.parseInt(params.get('hours') || '24', 10) || 24;
+          const metric = (params.get('metric') || 'cpu').trim().toLowerCase();
+          if (devProcessSnapshots.length === 0) {
+            const initProcs = sampleRealProcesses() as Array<Record<string, unknown>>;
+            recordProcessSnapshotDev(initProcs, true);
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(queryProcessHistoryDev(hours, metric)));
+          return;
+        }
+
+        if (url === '/api/net/speedtest/status' && req.method === 'GET') {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, ...speedtestState }));
+          return;
+        }
+
+        if (url === '/api/net/speedtest/history' && req.method === 'GET') {
+          const params = new URLSearchParams(queryStr || '');
+          const limit = Math.max(1, Math.min(500, Number.parseInt(params.get('limit') || '100', 10) || 100));
+          const items = devSpeedtestHistory.slice(0, limit);
+          const bestDl = items.reduce((m, x) => Math.max(m, x.download_mbps || 0), 0);
+          const bestUl = items.reduce((m, x) => Math.max(m, x.upload_mbps || 0), 0);
+          const avgPing = items.length ? Math.round((items.reduce((s, x) => s + (x.ping_ms || 0), 0) / items.length) * 100) / 100 : 0;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              ok: true,
+              db_file: 'recursos_history.db',
+              total: devSpeedtestHistory.length,
+              best_download_mbps: Math.round(bestDl * 100) / 100,
+              best_upload_mbps: Math.round(bestUl * 100) / 100,
+              avg_ping_ms: avgPing,
+              items,
+            })
+          );
+          return;
+        }
+
+        if (url === '/api/net/speedtest/history' && req.method === 'DELETE') {
+          const params = new URLSearchParams(queryStr || '');
+          const idParam = params.get('id');
+          let deleted = 0;
+          if (idParam) {
+            const idNum = Number.parseInt(idParam, 10);
+            const before = devSpeedtestHistory.length;
+            devSpeedtestHistory = devSpeedtestHistory.filter((x) => x.id !== idNum);
+            deleted = before - devSpeedtestHistory.length;
+          } else {
+            deleted = devSpeedtestHistory.length;
+            devSpeedtestHistory = [];
+          }
+          saveSpeedtestHistoryDev();
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, success: true, deleted }));
+          return;
+        }
+
+        if (url === '/api/net/speedtest/history/clear' && req.method === 'POST') {
+          let rawBody = '';
+          req.on('data', (c) => {
+            rawBody += c;
+          });
+          req.on('end', () => {
+            let entryId: number | null = null;
+            try {
+              const b = rawBody ? JSON.parse(rawBody) : {};
+              if (b.id !== undefined && b.id !== null) entryId = Number.parseInt(String(b.id), 10);
+            } catch {
+              entryId = null;
+            }
+            let deleted = 0;
+            if (entryId !== null && Number.isFinite(entryId)) {
+              const before = devSpeedtestHistory.length;
+              devSpeedtestHistory = devSpeedtestHistory.filter((x) => x.id !== entryId);
+              deleted = before - devSpeedtestHistory.length;
+            } else {
+              deleted = devSpeedtestHistory.length;
+              devSpeedtestHistory = [];
+            }
+            saveSpeedtestHistoryDev();
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, success: true, deleted }));
+          });
+          return;
+        }
+
+        if (url === '/api/net/speedtest/run' && req.method === 'POST') {
+          if (speedtestState.running) {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, started: false, already_running: true, status: speedtestState }));
+            return;
+          }
+          const localPort = Number(req.socket?.localPort || 3000);
+          void runDevSpeedtestWorker(`http://127.0.0.1:${localPort}`);
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true, started: true, already_running: false, status: speedtestState }));
+          return;
+        }
+
+        if (url === '/api/net/speedtest/payload') {
+          if (req.method === 'GET') {
+            const params = new URLSearchParams(queryStr || '');
+            const sz = Math.max(1024, Math.min(20_000_000, Number.parseInt(params.get('bytes') || '1048576', 10) || 1048576));
+            res.setHeader('Content-Type', 'application/octet-stream');
+            res.setHeader('Content-Length', sz);
+            res.setHeader('Cache-Control', 'no-store');
+            res.end(Buffer.alloc(sz));
+            return;
+          }
+          if (req.method === 'POST') {
+            let received = 0;
+            req.on('data', (c: Buffer) => {
+              received += c.byteLength;
+            });
+            req.on('end', () => {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ ok: true, received }));
+            });
+            return;
+          }
         }
 
         if (url === '/api/maps/config') {
@@ -2642,6 +3539,7 @@ function realOsTelemetryMiddleware(): Plugin {
           const net = sampleRealNetwork();
           const disks = sampleRealDisks();
           const procs = sampleRealProcesses();
+          recordProcessSnapshotDev(procs as Array<Record<string, unknown>>, devProcessSnapshots.length === 0);
           const ver = getRealVersionPayload(hostHdr);
           const [l1, l5, l15] = os.loadavg();
           const uptimeSec = Math.floor(os.uptime());
@@ -2773,6 +3671,10 @@ function realOsTelemetryMiddleware(): Plugin {
                 bytes_sent?: number;
                 rx_bytes_sec?: number;
                 tx_bytes_sec?: number;
+                wan_rx_bytes_sec?: number;
+                wan_tx_bytes_sec?: number;
+                lan_rx_bytes_sec?: number;
+                lan_tx_bytes_sec?: number;
               }[]
             ).map((nic) => ({
               name: `${os.hostname()} (${nic.name})`,
@@ -2785,12 +3687,17 @@ function realOsTelemetryMiddleware(): Plugin {
               brand_domain: osCatalogEntry.domain,
               auto_logo_url: osCatalogEntry.logo,
               rssi: null,
-              tx_rate: nic.speed_mbps ? `${nic.speed_mbps} Mbps` : ' Enlace Activo',
+              tx_rate: nic.speed_mbps ? `${nic.speed_mbps} Mbps` : 'Enlace Activo',
               tx_bytes: nic.bytes_recv || 0,
               rx_bytes: nic.bytes_sent || 0,
               speed_down: nic.rx_bytes_sec || 0,
               speed_up: nic.tx_bytes_sec || 0,
+              wan_speed_down: nic.wan_rx_bytes_sec ?? nic.rx_bytes_sec ?? 0,
+              wan_speed_up: nic.wan_tx_bytes_sec ?? nic.tx_bytes_sec ?? 0,
+              lan_speed_down: nic.lan_rx_bytes_sec ?? 0,
+              lan_speed_up: nic.lan_tx_bytes_sec ?? 0,
               is_online: true,
+              is_server: true,
             })),
             wifi_summary: {
               total_clients: net.interfaces_list.length,
@@ -2800,6 +3707,16 @@ function realOsTelemetryMiddleware(): Plugin {
               cable_rx_bytes: net.rx_total_bytes,
               wifi_tx_bytes: 0,
               wifi_rx_bytes: 0,
+              router_wan_available: false,
+              router_wan_rx_bytes_sec: net.wan_rx_bytes_sec ?? net.rx_bytes_sec ?? 0,
+              router_wan_tx_bytes_sec: net.wan_tx_bytes_sec ?? net.tx_bytes_sec ?? 0,
+              router_lan_rx_bytes_sec: net.lan_rx_bytes_sec ?? 0,
+              router_lan_tx_bytes_sec: net.lan_tx_bytes_sec ?? 0,
+              router_ip: detectDefaultGatewayIp() || net.local_ip,
+              gateway_ip: detectDefaultGatewayIp() || net.local_ip,
+              gateway_name: os.hostname(),
+              router_traffic_source: os.hostname(),
+              router_history_20m: net.router_history_20m || [],
               last_update: timeStr,
             },
             docker_activities: [],

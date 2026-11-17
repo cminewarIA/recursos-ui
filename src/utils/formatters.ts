@@ -87,7 +87,7 @@ export function normalizeExternalRoute(pathStr: string): 'inicio' | 'equipo' | '
   const clean = (pathStr || '/').toLowerCase().replace(/^\/+/, '').split('/')[0];
   if (['inicio', 'resumen', ''].includes(clean)) return 'inicio';
   if (['equipo', 'procesador', 'cpu', 'memoria', 'ram', 'grafica', 'gpu', 'almacenamiento', 'storage', 'procesos', 'processes'].includes(clean)) return 'equipo';
-  if (['red', 'seguridad', 'security', 'dns', 'duckdns', 'mapa', 'map'].includes(clean)) return 'red';
+  if (['red', 'seguridad', 'security', 'dns', 'duckdns', 'mapa', 'map', 'speedtest', 'velocidad'].includes(clean)) return 'red';
   if (['programas', 'aplicaciones', 'servicios', 'services', 'multimedia', 'media', 'descargas', 'downloads'].includes(clean)) return 'programas';
   if (['mas', 'sistema', 'version', 'updates', 'dispositivos', 'devices', 'dex', 'logs', 'manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(clean)) return 'mas';
   return 'inicio';
@@ -103,6 +103,7 @@ export function extractInitialSubTabFromRoute(pathStr: string): string | undefin
   if (['seguridad', 'security'].includes(clean)) return 'security';
   if (['dns', 'duckdns'].includes(clean)) return 'dns';
   if (['mapa', 'map'].includes(clean)) return 'map';
+  if (['speedtest', 'velocidad'].includes(clean)) return 'speedtest';
   if (['multimedia', 'media', 'descargas', 'downloads'].includes(clean)) return 'media';
   if (['aplicaciones', 'servicios', 'services'].includes(clean)) return 'services';
   if (['sistema', 'version', 'updates'].includes(clean)) return 'updates';

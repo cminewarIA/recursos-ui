@@ -179,6 +179,7 @@ export function App() {
         else if (raw.includes('almacenamiento')) sub = 'storage';
         else if (raw.includes('procesos')) sub = 'processes';
         else if (raw.includes('seguridad')) sub = 'security';
+        else if (raw.includes('speedtest') || raw.includes('velocidad')) sub = 'speedtest';
         else if (raw.includes('dns') || raw.includes('duckdns')) sub = 'dns';
         else if (raw.includes('multimedia') || raw.includes('descargas')) sub = 'media';
       }
