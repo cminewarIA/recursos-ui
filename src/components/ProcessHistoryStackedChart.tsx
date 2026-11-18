@@ -88,7 +88,8 @@ export const ProcessHistoryStackedChart: React.FC<ProcessHistoryStackedChartProp
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const w = Math.max(160, Math.floor(entry.contentRect.width));
-        setSize((prev) => (prev.width === w ? prev : { width: w, height: 224 }));
+        const h = Math.max(130, Math.floor(entry.contentRect.height) || 224);
+        setSize((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
       }
     });
     ro.observe(el);
@@ -437,25 +438,24 @@ export const ProcessHistoryStackedChart: React.FC<ProcessHistoryStackedChartProp
       )}
 
       {/* HiDPI Stacked Area Canvas */}
-      <div
-        ref={containerRef}
-        className="cockpit-subtile relative mt-3 overflow-hidden p-3"
-      >
-        {bucketCount === 0 ? (
-          <div className="flex h-[224px] items-center justify-center text-center text-xs text-slate-500 dark:text-slate-400">
-            {loading ? t('charts.loading_history') : t('equipment.process_history_empty')}
-          </div>
-        ) : (
-          <canvas
-            ref={canvasRef}
-            onPointerMove={handlePointerMove}
-            onPointerLeave={() => {
-              setHoverIdx(null);
-              setPointerPos(null);
-            }}
-            style={{ width: '100%', height: '224px', display: 'block', touchAction: 'none' }}
-          />
-        )}
+      <div className="cockpit-subtile relative mt-3 overflow-hidden p-[clamp(0.5rem,1.2vw,0.85rem)]">
+        <div ref={containerRef} className="cockpit-chart-tall relative w-full">
+          {bucketCount === 0 ? (
+            <div className="flex h-full items-center justify-center text-center text-xs text-slate-500 dark:text-slate-400">
+              {loading ? t('charts.loading_history') : t('equipment.process_history_empty')}
+            </div>
+          ) : (
+            <canvas
+              ref={canvasRef}
+              onPointerMove={handlePointerMove}
+              onPointerLeave={() => {
+                setHoverIdx(null);
+                setPointerPos(null);
+              }}
+              style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
+            />
+          )}
+        </div>
       </div>
 
       <FloatingTooltip data={tooltipData} />

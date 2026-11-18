@@ -122,33 +122,69 @@
 @keyframes cockpitFadeSlideUp {
   0% {
     opacity: 0;
-    transform: translateY(10px) scale(0.992);
+    transform: translateY(14px) scaleX(0.972) scaleY(1.028);
+  }
+  58% {
+    opacity: 1;
+    transform: translateY(-2px) scaleX(1.012) scaleY(0.988);
+  }
+  82% {
+    transform: translateY(1px) scaleX(0.996) scaleY(1.005);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0) scaleX(1) scaleY(1);
   }
 }
 
 @keyframes cockpitModalPop {
   0% {
     opacity: 0;
-    transform: translateY(14px) scale(0.96);
+    transform: translateY(18px) scaleX(0.92) scaleY(1.06);
+  }
+  48% {
+    opacity: 1;
+    transform: translateY(-3px) scaleX(1.026) scaleY(0.974);
+  }
+  74% {
+    transform: translateY(1.5px) scaleX(0.992) scaleY(1.01);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0) scaleX(1) scaleY(1);
   }
 }
 
 @keyframes cockpitToastIn {
   0% {
     opacity: 0;
-    transform: translateX(18px) scale(0.96);
+    transform: translateX(24px) scaleX(0.92) scaleY(1.05);
+  }
+  55% {
+    opacity: 1;
+    transform: translateX(-4px) scaleX(1.025) scaleY(0.978);
+  }
+  80% {
+    transform: translateX(1.5px) scaleX(0.994) scaleY(1.006);
   }
   100% {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translateX(0) scaleX(1) scaleY(1);
+  }
+}
+
+@keyframes cockpitTooltipPop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scaleX(0.91) scaleY(1.08);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-1px) scaleX(1.03) scaleY(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleX(1) scaleY(1);
   }
 }
 
@@ -191,11 +227,11 @@
   }
 
   .cockpit-view-enter {
-    animation: cockpitFadeSlideUp 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: cockpitFadeSlideUp 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
 
   .cockpit-modal-enter {
-    animation: cockpitModalPop 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: cockpitModalPop 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
 
   /* Evita encadenar el scroll al documento de fondo al llegar al final de una ventana modal o desplegable sin reiniciar scrollY */
@@ -214,7 +250,11 @@
   }
 
   .cockpit-toast-enter {
-    animation: cockpitToastIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: cockpitToastIn 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .cockpit-tooltip-enter {
+    animation: cockpitTooltipPop 240ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
 
   .cockpit-topbar {
@@ -224,7 +264,7 @@
     box-shadow: var(--ui-shadow);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    transition: border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+    transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
   }
   [data-theme="dark"] .cockpit-topbar,
   .dark .cockpit-topbar {
@@ -244,7 +284,7 @@
     border: 1.5px solid #cbd5e1;
     border-radius: 18px;
     box-shadow: var(--ui-shadow);
-    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), border-color 240ms ease, box-shadow 240ms ease;
+    transition: transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 240ms ease, box-shadow 240ms ease;
   }
   [data-theme="dark"] .cockpit-hero,
   .dark .cockpit-hero {
@@ -263,7 +303,7 @@
     border: 1.5px solid var(--border-hairline);
     border-radius: 18px;
     box-shadow: var(--ui-shadow);
-    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms ease, border-color 240ms ease, background-color 240ms ease;
+    transition: transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 260ms ease, border-color 240ms ease, background-color 240ms ease;
   }
   @media (hover: hover) {
     .cockpit-bento:hover {
@@ -280,7 +320,7 @@
     background-color: var(--bg-subtle);
     border: 1px solid var(--border-hairline);
     border-radius: 12px;
-    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+    transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 180ms ease, border-color 180ms ease, color 180ms ease;
   }
   [data-theme="dark"] .cockpit-subtile,
   .dark .cockpit-subtile {
@@ -288,7 +328,7 @@
   }
   button.cockpit-subtile:active,
   a.cockpit-subtile:active {
-    transform: scale(0.97);
+    transform: scaleX(1.03) scaleY(0.95);
   }
 
   .cockpit-segmented {
@@ -296,6 +336,51 @@
     border: 1.5px solid var(--border-hairline);
     border-radius: 18px;
     box-shadow: var(--ui-shadow);
+    transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 240ms ease;
+  }
+
+  /* Barra superior de subapartados autoajustable: jamás recorta ni oculta pestañas al estrechar la ventana */
+  .cockpit-subtabs-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: clamp(0.25rem, 0.55vw, 0.45rem);
+    padding: clamp(0.3rem, 0.65vw, 0.45rem);
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .cockpit-subtab-btn {
+    flex: 1 1 auto;
+    min-width: fit-content;
+    min-height: clamp(34px, min(5.4dvh, 4.8vw), 44px);
+    padding: clamp(0.32rem, 0.65dvh, 0.5rem) clamp(0.55rem, 1.1vw, 0.9rem);
+    font-size: clamp(0.6875rem, 0.7vw + 0.42rem, 0.8125rem);
+    gap: clamp(0.3rem, 0.5vw, 0.5rem);
+    white-space: nowrap;
+  }
+
+  /* Contenedores de altura fluida sincronizados al alto y ancho de la ventana */
+  .cockpit-chart-compact {
+    height: clamp(82px, 13.5dvh, 140px);
+  }
+  .cockpit-chart-medium {
+    height: clamp(120px, 22dvh, 230px);
+  }
+  .cockpit-chart-tall {
+    height: clamp(148px, 27dvh, 300px);
+  }
+  .cockpit-chart-modal {
+    height: clamp(168px, 35dvh, 420px);
+  }
+  .cockpit-map-box {
+    height: clamp(230px, 46dvh, 560px);
+  }
+  .cockpit-manual-frame {
+    height: clamp(260px, 68dvh, 860px);
+  }
+  .cockpit-scroll-panel {
+    max-height: clamp(120px, 30dvh, 280px);
   }
 
   .cockpit-dock {
@@ -305,7 +390,7 @@
     box-shadow: var(--ui-shadow-strong);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
-    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms ease, border-color 240ms ease;
+    transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 240ms ease, border-color 240ms ease;
   }
   [data-theme="dark"] .cockpit-dock,
   .dark .cockpit-dock {
@@ -317,7 +402,7 @@
     background: #e0f2fe;
     border: 1px solid #7dd3fc;
     color: #0369a1;
-    transition: all 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: all 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   [data-theme="dark"] .cockpit-tab-active,
   .dark .cockpit-tab-active {
@@ -329,7 +414,7 @@
   .cockpit-progress-fill {
     position: relative;
     overflow: hidden;
-    transition: width 550ms cubic-bezier(0.22, 1, 0.36, 1), background-color 280ms ease;
+    transition: width 620ms cubic-bezier(0.34, 1.38, 0.64, 1), background-color 280ms ease;
   }
   .cockpit-progress-fill::after {
     content: "";
@@ -344,28 +429,28 @@
     border: 1px solid #0284c7;
     color: #ffffff;
     box-shadow: 0 4px 12px -2px rgba(2, 132, 199, 0.32);
-    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease, filter 200ms ease;
+    transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease, filter 200ms ease;
   }
   .cockpit-btn-accent:hover:not(:disabled) {
     background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
-    transform: translateY(-1px);
+    transform: translateY(-1.5px) scaleX(1.015) scaleY(0.985);
     box-shadow: 0 8px 18px -4px rgba(2, 132, 199, 0.42);
   }
   .cockpit-btn-accent:active:not(:disabled) {
-    transform: scale(0.97);
+    transform: scaleX(1.04) scaleY(0.94);
   }
 
   .cockpit-btn-wol {
     background: #ecfdf5;
     border: 1px solid #6ee7b7;
     color: #047857;
-    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease;
+    transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 180ms ease;
   }
   .cockpit-btn-wol:hover:not(:disabled) {
     background: #d1fae5;
   }
   .cockpit-btn-wol:active:not(:disabled) {
-    transform: scale(0.96);
+    transform: scaleX(1.04) scaleY(0.94);
   }
   [data-theme="dark"] .cockpit-btn-wol,
   .dark .cockpit-btn-wol {
@@ -382,13 +467,13 @@
     background: #fef2f2;
     border: 1px solid #fca5a5;
     color: #b91c1c;
-    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease;
+    transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 180ms ease;
   }
   .cockpit-btn-off:hover:not(:disabled) {
     background: #fee2e2;
   }
   .cockpit-btn-off:active:not(:disabled) {
-    transform: scale(0.96);
+    transform: scaleX(1.04) scaleY(0.94);
   }
   [data-theme="dark"] .cockpit-btn-off,
   .dark .cockpit-btn-off {
@@ -466,48 +551,37 @@
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: clamp(0.75rem, 1.8vw, 2.25rem);
-    padding-right: clamp(0.75rem, 1.8vw, 2.25rem);
+    padding-left: clamp(0.65rem, 1.8vw, 2.25rem);
+    padding-right: clamp(0.65rem, 1.8vw, 2.25rem);
   }
   [data-tv="true"] .cockpit-shell {
     padding-left: max(1.5rem, 2.5vw);
     padding-right: max(1.5rem, 2.5vw);
   }
 
-  /* Rejilla automática multi-columna compacta y legible para widgets con gráficas */
+  /* Rejilla automática multi-columna fluida proporcional al viewport */
   .cockpit-auto-grid {
-    --cockpit-grid-min: 245px;
+    --cockpit-grid-min: clamp(215px, 20vw, 310px);
     display: grid;
-    gap: 0.75rem;
+    gap: clamp(0.5rem, 1.1vw, 0.95rem);
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cockpit-grid-min)), 1fr));
     align-items: stretch;
   }
-  @media (min-width: 1024px) {
-    .cockpit-auto-grid {
-      --cockpit-grid-min: 265px;
-      gap: 0.875rem;
-    }
-  }
 
-  /* Rejilla automática multi-columna para tarjetas compactas de red, contenedores y dispositivos */
+  /* Rejilla automática multi-columna fluida para tarjetas de red, contenedores y dispositivos */
   .cockpit-auto-grid-cards {
-    --cockpit-card-min: 280px;
+    --cockpit-card-min: clamp(235px, 22vw, 340px);
     display: grid;
-    gap: 0.625rem;
+    gap: clamp(0.45rem, 0.95vw, 0.85rem);
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cockpit-card-min)), 1fr));
     align-items: stretch;
-  }
-  @media (min-width: 1280px) {
-    .cockpit-auto-grid-cards {
-      --cockpit-card-min: 310px;
-    }
   }
 
   /* Rejilla fluida para núcleos CPU */
   .cockpit-cores-grid {
     display: grid;
-    gap: 0.5rem;
-    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+    gap: clamp(0.35rem, 0.7vw, 0.55rem);
+    grid-template-columns: repeat(auto-fit, minmax(clamp(46px, 5.2vw, 66px), 1fr));
   }
 }
 
@@ -594,13 +668,18 @@ html.dark .leaflet-popup-close-button:hover {
   .cockpit-view-enter,
   .cockpit-modal-enter,
   .cockpit-toast-enter,
+  .cockpit-tooltip-enter,
   .cockpit-hero,
   .cockpit-progress-fill::after {
     animation: none !important;
   }
   .cockpit-bento,
   .cockpit-subtile,
+  .cockpit-dock,
+  .cockpit-segmented,
   .cockpit-btn-accent,
+  .cockpit-btn-wol,
+  .cockpit-btn-off,
   .cockpit-progress-fill {
     transition: none !important;
   }

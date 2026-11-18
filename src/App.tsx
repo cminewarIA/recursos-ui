@@ -1,15 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion, MotionConfig } from 'motion/react';
 import {
   Activity,
-  ArrowDownUp,
   Cpu,
   Grid,
   Home,
-  Maximize2,
   Moon,
   MoreHorizontal,
-  RefreshCw,
   Sun,
   Wifi,
 } from 'lucide-react';
@@ -20,13 +17,13 @@ import { NetworkSecurityView } from './components/NetworkSecurityView';
 import { AppsMediaView } from './components/AppsMediaView';
 import { MoreView } from './components/MoreView';
 import { ExpandedChartModal } from './components/ExpandedChartModal';
-import { ChartSeries, TelemetryChart } from './components/TelemetryChart';
 import { MainTabId, MetricsPayload, TelemetryHistoryResponse, ThemeMode, VersionInfo, WifiClient } from './types/telemetry';
 import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/api';
-import { extractInitialSubTabFromRoute, formatSpeed, normalizeExternalRoute } from './utils/formatters';
+import { extractInitialSubTabFromRoute, normalizeExternalRoute } from './utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion, isRemoteVersionHigher } from './utils/version';
 import { useI18n } from './i18n';
 import { useFirebase } from './firebase/FirebaseProvider';
+import { installCockpitScrollContainment } from './utils/scrollContain';
 
 interface ToastState {
   id: number;
@@ -215,6 +212,7 @@ export function App() {
         else if (raw.includes('almacenamiento')) sub = 'storage';
         else if (raw.includes('procesos')) sub = 'processes';
         else if (raw.includes('seguridad')) sub = 'security';
+        else if (raw.includes('trafic') || raw.includes('traffic') || raw.includes('historial')) sub = 'traffic';
         else if (raw.includes('speedtest') || raw.includes('velocidad')) sub = 'speedtest';
         else if (raw.includes('dns') || raw.includes('duckdns')) sub = 'dns';
         else if (raw.includes('multimedia') || raw.includes('descargas')) sub = 'media';
@@ -273,146 +271,9 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [confirmShutdownClient]);
 
-  // Prevent mouse-wheel & touch scroll chaining to the background document when any modal or scrollable panel reaches its boundary
+  // Lock background viewport when modals open & add elastic jelly overscroll physics on modals/popovers
   useEffect(() => {
-    const syncModalDomAttr = () => {
-      const hasModal = Boolean(document.querySelector('[aria-modal="true"]'));
-      if (hasModal) {
-        document.documentElement.setAttribute('data-cockpit-modal-open', 'true');
-      } else {
-        document.documentElement.removeAttribute('data-cockpit-modal-open');
-      }
-    };
-
-    syncModalDomAttr();
-    const observer = new MutationObserver(syncModalDomAttr);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['aria-modal'],
-    });
-
-    const normalizeDeltaY = (ev: WheelEvent): number => {
-      if (ev.deltaMode === 1) return ev.deltaY * 16;
-      if (ev.deltaMode === 2) return ev.deltaY * window.innerHeight;
-      return ev.deltaY;
-    };
-
-    const isScrollContainerY = (el: HTMLElement): boolean => {
-      if (el === document.body || el === document.documentElement) return false;
-      if (el.scrollHeight <= el.clientHeight + 1) return false;
-      const oy = window.getComputedStyle(el).overflowY;
-      return oy === 'auto' || oy === 'scroll' || oy === 'overlay';
-    };
-
-    const handleWheel = (ev: WheelEvent) => {
-      const target = ev.target instanceof Element ? (ev.target as HTMLElement) : null;
-      const hasOpenModal = Boolean(document.querySelector('[aria-modal="true"]'));
-      const modalEl = target ? (target.closest('[aria-modal="true"]') as HTMLElement | null) : null;
-      const containRoot = target
-        ? (target.closest('[data-cockpit-scroll-contain="true"], [aria-modal="true"]') as HTMLElement | null)
-        : null;
-
-      // If an aria-modal is open and wheel lands outside any modal dialog, block background scroll unconditionally
-      if (hasOpenModal && !modalEl) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        return;
-      }
-
-      // Find nearest scrollable box (excluding document root/body) along ancestors
-      let cur: HTMLElement | null = target;
-      let scrollableAncestor: HTMLElement | null = null;
-      while (cur && cur !== document.body && cur !== document.documentElement) {
-        if (isScrollContainerY(cur)) {
-          scrollableAncestor = cur;
-          break;
-        }
-        if (cur === containRoot) break;
-        cur = cur.parentElement;
-      }
-
-      if (!hasOpenModal && !containRoot && !scrollableAncestor) return;
-
-      const dy = normalizeDeltaY(ev);
-      if (dy === 0) {
-        if (hasOpenModal) {
-          ev.preventDefault();
-          ev.stopPropagation();
-        }
-        return;
-      }
-
-      // Walk scrollable ancestors within the modal/contain boundary to absorb or block boundary spillover
-      let checkEl: HTMLElement | null = scrollableAncestor ?? target;
-      const stopAt = modalEl ?? containRoot ?? scrollableAncestor;
-      while (checkEl && checkEl !== document.body && checkEl !== document.documentElement) {
-        if (isScrollContainerY(checkEl)) {
-          if (dy > 0) {
-            const remainingDown = checkEl.scrollHeight - checkEl.clientHeight - checkEl.scrollTop;
-            if (remainingDown <= 1) {
-              // At bottom: if checkEl is an explicit contain-box/modal boundary, stop cleanly and never chain to background
-              if (checkEl === stopAt || checkEl.hasAttribute('data-cockpit-scroll-contain') || checkEl === scrollableAncestor) {
-                ev.preventDefault();
-                ev.stopPropagation();
-                return;
-              }
-            } else if (remainingDown <= dy + 4) {
-              // Final wheel tick before bottom: clamp cleanly without letting excess delta escape to background page
-              ev.preventDefault();
-              ev.stopPropagation();
-              checkEl.scrollTop = checkEl.scrollHeight - checkEl.clientHeight;
-              return;
-            } else {
-              // Comfortably inside scrollable bounds
-              return;
-            }
-          } else {
-            const remainingUp = checkEl.scrollTop;
-            if (remainingUp <= 1) {
-              if (checkEl === stopAt || checkEl.hasAttribute('data-cockpit-scroll-contain') || checkEl === scrollableAncestor) {
-                ev.preventDefault();
-                ev.stopPropagation();
-                return;
-              }
-            } else if (remainingUp <= Math.abs(dy) + 4) {
-              ev.preventDefault();
-              ev.stopPropagation();
-              checkEl.scrollTop = 0;
-              return;
-            } else {
-              return;
-            }
-          }
-        }
-        if (checkEl === stopAt) break;
-        checkEl = checkEl.parentElement;
-      }
-
-      // Reached boundary of modal or floating scrollable popover: block chaining to background page
-      ev.preventDefault();
-      ev.stopPropagation();
-    };
-
-    const handleTouchMove = (ev: TouchEvent) => {
-      const target = ev.target instanceof Element ? (ev.target as HTMLElement) : null;
-      const hasOpenModal = Boolean(document.querySelector('[aria-modal="true"]'));
-      if (!hasOpenModal) return;
-      const modalEl = target ? (target.closest('[aria-modal="true"]') as HTMLElement | null) : null;
-      if (!modalEl) {
-        ev.preventDefault();
-      }
-    };
-
-    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-    window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('wheel', handleWheel, { capture: true });
-      window.removeEventListener('touchmove', handleTouchMove, { capture: true });
-      document.documentElement.removeAttribute('data-cockpit-modal-open');
-    };
+    return installCockpitScrollContainment();
   }, []);
 
   // Register current browser/native session periodically on first mount
@@ -625,131 +486,42 @@ export function App() {
     { id: 'mas', label: t('nav.mas'), icon: <MoreHorizontal className="h-5 w-5" /> },
   ];
 
-  const network24hView = useMemo(() => {
-    const dbSeries = netHistory24h?.series;
-    const dbRx = dbSeries?.net_rx ?? [];
-    const useFallbackLive = dbRx.length < 2 && (metrics?.history?.net_rx?.length ?? 0) >= 2;
-    const sourceSeries = useFallbackLive ? metrics?.history : dbSeries;
-
-    const rxTotal = sourceSeries?.net_rx ?? [];
-    const txTotal = sourceSeries?.net_tx ?? [];
-    const wanRxData = sourceSeries?.net_wan_rx?.length ? sourceSeries.net_wan_rx : rxTotal;
-    const wanTxData = sourceSeries?.net_wan_tx?.length ? sourceSeries.net_wan_tx : txTotal;
-    const lanRxData = sourceSeries?.net_lan_rx?.length ? sourceSeries.net_lan_rx : rxTotal.map(() => 0);
-    const lanTxData = sourceSeries?.net_lan_tx?.length ? sourceSeries.net_lan_tx : txTotal.map(() => 0);
-
-    const timestamps = sourceSeries?.timestamps ?? [];
-    const dateTimestamps = sourceSeries?.date_timestamps ?? [];
-    const epochTs = sourceSeries?.epoch_ts ?? [];
-
-    const peakWanRxMb = wanRxData.length > 0 ? Math.max(...wanRxData) : 0;
-    const peakWanTxMb = wanTxData.length > 0 ? Math.max(...wanTxData) : 0;
-    const peakLanRxMb = lanRxData.length > 0 ? Math.max(...lanRxData) : 0;
-    const peakLanTxMb = lanTxData.length > 0 ? Math.max(...lanTxData) : 0;
-
-    const series: ChartSeries[] = [
-      {
-        id: 'net_wan_rx_24h',
-        metricKey: 'net_wan_rx',
-        label: t('hardware.net.wan_download'),
-        data: wanRxData,
-        color: '#0284c7',
-        unit: 'MB/s',
-        decimals: 2,
-        fillAlpha: 0.16,
-      },
-      {
-        id: 'net_wan_tx_24h',
-        metricKey: 'net_wan_tx',
-        label: t('hardware.net.wan_upload'),
-        data: wanTxData,
-        color: '#10b981',
-        unit: 'MB/s',
-        decimals: 2,
-        fillAlpha: 0.08,
-      },
-      {
-        id: 'net_lan_rx_24h',
-        metricKey: 'net_lan_rx',
-        label: t('hardware.net.lan_download'),
-        data: lanRxData,
-        color: '#6366f1',
-        unit: 'MB/s',
-        decimals: 2,
-        fillAlpha: 0.10,
-      },
-      {
-        id: 'net_lan_tx_24h',
-        metricKey: 'net_lan_tx',
-        label: t('hardware.net.lan_upload'),
-        data: lanTxData,
-        color: '#f59e0b',
-        unit: 'MB/s',
-        decimals: 2,
-        fillAlpha: 0.06,
-      },
-    ];
-
-    return {
-      series,
-      timestamps,
-      dateTimestamps,
-      epochTs,
-      sampleCount: Math.max(wanRxData.length, wanTxData.length, lanRxData.length, lanTxData.length),
-      peakWanRxMb,
-      peakWanTxMb,
-      peakLanRxMb,
-      peakLanTxMb,
-    };
-  }, [netHistory24h, metrics?.history, t]);
-
-  const openNetwork24hExpanded = useCallback(() => {
-    setExpandedChart({
-      title: t('overview.net_history_24h_title'),
-      subtitle: t('overview.net_history_24h_sub'),
-      series: network24hView.series,
-      timestamps: network24hView.timestamps,
-      epochTs: network24hView.epochTs,
-      leftUnit: 'MB/s',
-      chartKind: 'net',
-    });
-  }, [network24hView.series, network24hView.timestamps, network24hView.epochTs, t]);
-
   return (
     <MotionConfig reducedMotion="user">
-      <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] pb-28">
-        {/* Clean Frameless Brand Header with Enlarged Transparent CMineWar Emblem */}
-        <motion.div
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, ease: COCKPIT_EASE }}
-          className="cockpit-shell pt-3 sm:pt-4"
-        >
-          <header className="flex flex-wrap items-center justify-between gap-4 py-1">
-            {/* Zone 1: Brand with enlarged transparent CMineWar emblem */}
+      <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] pb-[clamp(4.5rem,11dvh,6.75rem)]">
+        <div id="cockpit-scroll-stage" data-cockpit-jelly-stage="true">
+          {/* Clean Frameless Brand Header with Enlarged Transparent CMineWar Emblem */}
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.42, ease: COCKPIT_EASE }}
+            className="cockpit-shell pt-[clamp(0.45rem,1.3dvh,1rem)]"
+          >
+          <header className="flex flex-wrap items-center justify-between gap-[clamp(0.5rem,1.5vw,1rem)] py-1">
+            {/* Zone 1: Brand with enlarged transparent CMineWar emblem scaled to both vw and dvh */}
             <motion.button
               whileTap={{ scale: 0.97 }}
               type="button"
               onClick={() => navigateTo('inicio')}
-              className="flex items-center gap-3.5 sm:gap-4 text-left whitespace-nowrap shrink-0"
+              className="flex min-w-0 items-center gap-[clamp(0.55rem,1.3vw,1rem)] text-left"
             >
               {!logoBroken ? (
                 <img
                   src="/recursos-cockpit.png"
                   alt={t('app.brand_alt')}
                   onError={() => setLogoBroken(true)}
-                  className="h-20 w-20 sm:h-28 sm:w-28 shrink-0 object-contain drop-shadow-[0_4px_14px_rgba(14,165,233,0.26)] dark:drop-shadow-[0_6px_18px_rgba(56,189,248,0.34)]"
+                  className="h-[clamp(2.65rem,min(7vw,10.5dvh),6.25rem)] w-[clamp(2.65rem,min(7vw,10.5dvh),6.25rem)] shrink-0 object-contain drop-shadow-[0_4px_14px_rgba(14,165,233,0.26)] dark:drop-shadow-[0_6px_18px_rgba(56,189,248,0.34)]"
                 />
               ) : (
-                <div className="flex h-20 w-20 sm:h-28 sm:w-28 shrink-0 items-center justify-center">
-                  <Activity className="h-10 w-10 text-sky-600 dark:text-sky-400" />
+                <div className="flex h-[clamp(2.65rem,min(7vw,10.5dvh),6.25rem)] w-[clamp(2.65rem,min(7vw,10.5dvh),6.25rem)] shrink-0 items-center justify-center">
+                  <Activity className="h-[clamp(1.5rem,3.5vw,2.5rem)] w-[clamp(1.5rem,3.5vw,2.5rem)] text-sky-600 dark:text-sky-400" />
                 </div>
               )}
-              <div className="leading-tight">
-                <span className="block font-display text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              <div className="min-w-0 leading-tight">
+                <span className="block truncate font-display text-[clamp(1rem,1.3vw+0.55rem,1.5rem)] font-bold tracking-tight text-slate-900 dark:text-white">
                   {t('app.brand')}
                 </span>
-                <span className="mt-0.5 block font-mono text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span className="mt-0.5 block truncate font-mono text-[clamp(0.625rem,0.5vw+0.42rem,0.75rem)] font-medium text-slate-500 dark:text-slate-400">
                   {metrics?.system?.hostname || t('app.cockpit_fallback')} · {theme === 'dark' ? t('app.theme_dark') : t('app.theme_light')}
                 </span>
               </div>
@@ -832,7 +604,7 @@ export function App() {
         </motion.div>
 
         {/* Main Content Container */}
-        <main className="cockpit-shell py-4 sm:py-5">
+        <main className="cockpit-shell py-[clamp(0.5rem,1.6dvh,1.25rem)]">
           <AnimatePresence>
             {connError && (
               <motion.div
@@ -851,7 +623,7 @@ export function App() {
               {[0, 1, 2, 3].map((k) => (
                 <div
                   key={k}
-                  className="cockpit-bento h-56 animate-pulse p-5"
+                  className="cockpit-bento cockpit-chart-medium animate-pulse p-5"
                 />
               ))}
             </div>
@@ -887,6 +659,10 @@ export function App() {
                   actionPendingMac={pendingMac}
                   onRefreshMetrics={() => void fetchMetrics()}
                   onNotify={notify}
+                  netHistory24h={netHistory24h}
+                  netHistoryLoading={netHistoryLoading}
+                  netHistoryError={netHistoryError}
+                  onRefreshNetHistory24h={() => void fetchNetworkHistory24h(true)}
                 />
               )}
               {activeTab === 'programas' && (
@@ -912,169 +688,20 @@ export function App() {
               )}
             </ViewStage>
           )}
-
-          {/* 24-Hour Network Traffic Evolution Section */}
-          <motion.section
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.08, ease: COCKPIT_EASE }}
-            aria-labelledby="network-24h-history-title"
-            className="cockpit-bento mt-6 p-5"
-          >
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2.5">
-                  <span className="cockpit-pill-cyan inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
-                    <ArrowDownUp className="h-4 w-4" />
-                  </span>
-                  <h2
-                    id="network-24h-history-title"
-                    className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white sm:text-lg"
-                  >
-                    {t('overview.net_history_24h_title')}
-                  </h2>
-                </div>
-                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <span>{t('overview.net_history_24h_sub')}</span>
-                  <span aria-hidden="true"> · </span>
-                  <span className="font-medium text-slate-700 dark:text-slate-300">
-                    {t('overview.net_history_24h_badge')}
-                  </span>
-                  {network24hView.sampleCount > 0 && (
-                    <>
-                      <span aria-hidden="true"> · </span>
-                      <span className="font-mono tabular-nums">
-                        {t('overview.net_history_24h_samples', { count: network24hView.sampleCount })}
-                      </span>
-                    </>
-                  )}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 shrink-0">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
-                    <span>{t('hardware.net.wan_download')}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="h-2 w-2 rounded-full bg-[#10b981]" />
-                    <span>{t('hardware.net.wan_upload')}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="h-2 w-2 rounded-full bg-[#6366f1]" />
-                    <span>{t('hardware.net.lan_download')}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
-                    <span>{t('hardware.net.lan_upload')}</span>
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <motion.button
-                    whileTap={{ scale: 0.92 }}
-                    type="button"
-                    aria-label={t('network.refresh')}
-                    onClick={() => void fetchNetworkHistory24h(true)}
-                    className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${netHistoryLoading ? 'animate-spin' : ''}`} />
-                  </motion.button>
-                  <motion.button
-                    whileTap={{ scale: 0.92 }}
-                    type="button"
-                    aria-label={t('hardware.net.expand_aria')}
-                    onClick={openNetwork24hExpanded}
-                    className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                  </motion.button>
-                </div>
-              </div>
-            </div>
-
-            {/* Summary KPI row separated by clean hairline divider */}
-            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200/70 pt-4 sm:grid-cols-4 dark:border-slate-800">
-              <div>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  {t('hardware.net.wan_download')} ({t('overview.net_history_24h_peak_wan')})
-                </p>
-                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-sky-700 dark:text-sky-300">
-                  ↓ {formatSpeed(network24hView.peakWanRxMb * 1024 * 1024)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  {t('hardware.net.wan_upload')} ({t('overview.net_history_24h_peak_wan')})
-                </p>
-                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-                  ↑ {formatSpeed(network24hView.peakWanTxMb * 1024 * 1024)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  {t('hardware.net.lan_download')} ({t('overview.net_history_24h_peak_lan')})
-                </p>
-                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-indigo-700 dark:text-indigo-300">
-                  ↓ {formatSpeed(network24hView.peakLanRxMb * 1024 * 1024)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  {t('hardware.net.lan_upload')} ({t('overview.net_history_24h_peak_lan')})
-                </p>
-                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-amber-700 dark:text-amber-300">
-                  ↑ {formatSpeed(network24hView.peakLanTxMb * 1024 * 1024)}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-800/80">
-              {netHistoryLoading && network24hView.sampleCount < 2 ? (
-                <div className="h-[220px] w-full animate-pulse rounded-xl bg-slate-100/80 dark:bg-slate-800/50" />
-              ) : netHistoryError && network24hView.sampleCount < 2 ? (
-                <div className="flex h-[220px] flex-col items-center justify-center gap-3 text-center">
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                    {t('overview.net_history_24h_error')}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void fetchNetworkHistory24h(true)}
-                    className="cockpit-subtile min-h-[40px] px-4 py-2 text-xs font-semibold text-sky-700 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-sky-300 dark:hover:bg-slate-800 whitespace-nowrap"
-                  >
-                    {t('overview.net_history_24h_retry')}
-                  </button>
-                </div>
-              ) : (
-                <TelemetryChart
-                  series={network24hView.series}
-                  timestamps={network24hView.timestamps}
-                  dateTimestamps={network24hView.dateTimestamps}
-                  epochTs={network24hView.epochTs}
-                  height={220}
-                  leftUnit="MB/s"
-                  intervalSec={300}
-                  theme={theme}
-                  emptyMessage={t('overview.net_history_24h_empty')}
-                  onExpandClick={openNetwork24hExpanded}
-                />
-              )}
-            </div>
-          </motion.section>
         </main>
+        </div>
 
         {/* Centered Floating Glassmorphic Dock with Spring Morph Pill */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.1, ease: COCKPIT_EASE }}
-          className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex justify-center px-3"
+          className="pointer-events-none fixed inset-x-0 bottom-[clamp(0.4rem,1.2dvh,0.85rem)] z-40 flex justify-center px-[clamp(0.5rem,1.5vw,1rem)]"
         >
           <LayoutGroup id="dock-nav">
             <nav
               aria-label={t('nav.bottom_aria')}
-              className="cockpit-dock pointer-events-auto grid w-full max-w-[560px] grid-cols-5 items-stretch gap-0.5 sm:gap-1 p-1.5"
+              className="cockpit-dock pointer-events-auto grid w-full max-w-[min(96vw,clamp(360px,48vw,640px))] grid-cols-5 items-stretch gap-0.5 sm:gap-1 p-[clamp(0.25rem,0.65vw,0.45rem)]"
             >
               {navItems.map((item) => {
                 const active = activeTab === item.id;
@@ -1085,7 +712,7 @@ export function App() {
                     type="button"
                     title={item.label}
                     onClick={() => navigateTo(item.id)}
-                    className={`relative flex min-h-[48px] min-w-0 w-full flex-col items-center justify-center gap-0.5 rounded-[14px] px-0.5 sm:px-1.5 py-1 transition-colors ${
+                    className={`relative flex min-h-[clamp(38px,6dvh,50px)] min-w-0 w-full flex-col items-center justify-center gap-0.5 rounded-[14px] px-0.5 sm:px-1.5 py-[clamp(0.2rem,0.5dvh,0.35rem)] transition-colors ${
                       active
                         ? 'text-sky-700 dark:text-sky-300 font-semibold'
                         : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
@@ -1099,7 +726,7 @@ export function App() {
                     >
                       {item.icon}
                     </motion.span>
-                    <span className="relative z-10 w-full max-w-full text-center text-[9.5px] sm:text-[11px] font-semibold leading-[1.1] sm:leading-tight tracking-tight line-clamp-2 break-words sm:whitespace-nowrap sm:truncate">
+                    <span className="relative z-10 w-full max-w-full text-center text-[clamp(9px,0.75vw+4px,11px)] font-semibold leading-[1.1] tracking-tight truncate">
                       {item.label}
                     </span>
                   </motion.button>

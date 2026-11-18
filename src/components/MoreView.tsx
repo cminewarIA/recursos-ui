@@ -12,6 +12,7 @@ import {
   Download,
   ExternalLink,
   GitCommit,
+  Globe,
   Languages,
   Laptop,
   Lock,
@@ -436,10 +437,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
   };
 
   return (
-    <div className="space-y-5">
-      {/* Sub-navigation */}
+    <div className="space-y-[clamp(0.85rem,1.8dvh,1.25rem)]">
+      {/* Sub-navigation auto-wrapping fluid bar (zero clipped tabs) */}
       <LayoutGroup id="more-subtabs">
-        <div className="cockpit-segmented flex items-center gap-1.5 overflow-x-auto p-1.5 no-scrollbar">
+        <div className="cockpit-segmented cockpit-subtabs-bar">
           {[
             { id: 'updates' as const, label: t('more.subtabs.updates'), icon: <GitCommit className="h-4 w-4" /> },
             { id: 'devices' as const, label: t('more.subtabs.devices'), icon: <ShieldCheck className="h-4 w-4" /> },
@@ -455,14 +456,14 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setSubTab(tab.id)}
-                className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                className={`cockpit-subtab-btn relative inline-flex items-center justify-center rounded-xl font-semibold transition-colors ${
                   active
                     ? 'text-sky-700 dark:text-sky-300'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 {active && <MorphPill layoutId="more-subtab-pill" className="rounded-xl" />}
-                <span className="relative z-10 inline-flex items-center gap-2">
+                <span className="relative z-10 inline-flex items-center gap-[clamp(0.3rem,0.5vw,0.5rem)]">
                   {tab.icon}
                   <span>{tab.label}</span>
                 </span>
@@ -580,7 +581,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 4, scale: 0.98 }}
                         transition={COCKPIT_SPRING}
-                        className="cockpit-bento absolute left-0 right-0 sm:left-auto sm:right-0 z-40 mt-2 sm:w-80 overflow-hidden p-2.5 shadow-2xl"
+                        className="cockpit-bento absolute left-0 right-0 sm:left-auto sm:right-0 z-40 mt-2 sm:w-[clamp(240px,26vw,340px)] overflow-hidden p-2.5 shadow-2xl"
                       >
                         <div className="relative">
                           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -598,7 +599,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                           role="listbox"
                           aria-label={t('more.language_label')}
                           data-cockpit-scroll-contain="true"
-                          className="mt-2 max-h-64 space-y-1 overflow-y-auto overscroll-contain pr-0.5"
+                          className="cockpit-scroll-panel mt-2 space-y-1 overflow-y-auto overscroll-contain pr-0.5"
                         >
                           {filteredLocales.length === 0 ? (
                             <p className="py-5 text-center text-xs text-slate-500 dark:text-slate-400">
@@ -966,7 +967,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 {updateOutput && (
                   <pre
                     data-cockpit-scroll-contain="true"
-                    className="cockpit-subtile max-h-40 overflow-y-auto overscroll-contain whitespace-pre-wrap p-3 text-[11px]"
+                    className="cockpit-subtile cockpit-scroll-panel overflow-y-auto overscroll-contain whitespace-pre-wrap p-3 text-[11px]"
                   >
                     {updateOutput}
                   </pre>
@@ -974,7 +975,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 {sysLogs.length > 0 && (
                   <div
                     data-cockpit-scroll-contain="true"
-                    className="cockpit-subtile max-h-40 overflow-y-auto overscroll-contain p-3 text-[11px]"
+                    className="cockpit-subtile cockpit-scroll-panel overflow-y-auto overscroll-contain p-3 text-[11px]"
                   >
                     <p className="mb-1 font-semibold">{t('more.system_warnings_title')}</p>
                     {sysLogs.slice(0, 12).map((log, idx) => (
@@ -1066,7 +1067,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 {sysLogs.length > 0 ? (
                   <div
                     data-cockpit-scroll-contain="true"
-                    className="mt-4 max-h-60 space-y-1.5 overflow-y-auto overscroll-contain pr-1 font-mono text-[11px] text-slate-600 dark:text-slate-300"
+                    className="cockpit-scroll-panel mt-4 space-y-1.5 overflow-y-auto overscroll-contain pr-1 font-mono text-[11px] text-slate-600 dark:text-slate-300"
                   >
                     {sysLogs.slice(0, 20).map((log, idx) => (
                       <div key={log.id || `${log.ts || idx}`} className="cockpit-subtile px-3 py-1.5">
@@ -1161,59 +1162,140 @@ export const MoreView: React.FC<MoreViewProps> = ({
               {t('more.devices_empty')}
             </p>
           ) : (
-            <div className="mt-4 cockpit-auto-grid-cards">
+            <div className="mt-4 cockpit-auto-grid-cards !items-start">
               {devices.map((dev) => {
                 const isOpen = expandedDevId === dev.id;
                 const accessText = dev.full_access ? t('more.native_verified') : t('more.web_verified');
-                return (
-                  <div key={dev.id} className="cockpit-subtile p-3.5">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        {editingId === dev.id ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={aliasDraft}
-                              onChange={(e) => setAliasDraft(e.target.value)}
-                              className="cockpit-subtile min-h-[38px] px-3 text-xs"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleSaveAlias(dev.id)}
-                              className="cockpit-btn-accent inline-flex min-h-[38px] items-center gap-1 rounded-xl px-3 text-xs font-semibold"
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                              <span>{t('more.save_btn')}</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                              {dev.name} {dev.is_current ? t('more.this_device') : ''}
-                            </p>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                dev.full_access ? 'cockpit-pill-violet' : 'cockpit-pill-cyan'
-                              }`}
-                            >
-                              {accessText}
-                            </span>
-                          </div>
-                        )}
-                        <p className="mt-0.5 text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                          {dev.connection_mode || 'LAN'} · {dev.local_ip || dev.last_external_ip || t('more.connected_fallback')} · {t('more.last_visit_label')}:{' '}
-                          {dev.last_seen || '--'}
-                        </p>
-                      </div>
+                const tel = (dev.device_telemetry || {}) as Record<string, unknown>;
+                const uaLower = String(dev.client_type || dev.client_label || tel.os_distro || '').toLowerCase();
+                const isMobileDev =
+                  uaLower.includes('android') || uaLower.includes('iphone') || uaLower.includes('ipad') || uaLower.includes('mobile');
+                const isUbuntuOrDesktop =
+                  uaLower.includes('ubuntu') || uaLower.includes('linux') || uaLower.includes('windows') || uaLower.includes('mac');
+                const subtitleParts = [
+                  dev.client_label || accessText,
+                  dev.app_version ? `v${dev.app_version}` : '',
+                  typeof tel.model === 'string' && tel.model && tel.model !== dev.name ? tel.model : '',
+                ].filter(Boolean);
+                const endpointText = `${dev.connection_mode || 'LAN'} · ${dev.local_ip || dev.last_external_ip || t('more.connected_fallback')}`;
 
-                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                return (
+                  <article key={dev.id} className="cockpit-subtile flex min-w-0 flex-col gap-3 p-4">
+                    {/* Header: Device icon + Name/Subtitle + Access Badge */}
+                    {editingId === dev.id ? (
+                      <div className="flex w-full min-w-0 items-center gap-2">
+                        <input
+                          type="text"
+                          value={aliasDraft}
+                          onChange={(e) => setAliasDraft(e.target.value)}
+                          className="cockpit-subtile min-h-[36px] min-w-0 flex-1 px-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveAlias(dev.id)}
+                          className="cockpit-btn-accent inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-xl px-3 text-xs font-semibold"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          <span>{t('more.save_btn')}</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                          <span
+                            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                              dev.full_access ? 'cockpit-pill-violet' : 'cockpit-pill-cyan'
+                            }`}
+                          >
+                            {isMobileDev ? (
+                              <Smartphone className="h-4 w-4" />
+                            ) : isUbuntuOrDesktop ? (
+                              <Laptop className="h-4 w-4" />
+                            ) : (
+                              <Globe className="h-4 w-4" />
+                            )}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <p
+                                className="truncate text-sm font-semibold text-slate-900 dark:text-white"
+                                title={dev.name}
+                              >
+                                {dev.name}
+                              </p>
+                              {dev.is_current && (
+                                <span className="cockpit-pill-emerald shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap">
+                                  {t('more.this_device')}
+                                </span>
+                              )}
+                            </div>
+                            <p
+                              className="truncate text-[11px] text-slate-500 dark:text-slate-400"
+                              title={subtitleParts.join(' · ')}
+                            >
+                              {subtitleParts.join(' · ')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${
+                            dev.full_access ? 'cockpit-pill-violet' : 'cockpit-pill-cyan'
+                          }`}
+                        >
+                          {accessText}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Structured Network & Visit Telemetry Strip */}
+                    <div className="grid grid-cols-2 gap-2 border-t border-slate-200/70 pt-2.5 text-[11px] dark:border-slate-800">
+                      <div className="min-w-0">
+                        <span
+                          className="block truncate font-mono font-semibold tabular-nums text-slate-700 dark:text-slate-200"
+                          title={endpointText}
+                        >
+                          {endpointText}
+                        </span>
+                      </div>
+                      <div className="min-w-0 text-right">
+                        <span
+                          className="block truncate font-mono tabular-nums text-slate-500 dark:text-slate-400"
+                          title={`${t('more.last_visit_label')}: ${dev.last_seen || '--'}`}
+                        >
+                          {dev.last_seen || '--'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Grouped Client Containers if > 1 */}
+                    {Array.isArray(dev.clients) && dev.clients.length > 1 && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {dev.clients.slice(0, 4).map((cl, ci) => (
+                          <span
+                            key={cl.client_key || `${dev.id}-cl-${ci}`}
+                            className={`inline-flex max-w-full items-center truncate rounded-md px-2 py-0.5 text-[10px] font-medium ${
+                              cl.is_current_client
+                                ? 'cockpit-pill-emerald'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800/80 dark:text-slate-300'
+                            }`}
+                          >
+                            {cl.client_label || cl.client_type}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Uniform Action Footer pinned at bottom */}
+                    <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 pt-2.5 dark:border-slate-800">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => {
                             setEditingId(dev.id);
                             setAliasDraft(dev.custom_alias || dev.name);
                           }}
-                          className="cockpit-subtile min-h-[38px] px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                          className="cockpit-subtile min-h-[34px] px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 whitespace-nowrap"
                         >
                           {t('more.rename_btn')}
                         </button>
@@ -1221,25 +1303,29 @@ export const MoreView: React.FC<MoreViewProps> = ({
                           <button
                             type="button"
                             onClick={() => handleRevokeDevice(dev.id)}
-                            className="cockpit-btn-off inline-flex min-h-[38px] items-center gap-1 rounded-xl px-3 text-xs font-semibold transition-colors"
+                            className="cockpit-btn-off inline-flex min-h-[34px] items-center gap-1 rounded-xl px-2.5 text-[11px] font-semibold transition-colors whitespace-nowrap"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3 w-3" />
                             <span>{t('more.disconnect_btn')}</span>
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setExpandedDevId(isOpen ? null : dev.id)}
-                          className="inline-flex min-h-[38px] items-center gap-1 px-2 text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                        >
-                          <span>{t('equipment.technical_details')}</span>
-                          {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                        </button>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setExpandedDevId(isOpen ? null : dev.id)}
+                        className="inline-flex min-h-[34px] items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white whitespace-nowrap"
+                      >
+                        <span>{t('equipment.technical_details')}</span>
+                        {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                      </button>
                     </div>
 
                     {isOpen && (
-                      <pre className="mt-3 overflow-x-auto border-t border-slate-200/70 pt-3 font-mono text-[11px] text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                      <pre
+                        data-cockpit-scroll-contain="true"
+                        className="cockpit-scroll-panel w-full max-w-full overflow-auto overscroll-contain rounded-xl border border-slate-200/70 bg-slate-950/[0.03] p-2.5 font-mono text-[10.5px] leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300"
+                      >
                         {JSON.stringify(
                           {
                             id: dev.id,
@@ -1251,7 +1337,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                         )}
                       </pre>
                     )}
-                  </div>
+                  </article>
                 );
               })}
             </div>
@@ -1293,7 +1379,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   // ignore
                 }
               }}
-              className="h-[74vh] min-h-[540px] w-full bg-white dark:bg-[#020617]"
+              className="cockpit-manual-frame w-full bg-white dark:bg-[#020617]"
             />
           </div>
         </section>

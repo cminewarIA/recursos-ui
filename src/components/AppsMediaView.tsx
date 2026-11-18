@@ -90,10 +90,10 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-[clamp(0.85rem,1.8dvh,1.25rem)]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <LayoutGroup id="apps-subtabs">
-          <div className="cockpit-segmented flex max-w-full items-center gap-1.5 overflow-x-auto p-1.5 no-scrollbar">
+          <div className="cockpit-segmented cockpit-subtabs-bar sm:flex-1">
           {subTabs.map((tab) => {
             const active = subTab === tab.id;
             return (
@@ -102,14 +102,14 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setSubTab(tab.id)}
-                className={`relative inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+                className={`cockpit-subtab-btn relative inline-flex items-center justify-center rounded-xl font-semibold transition-colors ${
                   active
                     ? 'text-sky-700 dark:text-sky-300'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 {active && <MorphPill layoutId="apps-subtab-pill" className="rounded-xl" />}
-                <span className="relative z-10 inline-flex items-center gap-2">
+                <span className="relative z-10 inline-flex items-center gap-[clamp(0.3rem,0.5vw,0.5rem)]">
                   {tab.icon}
                   <span>{tab.label}</span>
                 </span>
@@ -120,14 +120,14 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
         </LayoutGroup>
 
         {subTab === 'services' && (
-          <div className="relative">
+          <div className="relative w-full sm:w-[clamp(200px,24vw,300px)] shrink-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('apps.filter_placeholder')}
-              className="cockpit-subtile min-h-[44px] pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
+              className="cockpit-subtile w-full min-h-[clamp(36px,5dvh,44px)] pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
             />
           </div>
         )}

@@ -337,7 +337,7 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.16, ease: COCKPIT_EASE } }}
         transition={COCKPIT_SPRING}
-        className="cockpit-bento cockpit-modal-enter w-full max-w-6xl max-h-[94vh] overflow-y-auto overscroll-contain p-4 sm:p-5"
+        className="cockpit-bento cockpit-modal-enter w-[min(95vw,74rem)] max-h-[92dvh] overflow-y-auto overscroll-contain p-[clamp(0.85rem,1.8vw,1.35rem)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera estilo Inspección Táctil */}

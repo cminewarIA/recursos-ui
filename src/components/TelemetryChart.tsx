@@ -23,6 +23,7 @@ interface TelemetryChartProps {
   dateTimestamps?: string[];
   epochTs?: number[];
   height?: number;
+  heightClassName?: string;
   maxLeft?: number;
   maxRight?: number;
   leftUnit?: string;
@@ -147,6 +148,7 @@ function areTelemetryChartPropsEqual(prev: TelemetryChartProps, next: TelemetryC
   if (
     prev.theme !== next.theme ||
     prev.height !== next.height ||
+    prev.heightClassName !== next.heightClassName ||
     prev.maxLeft !== next.maxLeft ||
     prev.maxRight !== next.maxRight ||
     prev.leftUnit !== next.leftUnit ||
@@ -383,6 +385,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
   dateTimestamps = [],
   epochTs = [],
   height = 152,
+  heightClassName,
   maxLeft,
   maxRight = 100,
   leftUnit = '%',
@@ -439,8 +442,10 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
   }, [epochTs, sampleCount]);
 
   useEffect(() => {
-    setSize((prev) => (prev.height === height ? prev : { ...prev, height }));
-  }, [height]);
+    if (!heightClassName) {
+      setSize((prev) => (prev.height === height ? prev : { ...prev, height }));
+    }
+  }, [height, heightClassName]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -448,12 +453,15 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const w = Math.max(120, Math.floor(entry.contentRect.width));
-        setSize((prev) => (prev.width === w && prev.height === height ? prev : { width: w, height }));
+        const h = heightClassName
+          ? Math.max(70, Math.floor(entry.contentRect.height) || height)
+          : height;
+        setSize((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
       }
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [height]);
+  }, [height, heightClassName]);
 
   const computedMaxLeft = useMemo(() => {
     if (typeof maxLeft === 'number' && maxLeft > 0) return maxLeft;
@@ -1002,8 +1010,8 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
   return (
     <div
       ref={containerRef}
-      style={{ height: `${height}px` }}
-      className={`relative w-full select-none ${
+      style={heightClassName ? undefined : { height: `${height}px` }}
+      className={`relative w-full select-none ${heightClassName || ''} ${
         onExpandClick
           ? 'cursor-pointer'
           : interactionMode === 'pan'
@@ -1033,7 +1041,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
       ) : (
         <canvas
           ref={canvasRef}
-          style={{ width: '100%', height: `${height}px` }}
+          style={{ width: '100%', height: '100%' }}
           className={`block ${interactionMode === 'pan' ? 'touch-none' : 'touch-pan-y'}`}
           onPointerDown={(e) => {
             if (interactionMode === 'pan') {

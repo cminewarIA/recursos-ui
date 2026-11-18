@@ -429,10 +429,10 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
   ];
 
   return (
-    <div className="space-y-5">
-      {/* Sub-navigation segmented bar with animated MorphPill */}
+    <div className="space-y-[clamp(0.85rem,1.8dvh,1.25rem)]">
+      {/* Sub-navigation auto-wrapping fluid segmented bar (zero clipped/hidden tabs) */}
       <LayoutGroup id="equipment-subtabs">
-        <div className="cockpit-segmented flex items-center gap-1.5 overflow-x-auto p-1.5 no-scrollbar">
+        <div className="cockpit-segmented cockpit-subtabs-bar">
           {subTabs.map((tab) => {
             const active = subTab === tab.id;
             return (
@@ -441,14 +441,14 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setSubTab(tab.id)}
-                className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                className={`cockpit-subtab-btn relative inline-flex items-center justify-center rounded-xl font-semibold transition-colors ${
                   active
                     ? 'text-sky-700 dark:text-sky-300'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 {active && <MorphPill layoutId="equipment-subtab-pill" className="rounded-xl" />}
-                <span className="relative z-10 inline-flex items-center gap-2">
+                <span className="relative z-10 inline-flex items-center gap-[clamp(0.3rem,0.5vw,0.5rem)]">
                   {tab.icon}
                   <span>{tab.label}</span>
                 </span>
@@ -510,7 +510,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                 series={cpuSeries}
                 timestamps={timestamps}
                 epochTs={epochTs}
-                height={200}
+                heightClassName="cockpit-chart-tall"
                 maxLeft={100}
                 leftUnit="%"
                 theme={theme}
@@ -654,7 +654,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               series={ramSeries}
               timestamps={timestamps}
               epochTs={epochTs}
-              height={210}
+              heightClassName="cockpit-chart-tall"
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -907,7 +907,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                           series={g.series}
                           timestamps={g.timestamps}
                           epochTs={g.epochTs}
-                          height={175}
+                          heightClassName="cockpit-chart-medium"
                           maxLeft={g.maxLeft}
                           maxRight={g.maxRight}
                           leftUnit={g.leftUnit}
@@ -976,7 +976,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                 series={storageSeries}
                 timestamps={timestamps}
                 epochTs={epochTs}
-                height={200}
+                heightClassName="cockpit-chart-tall"
                 maxRight={100}
                 leftUnit="MB/s"
                 theme={theme}

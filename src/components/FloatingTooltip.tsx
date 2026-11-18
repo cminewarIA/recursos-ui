@@ -47,7 +47,7 @@ export const FloatingTooltip: React.FC<{ data: FloatingTooltipData | null }> = (
       ref={boxRef}
       role="tooltip"
       style={{ left: `${pos.left}px`, top: `${pos.top}px` }}
-      className="pointer-events-none fixed z-[9999] min-w-[178px] max-w-[268px] rounded-xl border border-slate-700/80 bg-[#0f172a]/95 px-3 py-2.5 text-xs text-slate-100 shadow-2xl backdrop-blur-md transition-opacity duration-100 dark:border-slate-600/80 dark:bg-[#020617]/95"
+      className="cockpit-tooltip-enter pointer-events-none fixed z-[9999] min-w-[178px] max-w-[268px] rounded-xl border border-slate-700/80 bg-[#0f172a]/95 px-3 py-2.5 text-xs text-slate-100 shadow-2xl backdrop-blur-md transition-opacity duration-100 dark:border-slate-600/80 dark:bg-[#020617]/95"
     >
       <div className="mb-1.5 flex items-baseline justify-between gap-2 border-b border-slate-800 pb-1">
         <span className="font-mono text-[11px] font-semibold tabular-nums text-white">

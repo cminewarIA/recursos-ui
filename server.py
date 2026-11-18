@@ -4566,16 +4566,21 @@ def record_connections_to_sqlite(connections_list):
                     pass
 
 def query_connection_history_from_sqlite(service_filter=None, device_filter=None, direction_filter=None, search_query=None, hours_filter=None, limit=300):
-    """Consulta el historial de conexiones geolocalizadas y el catálogo agrupado por servicios desde SQLite."""
+    """Consulta el historial de conexiones geolocalizadas y el catálogo agrupado por servicios, países y dominios desde SQLite."""
     init_geoip_history_db()
     services_catalog = []
+    countries_catalog = []
+    domains_catalog = []
     devices_catalog = []
     connections = []
     summary = {
         "total_records": 0,
         "total_services": 0,
         "total_unique_ips": 0,
-        "total_devices": 0
+        "total_devices": 0,
+        "total_countries": 0,
+        "total_domains": 0,
+        "total_hits": 0
     }
     try:
         limit_val = max(10, min(int(limit or 300), 1000))
@@ -4604,7 +4609,10 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
                     COUNT(*) AS total_records,
                     COUNT(DISTINCT service) AS total_services,
                     COUNT(DISTINCT remote_ip) AS total_unique_ips,
-                    COUNT(DISTINCT local_ip) AS total_devices
+                    COUNT(DISTINCT local_ip) AS total_devices,
+                    COUNT(DISTINCT CASE WHEN TRIM(country) != '' THEN TRIM(country) ELSE NULL END) AS total_countries,
+                    COUNT(DISTINCT CASE WHEN TRIM(domain) != '' THEN LOWER(TRIM(domain)) ELSE NULL END) AS total_domains,
+                    COALESCE(SUM(hit_count), 0) AS total_hits
                 FROM connection_history
             """)
             s_row = cur.fetchone()
@@ -4613,7 +4621,10 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
                     "total_records": int(s_row["total_records"] or 0),
                     "total_services": int(s_row["total_services"] or 0),
                     "total_unique_ips": int(s_row["total_unique_ips"] or 0),
-                    "total_devices": int(s_row["total_devices"] or 0)
+                    "total_devices": int(s_row["total_devices"] or 0),
+                    "total_countries": int(s_row["total_countries"] or 0),
+                    "total_domains": int(s_row["total_domains"] or 0),
+                    "total_hits": int(s_row["total_hits"] or 0)
                 }
 
             # 2. Catálogo de servicios agregados (filtrado por dispositivo/tiempo si aplica)
@@ -4641,21 +4652,88 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
                 FROM connection_history
                 {svc_where_sql}
                 GROUP BY service
-                ORDER BY last_seen DESC, total_hits DESC
+                ORDER BY total_hits DESC, last_seen DESC
                 LIMIT 120
             """, svc_params)
             for r in cur.fetchall():
                 countries_list = [x.strip() for x in str(r["countries_csv"] or "").split(",") if x.strip()][:5]
                 domains_list = [x.strip() for x in str(r["domains_csv"] or "").split(",") if x.strip()][:4]
                 services_catalog.append({
-                    "service": str(r["service"] or "Desconocido"),
+                    "service": str(r["service"] or ""),
                     "connections_count": int(r["connections_count"] or 0),
                     "total_hits": int(r["total_hits"] or 0),
+                    "hit_count": int(r["total_hits"] or 0),
                     "unique_ips": int(r["unique_ips"] or 0),
                     "unique_devices": int(r["unique_devices"] or 0),
                     "countries": countries_list,
                     "sample_domains": domains_list,
                     "first_seen": float(r["first_seen"] or 0),
+                    "last_seen": float(r["last_seen"] or 0)
+                })
+
+            # 2b. Catálogo de países con más conexiones e impactos
+            country_where = list(svc_where)
+            country_where.append("(TRIM(country) != '' OR TRIM(country_code) != '')")
+            country_where_sql = "WHERE " + " AND ".join(country_where)
+            cur.execute(f"""
+                SELECT
+                    TRIM(country) AS country_name,
+                    MAX(UPPER(TRIM(country_code))) AS country_code,
+                    COUNT(*) AS connections_count,
+                    SUM(hit_count) AS total_hits,
+                    COUNT(DISTINCT remote_ip) AS unique_ips,
+                    COUNT(DISTINCT CASE WHEN TRIM(city) != '' THEN TRIM(city) ELSE NULL END) AS cities_count,
+                    COUNT(DISTINCT local_ip) AS unique_devices,
+                    MAX(last_seen) AS last_seen
+                FROM connection_history
+                {country_where_sql}
+                GROUP BY UPPER(TRIM(CASE WHEN TRIM(country_code) != '' THEN country_code ELSE country END))
+                ORDER BY total_hits DESC, connections_count DESC
+                LIMIT 60
+            """, svc_params)
+            for r in cur.fetchall():
+                countries_catalog.append({
+                    "country": str(r["country_name"] or r["country_code"] or ""),
+                    "country_code": str(r["country_code"] or "").upper(),
+                    "connections_count": int(r["connections_count"] or 0),
+                    "total_hits": int(r["total_hits"] or 0),
+                    "unique_ips": int(r["unique_ips"] or 0),
+                    "cities_count": int(r["cities_count"] or 0),
+                    "unique_devices": int(r["unique_devices"] or 0),
+                    "last_seen": float(r["last_seen"] or 0)
+                })
+
+            # 2c. Catálogo de dominios más contactados en el historial
+            dom_where = list(svc_where)
+            dom_where.append("TRIM(domain) != ''")
+            dom_where_sql = "WHERE " + " AND ".join(dom_where)
+            cur.execute(f"""
+                SELECT
+                    LOWER(TRIM(domain)) AS domain_name,
+                    COUNT(*) AS connections_count,
+                    SUM(hit_count) AS total_hits,
+                    COUNT(DISTINCT remote_ip) AS unique_ips,
+                    COUNT(DISTINCT local_ip) AS unique_devices,
+                    MAX(service) AS top_service,
+                    MAX(country) AS top_country,
+                    MAX(UPPER(TRIM(country_code))) AS top_country_code,
+                    MAX(last_seen) AS last_seen
+                FROM connection_history
+                {dom_where_sql}
+                GROUP BY domain_name
+                ORDER BY total_hits DESC, connections_count DESC
+                LIMIT 80
+            """, svc_params)
+            for r in cur.fetchall():
+                domains_catalog.append({
+                    "domain": str(r["domain_name"] or ""),
+                    "connections_count": int(r["connections_count"] or 0),
+                    "total_hits": int(r["total_hits"] or 0),
+                    "unique_ips": int(r["unique_ips"] or 0),
+                    "unique_devices": int(r["unique_devices"] or 0),
+                    "top_service": str(r["top_service"] or ""),
+                    "top_country": str(r["top_country"] or ""),
+                    "top_country_code": str(r["top_country_code"] or ""),
                     "last_seen": float(r["last_seen"] or 0)
                 })
 
@@ -4716,7 +4794,6 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
             """, params + [limit_val])
 
             for r in cur.fetchall():
-                loc_parts = [p for p in (r["city"], r["region"], r["postal"]) if p]
                 precise_city = f"{r['city']} ({r['region']}{' · CP ' + r['postal'] if r['postal'] else ''})" if (r["region"] or r["postal"]) and r["city"] else (r["city"] or "Nodo Remoto")
                 connections.append({
                     "id": f"hist_{r['id']}",
@@ -4764,6 +4841,8 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
         "status": "ok",
         "summary": summary,
         "services_catalog": services_catalog,
+        "countries_catalog": countries_catalog,
+        "domains_catalog": domains_catalog,
         "devices_catalog": devices_catalog,
         "connections": connections
     }
@@ -10366,7 +10445,19 @@ def update_duckdns_now():
 def get_dns_traffic_stats(client_filter=None, limit=50):
     db_path = "/etc/pihole/pihole-FTL.db"
     if not os.path.isfile(db_path):
-        return {"available": False, "clients": [], "queries": []}
+        return {
+            "available": False,
+            "summary": {
+                "total_queries_24h": 0,
+                "blocked_queries_24h": 0,
+                "pct_blocked_24h": 0.0,
+                "unique_domains_24h": 0,
+                "unique_clients_24h": 0,
+            },
+            "top_domains": [],
+            "clients": [],
+            "recent_queries": [],
+        }
 
     ip_to_name = get_ip_to_device_name_map()
 
@@ -10374,6 +10465,53 @@ def get_dns_traffic_stats(client_filter=None, limit=50):
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.5)
         cur = conn.cursor()
+
+        sql_summary = (
+            "SELECT COUNT(*) AS total_q, "
+            "SUM(CASE WHEN status IN (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16) THEN 1 ELSE 0 END) AS blocked_q, "
+            "COUNT(DISTINCT LOWER(TRIM(domain))) AS unique_domains, "
+            "COUNT(DISTINCT client) AS unique_clients "
+            "FROM queries WHERE timestamp >= strftime('%s', 'now', '-24 hours');"
+        )
+        sum_row = cur.execute(sql_summary).fetchone()
+        total_q_24h = int(sum_row[0] or 0) if sum_row else 0
+        blocked_q_24h = int(sum_row[1] or 0) if sum_row else 0
+        unique_doms_24h = int(sum_row[2] or 0) if sum_row else 0
+        unique_clients_24h = int(sum_row[3] or 0) if sum_row else 0
+        summary = {
+            "total_queries_24h": total_q_24h,
+            "blocked_queries_24h": blocked_q_24h,
+            "pct_blocked_24h": round((blocked_q_24h / total_q_24h) * 100.0, 1) if total_q_24h > 0 else 0.0,
+            "unique_domains_24h": unique_doms_24h,
+            "unique_clients_24h": unique_clients_24h,
+        }
+
+        sql_global_domains = (
+            "SELECT LOWER(TRIM(domain)) AS dom, "
+            "COUNT(*) AS count, "
+            "SUM(CASE WHEN status IN (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16) THEN 1 ELSE 0 END) AS blocked_count, "
+            "COUNT(DISTINCT client) AS clients_count, "
+            "AVG(reply_time) * 1000.0 AS avg_reply_ms "
+            "FROM queries "
+            "WHERE domain IS NOT NULL AND TRIM(domain) != '' "
+            "AND timestamp >= strftime('%s', 'now', '-24 hours') "
+            "GROUP BY dom ORDER BY count DESC LIMIT 30;"
+        )
+        top_domains = []
+        for d_row in cur.execute(sql_global_domains).fetchall():
+            dom_name = d_row[0] or ""
+            if not dom_name:
+                continue
+            d_count = int(d_row[1] or 0)
+            d_blocked = int(d_row[2] or 0)
+            top_domains.append({
+                "domain": dom_name,
+                "count": d_count,
+                "blocked_count": d_blocked,
+                "pct_blocked": round((d_blocked / d_count) * 100.0, 1) if d_count > 0 else 0.0,
+                "clients_count": int(d_row[3] or 0),
+                "avg_reply_ms": round(float(d_row[4] or 0.0), 1),
+            })
 
         sql_clients = (
             "SELECT client, count(*) as count, "
@@ -10455,11 +10593,26 @@ def get_dns_traffic_stats(client_filter=None, limit=50):
 
         return {
             "available": True,
+            "summary": summary,
+            "top_domains": top_domains,
             "clients": clients_list,
             "recent_queries": queries_list
         }
     except Exception as e:
-        return {"available": False, "error": str(e), "clients": [], "recent_queries": []}
+        return {
+            "available": False,
+            "error": str(e),
+            "summary": {
+                "total_queries_24h": 0,
+                "blocked_queries_24h": 0,
+                "pct_blocked_24h": 0.0,
+                "unique_domains_24h": 0,
+                "unique_clients_24h": 0,
+            },
+            "top_domains": [],
+            "clients": [],
+            "recent_queries": [],
+        }
     finally:
         if conn is not None:
             try:

@@ -413,6 +413,115 @@ export interface SpeedTestHistoryResponse {
   items: SpeedTestResult[];
 }
 
+export interface NetHistoryServiceCatalogItem {
+  service: string;
+  connections_count?: number;
+  total_hits?: number;
+  hit_count?: number;
+  unique_ips?: number;
+  unique_devices?: number;
+  device_count?: number;
+  countries?: string[];
+  sample_domains?: string[];
+  first_seen?: number;
+  last_seen?: number | string;
+}
+
+export interface NetHistoryCountryCatalogItem {
+  country: string;
+  country_code?: string;
+  connections_count?: number;
+  total_hits?: number;
+  unique_ips?: number;
+  cities_count?: number;
+  unique_devices?: number;
+  last_seen?: number;
+}
+
+export interface NetHistoryDomainCatalogItem {
+  domain: string;
+  connections_count?: number;
+  total_hits?: number;
+  unique_ips?: number;
+  unique_devices?: number;
+  top_service?: string;
+  top_country?: string;
+  top_country_code?: string;
+  last_seen?: number;
+}
+
+export interface NetHistoryDeviceCatalogItem {
+  ip: string;
+  name?: string;
+  connections_count?: number;
+  total_hits?: number;
+  services_count?: number;
+  last_seen?: number | string;
+}
+
+export interface NetHistoryResponse {
+  status?: string;
+  summary?: {
+    total_records?: number;
+    total_services?: number;
+    total_unique_ips?: number;
+    total_devices?: number;
+    total_countries?: number;
+    total_domains?: number;
+    total_hits?: number;
+  };
+  services_catalog?: NetHistoryServiceCatalogItem[];
+  countries_catalog?: NetHistoryCountryCatalogItem[];
+  domains_catalog?: NetHistoryDomainCatalogItem[];
+  devices_catalog?: NetHistoryDeviceCatalogItem[];
+  connections?: GeoConnectionItem[];
+}
+
+export interface DnsTopDomainItem {
+  domain: string;
+  count: number;
+  blocked_count?: number;
+  pct_blocked?: number;
+  clients_count?: number;
+  avg_reply_ms?: number;
+}
+
+export interface DnsTrafficClientItem {
+  ip: string;
+  name?: string;
+  total: number;
+  blocked: number;
+  pct_blocked?: number;
+  top_domains?: Array<{ domain: string; count: number }>;
+}
+
+export interface DnsTrafficRecentQuery {
+  time?: string;
+  timestamp?: number;
+  client_ip?: string;
+  client_name?: string;
+  domain?: string;
+  status?: number;
+  is_blocked?: boolean;
+  forward?: string;
+  reply_ms?: number;
+}
+
+export interface DnsTrafficStatsResponse {
+  available?: boolean;
+  error?: string;
+  summary?: {
+    total_queries_24h?: number;
+    blocked_queries_24h?: number;
+    pct_blocked_24h?: number;
+    unique_domains_24h?: number;
+    unique_clients_24h?: number;
+  };
+  top_domains?: DnsTopDomainItem[];
+  clients?: DnsTrafficClientItem[];
+  recent_queries?: DnsTrafficRecentQuery[];
+}
+
 export interface NetInfo {
   rx_bytes_sec?: number;
   tx_bytes_sec?: number;

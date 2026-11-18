@@ -722,6 +722,91 @@ const geoIpNegativeCache = new Map<string, number>();
 const geoIpPendingQueue = new Set<string>();
 const recentHttpIncomingClients = new Map<string, { ip: string; port: number; ts: number; service: string }>();
 const resolvedOutboundEndpoints = new Map<string, { host: string; ip: string; port: number; protocol: string; service: string }>();
+interface ObservedDevConnRecord {
+  key: string;
+  direction: 'incoming' | 'outgoing' | 'blocked';
+  protocol: string;
+  local_ip: string;
+  local_hostname: string;
+  local_port: number;
+  remote_ip: string;
+  remote_port: number;
+  domain: string;
+  service: string;
+  process: string;
+  jail: string;
+  lat: number;
+  lng: number;
+  city: string;
+  country: string;
+  country_code: string;
+  isp: string;
+  asn: string;
+  hit_count: number;
+  bytes_total: number;
+  first_seen: number;
+  last_seen: number;
+}
+const observedDevNetHistory = new Map<string, ObservedDevConnRecord>();
+let lastObservedNetFlushSec = 0;
+
+interface ObservedDnsDomainStat {
+  domain: string;
+  count: number;
+  blocked_count: number;
+  clients: Set<string>;
+  total_reply_ms: number;
+  last_ts: number;
+}
+const observedDnsDomains = new Map<string, ObservedDnsDomainStat>();
+const observedDnsRecent: Array<{
+  time: string;
+  timestamp: number;
+  client_ip: string;
+  client_name: string;
+  domain: string;
+  status: number;
+  is_blocked: boolean;
+  forward: string;
+  reply_ms: number;
+}> = [];
+
+function recordObservedDnsLookup(domain: string, clientIp: string, replyMs: number, forward = 'System Resolver') {
+  const dom = String(domain || '').trim().toLowerCase();
+  if (!dom || dom === 'localhost') return;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const cIp = clientIp || '127.0.0.1';
+  const cur = observedDnsDomains.get(dom);
+  if (cur) {
+    cur.count += 1;
+    cur.clients.add(cIp);
+    cur.total_reply_ms += Math.max(0, replyMs);
+    cur.last_ts = nowSec;
+  } else {
+    observedDnsDomains.set(dom, {
+      domain: dom,
+      count: 1,
+      blocked_count: 0,
+      clients: new Set([cIp]),
+      total_reply_ms: Math.max(0, replyMs),
+      last_ts: nowSec,
+    });
+  }
+  const timeStr = new Date().toTimeString().split(' ')[0];
+  observedDnsRecent.unshift({
+    time: timeStr,
+    timestamp: nowSec,
+    client_ip: cIp,
+    client_name: os.hostname(),
+    domain: dom,
+    status: 2,
+    is_blocked: false,
+    forward,
+    reply_ms: Math.round(replyMs * 10) / 10,
+  });
+  if (observedDnsRecent.length > 80) observedDnsRecent.length = 80;
+}
+
 let lastGeoSyncTs = 0;
 let geoSyncInFlight = false;
 let geoWorkerIntervalStarted = false;
@@ -1249,8 +1334,11 @@ async function triggerAsyncGeoSync(immediate = false) {
     for (const t of activeTargets) {
       if (!resolvedOutboundEndpoints.has(t.host)) {
         try {
+          const tDns0 = performance.now();
           const res = await dns.promises.lookup(t.host, { family: 4 });
+          const dnsMs = performance.now() - tDns0;
           if (res && res.address) {
+            recordObservedDnsLookup(t.host, sampleRealNetwork().local_ip, dnsMs);
             resolvedOutboundEndpoints.set(t.host, {
               host: t.host,
               ip: res.address,
@@ -2849,6 +2937,64 @@ function buildLiveConnectionsMap(localIp: string, totalRxSec = 0, totalTxSec = 0
 
   if (uncachedPublicIps.length > 0) {
     enqueueRemoteIpsForGeoIp(uncachedPublicIps);
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (nowSec - lastObservedNetFlushSec >= 5) {
+    lastObservedNetFlushSec = nowSec;
+    for (const c of connections) {
+      if (c.is_lan || !c.remote_ip) continue;
+      const key = `${c.remote_ip}|${c.service}|${c.domain || ''}`;
+      const existing = observedDevNetHistory.get(key);
+      if (existing) {
+        existing.hit_count += 1;
+        existing.last_seen = nowSec;
+        existing.bytes_total = Math.max(existing.bytes_total, Number(c.bytes_total || 0));
+        if (!existing.country && c.country) existing.country = c.country;
+        if (!existing.country_code && c.country_code) existing.country_code = c.country_code;
+        if (!existing.city && c.city) existing.city = c.city;
+        if (!existing.domain && c.domain) existing.domain = c.domain;
+      } else {
+        observedDevNetHistory.set(key, {
+          key,
+          direction: c.direction,
+          protocol: c.protocol,
+          local_ip: c.local_ip,
+          local_hostname: c.local_hostname || os.hostname(),
+          local_port: c.local_port,
+          remote_ip: c.remote_ip,
+          remote_port: c.remote_port,
+          domain: c.domain || '',
+          service: c.service || 'Direct',
+          process: c.process || '',
+          jail: c.jail || 'caddy-scan',
+          lat: c.lat,
+          lng: c.lng,
+          city: c.city,
+          country: c.country,
+          country_code: c.country_code,
+          isp: c.isp,
+          asn: c.asn,
+          hit_count: 1,
+          bytes_total: Number(c.bytes_total || 0),
+          first_seen: nowSec,
+          last_seen: nowSec,
+        });
+      }
+      if (c.domain) {
+        const curDom = observedDnsDomains.get(c.domain.toLowerCase());
+        if (!curDom) {
+          recordObservedDnsLookup(c.domain, c.local_ip || localIp, 2.5);
+        }
+      }
+    }
+    if (observedDevNetHistory.size > 500) {
+      const oldestKeys = Array.from(observedDevNetHistory.entries())
+        .sort((a, b) => a[1].last_seen - b[1].last_seen)
+        .slice(0, observedDevNetHistory.size - 500)
+        .map(([k]) => k);
+      for (const k of oldestKeys) observedDevNetHistory.delete(k);
+    }
   }
 
   const incomingCount = connections.filter((c) => c.direction === 'incoming').length;
@@ -4723,71 +4869,295 @@ function realOsTelemetryMiddleware(): Plugin {
           return;
         }
 
-        if (url === '/api/dns/traffic') {
+        if (url?.startsWith('/api/dns/traffic')) {
+          const topDomainsList = Array.from(observedDnsDomains.values())
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 30)
+            .map((d) => ({
+              domain: d.domain,
+              count: d.count,
+              blocked_count: d.blocked_count,
+              pct_blocked: d.count > 0 ? Math.round((d.blocked_count / d.count) * 1000) / 10 : 0,
+              clients_count: d.clients.size,
+              avg_reply_ms: d.count > 0 ? Math.round((d.total_reply_ms / d.count) * 10) / 10 : 0,
+            }));
+
+          const totalDnsCount = topDomainsList.reduce((acc, d) => acc + d.count, 0);
+          const localHostIp = sampleRealNetwork().local_ip || '127.0.0.1';
+          const clientStats = topDomainsList.length
+            ? [
+                {
+                  ip: localHostIp,
+                  name: os.hostname(),
+                  total: totalDnsCount,
+                  blocked: 0,
+                  pct_blocked: 0,
+                  top_domains: topDomainsList.slice(0, 3).map((d) => ({ domain: d.domain, count: d.count })),
+                },
+              ]
+            : [];
+
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ clients: [], recent_queries: [] }));
+          res.end(
+            JSON.stringify({
+              available: topDomainsList.length > 0,
+              summary: {
+                total_queries_24h: totalDnsCount,
+                blocked_queries_24h: 0,
+                pct_blocked_24h: 0,
+                unique_domains_24h: observedDnsDomains.size,
+                unique_clients_24h: clientStats.length,
+              },
+              top_domains: topDomainsList,
+              clients: clientStats,
+              recent_queries: observedDnsRecent.slice(0, 50),
+            })
+          );
           return;
         }
 
         if (url?.startsWith('/api/net/history')) {
           if (url === '/api/net/history/clear') {
+            observedDevNetHistory.clear();
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ success: true, message: 'Historial SQLite vaciado' }));
+            res.end(JSON.stringify({ success: true, message: 'Historial limpio' }));
             return;
           }
           const liveMap = buildLiveConnectionsMap(sampleRealNetwork().local_ip);
-          const conns = (liveMap && Array.isArray(liveMap.connections)) ? liveMap.connections : [];
-          const servicesMap: Record<string, { service: string; count: number; ips: Set<string>; devices: Set<string> }> = {};
-          const devicesMap: Record<string, { ip: string; name: string; count: number; services: Set<string> }> = {};
+          const conns = liveMap && Array.isArray(liveMap.connections) ? liveMap.connections : [];
+          const historyItems =
+            observedDevNetHistory.size > 0
+              ? Array.from(observedDevNetHistory.values())
+              : conns
+                  .filter((c) => !c.is_lan)
+                  .map((c) => ({
+                    key: c.id,
+                    direction: c.direction,
+                    protocol: c.protocol,
+                    local_ip: c.local_ip,
+                    local_hostname: c.local_hostname || os.hostname(),
+                    local_port: c.local_port,
+                    remote_ip: c.remote_ip,
+                    remote_port: c.remote_port,
+                    domain: c.domain || '',
+                    service: c.service || 'Direct',
+                    process: c.process || '',
+                    jail: c.jail || 'caddy-scan',
+                    lat: c.lat,
+                    lng: c.lng,
+                    city: c.city,
+                    country: c.country,
+                    country_code: c.country_code,
+                    isp: c.isp,
+                    asn: c.asn,
+                    hit_count: 1,
+                    bytes_total: Number(c.bytes_total || 0),
+                    first_seen: Math.floor(Date.now() / 1000) - 60,
+                    last_seen: Math.floor(Date.now() / 1000),
+                  }));
 
-          for (const c of conns) {
-            const svc = c.service || 'Conexión Directa';
-            const dev = c.local_ip || 'Servidor';
-            if (!servicesMap[svc]) {
-              servicesMap[svc] = { service: svc, count: 0, ips: new Set<string>(), devices: new Set<string>() };
+          const servicesMap: Record<
+            string,
+            {
+              service: string;
+              connections_count: number;
+              total_hits: number;
+              ips: Set<string>;
+              devices: Set<string>;
+              countries: Set<string>;
+              domains: Set<string>;
+              first_seen: number;
+              last_seen: number;
             }
-            servicesMap[svc].count++;
-            servicesMap[svc].ips.add(c.remote_ip);
+          > = {};
+          const countriesMap: Record<
+            string,
+            {
+              country: string;
+              country_code: string;
+              connections_count: number;
+              total_hits: number;
+              ips: Set<string>;
+              cities: Set<string>;
+              devices: Set<string>;
+              last_seen: number;
+            }
+          > = {};
+          const domainsMap: Record<
+            string,
+            {
+              domain: string;
+              connections_count: number;
+              total_hits: number;
+              ips: Set<string>;
+              devices: Set<string>;
+              top_service: string;
+              top_country: string;
+              top_country_code: string;
+              last_seen: number;
+            }
+          > = {};
+          const devicesMap: Record<string, { ip: string; name: string; count: number; services: Set<string>; last_seen: number }> = {};
+
+          let totalHitsSum = 0;
+          const uniqueIpsAll = new Set<string>();
+
+          for (const c of historyItems) {
+            const svc = c.service || 'Direct';
+            const dev = c.local_ip || os.hostname();
+            const hits = Math.max(1, Number(c.hit_count || 1));
+            totalHitsSum += hits;
+            if (c.remote_ip) uniqueIpsAll.add(c.remote_ip);
+
+            if (!servicesMap[svc]) {
+              servicesMap[svc] = {
+                service: svc,
+                connections_count: 0,
+                total_hits: 0,
+                ips: new Set<string>(),
+                devices: new Set<string>(),
+                countries: new Set<string>(),
+                domains: new Set<string>(),
+                first_seen: c.first_seen,
+                last_seen: c.last_seen,
+              };
+            }
+            servicesMap[svc].connections_count += 1;
+            servicesMap[svc].total_hits += hits;
+            if (c.remote_ip) servicesMap[svc].ips.add(c.remote_ip);
             servicesMap[svc].devices.add(dev);
+            if (c.country) servicesMap[svc].countries.add(c.country);
+            if (c.domain) servicesMap[svc].domains.add(c.domain);
+            servicesMap[svc].first_seen = Math.min(servicesMap[svc].first_seen, c.first_seen);
+            servicesMap[svc].last_seen = Math.max(servicesMap[svc].last_seen, c.last_seen);
+
+            const cc = String(c.country_code || '').trim().toUpperCase();
+            const cName = String(c.country || cc).trim();
+            if (cName) {
+              const cKey = cc || cName.toUpperCase();
+              if (!countriesMap[cKey]) {
+                countriesMap[cKey] = {
+                  country: cName,
+                  country_code: cc,
+                  connections_count: 0,
+                  total_hits: 0,
+                  ips: new Set<string>(),
+                  cities: new Set<string>(),
+                  devices: new Set<string>(),
+                  last_seen: c.last_seen,
+                };
+              }
+              countriesMap[cKey].connections_count += 1;
+              countriesMap[cKey].total_hits += hits;
+              if (c.remote_ip) countriesMap[cKey].ips.add(c.remote_ip);
+              if (c.city) countriesMap[cKey].cities.add(c.city);
+              countriesMap[cKey].devices.add(dev);
+              countriesMap[cKey].last_seen = Math.max(countriesMap[cKey].last_seen, c.last_seen);
+            }
+
+            const dom = String(c.domain || '').trim().toLowerCase();
+            if (dom) {
+              if (!domainsMap[dom]) {
+                domainsMap[dom] = {
+                  domain: dom,
+                  connections_count: 0,
+                  total_hits: 0,
+                  ips: new Set<string>(),
+                  devices: new Set<string>(),
+                  top_service: svc,
+                  top_country: cName,
+                  top_country_code: cc,
+                  last_seen: c.last_seen,
+                };
+              }
+              domainsMap[dom].connections_count += 1;
+              domainsMap[dom].total_hits += hits;
+              if (c.remote_ip) domainsMap[dom].ips.add(c.remote_ip);
+              domainsMap[dom].devices.add(dev);
+              domainsMap[dom].last_seen = Math.max(domainsMap[dom].last_seen, c.last_seen);
+            }
 
             if (!devicesMap[dev]) {
-              devicesMap[dev] = { ip: dev, name: dev, count: 0, services: new Set<string>() };
+              devicesMap[dev] = {
+                ip: dev,
+                name: c.local_hostname || dev,
+                count: 0,
+                services: new Set<string>(),
+                last_seen: c.last_seen,
+              };
             }
-            devicesMap[dev].count++;
+            devicesMap[dev].count += 1;
             devicesMap[dev].services.add(svc);
+            devicesMap[dev].last_seen = Math.max(devicesMap[dev].last_seen, c.last_seen);
           }
 
-          const servicesCatalog = Object.values(servicesMap).map((s) => ({
-            service: s.service,
-            hit_count: s.count,
-            unique_ips: s.ips.size,
-            device_count: s.devices.size,
-            last_seen: new Date().toISOString().slice(0, 19).replace('T', ' '),
-          }));
+          const servicesCatalog = Object.values(servicesMap)
+            .sort((a, b) => b.total_hits - a.total_hits || b.connections_count - a.connections_count)
+            .map((s) => ({
+              service: s.service,
+              connections_count: s.connections_count,
+              total_hits: s.total_hits,
+              hit_count: s.total_hits,
+              unique_ips: s.ips.size,
+              unique_devices: s.devices.size,
+              countries: Array.from(s.countries).slice(0, 5),
+              sample_domains: Array.from(s.domains).slice(0, 4),
+              first_seen: s.first_seen,
+              last_seen: s.last_seen,
+            }));
+
+          const countriesCatalog = Object.values(countriesMap)
+            .sort((a, b) => b.total_hits - a.total_hits || b.connections_count - a.connections_count)
+            .map((ct) => ({
+              country: ct.country,
+              country_code: ct.country_code,
+              connections_count: ct.connections_count,
+              total_hits: ct.total_hits,
+              unique_ips: ct.ips.size,
+              cities_count: ct.cities.size,
+              unique_devices: ct.devices.size,
+              last_seen: ct.last_seen,
+            }));
+
+          const domainsCatalog = Object.values(domainsMap)
+            .sort((a, b) => b.total_hits - a.total_hits || b.connections_count - a.connections_count)
+            .map((d) => ({
+              domain: d.domain,
+              connections_count: d.connections_count,
+              total_hits: d.total_hits,
+              unique_ips: d.ips.size,
+              unique_devices: d.devices.size,
+              top_service: d.top_service,
+              top_country: d.top_country,
+              top_country_code: d.top_country_code,
+              last_seen: d.last_seen,
+            }));
 
           const devicesCatalog = Object.values(devicesMap).map((d) => ({
             ip: d.ip,
             name: d.name,
-            total_hits: d.count,
+            connections_count: d.count,
             services_count: d.services.size,
-            last_seen: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            last_seen: d.last_seen,
           }));
 
           const historyPayload = {
             status: 'ok',
             services_catalog: servicesCatalog,
+            countries_catalog: countriesCatalog,
+            domains_catalog: domainsCatalog,
             devices_catalog: devicesCatalog,
-            connections: conns.map((c) => ({
-              ...c,
-              hit_count: 1,
-              first_seen: new Date(Date.now() - 3600000).toISOString().slice(0, 19).replace('T', ' '),
-              last_seen: new Date().toISOString().slice(0, 19).replace('T', ' '),
-            })),
+            connections: historyItems
+              .sort((a, b) => b.last_seen - a.last_seen)
+              .slice(0, 300),
             summary: {
-              total_records: conns.length,
+              total_records: historyItems.length,
               total_services: servicesCatalog.length,
-              total_unique_ips: conns.length,
+              total_unique_ips: uniqueIpsAll.size,
               total_devices: devicesCatalog.length,
+              total_countries: countriesCatalog.length,
+              total_domains: domainsCatalog.length,
+              total_hits: totalHitsSum,
             },
           };
 

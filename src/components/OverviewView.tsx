@@ -14,11 +14,12 @@ import {
   Monitor,
   Power,
   PowerOff,
+  Router,
   Server,
   Usb,
   Wifi,
 } from 'lucide-react';
-import { AccordionBody, AnimatedMetricValue, COCKPIT_EASE } from './MotionPrimitives';
+import { AccordionBody, AnimatedMetricValue, COCKPIT_EASE, COCKPIT_SPRING } from './MotionPrimitives';
 import { NetworkDevicesModal, NetworkInspectTab } from './NetworkDevicesModal';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import {
@@ -307,7 +308,7 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${isMounted ? Math.max(2, pct) : 100}%` }}
-              transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+              transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
               className={`cockpit-progress-fill h-full rounded-full ${barClass}`}
               style={{ opacity: isMounted ? 1 : 0.35 }}
             />
@@ -319,7 +320,7 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
             series={diskSeries}
             timestamps={diskTimestamps}
             epochTs={diskEpochTs}
-            height={112}
+            heightClassName="cockpit-chart-compact"
             leftUnit="MB/s"
             theme={theme}
             onExpandClick={() => onExpandChart(expandSpec)}
@@ -510,8 +511,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     });
   }, [disks]);
 
-  const netRxBytes = Number(metrics?.net?.rx_bytes_sec ?? 0);
-  const netTxBytes = Number(metrics?.net?.tx_bytes_sec ?? 0);
+  const wifiSummary = metrics?.wifi_summary;
+  const routerWanAvailable = Boolean(wifiSummary?.router_wan_available);
+
+  const hostLanRxBytes = Number(metrics?.net?.lan_rx_bytes_sec ?? 0);
+  const hostLanTxBytes = Number(metrics?.net?.lan_tx_bytes_sec ?? 0);
+  const wanRxBytes = routerWanAvailable
+    ? Number(wifiSummary?.router_wan_rx_bytes_sec ?? metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0);
+  const wanTxBytes = routerWanAvailable
+    ? Number(wifiSummary?.router_wan_tx_bytes_sec ?? metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0);
+  const lanRxBytes = routerWanAvailable
+    ? Number(wifiSummary?.router_lan_rx_bytes_sec ?? hostLanRxBytes)
+    : hostLanRxBytes;
+  const lanTxBytes = routerWanAvailable
+    ? Number(wifiSummary?.router_lan_tx_bytes_sec ?? hostLanTxBytes)
+    : hostLanTxBytes;
 
   const activeInterfaces = useMemo(() => {
     const list =
@@ -597,6 +613,27 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     };
   }, [hist]);
 
+  // Datos históricos específicos del router cuando tiene telemetría WAN/LAN activa
+  const routerLiveWindow = useMemo(() => {
+    const rawRouter = wifiSummary?.router_history_20m ?? metrics?.net?.router_history_20m ?? [];
+    if (!routerWanAvailable || rawRouter.length < 2) return null;
+    const latestEpoch = Math.round(rawRouter[rawRouter.length - 1].t / 1000);
+    const cutoff = latestEpoch - OVERVIEW_WINDOW_SECONDS;
+    let startIdx = rawRouter.findIndex((b) => Math.round(b.t / 1000) >= cutoff);
+    if (startIdx < 0) startIdx = Math.max(0, rawRouter.length - 60);
+    else startIdx = Math.min(startIdx, Math.max(0, rawRouter.length - 2));
+    const sliced = rawRouter.slice(startIdx);
+    const loc = locale === 'es' ? 'es-ES' : locale;
+    return {
+      timestamps: sliced.map((b) => new Date(b.t).toLocaleTimeString(loc)),
+      epochTs: sliced.map((b) => Math.round(b.t / 1000)),
+      wanRx: sliced.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100),
+      wanTx: sliced.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100),
+      lanRx: sliced.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100),
+      lanTx: sliced.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100),
+    };
+  }, [wifiSummary?.router_history_20m, metrics?.net?.router_history_20m, routerWanAvailable, locale]);
+
   const cpuSeries: ChartSeries[] = useMemo(
     () => [{ id: 'cpu', metricKey: 'cpu', label: t('hardware.cpu.title'), data: cpuHist, color: '#0284c7', unit: '%' }],
     [cpuHist, t]
@@ -609,13 +646,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.title'), data: gpuHist, color: '#7c3aed', unit: '%' }],
     [gpuHist, t]
   );
-  const netSeries: ChartSeries[] = useMemo(
+  const wanSeries: ChartSeries[] = useMemo(
     () => [
       {
         id: 'net_wan_rx',
         metricKey: 'net_wan_rx',
         label: t('hardware.net.wan_download'),
-        data: netWanRxHist,
+        data: routerLiveWindow ? routerLiveWindow.wanRx : netWanRxHist,
         color: '#0284c7',
         unit: 'MB/s',
         decimals: 2,
@@ -625,35 +662,52 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         id: 'net_wan_tx',
         metricKey: 'net_wan_tx',
         label: t('hardware.net.wan_upload'),
-        data: netWanTxHist,
+        data: routerLiveWindow ? routerLiveWindow.wanTx : netWanTxHist,
         color: '#10b981',
         unit: 'MB/s',
         decimals: 2,
         fillAlpha: 0.08,
       },
+    ],
+    [routerLiveWindow, netWanRxHist, netWanTxHist, t]
+  );
+  const lanSeries: ChartSeries[] = useMemo(
+    () => [
       {
         id: 'net_lan_rx',
         metricKey: 'net_lan_rx',
         label: t('hardware.net.lan_download'),
-        data: netLanRxHist,
+        data: routerLiveWindow ? routerLiveWindow.lanRx : netLanRxHist,
         color: '#6366f1',
         unit: 'MB/s',
         decimals: 2,
-        fillAlpha: 0.10,
+        fillAlpha: 0.14,
       },
       {
         id: 'net_lan_tx',
         metricKey: 'net_lan_tx',
         label: t('hardware.net.lan_upload'),
-        data: netLanTxHist,
+        data: routerLiveWindow ? routerLiveWindow.lanTx : netLanTxHist,
         color: '#f59e0b',
         unit: 'MB/s',
         decimals: 2,
-        fillAlpha: 0.06,
+        fillAlpha: 0.08,
       },
     ],
-    [netWanRxHist, netWanTxHist, netLanRxHist, netLanTxHist, t]
+    [routerLiveWindow, netLanRxHist, netLanTxHist, t]
   );
+
+  const wanTimestamps = routerLiveWindow ? routerLiveWindow.timestamps : timestamps;
+  const wanEpochTs = routerLiveWindow ? routerLiveWindow.epochTs : epochTs;
+  const lanTimestamps = routerLiveWindow ? routerLiveWindow.timestamps : timestamps;
+  const lanEpochTs = routerLiveWindow ? routerLiveWindow.epochTs : epochTs;
+  const routerSourceLabel =
+    wifiSummary?.router_traffic_source ||
+    wifiSummary?.router_model ||
+    wifiSummary?.gateway_name ||
+    wifiSummary?.gateway_ip ||
+    metrics?.net?.local_ip ||
+    t('network.router_fallback');
 
   const cpuTone = getHealthTone(cpuPct);
   const ramTone = getHealthTone(ramPct);
@@ -678,15 +732,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const overallBusy = cpuPct >= 88 || ramPct >= 90 || storageSummary.percent >= 92;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[clamp(0.85rem,2dvh,1.5rem)]">
       {/* Hero Telemetry Summary Banner (matching docs/assets/hero-banner.svg) */}
       <motion.section
-        initial={{ opacity: 0, y: 12, scale: 0.992 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.44, ease: COCKPIT_EASE }}
-        className="cockpit-hero p-5 sm:p-6"
+        initial={{ opacity: 0, y: 14, scaleX: 0.98, scaleY: 1.02 }}
+        animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+        transition={COCKPIT_SPRING}
+        className="cockpit-hero p-[clamp(0.85rem,1.8vw,1.5rem)]"
       >
-        <div className="relative z-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="relative z-10 flex flex-col justify-between gap-[clamp(0.65rem,1.5vw,1rem)] sm:flex-row sm:items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="cockpit-pill-cyan inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
@@ -697,7 +751,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 {t('overview.subtitle')}
               </span>
             </div>
-            <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            <h1 className="mt-2 font-display text-[clamp(1.2rem,2vw+0.55rem,1.875rem)] font-bold tracking-tight text-slate-900 dark:text-white">
               {overallBusy ? t('overview.high_load_banner') : t('overview.all_normal_banner')}
             </h1>
             <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
@@ -789,10 +843,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       <section aria-label={t('overview.perf_grid_aria')} className="cockpit-auto-grid">
         {/* 1. Procesador (CPU) */}
         <motion.article
-          initial={{ opacity: 0, y: 16, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.42, delay: 0.04, ease: COCKPIT_EASE }}
-          whileHover={{ y: -2, transition: { duration: 0.2 } }}
+          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
+          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          transition={{ ...COCKPIT_SPRING, delay: 0.03 }}
+          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
           className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
@@ -851,7 +905,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(2, Math.min(100, cpuPct))}%` }}
-                transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+                transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
                 className="cockpit-progress-fill h-full rounded-full bg-[#0284c7] dark:bg-[#38bdf8]"
               />
             </div>
@@ -862,7 +916,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               series={cpuSeries}
               timestamps={timestamps}
               epochTs={epochTs}
-              height={112}
+              heightClassName="cockpit-chart-compact"
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -884,10 +938,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* 2. Memoria RAM */}
         <motion.article
-          initial={{ opacity: 0, y: 16, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.42, delay: 0.08, ease: COCKPIT_EASE }}
-          whileHover={{ y: -2, transition: { duration: 0.2 } }}
+          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
+          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          transition={{ ...COCKPIT_SPRING, delay: 0.06 }}
+          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
           className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
@@ -945,7 +999,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(2, Math.min(100, ramPct))}%` }}
-                transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+                transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
                 className="cockpit-progress-fill h-full rounded-full bg-[#10b981] dark:bg-[#34d399]"
               />
             </div>
@@ -956,7 +1010,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               series={ramSeries}
               timestamps={timestamps}
               epochTs={epochTs}
-              height={112}
+              heightClassName="cockpit-chart-compact"
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -981,10 +1035,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* 3. Tarjeta gráfica (GPU) */}
         <motion.article
-          initial={{ opacity: 0, y: 16, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.42, delay: 0.12, ease: COCKPIT_EASE }}
-          whileHover={{ y: -2, transition: { duration: 0.2 } }}
+          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
+          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          transition={{ ...COCKPIT_SPRING, delay: 0.09 }}
+          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
           className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
@@ -1047,7 +1101,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(gpuAvail ? 2 : 0, Math.min(100, gpuPct))}%` }}
-                transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+                transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
                 className="cockpit-progress-fill h-full rounded-full bg-[#7c3aed] dark:bg-[#a78bfa]"
               />
             </div>
@@ -1058,7 +1112,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               series={gpuSeries}
               timestamps={timestamps}
               epochTs={epochTs}
-              height={112}
+              heightClassName="cockpit-chart-compact"
               maxLeft={100}
               leftUnit="%"
               theme={theme}
@@ -1078,12 +1132,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
         </motion.article>
 
-        {/* 4. Red e Internet (Tráfico en tiempo real Descarga / Subida MB/s) */}
+        {/* 4. Router al Exterior (Datos WAN globales del router / salida Internet) */}
         <motion.article
-          initial={{ opacity: 0, y: 16, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.42, delay: 0.16, ease: COCKPIT_EASE }}
-          whileHover={{ y: -2, transition: { duration: 0.2 } }}
+          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
+          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          transition={{ ...COCKPIT_SPRING, delay: 0.12 }}
+          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
+          data-testid="overview-router-wan-card"
           className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
@@ -1091,30 +1146,27 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
                   <span className="cockpit-pill-cyan inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
-                    <ArrowDownUp className="h-3 w-3" />
+                    <Router className="h-3 w-3" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">{t('hardware.net.title')}</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">
+                    {t('hardware.net.router_wan_title')}
+                  </span>
                   <span aria-hidden="true">·</span>
-                  <span className="shrink-0 text-[11px] text-emerald-600 dark:text-emerald-400">
-                    {activeInterfaces.length > 0
-                      ? activeInterfaces.length === 1
-                        ? t('hardware.net.active_link_single', { count: activeInterfaces.length })
-                        : t('hardware.net.active_link_plural', { count: activeInterfaces.length })
-                      : t('hardware.net.active')}
+                  <span className="shrink-0 text-[11px] text-sky-600 dark:text-sky-400">
+                    {routerWanAvailable ? t('overview.router_global_badge') : t('hardware.net.router_wan_badge')}
                   </span>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
                   <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white">
-                    ↓ {formatSpeed(netRxBytes)}
+                    ↓ {formatSpeed(wanRxBytes)}
                   </span>
                   <span className="cockpit-pill-emerald rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums">
-                    ↑ {formatSpeed(netTxBytes)}
+                    ↑ {formatSpeed(wanTxBytes)}
                   </span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                  <span className="font-mono tabular-nums truncate">
-                    {metrics?.net?.local_ip || activeInterfaces[0]?.ip || t('hardware.net.lan_tag')}
-                    {activeInterfaces[0]?.name ? ` (${activeInterfaces.map((n) => n.name).slice(0, 2).join(', ')})` : ''}
+                  <span className="font-mono tabular-nums truncate" title={routerSourceLabel}>
+                    {routerSourceLabel}
                   </span>
                   <span aria-hidden="true">·</span>
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -1124,28 +1176,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
                       <span className="h-1.5 w-1.5 rounded-full bg-[#10b981]" /> {t('hardware.net.wan_upload')}
                     </span>
-                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#6366f1]" /> {t('hardware.net.lan_download')}
-                    </span>
-                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#f59e0b]" /> {t('hardware.net.lan_upload')}
-                    </span>
                   </span>
                 </div>
               </div>
               <motion.button
                 whileTap={{ scale: 0.92 }}
                 type="button"
-                aria-label={t('hardware.net.expand_aria')}
+                aria-label={t('hardware.net.router_wan_expand_aria')}
                 onClick={() =>
                   onExpandChart({
-                    title: t('hardware.net.chart_live_title'),
-                    subtitle: `${metrics?.net?.local_ip || t('hardware.net.main_iface')} · ↓ ${formatSpeed(netRxBytes)} · ↑ ${formatSpeed(netTxBytes)}`,
-                    series: netSeries,
-                    timestamps,
-                    epochTs,
+                    title: t('hardware.net.wan_chart_live_title'),
+                    subtitle: `${routerSourceLabel} · ↓ ${formatSpeed(wanRxBytes)} · ↑ ${formatSpeed(wanTxBytes)}`,
+                    series: wanSeries,
+                    timestamps: wanTimestamps,
+                    epochTs: wanEpochTs,
                     leftUnit: 'MB/s',
-                    chartKind: 'net',
+                    chartKind: routerLiveWindow ? 'router' : 'net',
                   })
                 }
                 className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
@@ -1158,9 +1204,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <motion.div
                 initial={{ width: 0 }}
                 animate={{
-                  width: `${Math.max(4, Math.min(100, ((netRxBytes + netTxBytes) / (1024 * 1024)) * 2.5))}%`,
+                  width: `${Math.max(4, Math.min(100, ((wanRxBytes + wanTxBytes) / (1024 * 1024)) * 2.5))}%`,
                 }}
-                transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+                transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
                 className="cockpit-progress-fill h-full rounded-full bg-gradient-to-r from-[#0284c7] to-[#10b981]"
               />
             </div>
@@ -1168,22 +1214,131 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
           <div className="mt-2.5">
             <TelemetryChart
-              series={netSeries}
-              timestamps={timestamps}
-              epochTs={epochTs}
-              height={112}
+              series={wanSeries}
+              timestamps={wanTimestamps}
+              epochTs={wanEpochTs}
+              heightClassName="cockpit-chart-compact"
               leftUnit="MB/s"
               theme={theme}
               emptyMessage={t('hardware.net.recording_traffic')}
               onExpandClick={() =>
                 onExpandChart({
-                  title: t('hardware.net.chart_live_title'),
-                  subtitle: `${metrics?.net?.local_ip || t('hardware.net.main_iface')} · ↓ ${formatSpeed(netRxBytes)} · ↑ ${formatSpeed(netTxBytes)}`,
-                  series: netSeries,
-                  timestamps,
-                  epochTs,
+                  title: t('hardware.net.wan_chart_live_title'),
+                  subtitle: `${routerSourceLabel} · ↓ ${formatSpeed(wanRxBytes)} · ↑ ${formatSpeed(wanTxBytes)}`,
+                  series: wanSeries,
+                  timestamps: wanTimestamps,
+                  epochTs: wanEpochTs,
                   leftUnit: 'MB/s',
-                  chartKind: 'net',
+                  chartKind: routerLiveWindow ? 'router' : 'net',
+                })
+              }
+            />
+          </div>
+        </motion.article>
+
+        {/* 5. Comunicación Local (Velocidad interna de red LAN sin tráfico externo) */}
+        <motion.article
+          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
+          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          transition={{ ...COCKPIT_SPRING, delay: 0.15 }}
+          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
+          data-testid="overview-local-lan-card"
+          className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
+        >
+          <div>
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span className="cockpit-pill-violet inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
+                    <ArrowDownUp className="h-3 w-3" />
+                  </span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">
+                    {t('hardware.net.local_lan_title')}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span className="shrink-0 text-[11px] text-indigo-600 dark:text-indigo-400">
+                    {activeInterfaces.length > 0
+                      ? activeInterfaces.length === 1
+                        ? t('hardware.net.active_link_single', { count: activeInterfaces.length })
+                        : t('hardware.net.active_link_plural', { count: activeInterfaces.length })
+                      : t('hardware.net.local_lan_badge')}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
+                  <span className="font-mono text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white">
+                    ↓ {formatSpeed(lanRxBytes)}
+                  </span>
+                  <span className="cockpit-pill-amber rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums">
+                    ↑ {formatSpeed(lanTxBytes)}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span className="font-mono tabular-nums truncate">
+                    {metrics?.net?.local_ip || activeInterfaces[0]?.ip || t('hardware.net.lan_tag')}
+                    {activeInterfaces[0]?.name ? ` (${activeInterfaces.map((n) => n.name).slice(0, 2).join(', ')})` : ''}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6366f1]" /> {t('hardware.net.lan_download')}
+                    </span>
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#f59e0b]" /> {t('hardware.net.lan_upload')}
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                type="button"
+                aria-label={t('hardware.net.local_lan_expand_aria')}
+                onClick={() =>
+                  onExpandChart({
+                    title: t('hardware.net.lan_chart_live_title'),
+                    subtitle: `${metrics?.net?.local_ip || t('hardware.net.lan_tag')} · ↓ ${formatSpeed(lanRxBytes)} · ↑ ${formatSpeed(lanTxBytes)}`,
+                    series: lanSeries,
+                    timestamps: lanTimestamps,
+                    epochTs: lanEpochTs,
+                    leftUnit: 'MB/s',
+                    chartKind: routerLiveWindow ? 'router' : 'net',
+                  })
+                }
+                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-indigo-300"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </motion.button>
+            </div>
+
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{
+                  width: `${Math.max(4, Math.min(100, ((lanRxBytes + lanTxBytes) / (1024 * 1024)) * 2.5))}%`,
+                }}
+                transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
+                className="cockpit-progress-fill h-full rounded-full bg-gradient-to-r from-[#6366f1] to-[#f59e0b]"
+              />
+            </div>
+          </div>
+
+          <div className="mt-2.5">
+            <TelemetryChart
+              series={lanSeries}
+              timestamps={lanTimestamps}
+              epochTs={lanEpochTs}
+              heightClassName="cockpit-chart-compact"
+              leftUnit="MB/s"
+              theme={theme}
+              emptyMessage={t('hardware.net.recording_traffic')}
+              onExpandClick={() =>
+                onExpandChart({
+                  title: t('hardware.net.lan_chart_live_title'),
+                  subtitle: `${metrics?.net?.local_ip || t('hardware.net.lan_tag')} · ↓ ${formatSpeed(lanRxBytes)} · ↑ ${formatSpeed(lanTxBytes)}`,
+                  series: lanSeries,
+                  timestamps: lanTimestamps,
+                  epochTs: lanEpochTs,
+                  leftUnit: 'MB/s',
+                  chartKind: routerLiveWindow ? 'router' : 'net',
                 })
               }
             />
@@ -1211,9 +1366,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       {/* Quick Control Row: Aparatos en casa con botones simétricos Encender / Apagar */}
       <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.44, delay: 0.2, ease: COCKPIT_EASE }}
+        initial={{ opacity: 0, y: 16, scaleX: 0.97, scaleY: 1.02 }}
+        animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+        transition={{ ...COCKPIT_SPRING, delay: 0.18 }}
         className="cockpit-bento p-5"
       >
         <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
@@ -1250,10 +1405,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               return (
                 <motion.div
                   key={`${mac}-${client.ip || idx}`}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.04 * idx, ease: COCKPIT_EASE }}
-                  whileHover={{ scale: 1.006 }}
+                  initial={{ opacity: 0, y: 12, scaleX: 0.95, scaleY: 1.04 }}
+                  animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+                  transition={{ ...COCKPIT_SPRING, delay: Math.min(0.03 * idx, 0.24) }}
+                  whileHover={{ y: -1.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
                   className="cockpit-subtile flex flex-col justify-between gap-3 p-3.5"
                 >
                   <div className="flex items-center gap-3 min-w-0">

@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import {
   Activity,
+  ArrowDownUp,
   Bell,
   ChevronDown,
   ChevronUp,
   Cloud,
   Gauge,
   Globe,
+  Globe2,
   Image as ImageIcon,
   Lock,
   MapPin,
@@ -18,24 +20,30 @@ import {
   Router,
   Search,
   Send,
+  Server,
   Shield,
   ShieldAlert,
+  Sparkles,
   Trash2,
   Unlock,
   Wifi,
+  Zap,
 } from 'lucide-react';
 import { COCKPIT_EASE, COCKPIT_SPRING, MorphPill, ViewStage } from './MotionPrimitives';
 import { ExpandChartSpec } from './OverviewView';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
 import {
+  DnsTrafficStatsResponse,
   GeoConnectionItem,
   MetricsPayload,
+  NetHistoryResponse,
   NetInterfaceInfo,
   NicHistoryBucket,
   SpeedTestHistoryResponse,
   SpeedTestResult,
   SpeedTestStatus,
+  TelemetryHistoryResponse,
   TelegramBotStatusPayload,
   ThemeMode,
   WifiClient,
@@ -170,7 +178,7 @@ const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, on
           series={nicSeries}
           timestamps={nicTimestamps}
           epochTs={nicEpochTs}
-          height={112}
+          heightClassName="cockpit-chart-compact"
           leftUnit="MB/s"
           theme={theme}
           emptyMessage={t('hardware.net.accumulating_20m')}
@@ -297,7 +305,7 @@ const RouterTrafficCard = React.memo<RouterTrafficCardProps>(({ metrics, theme, 
           series={routerSeries}
           timestamps={routerTimestamps}
           epochTs={routerEpochTs}
-          height={112}
+          heightClassName="cockpit-chart-compact"
           leftUnit="MB/s"
           theme={theme}
           emptyMessage={t('network.router_accumulating')}
@@ -347,13 +355,44 @@ function inferDefaultJail(c: GeoConnectionItem): string {
   return 'all';
 }
 
-type RedSubTab = 'home' | 'map' | 'speedtest' | 'security' | 'dns';
+function countryCodeToFlag(code?: string): string {
+  const c = String(code || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(c)) return '🌐';
+  return String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65, 0x1f1e6 + c.charCodeAt(1) - 65);
+}
+
+function localizeCountryName(rawName: string, code: string | undefined, locale: string): string {
+  const c = String(code || '').trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(c) && typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function') {
+    try {
+      const dn = new Intl.DisplayNames([locale || 'es'], { type: 'region' });
+      const localized = dn.of(c);
+      if (localized) return localized;
+    } catch {
+      // Fallback to raw geoip name
+    }
+  }
+  return rawName || c || '--';
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+}
+
+type RedSubTab = 'home' | 'traffic' | 'map' | 'speedtest' | 'security' | 'dns';
 type ClientSortMode = 'down' | 'up' | 'lan' | 'name';
 
 function resolveRedSubTab(hint?: string): RedSubTab | undefined {
   if (!hint) return undefined;
   const h = hint.toLowerCase();
   if (h === 'security' || h === 'seguridad') return 'security';
+  if (h === 'traffic' || h === 'trafico' || h === 'historial' || h === 'history') return 'traffic';
   if (h === 'dns' || h === 'duckdns') return 'dns';
   if (h === 'map' || h === 'mapa') return 'map';
   if (h === 'speedtest' || h === 'velocidad') return 'speedtest';
@@ -371,6 +410,10 @@ interface NetworkSecurityViewProps {
   actionPendingMac: string | null;
   onRefreshMetrics: () => void;
   onNotify: (msg: string, isError?: boolean) => void;
+  netHistory24h?: TelemetryHistoryResponse | null;
+  netHistoryLoading?: boolean;
+  netHistoryError?: boolean;
+  onRefreshNetHistory24h?: () => void;
 }
 
 interface DuckDnsStatusPayload {
@@ -399,6 +442,10 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   actionPendingMac,
   onRefreshMetrics,
   onNotify,
+  netHistory24h,
+  netHistoryLoading = false,
+  netHistoryError = false,
+  onRefreshNetHistory24h,
 }) => {
   const { t, locale } = useI18n();
   const {
@@ -432,6 +479,13 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const [speedtestHistory, setSpeedtestHistory] = useState<SpeedTestHistoryResponse | null>(null);
   const [speedtestLoadingHistory, setSpeedtestLoadingHistory] = useState(false);
   const [speedtestClearing, setSpeedtestClearing] = useState(false);
+
+  // Traffic history analytics sub-tab state
+  const [netHistoryCatalog, setNetHistoryCatalog] = useState<NetHistoryResponse | null>(null);
+  const [dnsTrafficStats, setDnsTrafficStats] = useState<DnsTrafficStatsResponse | null>(null);
+  const [trafficLoading, setTrafficLoading] = useState(false);
+  const [trafficFilterQuery, setTrafficFilterQuery] = useState('');
+  const [domainsMode, setDomainsMode] = useState<'all' | 'blocked'>('all');
 
   // Map filters & search (v4.13.0)
   const [mapFilter, setMapFilter] = useState<MapConnFilter>('all');
@@ -700,10 +754,516 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
     if (showSpinner) setSpeedtestLoadingHistory(false);
   }, []);
 
-  // Load Speedtest, Telegram & DuckDNS on tab switch
+  const loadTrafficAnalytics = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setTrafficLoading(true);
+    const [histRes, dnsRes] = await Promise.all([
+      apiFetchJson<NetHistoryResponse>('/api/net/history?limit=400'),
+      apiFetchJson<DnsTrafficStatsResponse>('/api/dns/traffic?limit=80'),
+    ]);
+    if (histRes.ok && histRes.data) setNetHistoryCatalog(histRes.data);
+    if (dnsRes.ok && dnsRes.data) setDnsTrafficStats(dnsRes.data);
+    if (showSpinner) setTrafficLoading(false);
+  }, []);
+
+  const network24hView = useMemo(() => {
+    const dbSeries = netHistory24h?.series;
+    const dbRx = dbSeries?.net_rx ?? [];
+    const useFallbackLive = dbRx.length < 2 && (metrics?.history?.net_rx?.length ?? 0) >= 2;
+    const sourceSeries = useFallbackLive ? metrics?.history : dbSeries;
+
+    const rxTotal = sourceSeries?.net_rx ?? [];
+    const txTotal = sourceSeries?.net_tx ?? [];
+    const wanRxData = sourceSeries?.net_wan_rx?.length ? sourceSeries.net_wan_rx : rxTotal;
+    const wanTxData = sourceSeries?.net_wan_tx?.length ? sourceSeries.net_wan_tx : txTotal;
+    const lanRxData = sourceSeries?.net_lan_rx?.length ? sourceSeries.net_lan_rx : rxTotal.map(() => 0);
+    const lanTxData = sourceSeries?.net_lan_tx?.length ? sourceSeries.net_lan_tx : txTotal.map(() => 0);
+
+    const timestamps = sourceSeries?.timestamps ?? [];
+    const dateTimestamps = sourceSeries?.date_timestamps ?? [];
+    const epochTs = sourceSeries?.epoch_ts ?? [];
+
+    const peakWanRxMb = wanRxData.length > 0 ? Math.max(...wanRxData) : 0;
+    const peakWanTxMb = wanTxData.length > 0 ? Math.max(...wanTxData) : 0;
+    const peakLanRxMb = lanRxData.length > 0 ? Math.max(...lanRxData) : 0;
+    const peakLanTxMb = lanTxData.length > 0 ? Math.max(...lanTxData) : 0;
+
+    const series: ChartSeries[] = [
+      {
+        id: 'net_wan_rx_24h',
+        metricKey: 'net_wan_rx',
+        label: t('hardware.net.wan_download'),
+        data: wanRxData,
+        color: '#0284c7',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.16,
+      },
+      {
+        id: 'net_wan_tx_24h',
+        metricKey: 'net_wan_tx',
+        label: t('hardware.net.wan_upload'),
+        data: wanTxData,
+        color: '#10b981',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.08,
+      },
+      {
+        id: 'net_lan_rx_24h',
+        metricKey: 'net_lan_rx',
+        label: t('hardware.net.lan_download'),
+        data: lanRxData,
+        color: '#6366f1',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.10,
+      },
+      {
+        id: 'net_lan_tx_24h',
+        metricKey: 'net_lan_tx',
+        label: t('hardware.net.lan_upload'),
+        data: lanTxData,
+        color: '#f59e0b',
+        unit: 'MB/s',
+        decimals: 2,
+        fillAlpha: 0.06,
+      },
+    ];
+
+    return {
+      series,
+      wanRxData,
+      wanTxData,
+      lanRxData,
+      lanTxData,
+      timestamps,
+      dateTimestamps,
+      epochTs,
+      sampleCount: Math.max(wanRxData.length, wanTxData.length, lanRxData.length, lanTxData.length),
+      peakWanRxMb,
+      peakWanTxMb,
+      peakLanRxMb,
+      peakLanTxMb,
+    };
+  }, [netHistory24h, metrics?.history, t]);
+
+  const openNetwork24hExpanded = useCallback(() => {
+    if (!onExpandChart) return;
+    onExpandChart({
+      title: t('overview.net_history_24h_title'),
+      subtitle: t('overview.net_history_24h_sub'),
+      series: network24hView.series,
+      timestamps: network24hView.timestamps,
+      epochTs: network24hView.epochTs,
+      leftUnit: 'MB/s',
+      chartKind: 'net',
+    });
+  }, [onExpandChart, network24hView.series, network24hView.timestamps, network24hView.epochTs, t]);
+
+  const topDomains = useMemo(() => {
+    const q = trafficFilterQuery.trim().toLowerCase();
+    const map = new Map<
+      string,
+      {
+        domain: string;
+        count: number;
+        blockedCount: number;
+        pctBlocked: number;
+        uniqueIps: number;
+        clientsCount: number;
+        service: string;
+        country: string;
+        avgReplyMs: number | null;
+        isPiholeSource: boolean;
+      }
+    >();
+
+    for (const d of dnsTrafficStats?.top_domains ?? []) {
+      const dom = String(d.domain || '').trim().toLowerCase();
+      if (!dom) continue;
+      const cnt = Number(d.count || 0);
+      const blk = Number(d.blocked_count || 0);
+      map.set(dom, {
+        domain: dom,
+        count: cnt,
+        blockedCount: blk,
+        pctBlocked: Number(d.pct_blocked ?? (cnt > 0 ? Math.round((blk / cnt) * 1000) / 10 : 0)),
+        uniqueIps: 0,
+        clientsCount: Number(d.clients_count || 0),
+        service: '',
+        country: '',
+        avgReplyMs: typeof d.avg_reply_ms === 'number' ? d.avg_reply_ms : null,
+        isPiholeSource: true,
+      });
+    }
+
+    for (const d of netHistoryCatalog?.domains_catalog ?? []) {
+      const dom = String(d.domain || '').trim().toLowerCase();
+      if (!dom) continue;
+      const cur = map.get(dom);
+      const hits = Number(d.total_hits ?? d.connections_count ?? 0);
+      if (cur) {
+        cur.uniqueIps = Math.max(cur.uniqueIps, Number(d.unique_ips || 0));
+        cur.clientsCount = Math.max(cur.clientsCount, Number(d.unique_devices || 0));
+        if (!cur.service && d.top_service) cur.service = d.top_service;
+        if (!cur.country && d.top_country) cur.country = d.top_country;
+        if (hits > cur.count) cur.count = hits;
+      } else {
+        map.set(dom, {
+          domain: dom,
+          count: hits,
+          blockedCount: 0,
+          pctBlocked: 0,
+          uniqueIps: Number(d.unique_ips || 0),
+          clientsCount: Number(d.unique_devices || 0),
+          service: d.top_service || '',
+          country: d.top_country || '',
+          avgReplyMs: null,
+          isPiholeSource: false,
+        });
+      }
+    }
+
+    for (const c of rawGeoConnections) {
+      if (c.is_server_node || c.is_lan) continue;
+      const dom = String(c.domain || '').trim().toLowerCase();
+      if (!dom) continue;
+      const cur = map.get(dom);
+      const isBlocked = c.direction === 'blocked' || c.state === 'BANNED';
+      if (cur) {
+        if (!cur.isPiholeSource) cur.count = Math.max(cur.count, 1);
+        if (isBlocked && cur.blockedCount === 0) {
+          cur.blockedCount = 1;
+          cur.pctBlocked = Math.round((1 / Math.max(1, cur.count)) * 1000) / 10;
+        }
+        if (!cur.service && c.service) cur.service = c.service;
+        if (!cur.country && c.country) cur.country = c.country;
+      } else {
+        map.set(dom, {
+          domain: dom,
+          count: 1,
+          blockedCount: isBlocked ? 1 : 0,
+          pctBlocked: isBlocked ? 100 : 0,
+          uniqueIps: 1,
+          clientsCount: 1,
+          service: c.service || '',
+          country: c.country || '',
+          avgReplyMs: null,
+          isPiholeSource: false,
+        });
+      }
+    }
+
+    let items = Array.from(map.values());
+    if (domainsMode === 'blocked') {
+      items = items.filter((item) => item.blockedCount > 0);
+    }
+    if (q) {
+      items = items.filter(
+        (item) =>
+          item.domain.includes(q) ||
+          item.service.toLowerCase().includes(q) ||
+          item.country.toLowerCase().includes(q)
+      );
+    }
+    items.sort((a, b) => (domainsMode === 'blocked' ? b.blockedCount - a.blockedCount : b.count - a.count));
+    return items.slice(0, 12);
+  }, [dnsTrafficStats?.top_domains, netHistoryCatalog?.domains_catalog, rawGeoConnections, domainsMode, trafficFilterQuery]);
+
+  const topServices = useMemo(() => {
+    const q = trafficFilterQuery.trim().toLowerCase();
+    const map = new Map<
+      string,
+      { service: string; hitCount: number; ipsCount: number; devicesCount: number; protocols: string[] }
+    >();
+
+    for (const s of netHistoryCatalog?.services_catalog ?? []) {
+      const name = String(s.service || '').trim();
+      if (!name) continue;
+      const hits = Number(s.hit_count ?? s.total_hits ?? s.connections_count ?? 0);
+      map.set(name.toLowerCase(), {
+        service: name,
+        hitCount: hits,
+        ipsCount: Number(s.unique_ips || 0),
+        devicesCount: Number(s.unique_devices ?? s.device_count ?? 0),
+        protocols: [],
+      });
+    }
+
+    const liveIpsBySvc = new Map<string, Set<string>>();
+    const liveDevsBySvc = new Map<string, Set<string>>();
+    const liveHitsBySvc = new Map<string, number>();
+    const liveProtosBySvc = new Map<string, Set<string>>();
+    const liveCanonicalName = new Map<string, string>();
+
+    for (const c of rawGeoConnections) {
+      if (c.is_server_node || c.is_lan) continue;
+      const svcName = String(c.service || t('hardware.net.geo.direct_traffic')).trim();
+      const key = svcName.toLowerCase();
+      liveCanonicalName.set(key, svcName);
+      liveHitsBySvc.set(key, (liveHitsBySvc.get(key) || 0) + 1);
+      if (c.remote_ip || c.ip) {
+        const set = liveIpsBySvc.get(key) ?? new Set<string>();
+        set.add(String(c.remote_ip || c.ip));
+        liveIpsBySvc.set(key, set);
+      }
+      if (c.local_hostname || c.local_ip) {
+        const set = liveDevsBySvc.get(key) ?? new Set<string>();
+        set.add(String(c.local_hostname || c.local_ip));
+        liveDevsBySvc.set(key, set);
+      }
+      if (c.protocol) {
+        const set = liveProtosBySvc.get(key) ?? new Set<string>();
+        set.add(String(c.protocol).toUpperCase());
+        liveProtosBySvc.set(key, set);
+      }
+    }
+
+    for (const [key, liveHits] of liveHitsBySvc.entries()) {
+      const existing = map.get(key);
+      const ipsCnt = liveIpsBySvc.get(key)?.size ?? 0;
+      const devsCnt = liveDevsBySvc.get(key)?.size ?? 0;
+      const protos = Array.from(liveProtosBySvc.get(key) ?? []);
+      if (existing) {
+        existing.hitCount = Math.max(existing.hitCount, liveHits);
+        existing.ipsCount = Math.max(existing.ipsCount, ipsCnt);
+        existing.devicesCount = Math.max(existing.devicesCount, devsCnt);
+        if (existing.protocols.length === 0 && protos.length > 0) existing.protocols = protos;
+      } else {
+        map.set(key, {
+          service: liveCanonicalName.get(key) || key,
+          hitCount: liveHits,
+          ipsCount: ipsCnt,
+          devicesCount: devsCnt,
+          protocols: protos,
+        });
+      }
+    }
+
+    let items = Array.from(map.values());
+    if (q) {
+      items = items.filter(
+        (item) =>
+          item.service.toLowerCase().includes(q) ||
+          item.protocols.some((p) => p.toLowerCase().includes(q))
+      );
+    }
+    items.sort((a, b) => b.hitCount - a.hitCount);
+    return items.slice(0, 10);
+  }, [netHistoryCatalog?.services_catalog, rawGeoConnections, trafficFilterQuery, t]);
+
+  const topCountries = useMemo(() => {
+    const q = trafficFilterQuery.trim().toLowerCase();
+    const map = new Map<
+      string,
+      { country: string; countryCode: string; hitCount: number; uniqueIps: number; citiesCount: number; flag: string }
+    >();
+
+    for (const c of netHistoryCatalog?.countries_catalog ?? []) {
+      const code = String(c.country_code || '').trim().toUpperCase();
+      const rawName = String(c.country || '').trim();
+      if (!rawName && !code) continue;
+      const key = (code || rawName).toLowerCase();
+      const localized = localizeCountryName(rawName, code, locale);
+      map.set(key, {
+        country: localized,
+        countryCode: code,
+        hitCount: Number(c.total_hits ?? c.connections_count ?? 0),
+        uniqueIps: Number(c.unique_ips || 0),
+        citiesCount: Number(c.cities_count || 0),
+        flag: countryCodeToFlag(code),
+      });
+    }
+
+    const liveHits = new Map<string, number>();
+    const liveIps = new Map<string, Set<string>>();
+    const liveCities = new Map<string, Set<string>>();
+    const liveMeta = new Map<string, { rawName: string; code: string }>();
+
+    for (const c of rawGeoConnections) {
+      if (c.is_server_node || c.is_lan) continue;
+      const code = String(c.country_code || '').trim().toUpperCase();
+      const rawName = String(c.country || '').trim();
+      if (!rawName && !code) continue;
+      const key = (code || rawName).toLowerCase();
+      liveMeta.set(key, { rawName: rawName || code, code });
+      liveHits.set(key, (liveHits.get(key) || 0) + 1);
+      if (c.remote_ip || c.ip) {
+        const s = liveIps.get(key) ?? new Set<string>();
+        s.add(String(c.remote_ip || c.ip));
+        liveIps.set(key, s);
+      }
+      if (c.city) {
+        const s = liveCities.get(key) ?? new Set<string>();
+        s.add(String(c.city));
+        liveCities.set(key, s);
+      }
+    }
+
+    for (const [key, hits] of liveHits.entries()) {
+      const meta = liveMeta.get(key);
+      const ipsCnt = liveIps.get(key)?.size ?? 0;
+      const citiesCnt = liveCities.get(key)?.size ?? 0;
+      const existing = map.get(key);
+      if (existing) {
+        existing.hitCount = Math.max(existing.hitCount, hits);
+        existing.uniqueIps = Math.max(existing.uniqueIps, ipsCnt);
+        existing.citiesCount = Math.max(existing.citiesCount, citiesCnt);
+      } else if (meta) {
+        map.set(key, {
+          country: localizeCountryName(meta.rawName, meta.code, locale),
+          countryCode: meta.code,
+          hitCount: hits,
+          uniqueIps: ipsCnt,
+          citiesCount: citiesCnt,
+          flag: countryCodeToFlag(meta.code),
+        });
+      }
+    }
+
+    let items = Array.from(map.values());
+    if (q) {
+      items = items.filter(
+        (item) => item.country.toLowerCase().includes(q) || item.countryCode.toLowerCase().includes(q)
+      );
+    }
+    items.sort((a, b) => b.hitCount - a.hitCount);
+    const totalHits = Math.max(1, items.reduce((acc, it) => acc + it.hitCount, 0));
+    return items.slice(0, 10).map((it) => ({
+      ...it,
+      sharePct: Math.round((it.hitCount / totalHits) * 1000) / 10,
+    }));
+  }, [netHistoryCatalog?.countries_catalog, rawGeoConnections, trafficFilterQuery, locale]);
+
+  const networkCuriosities = useMemo(() => {
+    // 1. Farthest GeoIP node & speed of light in silica fiber (~204,200 km/s)
+    const serverNode = metrics?.net?.connections_map?.server_node;
+    const serverLat = Number(serverNode?.lat);
+    const serverLng = Number(serverNode?.lng);
+    let farthestKm = 0;
+    let farthestTarget = '';
+
+    if (Number.isFinite(serverLat) && Number.isFinite(serverLng)) {
+      for (const c of rawGeoConnections) {
+        if (c.is_server_node || c.is_lan) continue;
+        const cLat = Number(c.lat);
+        const cLng = Number(c.lng);
+        if (!Number.isFinite(cLat) || !Number.isFinite(cLng)) continue;
+        const km = haversineKm(serverLat, serverLng, cLat, cLng);
+        if (km > farthestKm) {
+          farthestKm = km;
+          const localizedCountry = localizeCountryName(c.country || '', c.country_code, locale);
+          const place = [c.city, localizedCountry].filter(Boolean).join(', ');
+          farthestTarget = c.domain || c.service || place || c.remote_ip || c.ip || '';
+          if (place && (c.domain || c.service)) {
+            farthestTarget = `${c.domain || c.service} · ${place}`;
+          }
+        }
+      }
+    }
+    const farthestRoundedKm = Math.round(farthestKm);
+    const lightFiberRttMs = farthestRoundedKm > 0 ? ((farthestRoundedKm * 2) / 204.2).toFixed(1) : '0.0';
+
+    // 2. Integrated 24h traffic volume (WAN vs LAN) + HD 1080p stream mathematical equivalence
+    const { wanRxData, wanTxData, lanRxData, lanTxData, timestamps, epochTs } = network24hView;
+    const len = Math.max(wanRxData.length, wanTxData.length, lanRxData.length, lanTxData.length);
+    let totalWanBytes = 0;
+    let totalLanBytes = 0;
+    let totalRxWeight = 0;
+    let totalTxWeight = 0;
+    let peakMb = 0;
+    let peakTime = '--:--';
+
+    for (let i = 0; i < len; i++) {
+      const wr = Number(wanRxData[i] || 0);
+      const wt = Number(wanTxData[i] || 0);
+      const lr = Number(lanRxData[i] || 0);
+      const lt = Number(lanTxData[i] || 0);
+      const totMb = wr + wt + lr + lt;
+      if (totMb >= peakMb) {
+        peakMb = totMb;
+        peakTime = timestamps[i] || '--:--';
+      }
+      totalRxWeight += wr + lr;
+      totalTxWeight += wt + lt;
+
+      let dt = 300;
+      if (i > 0 && Number.isFinite(epochTs[i]) && Number.isFinite(epochTs[i - 1])) {
+        const diff = Number(epochTs[i]) - Number(epochTs[i - 1]);
+        if (diff > 0 && diff <= 1800) dt = diff;
+      } else if (len > 1 && i === 0 && Number.isFinite(epochTs[1]) && Number.isFinite(epochTs[0])) {
+        const diff = Number(epochTs[1]) - Number(epochTs[0]);
+        if (diff > 0 && diff <= 1800) dt = diff;
+      }
+      totalWanBytes += (wr + wt) * 1024 * 1024 * dt;
+      totalLanBytes += (lr + lt) * 1024 * 1024 * dt;
+    }
+
+    const combinedBytes = totalWanBytes + totalLanBytes;
+    const wanPct = combinedBytes > 0 ? Math.round((totalWanBytes / combinedBytes) * 100) : 0;
+    const lanPct = combinedBytes > 0 ? Math.max(0, 100 - wanPct) : 0;
+    const combinedGb = combinedBytes / (1024 * 1024 * 1024);
+    const hdHours = (combinedGb / 2.25).toFixed(1);
+    const dlUlRatio =
+      totalTxWeight > 0.001
+        ? (totalRxWeight / totalTxWeight).toFixed(1)
+        : totalRxWeight > 0
+          ? '∞'
+          : '1.0';
+
+    // 3. Global footprint & shield (countries, ISPs/ASNs, blocked DNS + Fail2ban)
+    const ispSet = new Set<string>();
+    const countrySet = new Set<string>();
+    for (const c of rawGeoConnections) {
+      if (c.is_server_node || c.is_lan) continue;
+      if (c.isp || c.org) ispSet.add(String(c.isp || c.org).trim());
+      if (c.country_code || c.country) countrySet.add(String(c.country_code || c.country).trim().toLowerCase());
+    }
+    const countriesCount = Math.max(countrySet.size, netHistoryCatalog?.summary?.total_countries ?? topCountries.length);
+    const blockedTotal =
+      Number(dnsTrafficStats?.summary?.blocked_queries_24h ?? metrics?.security?.pihole?.blocked_today ?? 0) +
+      Number(bannedDetails.length ?? 0);
+
+    return {
+      farthestKm: farthestRoundedKm,
+      lightFiberRttMs,
+      farthestTarget,
+      hasVolume: len >= 2 && combinedBytes > 0,
+      combinedBytes,
+      wanPct,
+      lanPct,
+      hdHours,
+      peakMb,
+      peakTime,
+      dlUlRatio,
+      countriesCount,
+      ispsCount: ispSet.size,
+      blockedTotal,
+    };
+  }, [
+    metrics?.net?.connections_map?.server_node,
+    metrics?.security?.pihole?.blocked_today,
+    rawGeoConnections,
+    locale,
+    network24hView,
+    netHistoryCatalog?.summary?.total_countries,
+    topCountries.length,
+    dnsTrafficStats?.summary?.blocked_queries_24h,
+    bannedDetails.length,
+  ]);
+
+  // Load Speedtest, Traffic Analytics, Telegram & DuckDNS on tab switch
   useEffect(() => {
     if (subTab === 'speedtest') {
       void loadSpeedtestData(true);
+    } else if (subTab === 'traffic') {
+      void loadTrafficAnalytics(true);
+      const id = window.setInterval(() => {
+        if (typeof document === 'undefined' || !document.hidden) {
+          void loadTrafficAnalytics(false);
+        }
+      }, 15000);
+      return () => window.clearInterval(id);
     } else if (subTab === 'security') {
       void apiFetchJson<TelegramBotStatusPayload>('/api/telegram_bot').then((r) => {
         if (r.ok && r.data) setTelegramData(r.data);
@@ -721,7 +1281,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         }
       });
     }
-  }, [subTab, loadSpeedtestData]);
+  }, [subTab, loadSpeedtestData, loadTrafficAnalytics]);
 
   // Poll speedtest status smoothly while test is active
   useEffect(() => {
@@ -950,7 +1510,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         <strong style="font-size:12.5px;">🔀 ${escapeMapHtml(placeName)}</strong>
         <span style="background:rgba(14,165,233,0.16);color:#0284c7;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:700;font-family:ui-monospace,monospace;">${count}</span>
       </div>
-      <div style="max-height:225px;overflow-y:auto;padding-right:2px;">${rowsHtml}</div>
+      <div data-cockpit-scroll-contain="true" style="max-height:225px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px;">${rowsHtml}</div>
     </div>`;
   };
   renderPopupHtmlForClusterRef.current = renderPopupHtmlForCluster;
@@ -1702,6 +2262,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
   const tabs: Array<{ id: RedSubTab; label: string; icon: React.ReactNode }> = [
     { id: 'home', label: t('network.subtabs.home'), icon: <Wifi className="h-4 w-4" /> },
+    { id: 'traffic', label: t('network.subtabs.traffic'), icon: <ArrowDownUp className="h-4 w-4" /> },
     { id: 'map', label: t('network.subtabs.map'), icon: <MapPin className="h-4 w-4" /> },
     { id: 'speedtest', label: t('network.subtabs.speedtest'), icon: <Gauge className="h-4 w-4" /> },
     { id: 'security', label: t('network.subtabs.security'), icon: <Shield className="h-4 w-4" /> },
@@ -1712,9 +2273,9 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const totalGeo = Math.max(1, serviceBreakdown.reduce((acc, s) => acc + s.count, 0));
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-[clamp(0.85rem,1.8dvh,1.25rem)]">
       <LayoutGroup id="net-subtabs">
-        <div className="cockpit-segmented flex items-center gap-1.5 overflow-x-auto p-1.5 no-scrollbar">
+        <div className="cockpit-segmented cockpit-subtabs-bar">
           {tabs.map((tab) => {
             const active = subTab === tab.id;
             return (
@@ -1723,14 +2284,14 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setSubTab(tab.id)}
-                className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                className={`cockpit-subtab-btn relative inline-flex items-center justify-center rounded-xl font-semibold transition-colors ${
                   active
                     ? 'text-sky-700 dark:text-sky-300'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 {active && <MorphPill layoutId="net-subtab-pill" className="rounded-xl" />}
-                <span className="relative z-10 inline-flex items-center gap-2">
+                <span className="relative z-10 inline-flex items-center gap-[clamp(0.3rem,0.5vw,0.5rem)]">
                   {tab.icon}
                   <span>{tab.label}</span>
                 </span>
@@ -1845,7 +2406,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 series={pingChartView.series}
                 timestamps={pingChartView.timestamps}
                 epochTs={pingChartView.epochTs}
-                height={152}
+                heightClassName="cockpit-chart-medium"
                 leftUnit="ms"
                 theme={theme}
                 emptyMessage={t('network.ping_accumulating')}
@@ -2055,7 +2616,532 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         </div>
       )}
 
-      {/* 2. Mapa de conexiones */}
+      {/* 2. Historial de tráfico, dominios, servicios, países y curiosidades */}
+      {subTab === 'traffic' && (
+        <div className="space-y-4">
+          {/* 24-Hour Network Traffic Evolution Section */}
+          <section
+            aria-labelledby="network-24h-history-title"
+            className="cockpit-bento p-5"
+          >
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="cockpit-pill-cyan inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+                    <ArrowDownUp className="h-4 w-4" />
+                  </span>
+                  <h2
+                    id="network-24h-history-title"
+                    className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-white sm:text-lg"
+                  >
+                    {t('overview.net_history_24h_title')}
+                  </h2>
+                </div>
+                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  <span>{t('overview.net_history_24h_sub')}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {t('overview.net_history_24h_badge')}
+                  </span>
+                  {network24hView.sampleCount > 0 && (
+                    <>
+                      <span aria-hidden="true"> · </span>
+                      <span className="font-mono tabular-nums">
+                        {t('overview.net_history_24h_samples', { count: network24hView.sampleCount })}
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
+                    <span>{t('hardware.net.wan_download')}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#10b981]" />
+                    <span>{t('hardware.net.wan_upload')}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#6366f1]" />
+                    <span>{t('hardware.net.lan_download')}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
+                    <span>{t('hardware.net.lan_upload')}</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    type="button"
+                    aria-label={t('network.refresh')}
+                    onClick={() => {
+                      onRefreshNetHistory24h?.();
+                      void loadTrafficAnalytics(true);
+                    }}
+                    className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${(netHistoryLoading || trafficLoading) ? 'animate-spin' : ''}`} />
+                  </motion.button>
+                  {onExpandChart && (
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      type="button"
+                      aria-label={t('hardware.net.expand_aria')}
+                      onClick={openNetwork24hExpanded}
+                      className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                    </motion.button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary KPI row separated by clean hairline divider */}
+            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200/70 pt-4 sm:grid-cols-4 dark:border-slate-800">
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {t('hardware.net.wan_download')} ({t('overview.net_history_24h_peak_wan')})
+                </p>
+                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-sky-700 dark:text-sky-300">
+                  ↓ {formatSpeed(network24hView.peakWanRxMb * 1024 * 1024)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {t('hardware.net.wan_upload')} ({t('overview.net_history_24h_peak_wan')})
+                </p>
+                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                  ↑ {formatSpeed(network24hView.peakWanTxMb * 1024 * 1024)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {t('hardware.net.lan_download')} ({t('overview.net_history_24h_peak_lan')})
+                </p>
+                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-indigo-700 dark:text-indigo-300">
+                  ↓ {formatSpeed(network24hView.peakLanRxMb * 1024 * 1024)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {t('hardware.net.lan_upload')} ({t('overview.net_history_24h_peak_lan')})
+                </p>
+                <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                  ↑ {formatSpeed(network24hView.peakLanTxMb * 1024 * 1024)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-800/80">
+              {netHistoryLoading && network24hView.sampleCount < 2 ? (
+                <div className="cockpit-chart-tall w-full animate-pulse rounded-xl bg-slate-100/80 dark:bg-slate-800/50" />
+              ) : netHistoryError && network24hView.sampleCount < 2 ? (
+                <div className="cockpit-chart-tall flex flex-col items-center justify-center gap-3 text-center">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {t('overview.net_history_24h_error')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onRefreshNetHistory24h?.()}
+                    className="cockpit-subtile min-h-[40px] px-4 py-2 text-xs font-semibold text-sky-700 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-sky-300 dark:hover:bg-slate-800 whitespace-nowrap"
+                  >
+                    {t('overview.net_history_24h_retry')}
+                  </button>
+                </div>
+              ) : (
+                <TelemetryChart
+                  series={network24hView.series}
+                  timestamps={network24hView.timestamps}
+                  dateTimestamps={network24hView.dateTimestamps}
+                  epochTs={network24hView.epochTs}
+                  heightClassName="cockpit-chart-tall"
+                  leftUnit="MB/s"
+                  intervalSec={300}
+                  theme={theme}
+                  emptyMessage={t('overview.net_history_24h_empty')}
+                  onExpandClick={onExpandChart ? openNetwork24hExpanded : undefined}
+                />
+              )}
+            </div>
+          </section>
+
+          {/* Search Bar & Analytics Intro */}
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              {t('network.traffic_analytics_sub')}
+            </p>
+            <div className="relative shrink-0 sm:w-72">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={trafficFilterQuery}
+                onChange={(e) => setTrafficFilterQuery(e.target.value)}
+                placeholder={t('network.traffic_search_placeholder')}
+                className="cockpit-subtile min-h-[40px] w-full pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
+              />
+            </div>
+          </div>
+
+          {/* Curiosidades de tu red (4 real-telemetry calculation tiles) */}
+          <section className="cockpit-bento p-5" data-testid="network-curiosities-section">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-200/70 dark:border-slate-800">
+              <span className="cockpit-pill-violet inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                  {t('network.curiosities_title')}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t('network.curiosities_sub')}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {/* Tile 1: Farthest node & speed of light in fiber */}
+              <div className="cockpit-subtile flex flex-col justify-between gap-2 p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    {t('network.curiosity_farthest_label')}
+                  </span>
+                  <Globe2 className="h-4 w-4 shrink-0 text-sky-500" />
+                </div>
+                <div className="font-mono text-lg font-bold tabular-nums text-slate-900 dark:text-white">
+                  {networkCuriosities.farthestKm > 0
+                    ? `${networkCuriosities.farthestKm.toLocaleString(locale === 'es' ? 'es-ES' : locale)} km`
+                    : '--'}
+                </div>
+                <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-300">
+                  {networkCuriosities.farthestKm > 0
+                    ? t('network.curiosity_farthest_detail', {
+                        km: networkCuriosities.farthestKm.toLocaleString(locale === 'es' ? 'es-ES' : locale),
+                        light_ms: networkCuriosities.lightFiberRttMs,
+                      })
+                    : t('network.curiosity_farthest_empty')}
+                </p>
+                {networkCuriosities.farthestTarget && (
+                  <p className="truncate font-mono text-[10.5px] text-sky-600 dark:text-sky-400">
+                    {networkCuriosities.farthestTarget}
+                  </p>
+                )}
+              </div>
+
+              {/* Tile 2: 24h integrated volume & WAN/LAN split + HD eq */}
+              <div className="cockpit-subtile flex flex-col justify-between gap-2 p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    {t('network.curiosity_volume_label')}
+                  </span>
+                  <ArrowDownUp className="h-4 w-4 shrink-0 text-emerald-500" />
+                </div>
+                <div className="font-mono text-lg font-bold tabular-nums text-slate-900 dark:text-white">
+                  {networkCuriosities.hasVolume ? formatBytes(networkCuriosities.combinedBytes) : '--'}
+                </div>
+                <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-300">
+                  {networkCuriosities.hasVolume
+                    ? t('network.curiosity_volume_detail', {
+                        wan_pct: networkCuriosities.wanPct,
+                        lan_pct: networkCuriosities.lanPct,
+                        hd_hours: networkCuriosities.hdHours,
+                      })
+                    : t('network.curiosity_volume_empty')}
+                </p>
+              </div>
+
+              {/* Tile 3: Peak burst & DL/UL balance */}
+              <div className="cockpit-subtile flex flex-col justify-between gap-2 p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    {t('network.curiosity_peak_label')}
+                  </span>
+                  <Zap className="h-4 w-4 shrink-0 text-amber-500" />
+                </div>
+                <div className="font-mono text-lg font-bold tabular-nums text-slate-900 dark:text-white">
+                  {networkCuriosities.peakMb > 0 ? formatSpeed(networkCuriosities.peakMb * 1024 * 1024) : '--'}
+                </div>
+                <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-300">
+                  {t('network.curiosity_peak_detail', {
+                    time: networkCuriosities.peakTime,
+                    ratio: networkCuriosities.dlUlRatio,
+                  })}
+                </p>
+              </div>
+
+              {/* Tile 4: Global footprint & shield */}
+              <div className="cockpit-subtile flex flex-col justify-between gap-2 p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    {t('network.curiosity_footprint_label')}
+                  </span>
+                  <Shield className="h-4 w-4 shrink-0 text-indigo-500" />
+                </div>
+                <div className="font-mono text-lg font-bold tabular-nums text-slate-900 dark:text-white">
+                  {networkCuriosities.countriesCount} · {networkCuriosities.ispsCount} ISP
+                </div>
+                <p className="text-[11px] leading-snug text-slate-600 dark:text-slate-300">
+                  {t('network.curiosity_footprint_detail', {
+                    countries: networkCuriosities.countriesCount,
+                    isps: networkCuriosities.ispsCount,
+                    blocked: networkCuriosities.blockedTotal.toLocaleString(locale === 'es' ? 'es-ES' : locale),
+                  })}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Symmetric 3-Widget Bento Grid: Top Domains + Top Services + Top Countries */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            {/* Widget 1: Dominios más utilizados */}
+            <section className="cockpit-bento flex flex-col p-5" data-testid="traffic-top-domains">
+              <div className="flex flex-wrap items-start justify-between gap-2 pb-3 border-b border-slate-200/70 dark:border-slate-800">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="cockpit-pill-cyan inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                    <Globe className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white truncate">
+                      {t('network.traffic_top_domains_title')}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      {(dnsTrafficStats?.top_domains?.length ?? 0) > 0
+                        ? t('network.traffic_top_domains_sub_pihole')
+                        : t('network.traffic_top_domains_sub_live')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="cockpit-subtile flex items-center gap-1 p-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setDomainsMode('all')}
+                    className={`min-h-[30px] rounded-lg px-2.5 text-[11px] font-semibold transition-colors ${
+                      domainsMode === 'all'
+                        ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                  >
+                    {t('network.traffic_domains_filter_all')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDomainsMode('blocked')}
+                    className={`min-h-[30px] rounded-lg px-2.5 text-[11px] font-semibold transition-colors ${
+                      domainsMode === 'blocked'
+                        ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                  >
+                    {t('network.traffic_domains_filter_blocked')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 flex-1 space-y-2.5">
+                {topDomains.length === 0 ? (
+                  <p className="py-10 text-center text-xs text-slate-500 dark:text-slate-400">
+                    {t('network.traffic_domains_empty')}
+                  </p>
+                ) : (
+                  topDomains.map((d, idx) => {
+                    const maxVal = Math.max(
+                      1,
+                      domainsMode === 'blocked' ? topDomains[0].blockedCount : topDomains[0].count
+                    );
+                    const val = domainsMode === 'blocked' ? d.blockedCount : d.count;
+                    const barW = Math.min(100, Math.max(6, Math.round((val / maxVal) * 100)));
+                    return (
+                      <div key={d.domain} className="cockpit-subtile space-y-1.5 px-3 py-2.5 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="font-mono text-[10px] font-semibold text-slate-400 tabular-nums">
+                              #{idx + 1}
+                            </span>
+                            <span className="truncate font-mono font-semibold text-slate-900 dark:text-white" title={d.domain}>
+                              {d.domain}
+                            </span>
+                          </div>
+                          <span className="shrink-0 font-mono text-[11px] font-bold tabular-nums text-sky-700 dark:text-sky-300">
+                            {d.isPiholeSource
+                              ? t('network.traffic_domain_queries', {
+                                  count: d.count.toLocaleString(locale === 'es' ? 'es-ES' : locale),
+                                })
+                              : t('network.traffic_domain_hits', {
+                                  count: d.count.toLocaleString(locale === 'es' ? 'es-ES' : locale),
+                                })}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[10.5px] text-slate-500 dark:text-slate-400">
+                          <span className="truncate">
+                            {[
+                              d.service,
+                              d.country,
+                              d.avgReplyMs !== null ? t('network.traffic_latency_unit', { ms: d.avgReplyMs }) : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || 'DNS / TLS'}
+                          </span>
+                          {d.blockedCount > 0 && (
+                            <span className="font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                              {t('network.traffic_domain_blocked_pct', { pct: d.pctBlocked })}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800">
+                          <div
+                            className={`h-full rounded-full transition-[width] duration-300 ${
+                              domainsMode === 'blocked'
+                                ? 'bg-gradient-to-r from-rose-500 to-amber-500'
+                                : 'bg-gradient-to-r from-sky-500 to-cyan-400'
+                            }`}
+                            style={{ width: `${barW}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+
+            {/* Widget 2: Servicios más usados */}
+            <section className="cockpit-bento flex flex-col p-5" data-testid="traffic-top-services">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-200/70 dark:border-slate-800">
+                <span className="cockpit-pill-emerald inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                  <Server className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white truncate">
+                    {t('network.traffic_top_services_title')}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    {t('network.traffic_top_services_sub')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex-1 space-y-2.5">
+                {topServices.length === 0 ? (
+                  <p className="py-10 text-center text-xs text-slate-500 dark:text-slate-400">
+                    {t('network.traffic_services_empty')}
+                  </p>
+                ) : (
+                  topServices.map((s, idx) => {
+                    const maxHits = Math.max(1, topServices[0].hitCount);
+                    const barW = Math.min(100, Math.max(6, Math.round((s.hitCount / maxHits) * 100)));
+                    return (
+                      <div key={s.service} className="cockpit-subtile space-y-1.5 px-3 py-2.5 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="font-mono text-[10px] font-semibold text-slate-400 tabular-nums">
+                              #{idx + 1}
+                            </span>
+                            <span className="truncate font-semibold text-slate-900 dark:text-white" title={s.service}>
+                              {s.service}
+                            </span>
+                          </div>
+                          <span className="shrink-0 font-mono text-[11px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                            {t('network.traffic_domain_hits', {
+                              count: s.hitCount.toLocaleString(locale === 'es' ? 'es-ES' : locale),
+                            })}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[10.5px] text-slate-500 dark:text-slate-400">
+                          <span className="font-mono tabular-nums">
+                            {t('network.traffic_service_meta', { ips: s.ipsCount, devices: s.devicesCount })}
+                          </span>
+                          {s.protocols.length > 0 && (
+                            <span className="font-mono text-[10px] font-semibold uppercase text-slate-600 dark:text-slate-300">
+                              {s.protocols.slice(0, 3).join(' · ')}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-[width] duration-300"
+                            style={{ width: `${barW}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+
+            {/* Widget 3: Países con más conexiones */}
+            <section className="cockpit-bento flex flex-col p-5" data-testid="traffic-top-countries">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-200/70 dark:border-slate-800">
+                <span className="cockpit-pill-amber inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                  <Globe2 className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white truncate">
+                    {t('network.traffic_top_countries_title')}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    {t('network.traffic_top_countries_sub')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex-1 space-y-2.5">
+                {topCountries.length === 0 ? (
+                  <p className="py-10 text-center text-xs text-slate-500 dark:text-slate-400">
+                    {t('network.traffic_countries_empty')}
+                  </p>
+                ) : (
+                  topCountries.map((c, idx) => {
+                    const maxHits = Math.max(1, topCountries[0].hitCount);
+                    const barW = Math.min(100, Math.max(6, Math.round((c.hitCount / maxHits) * 100)));
+                    return (
+                      <div key={`${c.countryCode || c.country}-${idx}`} className="cockpit-subtile space-y-1.5 px-3 py-2.5 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="text-base leading-none shrink-0" aria-hidden="true">
+                              {c.flag}
+                            </span>
+                            <span className="truncate font-semibold text-slate-900 dark:text-white" title={c.country}>
+                              {c.country}
+                            </span>
+                          </div>
+                          <span className="shrink-0 font-mono text-[11px] font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                            {c.hitCount.toLocaleString(locale === 'es' ? 'es-ES' : locale)} ({c.sharePct}%)
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 text-[10.5px] text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+                          <span>{t('network.traffic_country_meta', { ips: c.uniqueIps, cities: c.citiesCount })}</span>
+                          {c.countryCode && <span>{c.countryCode}</span>}
+                        </div>
+
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-indigo-500 transition-[width] duration-300"
+                            style={{ width: `${barW}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Mapa de conexiones */}
       {subTab === 'map' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
@@ -2153,7 +3239,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   </div>
                 </div>
               </div>
-              <div ref={setMapContainerEl} className="relative h-[360px] lg:h-[440px] xl:h-[480px] w-full bg-slate-100 dark:bg-slate-900" />
+              <div ref={setMapContainerEl} className="cockpit-map-box relative w-full bg-slate-100 dark:bg-slate-900" />
             </div>
 
             {/* Service Breakdown Donut with interactive tooltip */}
@@ -2169,7 +3255,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 {serviceBreakdown.length === 0 ? (
                   <p className="py-12 text-xs text-slate-500 dark:text-slate-400">{t('network.no_external_conns')}</p>
                 ) : (
-                  <svg viewBox="0 0 160 160" className="h-44 w-44">
+                  <svg viewBox="0 0 160 160" className="h-[clamp(8.5rem,18vw,11.5rem)] w-[clamp(8.5rem,18vw,11.5rem)]">
                     {(() => {
                       let cumAngle = -Math.PI / 2;
                       return serviceBreakdown.map((seg) => {
@@ -2803,7 +3889,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             {duckLogs.length > 0 && (
               <div
                 data-cockpit-scroll-contain="true"
-                className="cockpit-subtile mt-4 max-h-36 overflow-y-auto overscroll-contain p-3 font-mono text-[11px] text-slate-600 dark:text-slate-300"
+                className="cockpit-subtile cockpit-scroll-panel mt-4 overflow-y-auto overscroll-contain p-3 font-mono text-[11px] text-slate-600 dark:text-slate-300"
               >
                 {duckLogs.slice(-6).map((l, idx) => (
                   <div key={idx}>{l}</div>
@@ -2893,7 +3979,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               />
               <div
                 data-cockpit-scroll-contain="true"
-                className="mt-3 grid max-h-60 grid-cols-3 gap-2 overflow-y-auto overscroll-contain"
+                className="cockpit-scroll-panel mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 overflow-y-auto overscroll-contain"
               >
                 {logoResults.map((res, idx) => (
                   <button
