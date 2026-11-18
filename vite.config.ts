@@ -29,7 +29,37 @@ interface AiConnInsightRecord {
 
 const aiNetInsightsCache = new Map<string, { insight: AiConnInsightRecord; cachedAt: number }>();
 const AI_NET_CACHE_TTL_MS = 30 * 60 * 1000;
+const aiInsightsDevPath = path.resolve(ROOT_DIR, 'ai_insights_dev.json');
 let cachedHostSocketsSummary: { ts: number; services: string[] } = { ts: 0, services: [] };
+
+try {
+  if (fs.existsSync(aiInsightsDevPath)) {
+    const rawAi = JSON.parse(fs.readFileSync(aiInsightsDevPath, 'utf-8'));
+    if (rawAi && typeof rawAi === 'object') {
+      for (const [k, v] of Object.entries(rawAi)) {
+        if (v && typeof v === 'object' && 'insight' in v && 'cachedAt' in v) {
+          aiNetInsightsCache.set(k, v as { insight: AiConnInsightRecord; cachedAt: number });
+        }
+      }
+    }
+  }
+} catch {
+  // Ignore corrupt dev insights cache
+}
+
+function saveAiInsightsDev() {
+  try {
+    const obj: Record<string, { insight: AiConnInsightRecord; cachedAt: number }> = {};
+    for (const [k, v] of aiNetInsightsCache.entries()) {
+      obj[k] = v;
+    }
+    const tmp = `${aiInsightsDevPath}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(obj), 'utf-8');
+    fs.renameSync(tmp, aiInsightsDevPath);
+  } catch {
+    // Ignore dev cache write errors
+  }
+}
 
 function readDotEnvKey(keyName: string): string {
   for (const fname of ['.env.local', '.env']) {
@@ -5159,6 +5189,7 @@ function realOsTelemetryMiddleware(): Plugin {
                   .slice(0, aiNetInsightsCache.size - 1000);
                 for (const [k] of oldest) aiNetInsightsCache.delete(k);
               }
+              saveAiInsightsDev();
 
               sendAiJson({ ok: true, model: AI_NET_MODEL, insights: resultInsights }, 200);
             } catch (err) {
@@ -5451,6 +5482,16 @@ function realOsTelemetryMiddleware(): Plugin {
             last_seen: d.last_seen,
           }));
 
+          const langFilter = (reqUrlObj.searchParams.get('lang') || '').trim().toLowerCase().slice(0, 8);
+          const historyAiInsights: Record<string, AiConnInsightRecord> = {};
+          for (const [cacheKey, entry] of aiNetInsightsCache.entries()) {
+            const sepIdx = cacheKey.indexOf('::');
+            const entryLang = sepIdx > 0 ? cacheKey.slice(0, sepIdx) : '';
+            const sig = sepIdx > 0 ? cacheKey.slice(sepIdx + 2) : cacheKey;
+            if (langFilter && entryLang && entryLang !== langFilter) continue;
+            if (!historyAiInsights[sig]) historyAiInsights[sig] = entry.insight;
+          }
+
           const historyPayload = {
             status: 'ok',
             services_catalog: servicesCatalog,
@@ -5467,6 +5508,7 @@ function realOsTelemetryMiddleware(): Plugin {
                 is_history: true,
                 state: `HISTORIAL (${Math.max(1, Number(item.hit_count || 1))}x)`,
               })),
+            ai_insights: historyAiInsights,
             summary: {
               total_records: timeScopedItems.length,
               total_services: servicesCatalog.length,

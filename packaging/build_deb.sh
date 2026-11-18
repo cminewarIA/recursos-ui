@@ -118,7 +118,7 @@ cp "$PROJECT_ROOT/desktop_app/assets/recursos-cockpit.svg" "$PKG_DIR/usr/share/i
 chmod 644 "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/recursos-cockpit.svg"
 
 # Garantizar que el paquete .deb nunca incluya archivos de base de datos ni caches locales que sobrescriban datos al actualizar
-find "$PKG_DIR" -type f \( -name "*.db" -o -name "*.db-wal" -o -name "*.db-shm" -o -name "telemetry_history_dev.json" -o -name "nic_history_2h.json" \) -delete
+find "$PKG_DIR" -type f \( -name "*.db" -o -name "*.db-wal" -o -name "*.db-shm" -o -name "*_dev.json" -o -name "nic_history_2h.json" -o -name "*.vault" \) -delete
 
 # Calcular Installed-Size exacto para compatibilidad con Snap Store / App Center / PackageKit
 INSTALLED_SIZE=$(du -sk "$PKG_DIR" | awk '{print $1}')

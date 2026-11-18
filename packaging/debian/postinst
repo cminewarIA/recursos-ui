@@ -70,7 +70,7 @@ if db_exists:
         ro_conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5.0)
         tables = {r[0] for r in ro_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         ro_conn.close()
-        if {"geoip_locations", "connection_history", "telemetry_history"}.issubset(tables):
+        if {"geoip_locations", "connection_history", "telemetry_history", "ping_history", "process_history", "ai_connection_insights", "speedtest_history"}.issubset(tables):
             sys.exit(0)
     except Exception:
         pass
@@ -103,11 +103,54 @@ conn.execute("""
     CREATE TABLE IF NOT EXISTS telemetry_history (
         ts REAL PRIMARY KEY, time_str TEXT NOT NULL,
         cpu REAL DEFAULT 0, gpu REAL DEFAULT 0, ram REAL DEFAULT 0, ram_total REAL DEFAULT 0,
-        net_rx REAL DEFAULT 0, net_tx REAL DEFAULT 0, disk_r REAL DEFAULT 0,
-        disk_w REAL DEFAULT 0, disk_pct REAL DEFAULT 0
+        net_rx REAL DEFAULT 0, net_tx REAL DEFAULT 0,
+        net_wan_rx REAL DEFAULT 0, net_wan_tx REAL DEFAULT 0,
+        net_lan_rx REAL DEFAULT 0, net_lan_tx REAL DEFAULT 0,
+        disk_r REAL DEFAULT 0, disk_w REAL DEFAULT 0, disk_pct REAL DEFAULT 0
     )
 """)
 conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_history_ts ON telemetry_history(ts DESC);")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS ping_history (
+        ts REAL NOT NULL, target_id TEXT NOT NULL, target_ip TEXT NOT NULL,
+        label TEXT DEFAULT '', kind TEXT DEFAULT 'external',
+        rtt_ms REAL DEFAULT -1, loss_pct REAL DEFAULT 0,
+        PRIMARY KEY (ts, target_id)
+    )
+""")
+conn.execute("CREATE INDEX IF NOT EXISTS idx_ping_history_ts ON ping_history(ts DESC);")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS process_history (
+        ts REAL NOT NULL, proc_name TEXT NOT NULL,
+        cpu_pct REAL DEFAULT 0, ram_mb REAL DEFAULT 0,
+        vram_mb REAL DEFAULT 0, io_bps REAL DEFAULT 0,
+        PRIMARY KEY (ts, proc_name)
+    )
+""")
+conn.execute("CREATE INDEX IF NOT EXISTS idx_process_history_ts ON process_history(ts DESC);")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS ai_connection_insights (
+        lang TEXT NOT NULL, signature TEXT NOT NULL,
+        app_name TEXT NOT NULL, category TEXT DEFAULT '',
+        role TEXT DEFAULT '', summary TEXT DEFAULT '',
+        confidence TEXT DEFAULT 'medium', model TEXT DEFAULT '',
+        analyzed_at REAL NOT NULL,
+        PRIMARY KEY (lang, signature)
+    )
+""")
+conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_conn_analyzed_at ON ai_connection_insights(analyzed_at DESC);")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS speedtest_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts REAL NOT NULL, created_at TEXT NOT NULL,
+        download_mbps REAL NOT NULL, upload_mbps REAL NOT NULL,
+        ping_ms REAL DEFAULT 0, jitter_ms REAL DEFAULT 0, packet_loss_pct REAL DEFAULT 0,
+        server_name TEXT DEFAULT '', server_host TEXT DEFAULT '',
+        server_location TEXT DEFAULT '', client_ip TEXT DEFAULT '',
+        isp TEXT DEFAULT '', duration_ms INTEGER DEFAULT 0, scope TEXT DEFAULT 'wan'
+    )
+""")
+conn.execute("CREATE INDEX IF NOT EXISTS idx_speedtest_history_ts ON speedtest_history(ts DESC);")
 conn.commit()
 conn.close()
 

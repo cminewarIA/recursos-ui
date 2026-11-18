@@ -705,6 +705,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       if (showSpinner) setMapHistoryLoading(true);
       const params = new URLSearchParams();
       params.set('limit', '300');
+      params.set('lang', locale);
       if (mapHistoryHours !== 'all') params.set('hours', mapHistoryHours);
       if (mapServiceFilter !== 'all') params.set('service', mapServiceFilter);
       if (mapDeviceFilter !== 'all') params.set('device', mapDeviceFilter);
@@ -714,10 +715,13 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       const res = await apiFetchJson<NetHistoryResponse>(`/api/net/history?${params.toString()}`);
       if (res.ok && res.data) {
         setMapHistoryData(res.data);
+        if (res.data.ai_insights && Object.keys(res.data.ai_insights).length > 0) {
+          setAiInsights((prev) => ({ ...res.data!.ai_insights!, ...prev }));
+        }
       }
       if (showSpinner) setMapHistoryLoading(false);
     },
-    [mapHistoryHours, mapServiceFilter, mapDeviceFilter, mapFilter, mapSearchQuery]
+    [locale, mapHistoryHours, mapServiceFilter, mapDeviceFilter, mapFilter, mapSearchQuery]
   );
 
   useEffect(() => {
@@ -996,13 +1000,18 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const loadTrafficAnalytics = useCallback(async (showSpinner = false) => {
     if (showSpinner) setTrafficLoading(true);
     const [histRes, dnsRes] = await Promise.all([
-      apiFetchJson<NetHistoryResponse>('/api/net/history?limit=400'),
+      apiFetchJson<NetHistoryResponse>(`/api/net/history?limit=400&lang=${encodeURIComponent(locale)}`),
       apiFetchJson<DnsTrafficStatsResponse>('/api/dns/traffic?limit=80'),
     ]);
-    if (histRes.ok && histRes.data) setNetHistoryCatalog(histRes.data);
+    if (histRes.ok && histRes.data) {
+      setNetHistoryCatalog(histRes.data);
+      if (histRes.data.ai_insights && Object.keys(histRes.data.ai_insights).length > 0) {
+        setAiInsights((prev) => ({ ...histRes.data!.ai_insights!, ...prev }));
+      }
+    }
     if (dnsRes.ok && dnsRes.data) setDnsTrafficStats(dnsRes.data);
     if (showSpinner) setTrafficLoading(false);
-  }, []);
+  }, [locale]);
 
   const network24hView = useMemo(() => {
     const dbSeries = netHistory24h?.series;

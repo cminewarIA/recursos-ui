@@ -15,7 +15,12 @@ env/
 venv/
 .venv/
 
-# Datos y sesiones locales sensibles
+# Datos, bases de datos locales y sesiones sensibles (nunca en GitHub)
+*.db
+*.db-wal
+*.db-shm
+*.vault
+*_dev.json
 trusted_devices.json
 geoip_cache.json
 geoip_history.db*

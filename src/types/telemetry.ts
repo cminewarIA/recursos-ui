@@ -500,6 +500,7 @@ export interface NetHistoryResponse {
   domains_catalog?: NetHistoryDomainCatalogItem[];
   devices_catalog?: NetHistoryDeviceCatalogItem[];
   connections?: GeoConnectionItem[];
+  ai_insights?: Record<string, AiConnectionInsight>;
 }
 
 export interface DnsTopDomainItem {

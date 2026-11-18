@@ -4653,14 +4653,15 @@ def record_connections_to_sqlite(connections_list):
                 except Exception:
                     pass
 
-def query_connection_history_from_sqlite(service_filter=None, device_filter=None, direction_filter=None, search_query=None, hours_filter=None, limit=300):
-    """Consulta el historial de conexiones geolocalizadas y el catálogo agrupado por servicios, países y dominios desde SQLite."""
+def query_connection_history_from_sqlite(service_filter=None, device_filter=None, direction_filter=None, search_query=None, hours_filter=None, limit=300, lang=None):
+    """Consulta el historial de conexiones geolocalizadas, traducciones IA y catálogos desde recursos_history.db."""
     init_geoip_history_db()
     services_catalog = []
     countries_catalog = []
     domains_catalog = []
     devices_catalog = []
     connections = []
+    ai_insights = {}
     summary = {
         "total_records": 0,
         "total_services": 0,
@@ -4916,6 +4917,41 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
                     "is_history": True,
                     "geo_status": "cached"
                 })
+            lang_clean = str(lang or "").strip().lower()[:8]
+            if lang_clean:
+                cur.execute(
+                    """
+                    SELECT signature, app_name, category, role, summary, confidence, model, analyzed_at
+                    FROM ai_connection_insights
+                    WHERE lang = ?
+                    ORDER BY analyzed_at DESC
+                    LIMIT 500
+                    """,
+                    (lang_clean,)
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT signature, app_name, category, role, summary, confidence, model, analyzed_at
+                    FROM ai_connection_insights
+                    ORDER BY analyzed_at DESC
+                    LIMIT 500
+                    """
+                )
+            for ar in cur.fetchall():
+                sig_k = str(ar["signature"] or "").strip()
+                if not sig_k or sig_k in ai_insights:
+                    continue
+                ai_insights[sig_k] = {
+                    "signature": sig_k,
+                    "app_name": str(ar["app_name"] or ""),
+                    "category": str(ar["category"] or ""),
+                    "role": str(ar["role"] or ""),
+                    "summary": str(ar["summary"] or ""),
+                    "confidence": str(ar["confidence"] or "medium"),
+                    "model": str(ar["model"] or ""),
+                    "analyzed_at": float(ar["analyzed_at"] or 0),
+                }
         except Exception as e:
             print(f"[-] Error consultando historial SQLite: {e}")
         finally:
@@ -4932,7 +4968,8 @@ def query_connection_history_from_sqlite(service_filter=None, device_filter=None
         "countries_catalog": countries_catalog,
         "domains_catalog": domains_catalog,
         "devices_catalog": devices_catalog,
-        "connections": connections
+        "connections": connections,
+        "ai_insights": ai_insights,
     }
 
 def clear_connection_history_sqlite():
@@ -7158,7 +7195,7 @@ def _download_and_apply_github_tarball(out_lines):
                     for fname in files:
                         rel_file = fname if rel_dir == "." else os.path.join(rel_dir, fname)
                         norm_rel = rel_file.replace("\\", "/")
-                        if norm_rel in preserve_exact or norm_rel.endswith((".db", ".db-wal", ".db-shm", ".vault")):
+                        if norm_rel in preserve_exact or norm_rel.endswith((".db", ".db-wal", ".db-shm", ".vault", "_dev.json")):
                             continue
                         src_f = os.path.join(root_dir, fname)
                         dst_f = os.path.join(dest_dir, fname)
@@ -14679,6 +14716,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             dir_f = None
             q_f = None
             hours_f = None
+            lang_f = None
             lim_f = 300
             if "?" in self.path:
                 try:
@@ -14689,6 +14727,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     dir_f = q_params.get("direction", [None])[0]
                     q_f = q_params.get("q", [None])[0]
                     hours_f = q_params.get("hours", [None])[0]
+                    lang_f = q_params.get("lang", [None])[0]
                     if "limit" in q_params:
                         lim_f = int(q_params["limit"][0])
                 except Exception:
@@ -14699,7 +14738,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 direction_filter=dir_f,
                 search_query=q_f,
                 hours_filter=hours_f,
-                limit=lim_f
+                limit=lim_f,
+                lang=lang_f
             )
             resp = json.dumps(hist_payload).encode('utf-8')
             self.send_response(200)
