@@ -16,6 +16,7 @@ import {
   PowerOff,
   Router,
   Server,
+  Sparkles,
   Usb,
   Wifi,
 } from 'lucide-react';
@@ -23,12 +24,15 @@ import { AccordionBody, AnimatedMetricValue, COCKPIT_EASE, COCKPIT_SPRING } from
 import { NetworkDevicesModal, NetworkInspectTab } from './NetworkDevicesModal';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import {
+  AiSimplifyFaultsResponse,
+  AiSystemFaultInsight,
   DiskInfo,
   MainTabId,
   MetricsPayload,
   ThemeMode,
   WifiClient,
 } from '../types/telemetry';
+import { apiFetchJson } from '../utils/api';
 import {
   formatBytes,
   formatMbRate,
@@ -230,11 +234,10 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
     return (
       <motion.article
         layout
-        initial={{ opacity: 0, y: 16, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -12, scale: 0.94 }}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -12 }}
         transition={{ duration: 0.36, ease: COCKPIT_EASE }}
-        whileHover={{ y: -2, transition: { duration: 0.2 } }}
         className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
       >
         <div>
@@ -294,7 +297,6 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
             </div>
 
             <motion.button
-              whileTap={{ scale: 0.92 }}
               type="button"
               aria-label={t('hardware.storage.expand_aria', { name: widgetTitle })}
               onClick={() => onExpandChart(expandSpec)}
@@ -342,6 +344,28 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const { t, locale } = useI18n();
   const [showErrorsDetail, setShowErrorsDetail] = useState(false);
   const [devicesModalMode, setDevicesModalMode] = useState<NetworkInspectTab | null>(null);
+  const [simplifyingOverviewFaults, setSimplifyingOverviewFaults] = useState(false);
+  const [localFaultHistory, setLocalFaultHistory] = useState<AiSystemFaultInsight[]>([]);
+
+  const handleOverviewSimplifyFaults = async () => {
+    setSimplifyingOverviewFaults(true);
+    const res = await apiFetchJson<AiSimplifyFaultsResponse>('/api/system/logs/ai-simplify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        failed_units: metrics?.system_errors_summary?.failed_units ?? [],
+        locale,
+      }),
+    });
+    setSimplifyingOverviewFaults(false);
+    if (res.ok && res.data?.status === 'ok') {
+      if (Array.isArray(res.data.ai_fault_history)) {
+        setLocalFaultHistory(res.data.ai_fault_history);
+      } else if (res.data.ai_fault_insights) {
+        setLocalFaultHistory(Object.values(res.data.ai_fault_insights));
+      }
+    }
+  };
 
   const cpuPct = Number(metrics?.cpu?.usage_percent ?? 0);
   const cpuTemp = metrics?.cpu?.temp_c ?? null;
@@ -731,12 +755,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const totalErrors = Number(metrics?.system_errors_summary?.total_errors ?? metrics?.system_errors_summary?.total ?? 0);
   const overallBusy = cpuPct >= 88 || ramPct >= 90 || storageSummary.percent >= 92;
 
+  const activeFaultInsights = useMemo(() => {
+    if (localFaultHistory.length > 0) return localFaultHistory;
+    if (Array.isArray(metrics?.system_errors_summary?.ai_fault_history) && metrics.system_errors_summary.ai_fault_history.length > 0) {
+      return metrics.system_errors_summary.ai_fault_history;
+    }
+    if (metrics?.system_errors_summary?.ai_fault_insights) {
+      return Object.values(metrics.system_errors_summary.ai_fault_insights);
+    }
+    return [];
+  }, [localFaultHistory, metrics?.system_errors_summary?.ai_fault_history, metrics?.system_errors_summary?.ai_fault_insights]);
+
   return (
     <div className="space-y-[clamp(0.85rem,2dvh,1.5rem)]">
       {/* Hero Telemetry Summary Banner (matching docs/assets/hero-banner.svg) */}
       <motion.section
-        initial={{ opacity: 0, y: 14, scaleX: 0.98, scaleY: 1.02 }}
-        animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={COCKPIT_SPRING}
         className="cockpit-hero p-[clamp(0.85rem,1.8vw,1.5rem)]"
       >
@@ -759,7 +794,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 {t('overview.uptime_badge', { uptime: metrics?.system?.uptime_str || '--' })}
               </span>
               <motion.button
-                whileTap={{ scale: 0.97 }}
                 type="button"
                 data-testid="banner-devices-btn"
                 title={t('overview.devices_inspect_hint')}
@@ -771,7 +805,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <ChevronRight className="h-3 w-3 opacity-60 shrink-0" />
               </motion.button>
               <motion.button
-                whileTap={{ scale: 0.97 }}
                 type="button"
                 data-testid="banner-speed-btn"
                 title={t('overview.internet_rate_inspect_hint')}
@@ -797,7 +830,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             {totalErrors > 0 ? (
               <motion.button
-                whileTap={{ scale: 0.96 }}
                 type="button"
                 onClick={() => setShowErrorsDetail((v) => !v)}
                 className="cockpit-pill-amber inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-opacity hover:opacity-90"
@@ -810,8 +842,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </motion.button>
             ) : (
               <motion.button
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.96 }}
                 type="button"
                 onClick={() => onNavigate('equipo')}
                 className="cockpit-btn-accent inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap"
@@ -824,17 +854,71 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
 
         <AccordionBody open={showErrorsDetail}>
-          <div className="mt-4 border-t border-slate-200/70 pt-4 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+          <div className="mt-4 border-t border-slate-200/70 pt-4 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>{t('overview.errors_banner', { count: totalErrors })}</span>
-              <button
-                type="button"
-                onClick={() => onNavigate('mas', 'logs')}
-                className="font-semibold text-sky-600 hover:underline dark:text-sky-400"
-              >
-                {t('overview.open_full_log')}
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="overview-ai-simplify-faults-btn"
+                  disabled={simplifyingOverviewFaults}
+                  onClick={() => void handleOverviewSimplifyFaults()}
+                  className="cockpit-pill-violet inline-flex min-h-[34px] items-center gap-1.5 rounded-xl px-3 py-1 text-[11px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  <Sparkles className={`h-3.5 w-3.5 ${simplifyingOverviewFaults ? 'animate-spin' : ''}`} />
+                  <span>
+                    {simplifyingOverviewFaults ? t('more.ai_fault_simplifying') : t('more.ai_fault_simplify_btn')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('mas', 'logs')}
+                  className="font-semibold text-sky-600 hover:underline dark:text-sky-400"
+                >
+                  {t('overview.open_full_log')}
+                </button>
+              </div>
             </div>
+            {activeFaultInsights.length > 0 && (
+              <div className="cockpit-auto-grid-cards">
+                {activeFaultInsights.slice(0, 4).map((item) => {
+                  const norm = String(item.danger_level || 'medium').toLowerCase();
+                  const pillCls =
+                    norm === 'critical'
+                      ? 'cockpit-pill-rose'
+                      : norm === 'high'
+                        ? 'cockpit-pill-amber'
+                        : norm === 'low'
+                          ? 'cockpit-pill-emerald'
+                          : 'cockpit-pill-cyan';
+                  const dangerLabel =
+                    norm === 'critical'
+                      ? t('more.ai_fault_danger_critical')
+                      : norm === 'high'
+                        ? t('more.ai_fault_danger_high')
+                        : norm === 'low'
+                          ? t('more.ai_fault_danger_low')
+                          : t('more.ai_fault_danger_medium');
+                  return (
+                    <div key={item.signature} className="cockpit-subtile p-3 space-y-1.5 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
+                        <span className="font-semibold text-slate-900 dark:text-white">{item.title}</span>
+                        <span className={`${pillCls} rounded-full px-2 py-0.5 text-[10px] font-bold uppercase`}>
+                          {dangerLabel}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300">{item.summary}</p>
+                      {item.solution && (
+                        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-2.5 py-1.5 text-[10.5px] text-emerald-950 dark:text-emerald-200">
+                          <span className="font-semibold">{t('more.ai_fault_solution_label')}: </span>
+                          <span>{item.solution}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </AccordionBody>
       </motion.section>
@@ -843,10 +927,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       <section aria-label={t('overview.perf_grid_aria')} className="cockpit-auto-grid">
         {/* 1. Procesador (CPU) */}
         <motion.article
-          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
-          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ ...COCKPIT_SPRING, delay: 0.03 }}
-          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
           className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
@@ -879,7 +962,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </p>
               </div>
               <motion.button
-                whileTap={{ scale: 0.92 }}
                 type="button"
                 aria-label={t('hardware.cpu.expand_aria')}
                 onClick={() =>
@@ -938,10 +1020,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* 2. Memoria RAM */}
         <motion.article
-          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
-          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ ...COCKPIT_SPRING, delay: 0.06 }}
-          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
           className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
@@ -971,7 +1052,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </p>
               </div>
               <motion.button
-                whileTap={{ scale: 0.92 }}
                 type="button"
                 aria-label={t('hardware.ram.expand_aria')}
                 onClick={() =>
@@ -1035,10 +1115,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* 3. Tarjeta gráfica (GPU) */}
         <motion.article
-          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
-          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ ...COCKPIT_SPRING, delay: 0.09 }}
-          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
           className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
           <div>
@@ -1076,7 +1155,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </p>
               </div>
               <motion.button
-                whileTap={{ scale: 0.92 }}
                 type="button"
                 aria-label={t('hardware.gpu.expand_aria')}
                 onClick={() =>
@@ -1134,10 +1212,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* 4. Router al Exterior (Datos WAN globales del router / salida Internet) */}
         <motion.article
-          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
-          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ ...COCKPIT_SPRING, delay: 0.12 }}
-          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
           data-testid="overview-router-wan-card"
           className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
@@ -1180,7 +1257,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </div>
               </div>
               <motion.button
-                whileTap={{ scale: 0.92 }}
                 type="button"
                 aria-label={t('hardware.net.router_wan_expand_aria')}
                 onClick={() =>
@@ -1238,10 +1314,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* 5. Comunicación Local (Velocidad interna de red LAN sin tráfico externo) */}
         <motion.article
-          initial={{ opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
-          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ ...COCKPIT_SPRING, delay: 0.15 }}
-          whileHover={{ y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
           data-testid="overview-local-lan-card"
           className="cockpit-bento flex flex-col justify-between p-3.5 sm:p-4"
         >
@@ -1289,7 +1364,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </div>
               </div>
               <motion.button
-                whileTap={{ scale: 0.92 }}
                 type="button"
                 aria-label={t('hardware.net.local_lan_expand_aria')}
                 onClick={() =>
@@ -1366,8 +1440,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       {/* Quick Control Row: Aparatos en casa con botones simétricos Encender / Apagar */}
       <motion.section
-        initial={{ opacity: 0, y: 16, scaleX: 0.97, scaleY: 1.02 }}
-        animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ ...COCKPIT_SPRING, delay: 0.18 }}
         className="cockpit-bento p-5"
       >
@@ -1381,7 +1455,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </p>
           </div>
           <motion.button
-            whileTap={{ scale: 0.96 }}
             type="button"
             onClick={() => onNavigate('red')}
             className="cockpit-subtile min-h-[40px] px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-sky-300 whitespace-nowrap"
@@ -1405,10 +1478,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               return (
                 <motion.div
                   key={`${mac}-${client.ip || idx}`}
-                  initial={{ opacity: 0, y: 12, scaleX: 0.95, scaleY: 1.04 }}
-                  animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ ...COCKPIT_SPRING, delay: Math.min(0.03 * idx, 0.24) }}
-                  whileHover={{ y: -1.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }}
                   className="cockpit-subtile flex flex-col justify-between gap-3 p-3.5"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -1439,7 +1511,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
                   <div className="flex items-center gap-2 shrink-0">
                     <motion.button
-                      whileTap={{ scale: 0.94 }}
                       type="button"
                       disabled={pending || !client.mac}
                       onClick={() => onPowerAction('wake', client)}
@@ -1450,7 +1521,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       <span>{t('overview.wake_btn')}</span>
                     </motion.button>
                     <motion.button
-                      whileTap={{ scale: 0.94 }}
                       type="button"
                       disabled={pending || (!client.ip && !client.mac)}
                       onClick={() => onPowerAction('shutdown', client)}

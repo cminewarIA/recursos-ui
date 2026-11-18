@@ -1,45 +1,20 @@
 /**
- * Universal elastic "jelly" physics + strict modal/popover scroll containment
- * for the entire Cockpit application.
+ * Universal scroll-boundary ("edge") elastic jelly physics + strict modal/popover
+ * scroll containment for the entire Cockpit application.
  *
  * Covers:
- * - Main viewport scrolling, wheel, touch, keyboard, and window scrollbar edge bounce
- * - Every scrollable inner panel/table/dropdown/modal/Leaflet popup (vertical & horizontal)
+ * - Main viewport scrolling, wheel, touch, keyboard, and window scrollbar boundary bounce (top/bottom/left/right edges only)
+ * - Every scrollable inner panel/table/dropdown/modal/Leaflet popup at scroll boundaries (vertical & horizontal)
  * - Strict overscroll containment on modals & popovers (never leaks to background page)
- * - Tactile GPU-composited squash-and-stretch ("efecto gelatina") across buttons,
- *   cards, tabs, dock items, pills, toggles, sliders, and interactive tiles.
+ * - Zero hover, tap, press, or mid-scroll wobble (per user preference: jelly strictly on scroll boundaries)
  */
 
 interface JellyState {
   anim: Animation | null;
   lastAt: number;
-  lastIntensity: 'edge' | 'move' | 'tap' | 'press' | 'hover';
 }
 
 const jellyMap = new WeakMap<HTMLElement, JellyState>();
-
-const INTERACTIVE_JELLY_SELECTOR = [
-  'button',
-  'a[href]',
-  'summary',
-  '[role="button"]',
-  '[role="tab"]',
-  '[role="switch"]',
-  '.cockpit-subtab-btn',
-  '.cockpit-subtile',
-  '.cockpit-bento',
-  '.cockpit-hero',
-  '.cockpit-dock',
-  '.cockpit-topbar',
-  '.cockpit-segmented',
-  '.cockpit-pill-cyan',
-  '.cockpit-pill-emerald',
-  '.cockpit-pill-violet',
-  '.cockpit-pill-amber',
-  '.cockpit-pill-red',
-  '.leaflet-control-zoom a',
-  '.leaflet-popup-close-button',
-].join(', ');
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return true;
@@ -84,42 +59,37 @@ function resolveScrollJellyTarget(rawEl: HTMLElement | null): HTMLElement | null
   return rawEl;
 }
 
-function runStageCompanionDockJelly(direction: 'up' | 'down', intensity: 'edge' | 'move'): void {
+function runStageCompanionDockJelly(direction: 'up' | 'down'): void {
   const dock = document.querySelector('.cockpit-dock') as HTMLElement | null;
   if (!dock || typeof dock.animate !== 'function') return;
   const now = performance.now();
   const prev = jellyMap.get(dock);
-  const prevRunning = Boolean(prev?.anim && prev.anim.playState === 'running');
   if (prev) {
-    if (intensity === 'move' && (prevRunning || now - prev.lastAt < 230)) return;
-    if (intensity === 'edge' && prev.lastIntensity === 'edge' && now - prev.lastAt < 200) return;
-    if (intensity === 'edge') cancelExistingAnim(prev);
+    if (now - prev.lastAt < 200) return;
+    cancelExistingAnim(prev);
   }
   const dir = direction === 'down' ? 1 : -1;
-  const shift = intensity === 'edge' ? 6 : 2.5;
-  const sx = intensity === 'edge' ? 1.032 : 1.012;
-  const sy = intensity === 'edge' ? 0.935 : 0.975;
+  const shift = 6;
   const anim = dock.animate(
     [
       { translate: '0 0', scale: '1 1', easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-      { translate: `0 ${dir * shift}px`, scale: `${sx} ${sy}`, offset: 0.25, easing: 'ease-in-out' },
+      { translate: `0 ${dir * shift}px`, scale: '1.032 0.935', offset: 0.25, easing: 'ease-in-out' },
       { translate: `0 ${dir * -shift * 0.45}px`, scale: '0.986 1.022', offset: 0.56, easing: 'ease-in-out' },
       { translate: '0 0', scale: '1 1' },
     ],
     {
       id: 'cockpit-dock-jelly',
-      duration: intensity === 'edge' ? 420 : 250,
+      duration: 420,
       easing: 'linear',
       fill: 'none',
     }
   );
-  jellyMap.set(dock, { anim, lastAt: now, lastIntensity: intensity });
+  jellyMap.set(dock, { anim, lastAt: now });
 }
 
 export function triggerScrollJelly(
   rawEl: HTMLElement | null,
   direction: 'up' | 'down' | 'left' | 'right',
-  intensity: 'edge' | 'move' = 'edge',
   axis: 'y' | 'x' = 'y'
 ): void {
   if (prefersReducedMotion()) return;
@@ -129,258 +99,87 @@ export function triggerScrollJelly(
   const isMainStage = el.hasAttribute('data-cockpit-jelly-stage') || el.tagName === 'MAIN';
   const now = performance.now();
   const prev = jellyMap.get(el);
-  const prevRunning = Boolean(prev?.anim && prev.anim.playState === 'running');
 
   if (prev) {
-    if (intensity === 'move') {
-      if (prevRunning) return;
-      if (prev.lastIntensity === 'edge' && now - prev.lastAt < 440) return;
-      if (now - prev.lastAt < 210) return;
-    } else {
-      if (prev.lastIntensity === 'edge' && now - prev.lastAt < 190) return;
-      cancelExistingAnim(prev);
-    }
+    if (now - prev.lastAt < 190) return;
+    cancelExistingAnim(prev);
   }
 
   const dir = direction === 'down' || direction === 'right' ? 1 : -1;
 
   if (axis === 'x') {
     el.style.transformOrigin = direction === 'right' ? '86% 50%' : '14% 50%';
-    const shift = intensity === 'edge' ? (isMainStage ? 9 : 13) : 5;
-    const keyframes: Keyframe[] =
-      intensity === 'edge'
-        ? [
-            { translate: '0 0', scale: '1 1', easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-            { translate: `${dir * shift}px 0`, scale: '0.962 1.024', offset: 0.24, easing: 'ease-in-out' },
-            { translate: `${dir * -shift * 0.48}px 0`, scale: '1.018 0.988', offset: 0.52, easing: 'ease-in-out' },
-            { translate: `${dir * shift * 0.22}px 0`, scale: '0.993 1.006', offset: 0.76, easing: 'ease-in-out' },
-            { translate: '0 0', scale: '1 1' },
-          ]
-        : [
-            { translate: '0 0', scale: '1 1', easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-            { translate: `${dir * shift}px 0`, scale: '0.986 1.01', offset: 0.35, easing: 'ease-in-out' },
-            { translate: `${dir * -shift * 0.35}px 0`, scale: '1.006 0.996', offset: 0.72, easing: 'ease-out' },
-            { translate: '0 0', scale: '1 1' },
-          ];
+    const shift = isMainStage ? 9 : 13;
+    const keyframes: Keyframe[] = [
+      { translate: '0 0', scale: '1 1', easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+      { translate: `${dir * shift}px 0`, scale: '0.962 1.024', offset: 0.24, easing: 'ease-in-out' },
+      { translate: `${dir * -shift * 0.48}px 0`, scale: '1.018 0.988', offset: 0.52, easing: 'ease-in-out' },
+      { translate: `${dir * shift * 0.22}px 0`, scale: '0.993 1.006', offset: 0.76, easing: 'ease-in-out' },
+      { translate: '0 0', scale: '1 1' },
+    ];
     const anim = el.animate(keyframes, {
       id: 'cockpit-scroll-jelly',
-      duration: intensity === 'edge' ? 460 : 270,
+      duration: 460,
       easing: 'linear',
       fill: 'none',
     });
-    jellyMap.set(el, { anim, lastAt: now, lastIntensity: intensity });
+    jellyMap.set(el, { anim, lastAt: now });
     return;
   }
 
   el.style.transformOrigin = direction === 'down' ? '50% 84%' : '50% 16%';
   // For the full-width main stage, keep horizontal scale <= 1.009 so it never induces horizontal overflow
-  const shift = intensity === 'edge' ? (isMainStage ? 12 : 15) : isMainStage ? 5 : 6;
-  const sx1 = intensity === 'edge' ? (isMainStage ? 1.009 : 1.028) : isMainStage ? 1.004 : 1.012;
-  const sy1 = intensity === 'edge' ? (isMainStage ? 0.976 : 0.952) : isMainStage ? 0.988 : 0.982;
-  const sx2 = intensity === 'edge' ? (isMainStage ? 0.995 : 0.985) : isMainStage ? 0.998 : 0.994;
-  const sy2 = intensity === 'edge' ? (isMainStage ? 1.014 : 1.024) : isMainStage ? 1.006 : 1.008;
+  const shift = isMainStage ? 12 : 15;
+  const sx1 = isMainStage ? 1.009 : 1.028;
+  const sy1 = isMainStage ? 0.976 : 0.952;
+  const sx2 = isMainStage ? 0.995 : 0.985;
+  const sy2 = isMainStage ? 1.014 : 1.024;
 
-  const keyframes: Keyframe[] =
-    intensity === 'edge'
-      ? [
-          {
-            translate: '0 0',
-            scale: '1 1',
-            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-          },
-          {
-            translate: `0 ${dir * shift}px`,
-            scale: `${sx1} ${sy1}`,
-            offset: 0.22,
-            easing: 'ease-in-out',
-          },
-          {
-            translate: `0 ${dir * -shift * 0.5}px`,
-            scale: `${sx2} ${sy2}`,
-            offset: 0.48,
-            easing: 'ease-in-out',
-          },
-          {
-            translate: `0 ${dir * shift * 0.24}px`,
-            scale: `${isMainStage ? 1.003 : 1.009} ${isMainStage ? 0.995 : 0.99}`,
-            offset: 0.72,
-            easing: 'ease-in-out',
-          },
-          {
-            translate: `0 ${dir * -1}px`,
-            scale: '0.998 1.003',
-            offset: 0.88,
-            easing: 'ease-out',
-          },
-          { translate: '0 0', scale: '1 1' },
-        ]
-      : [
-          {
-            translate: '0 0',
-            scale: '1 1',
-            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-          },
-          {
-            translate: `0 ${dir * shift}px`,
-            scale: `${sx1} ${sy1}`,
-            offset: 0.34,
-            easing: 'ease-in-out',
-          },
-          {
-            translate: `0 ${dir * -shift * 0.38}px`,
-            scale: `${sx2} ${sy2}`,
-            offset: 0.7,
-            easing: 'ease-out',
-          },
-          { translate: '0 0', scale: '1 1' },
-        ];
-
-  const anim = el.animate(keyframes, {
-    id: 'cockpit-scroll-jelly',
-    duration: intensity === 'edge' ? 480 : 280,
-    easing: 'linear',
-    fill: 'none',
-  });
-
-  jellyMap.set(el, { anim, lastAt: now, lastIntensity: intensity });
-
-  if (isMainStage) {
-    runStageCompanionDockJelly(direction === 'down' ? 'down' : 'up', intensity);
-  }
-}
-
-function isElementEligibleForJelly(el: HTMLElement | null): el is HTMLElement {
-  if (!el || el === document.body || el === document.documentElement) return false;
-  if (el.hasAttribute('data-cockpit-no-jelly')) return false;
-  if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') return false;
-  if (el.matches('input, textarea, select, canvas, svg')) return false;
-  // Never distort Leaflet map canvas/tiles/markers during pan
-  if (
-    el.closest('.leaflet-container') &&
-    !el.closest('.leaflet-popup-content-wrapper') &&
-    !el.closest('.leaflet-control-zoom')
-  ) {
-    return false;
-  }
-  const rect = el.getBoundingClientRect();
-  if (rect.width < 12 || rect.height < 12) return false;
-  // Skip giant full-viewport shells (handled by main stage scroll jelly instead)
-  if (rect.width > window.innerWidth * 0.94 && rect.height > window.innerHeight * 0.9) return false;
-  return true;
-}
-
-function resolveInteractiveJellyTarget(rawTarget: HTMLElement | null): HTMLElement | null {
-  if (!rawTarget) return null;
-  // Do not wobble containers when interacting directly inside text fields or canvases
-  if (rawTarget.closest('input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]), textarea, select, canvas')) {
-    return null;
-  }
-  const match = rawTarget.closest(INTERACTIVE_JELLY_SELECTOR) as HTMLElement | null;
-  if (!isElementEligibleForJelly(match)) return null;
-  return match;
-}
-
-export function triggerElementJelly(
-  rawEl: HTMLElement | null,
-  strength: 'tap' | 'press' | 'hover' = 'tap',
-  clientX?: number,
-  clientY?: number
-): void {
-  if (prefersReducedMotion()) return;
-  const el = resolveInteractiveJellyTarget(rawEl);
-  if (!el || typeof el.animate !== 'function') return;
-
-  const now = performance.now();
-  const prev = jellyMap.get(el);
-  const prevRunning = Boolean(prev?.anim && prev.anim.playState === 'running');
-
-  if (prev) {
-    if (strength === 'hover') {
-      if (prevRunning) return;
-      if (now - prev.lastAt < 460) return;
-    } else if (strength === 'press') {
-      if (prev.lastIntensity === 'press' && now - prev.lastAt < 90) return;
-      cancelExistingAnim(prev);
-    } else {
-      if (prev.lastIntensity === 'tap' && now - prev.lastAt < 120) return;
-      cancelExistingAnim(prev);
-    }
-  }
-
-  const rect = el.getBoundingClientRect();
-  const areaRatio = (rect.width * rect.height) / Math.max(1, window.innerWidth * window.innerHeight);
-
-  // Subtle origin bias toward touch/pointer coordinates inside larger widgets
-  if (
-    typeof clientX === 'number' &&
-    typeof clientY === 'number' &&
-    rect.width > 64 &&
-    rect.height > 48
-  ) {
-    const ox = Math.min(78, Math.max(22, ((clientX - rect.left) / rect.width) * 100));
-    const oy = Math.min(78, Math.max(22, ((clientY - rect.top) / rect.height) * 100));
-    el.style.transformOrigin = `${ox.toFixed(1)}% ${oy.toFixed(1)}%`;
-  } else {
-    el.style.transformOrigin = '50% 50%';
-  }
-
-  // Scale amplitude proportionally to widget size so tiny buttons pop crisply and huge cards feel plush
-  const sizeFactor = areaRatio > 0.25 ? 0.36 : areaRatio > 0.08 ? 0.62 : 1;
-
-  if (strength === 'press') {
-    const sx = 1 + 0.032 * sizeFactor;
-    const sy = 1 - 0.052 * sizeFactor;
-    const anim = el.animate(
-      [
-        { scale: '1 1', easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-        { scale: `${sx.toFixed(4)} ${sy.toFixed(4)}`, offset: 0.65, easing: 'ease-out' },
-        { scale: '1 1' },
-      ],
-      {
-        id: 'cockpit-element-jelly',
-        duration: 180,
-        easing: 'linear',
-        fill: 'none',
-      }
-    );
-    jellyMap.set(el, { anim, lastAt: now, lastIntensity: 'press' });
-    return;
-  }
-
-  const amp = strength === 'hover' ? 0.42 * sizeFactor : 1 * sizeFactor;
   const keyframes: Keyframe[] = [
-    { scale: '1 1', easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
     {
-      scale: `${(1 + 0.056 * amp).toFixed(4)} ${(1 - 0.068 * amp).toFixed(4)}`,
+      translate: '0 0',
+      scale: '1 1',
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+    },
+    {
+      translate: `0 ${dir * shift}px`,
+      scale: `${sx1} ${sy1}`,
       offset: 0.22,
       easing: 'ease-in-out',
     },
     {
-      scale: `${(1 - 0.028 * amp).toFixed(4)} ${(1 + 0.036 * amp).toFixed(4)}`,
-      offset: 0.5,
+      translate: `0 ${dir * -shift * 0.5}px`,
+      scale: `${sx2} ${sy2}`,
+      offset: 0.48,
       easing: 'ease-in-out',
     },
     {
-      scale: `${(1 + 0.013 * amp).toFixed(4)} ${(1 - 0.014 * amp).toFixed(4)}`,
-      offset: 0.74,
+      translate: `0 ${dir * shift * 0.24}px`,
+      scale: `${isMainStage ? 1.003 : 1.009} ${isMainStage ? 0.995 : 0.99}`,
+      offset: 0.72,
       easing: 'ease-in-out',
     },
     {
-      scale: `${(1 - 0.004 * amp).toFixed(4)} ${(1 + 0.005 * amp).toFixed(4)}`,
-      offset: 0.9,
+      translate: `0 ${dir * -1}px`,
+      scale: '0.998 1.003',
+      offset: 0.88,
       easing: 'ease-out',
     },
-    { scale: '1 1' },
+    { translate: '0 0', scale: '1 1' },
   ];
 
   const anim = el.animate(keyframes, {
-    id: 'cockpit-element-jelly',
-    duration: strength === 'hover' ? 300 : 390,
+    id: 'cockpit-scroll-jelly',
+    duration: 480,
     easing: 'linear',
     fill: 'none',
   });
 
-  jellyMap.set(el, { anim, lastAt: now, lastIntensity: strength });
+  jellyMap.set(el, { anim, lastAt: now });
+
+  if (isMainStage) {
+    runStageCompanionDockJelly(direction === 'down' ? 'down' : 'up');
+  }
 }
 
 function isScrollContainerY(el: HTMLElement): boolean {
@@ -528,7 +327,7 @@ export function installCockpitScrollContainment(): () => void {
     return raw;
   };
 
-  const triggerMainDocumentScrollJelly = (dy: number) => {
+  const triggerMainDocumentScrollEdgeJelly = (dy: number) => {
     if (dy === 0) return;
     const docEl = document.scrollingElement || document.documentElement;
     const curTop = window.scrollY || docEl.scrollTop || 0;
@@ -536,14 +335,18 @@ export function installCockpitScrollContainment(): () => void {
     const stage = getMainStage();
     if (!stage) return;
     if (maxTop <= 2) {
-      triggerScrollJelly(stage, dy > 0 ? 'down' : 'up', 'edge');
+      triggerScrollJelly(stage, dy > 0 ? 'down' : 'up');
       return;
     }
     if (dy > 0) {
       const rem = maxTop - curTop;
-      triggerScrollJelly(stage, 'down', rem <= dy + 4 ? 'edge' : 'move');
+      if (rem <= dy + 4) {
+        triggerScrollJelly(stage, 'down');
+      }
     } else {
-      triggerScrollJelly(stage, 'up', curTop <= Math.abs(dy) + 4 ? 'edge' : 'move');
+      if (curTop <= Math.abs(dy) + 4) {
+        triggerScrollJelly(stage, 'up');
+      }
     }
   };
 
@@ -573,35 +376,29 @@ export function installCockpitScrollContainment(): () => void {
     if (hasOpenModal && !modalEl) {
       prevent();
       if (dy !== 0) {
-        triggerScrollJelly(anyOpenModal, dy > 0 ? 'down' : 'up', 'edge');
+        triggerScrollJelly(anyOpenModal, dy > 0 ? 'down' : 'up');
       }
       return;
     }
 
-    // Horizontal gesture inside horizontally scrollable table/bar
+    // Horizontal gesture inside horizontally scrollable table/bar (bounce strictly at edges)
     if (Math.abs(dx) > Math.abs(dy) && scrollableXAncestor) {
       const maxLeft = scrollableXAncestor.scrollWidth - scrollableXAncestor.clientWidth;
       if (dx > 0) {
         const remR = maxLeft - scrollableXAncestor.scrollLeft;
-        triggerScrollJelly(
-          scrollableXAncestor,
-          'right',
-          remR <= dx + 4 ? 'edge' : 'move',
-          'x'
-        );
+        if (remR <= dx + 4) {
+          triggerScrollJelly(scrollableXAncestor, 'right', 'x');
+        }
       } else if (dx < 0) {
-        triggerScrollJelly(
-          scrollableXAncestor,
-          'left',
-          scrollableXAncestor.scrollLeft <= Math.abs(dx) + 4 ? 'edge' : 'move',
-          'x'
-        );
+        if (scrollableXAncestor.scrollLeft <= Math.abs(dx) + 4) {
+          triggerScrollJelly(scrollableXAncestor, 'left', 'x');
+        }
       }
       if (Math.abs(dy) < 2) return;
     }
 
     if (!hasOpenModal && !containRoot && !scrollableAncestor) {
-      triggerMainDocumentScrollJelly(dy);
+      triggerMainDocumentScrollEdgeJelly(dy);
       return;
     }
 
@@ -622,16 +419,15 @@ export function installCockpitScrollContainment(): () => void {
           if (remainingDown <= 2) {
             if (shouldContain) {
               prevent();
-              triggerScrollJelly(checkEl, 'down', 'edge');
+              triggerScrollJelly(checkEl, 'down');
               return;
             }
           } else if (remainingDown <= dy + 4) {
             if (shouldContain) prevent();
             checkEl.scrollTop = checkEl.scrollHeight - checkEl.clientHeight;
-            triggerScrollJelly(checkEl, 'down', 'edge');
+            triggerScrollJelly(checkEl, 'down');
             return;
           } else {
-            triggerScrollJelly(checkEl, 'down', 'move');
             return;
           }
         } else {
@@ -639,16 +435,15 @@ export function installCockpitScrollContainment(): () => void {
           if (remainingUp <= 2) {
             if (shouldContain) {
               prevent();
-              triggerScrollJelly(checkEl, 'up', 'edge');
+              triggerScrollJelly(checkEl, 'up');
               return;
             }
           } else if (remainingUp <= Math.abs(dy) + 4) {
             if (shouldContain) prevent();
             checkEl.scrollTop = 0;
-            triggerScrollJelly(checkEl, 'up', 'edge');
+            triggerScrollJelly(checkEl, 'up');
             return;
           } else {
-            triggerScrollJelly(checkEl, 'up', 'move');
             return;
           }
         }
@@ -659,9 +454,9 @@ export function installCockpitScrollContainment(): () => void {
 
     if (hasOpenModal || containRoot) {
       prevent();
-      triggerScrollJelly(modalEl ?? containRoot ?? anyOpenModal, dir, 'edge');
+      triggerScrollJelly(modalEl ?? containRoot ?? anyOpenModal, dir);
     } else {
-      triggerMainDocumentScrollJelly(dy);
+      triggerMainDocumentScrollEdgeJelly(dy);
     }
   };
 
@@ -681,7 +476,6 @@ export function installCockpitScrollContainment(): () => void {
     lastY: number;
     pinnedWindowY: number;
   } | null = null;
-  let lastScrollbarDragEndAt = 0;
 
   const findScrollbarHit = (target: HTMLElement, clientX: number): HTMLElement | 'window' | null => {
     let cur: HTMLElement | null = target;
@@ -727,17 +521,13 @@ export function installCockpitScrollContainment(): () => void {
   const handlePointerDown = (ev: PointerEvent) => {
     if (ev.button !== 0) return;
     const target = ev.target instanceof Element ? (ev.target as HTMLElement) : null;
-    const hitBar = startScrollbarDrag(target, ev.clientX, ev.clientY);
-    if (!hitBar) {
-      triggerElementJelly(target, 'press', ev.clientX, ev.clientY);
-    }
+    startScrollbarDrag(target, ev.clientX, ev.clientY);
   };
 
   const handlePointerOrMouseMove = (clientY: number, buttons: number) => {
     if (!scrollbarDrag) return;
     if ((buttons & 1) === 0) {
       scrollbarDrag = null;
-      lastScrollbarDragEndAt = performance.now();
       return;
     }
 
@@ -752,11 +542,9 @@ export function installCockpitScrollContainment(): () => void {
       const maxTop = Math.max(0, docEl.scrollHeight - window.innerHeight);
       const stage = getMainStage();
       if (moveDy > 0 && maxTop - curTop <= 2) {
-        triggerScrollJelly(stage, 'down', 'edge');
+        triggerScrollJelly(stage, 'down');
       } else if (moveDy < 0 && curTop <= 2) {
-        triggerScrollJelly(stage, 'up', 'edge');
-      } else {
-        triggerScrollJelly(stage, moveDy > 0 ? 'down' : 'up', 'move');
+        triggerScrollJelly(stage, 'up');
       }
       return;
     }
@@ -772,11 +560,9 @@ export function installCockpitScrollContainment(): () => void {
     const remainingDown = el.scrollHeight - el.clientHeight - el.scrollTop;
     const remainingUp = el.scrollTop;
     if (moveDy > 0 && remainingDown <= 2) {
-      triggerScrollJelly(el, 'down', 'edge');
+      triggerScrollJelly(el, 'down');
     } else if (moveDy < 0 && remainingUp <= 2) {
-      triggerScrollJelly(el, 'up', 'edge');
-    } else {
-      triggerScrollJelly(el, moveDy > 0 ? 'down' : 'up', 'move');
+      triggerScrollJelly(el, 'up');
     }
   };
 
@@ -791,7 +577,6 @@ export function installCockpitScrollContainment(): () => void {
   const handleDragEnd = () => {
     if (scrollbarDrag) {
       scrollbarDrag = null;
-      lastScrollbarDragEndAt = performance.now();
     }
   };
 
@@ -835,11 +620,9 @@ export function installCockpitScrollContainment(): () => void {
       lastWinScrollY = curTop;
       const stage = getMainStage();
       if (curTop > prevTop && maxTop - curTop <= 2 && maxTop - prevTop > 2) {
-        triggerScrollJelly(stage, 'down', 'edge');
+        triggerScrollJelly(stage, 'down');
       } else if (curTop < prevTop && curTop <= 2 && prevTop > 2) {
-        triggerScrollJelly(stage, 'up', 'edge');
-      } else if (Math.abs(curTop - prevTop) >= 18) {
-        triggerScrollJelly(stage, curTop > prevTop ? 'down' : 'up', 'move');
+        triggerScrollJelly(stage, 'up');
       }
       return;
     }
@@ -853,11 +636,9 @@ export function installCockpitScrollContainment(): () => void {
       lastScrollTopMap.set(target, curTop);
       const maxTop = target.scrollHeight - target.clientHeight;
       if (curTop > prevTop && maxTop - curTop <= 2 && maxTop - prevTop > 2) {
-        triggerScrollJelly(target, 'down', 'edge');
+        triggerScrollJelly(target, 'down');
       } else if (curTop < prevTop && curTop <= 2 && prevTop > 2) {
-        triggerScrollJelly(target, 'up', 'edge');
-      } else if (Math.abs(curTop - prevTop) >= 10) {
-        triggerScrollJelly(target, curTop > prevTop ? 'down' : 'up', 'move');
+        triggerScrollJelly(target, 'up');
       }
     }
 
@@ -867,16 +648,14 @@ export function installCockpitScrollContainment(): () => void {
       lastScrollLeftMap.set(target, curLeft);
       const maxLeft = target.scrollWidth - target.clientWidth;
       if (curLeft > prevLeft && maxLeft - curLeft <= 2 && maxLeft - prevLeft > 2) {
-        triggerScrollJelly(target, 'right', 'edge', 'x');
+        triggerScrollJelly(target, 'right', 'x');
       } else if (curLeft < prevLeft && curLeft <= 2 && prevLeft > 2) {
-        triggerScrollJelly(target, 'left', 'edge', 'x');
-      } else if (Math.abs(curLeft - prevLeft) >= 10) {
-        triggerScrollJelly(target, curLeft > prevLeft ? 'right' : 'left', 'move', 'x');
+        triggerScrollJelly(target, 'left', 'x');
       }
     }
   };
 
-  // Touch overscroll prevention & jelly bounce everywhere
+  // Touch overscroll prevention & scroll-boundary jelly bounce
   let lastTouchX: number | null = null;
   let lastTouchY: number | null = null;
   let lastTouchTarget: HTMLElement | null = null;
@@ -910,42 +689,9 @@ export function installCockpitScrollContainment(): () => void {
     lastTouchTarget = null;
   };
 
-  // Universal interactive tap & hover jelly feedback across the whole app
-  const handleClick = (ev: MouseEvent) => {
-    if (performance.now() - lastScrollbarDragEndAt < 180) return;
-    const target = ev.target instanceof Element ? (ev.target as HTMLElement) : null;
-    triggerElementJelly(target, 'tap', ev.clientX || undefined, ev.clientY || undefined);
-  };
-
-  const handleChange = (ev: Event) => {
-    const target = ev.target instanceof Element ? (ev.target as HTMLElement) : null;
-    if (!target) return;
-    const shell =
-      (target.closest('.cockpit-subtile, .cockpit-bento, label') as HTMLElement | null) ?? target;
-    triggerElementJelly(shell, 'tap');
-  };
-
-  let lastHoverTarget: HTMLElement | null = null;
-  const handlePointerOver = (ev: PointerEvent) => {
-    if (ev.pointerType !== 'mouse' || scrollbarDrag) return;
-    const rawTarget = ev.target instanceof Element ? (ev.target as HTMLElement) : null;
-    const nextHover = resolveInteractiveJellyTarget(rawTarget);
-    if (nextHover === lastHoverTarget) return;
-    lastHoverTarget = nextHover;
-    if (nextHover) {
-      triggerElementJelly(nextHover, 'hover', ev.clientX, ev.clientY);
-    }
-  };
-
-  // Keyboard boundary guard (modal & main document) + activation jelly
+  // Keyboard boundary guard (modal & main document at scroll boundaries only)
   const handleKeyDown = (ev: KeyboardEvent) => {
     const active = document.activeElement as HTMLElement | null;
-    if (ev.key === 'Enter' || ev.key === ' ') {
-      if (active && active !== document.body && !['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) {
-        triggerElementJelly(active, 'tap');
-      }
-    }
-
     if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
 
     let dir: 'up' | 'down' | null = null;
@@ -960,12 +706,10 @@ export function installCockpitScrollContainment(): () => void {
     if (modal) {
       if (dir === 'down' && modal.scrollHeight - modal.clientHeight - modal.scrollTop <= 2) {
         ev.preventDefault();
-        triggerScrollJelly(modal, 'down', 'edge');
+        triggerScrollJelly(modal, 'down');
       } else if (dir === 'up' && modal.scrollTop <= 2) {
         ev.preventDefault();
-        triggerScrollJelly(modal, 'up', 'edge');
-      } else if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') {
-        triggerScrollJelly(modal, dir, 'move');
+        triggerScrollJelly(modal, 'up');
       }
       return;
     }
@@ -975,11 +719,9 @@ export function installCockpitScrollContainment(): () => void {
     const maxTop = Math.max(0, docEl.scrollHeight - window.innerHeight);
     const stage = getMainStage();
     if (dir === 'down' && maxTop - curTop <= 2) {
-      triggerScrollJelly(stage, 'down', 'edge');
+      triggerScrollJelly(stage, 'down');
     } else if (dir === 'up' && curTop <= 2) {
-      triggerScrollJelly(stage, 'up', 'edge');
-    } else if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') {
-      triggerScrollJelly(stage, dir, 'move');
+      triggerScrollJelly(stage, 'up');
     }
   };
 
@@ -988,7 +730,6 @@ export function installCockpitScrollContainment(): () => void {
   window.addEventListener('pointerdown', handlePointerDown, { capture: true });
   window.addEventListener('mousemove', handleMouseMove, { capture: true });
   window.addEventListener('pointermove', handlePointerMove, { capture: true });
-  window.addEventListener('pointerover', handlePointerOver, { passive: true, capture: true });
   window.addEventListener('mouseup', handleDragEnd, { capture: true });
   window.addEventListener('pointerup', handleDragEnd, { capture: true });
   window.addEventListener('pointercancel', handleDragEnd, { capture: true });
@@ -998,8 +739,6 @@ export function installCockpitScrollContainment(): () => void {
   window.addEventListener('touchstart', handleTouchStart, { passive: true, capture: true });
   window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
   window.addEventListener('touchend', handleTouchEnd, { passive: true, capture: true });
-  window.addEventListener('click', handleClick, { capture: true });
-  window.addEventListener('change', handleChange, { capture: true });
   window.addEventListener('keydown', handleKeyDown, { capture: true });
 
   return () => {
@@ -1009,7 +748,6 @@ export function installCockpitScrollContainment(): () => void {
     window.removeEventListener('pointerdown', handlePointerDown, { capture: true });
     window.removeEventListener('mousemove', handleMouseMove, { capture: true });
     window.removeEventListener('pointermove', handlePointerMove, { capture: true });
-    window.removeEventListener('pointerover', handlePointerOver, { capture: true });
     window.removeEventListener('mouseup', handleDragEnd, { capture: true });
     window.removeEventListener('pointerup', handleDragEnd, { capture: true });
     window.removeEventListener('pointercancel', handleDragEnd, { capture: true });
@@ -1019,8 +757,6 @@ export function installCockpitScrollContainment(): () => void {
     window.removeEventListener('touchstart', handleTouchStart, { capture: true });
     window.removeEventListener('touchmove', handleTouchMove, { capture: true });
     window.removeEventListener('touchend', handleTouchEnd, { capture: true });
-    window.removeEventListener('click', handleClick, { capture: true });
-    window.removeEventListener('change', handleChange, { capture: true });
     window.removeEventListener('keydown', handleKeyDown, { capture: true });
     unlockBodyScroll();
   };

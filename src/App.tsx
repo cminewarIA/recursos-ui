@@ -500,7 +500,6 @@ export function App() {
           <header className="flex flex-wrap items-center justify-between gap-[clamp(0.5rem,1.5vw,1rem)] py-1">
             {/* Zone 1: Brand with enlarged transparent CMineWar emblem scaled to both vw and dvh */}
             <motion.button
-              whileTap={{ scale: 0.97 }}
               type="button"
               onClick={() => navigateTo('inicio')}
               className="flex min-w-0 items-center gap-[clamp(0.55rem,1.3vw,1rem)] text-left"
@@ -530,7 +529,6 @@ export function App() {
             {/* Zone 2: Live Health Pill + Quick Theme + Version Pill */}
             <div className="flex items-center gap-2 shrink-0">
               <motion.button
-                whileTap={{ scale: 0.96 }}
                 type="button"
                 onClick={() => navigateTo(topbarErrors > 0 ? 'mas' : 'inicio', topbarErrors > 0 ? 'logs' : undefined)}
                 className={`hidden sm:inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-colors whitespace-nowrap ${
@@ -556,7 +554,6 @@ export function App() {
               </motion.button>
 
               <motion.button
-                whileTap={{ scale: 0.9, rotate: 18 }}
                 type="button"
                 aria-label={theme === 'dark' ? t('app.toggle_to_light') : t('app.toggle_to_dark')}
                 onClick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -577,7 +574,6 @@ export function App() {
               </motion.button>
 
               <motion.button
-                whileTap={{ scale: 0.95 }}
                 type="button"
                 onClick={() => navigateTo('mas', 'updates')}
                 title={
@@ -707,7 +703,6 @@ export function App() {
                 const active = activeTab === item.id;
                 return (
                   <motion.button
-                    whileTap={{ scale: 0.94 }}
                     key={item.id}
                     type="button"
                     title={item.label}

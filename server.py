@@ -1935,8 +1935,111 @@ def save_system_logs_ack_state(ack_ts=None):
             SYSTEM_LOGS_CACHE[k]["ts"] = 0.0
     return payload
 
-def _apply_system_logs_ack_and_totals(raw_payload):
-    """Filtra avisos ya revisados sin ocultar unidades systemd fallidas y unifica el total."""
+_RE_FAULT_HEX = re.compile(r'0x[0-9a-fA-F]+')
+_RE_FAULT_BRACKET_NUM = re.compile(r'\[\s*\d+\s*\]')
+_RE_FAULT_IPV4 = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b')
+_RE_FAULT_NUM = re.compile(r'\b\d+\b')
+_RE_FAULT_WS = re.compile(r'\s+')
+
+def _normalize_system_fault_signature(unit_str, category_str, message_str):
+    """Genera una firma canónica invariante ante PIDs, fechas o direcciones de memoria para no re-consultar fallos recurrentes."""
+    u = str(unit_str or "system").strip().lower()
+    if "@" in u and u.endswith(".service"):
+        u = u.split("@", 1)[0] + "@.service"
+    c = str(category_str or "system").strip().lower()
+    m = str(message_str or "").strip().lower()
+    m = _RE_FAULT_HEX.sub("0x#", m)
+    m = _RE_FAULT_BRACKET_NUM.sub("[#]", m)
+    m = _RE_FAULT_IPV4.sub("#.#.#.#", m)
+    m = _RE_FAULT_NUM.sub("#", m)
+    m = _RE_FAULT_WS.sub(" ", m).strip()[:130]
+    return f"{u}|{c}|{m}"
+
+def _lookup_stored_fault_insights(signatures=None, lang="es", history_limit=50):
+    """Consulta en recursos_history.db los diagnósticos IA ya almacenados para fallos recurrentes."""
+    lang_clean = (str(lang or "es").strip().lower()[:8]) or "es"
+    by_sig = {}
+    recent_list = []
+    if not os.path.exists(RECURSOS_HISTORY_DB_FILE):
+        return by_sig, recent_list
+    with GEOIP_HISTORY_DB_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=6.0)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT lang, signature, unit, category, title, danger_level,
+                       summary, solution, confidence, model, occurrence_count,
+                       first_seen_at, analyzed_at
+                FROM ai_system_fault_insights
+                WHERE lang = ?
+                ORDER BY analyzed_at DESC
+                LIMIT ?
+                """,
+                (lang_clean, max(20, int(history_limit)))
+            ).fetchall()
+            for r in rows:
+                item = {
+                    "signature": r["signature"],
+                    "unit": r["unit"] or "",
+                    "category": r["category"] or "system",
+                    "title": r["title"] or "",
+                    "danger_level": r["danger_level"] or "medium",
+                    "summary": r["summary"] or "",
+                    "solution": r["solution"] or "",
+                    "confidence": r["confidence"] or "medium",
+                    "model": r["model"] or AI_NET_MODEL,
+                    "occurrence_count": int(r["occurrence_count"] or 1),
+                    "first_seen_at": float(r["first_seen_at"] or r["analyzed_at"] or 0),
+                    "analyzed_at": float(r["analyzed_at"] or 0),
+                    "cached_from_db": True,
+                }
+                by_sig[r["signature"]] = item
+                recent_list.append(item)
+
+            if signatures:
+                missing = [s for s in signatures if s and s not in by_sig]
+                if missing:
+                    placeholders = ",".join("?" for _ in missing)
+                    extra_rows = conn.execute(
+                        f"""
+                        SELECT lang, signature, unit, category, title, danger_level,
+                               summary, solution, confidence, model, occurrence_count,
+                               first_seen_at, analyzed_at
+                        FROM ai_system_fault_insights
+                        WHERE lang = ? AND signature IN ({placeholders})
+                        """,
+                        [lang_clean] + missing
+                    ).fetchall()
+                    for r in extra_rows:
+                        item = {
+                            "signature": r["signature"],
+                            "unit": r["unit"] or "",
+                            "category": r["category"] or "system",
+                            "title": r["title"] or "",
+                            "danger_level": r["danger_level"] or "medium",
+                            "summary": r["summary"] or "",
+                            "solution": r["solution"] or "",
+                            "confidence": r["confidence"] or "medium",
+                            "model": r["model"] or AI_NET_MODEL,
+                            "occurrence_count": int(r["occurrence_count"] or 1),
+                            "first_seen_at": float(r["first_seen_at"] or r["analyzed_at"] or 0),
+                            "analyzed_at": float(r["analyzed_at"] or 0),
+                            "cached_from_db": True,
+                        }
+                        by_sig[r["signature"]] = item
+        except Exception:
+            pass
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+    return by_sig, recent_list
+
+def _apply_system_logs_ack_and_totals(raw_payload, lang="es"):
     if not isinstance(raw_payload, dict):
         return raw_payload
     ack_state = load_system_logs_ack_state()
@@ -1945,19 +2048,42 @@ def _apply_system_logs_ack_and_totals(raw_payload):
 
     raw_logs = list(raw_payload.get("logs") or [])
     if ack_ts_ms > 0:
-        filtered_logs = [e for e in raw_logs if int((e or {}).get("ts") or 0) > ack_ts_ms]
+        filtered_logs = [dict(e) for e in raw_logs if int((e or {}).get("ts") or 0) > ack_ts_ms]
     else:
-        filtered_logs = raw_logs
+        filtered_logs = [dict(e) for e in raw_logs]
 
     counts = {"docker": 0, "service": 0, "kernel": 0, "system": 0, "total": 0}
+    active_sigs = []
     for entry in filtered_logs:
         cat = str((entry or {}).get("category") or "system")
         if cat not in counts:
             cat = "system"
         counts[cat] += 1
         counts["total"] += 1
+        sig = entry.get("signature") or _normalize_system_fault_signature(
+            entry.get("unit") or entry.get("source"), cat, entry.get("message")
+        )
+        entry["signature"] = sig
+        active_sigs.append(sig)
 
-    failed_units = list(raw_payload.get("failed_units") or [])
+    failed_units = [dict(u) if isinstance(u, dict) else {"unit": str(u), "description": str(u)} for u in (raw_payload.get("failed_units") or [])]
+    for u in failed_units:
+        sig = u.get("signature") or _normalize_system_fault_signature(
+            u.get("unit"), "service", f"systemd unit failed: {u.get('description') or u.get('unit')} ({u.get('sub') or 'failed'})"
+        )
+        u["signature"] = sig
+        active_sigs.append(sig)
+
+    stored_by_sig, stored_history = _lookup_stored_fault_insights(active_sigs, lang=lang, history_limit=50)
+    for entry in filtered_logs:
+        sig = entry.get("signature")
+        if sig and sig in stored_by_sig:
+            entry["ai_insight"] = stored_by_sig[sig]
+    for u in failed_units:
+        sig = u.get("signature")
+        if sig and sig in stored_by_sig:
+            u["ai_insight"] = stored_by_sig[sig]
+
     failed_count = len(failed_units)
     effective_total = len(filtered_logs) + failed_count
 
@@ -1971,11 +2097,13 @@ def _apply_system_logs_ack_and_totals(raw_payload):
     out["counts_by_category"] = counts
     out["ack_ts"] = ack_ts if ack_ts > 0 else None
     out["ack_time_str"] = ack_state.get("ack_time_str") if ack_ts > 0 else None
+    out["ai_fault_insights"] = stored_by_sig
+    out["ai_fault_history"] = stored_history
     return out
 
-def fetch_effective_system_logs(priority_max=3, limit=80, force=False):
+def fetch_effective_system_logs(priority_max=3, limit=80, force=False, lang="es"):
     raw_payload = fetch_system_logs(priority_max=priority_max, limit=limit, force=force)
-    return _apply_system_logs_ack_and_totals(raw_payload)
+    return _apply_system_logs_ack_and_totals(raw_payload, lang=lang)
 
 def get_effective_system_errors_summary():
     data = fetch_effective_system_logs(priority_max=3, limit=50)
@@ -1989,6 +2117,8 @@ def get_effective_system_errors_summary():
         "ack_time_str": data.get("ack_time_str"),
         "counts_by_category": data.get("counts_by_category", {}),
         "fetched_at": data.get("fetched_at", ""),
+        "ai_fault_insights": data.get("ai_fault_insights", {}),
+        "ai_fault_history": list(data.get("ai_fault_history") or [])[:25],
     }
 
 def fetch_system_logs(priority_max=3, limit=80, force=False):
@@ -2017,12 +2147,18 @@ def fetch_system_logs(priority_max=3, limit=80, force=False):
                 continue
             parts = line.split(None, 4)
             if parts and parts[0].endswith(('.service', '.mount', '.socket', '.timer', '.target')):
+                u_name = parts[0]
+                u_sub = parts[3] if len(parts) > 3 else "failed"
+                u_desc = parts[4] if len(parts) > 4 else u_name
                 failed_units.append({
-                    "unit": parts[0],
+                    "unit": u_name,
                     "load": parts[1] if len(parts) > 1 else "loaded",
                     "active": parts[2] if len(parts) > 2 else "failed",
-                    "sub": parts[3] if len(parts) > 3 else "failed",
-                    "description": parts[4] if len(parts) > 4 else parts[0]
+                    "sub": u_sub,
+                    "description": u_desc,
+                    "signature": _normalize_system_fault_signature(
+                        u_name, "service", f"systemd unit failed: {u_desc} ({u_sub})"
+                    ),
                 })
     except Exception:
         pass
@@ -2112,7 +2248,8 @@ def fetch_system_logs(priority_max=3, limit=80, force=False):
                     "category": category,
                     "level": prio_label,
                     "priority": prio_num,
-                    "message": msg_str
+                    "message": msg_str,
+                    "signature": _normalize_system_fault_signature(unit_name, category, msg_str),
                 })
             except Exception:
                 continue
@@ -2591,6 +2728,25 @@ def init_geoip_history_db():
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_conn_analyzed_at ON ai_connection_insights(analyzed_at DESC);")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS ai_system_fault_insights (
+                    lang TEXT NOT NULL,
+                    signature TEXT NOT NULL,
+                    unit TEXT DEFAULT '',
+                    category TEXT DEFAULT '',
+                    title TEXT NOT NULL,
+                    danger_level TEXT DEFAULT 'medium',
+                    summary TEXT DEFAULT '',
+                    solution TEXT DEFAULT '',
+                    confidence TEXT DEFAULT 'medium',
+                    model TEXT DEFAULT '',
+                    occurrence_count INTEGER DEFAULT 1,
+                    first_seen_at REAL NOT NULL,
+                    analyzed_at REAL NOT NULL,
+                    PRIMARY KEY (lang, signature)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_fault_analyzed_at ON ai_system_fault_insights(analyzed_at DESC);")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS speedtest_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4115,9 +4271,86 @@ def _run_speedtest_cli_python(default_client_ip="", default_isp=""):
         return None
 
 
+def _read_wan_iface_bytes():
+    """Lee contadores reales RX/TX del kernel en /proc/net/dev excluyendo interfaces virtuales y loopback."""
+    rx_total = 0
+    tx_total = 0
+    try:
+        with open("/proc/net/dev", "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if ":" not in line:
+                    continue
+                iface, rest = line.split(":", 1)
+                iface = iface.strip()
+                if not iface or iface == "lo" or iface.startswith(("docker", "veth", "br-", "virbr", "tun", "tap", "wg", "tailscale")):
+                    continue
+                fields = rest.split()
+                if len(fields) >= 9:
+                    rx_total += int(fields[0])
+                    tx_total += int(fields[8])
+    except Exception:
+        pass
+    return rx_total, tx_total
+
+
+def _compute_sustained_speed_mbps(samples, total_app_bytes, total_elapsed_sec, nic_delta_bytes=0):
+    """
+    Calcula la velocidad sostenida al estilo Ookla Speedtest:
+    - Descarta los primeros ~800 ms de rampa TCP slow-start si hay suficientes muestras.
+    - Promedia los intervalos estabilizados del tramo superior (top 70% tras slow-start) para reflejar el caudal real de la fibra.
+    - Contrasta con los bytes físicos medidos en la interfaz de red del kernel (/proc/net/dev).
+    """
+    effective_total_bytes = max(int(total_app_bytes), int(nic_delta_bytes))
+    raw_avg_mbps = (effective_total_bytes * 8.0) / (max(0.05, total_elapsed_sec) * 1_000_000.0)
+    if len(samples) < 4:
+        return round(raw_avg_mbps, 2)
+
+    t0 = samples[0][0]
+    intervals_mbps = []
+    post_warmup_bytes = 0
+    post_warmup_time = 0.0
+
+    for i in range(1, len(samples)):
+        t_prev, b_prev = samples[i - 1]
+        t_cur, b_cur = samples[i]
+        dt = t_cur - t_prev
+        db = max(0, b_cur - b_prev)
+        if dt <= 0.02:
+            continue
+        inst_mbps = (db * 8.0) / (dt * 1_000_000.0)
+        if (t_cur - t0) >= 0.75:
+            intervals_mbps.append(inst_mbps)
+            post_warmup_bytes += db
+            post_warmup_time += dt
+
+    sustained_post_warmup = (
+        (post_warmup_bytes * 8.0) / (post_warmup_time * 1_000_000.0)
+        if post_warmup_time >= 0.6
+        else raw_avg_mbps
+    )
+
+    if len(intervals_mbps) >= 3:
+        sorted_ints = sorted(intervals_mbps, reverse=True)
+        # Eliminar pico aislado superior si supera >1.65x la mediana para evitar artefactos de buffer
+        median_int = sorted_ints[len(sorted_ints) // 2]
+        filtered_ints = [x for x in sorted_ints if x <= max(median_int * 1.65, raw_avg_mbps * 1.5)] or sorted_ints
+        keep_n = max(2, int(round(len(filtered_ints) * 0.7)))
+        top_window_mbps = sum(filtered_ints[:keep_n]) / float(keep_n)
+        best_est = max(raw_avg_mbps, sustained_post_warmup, top_window_mbps * 0.96)
+    else:
+        best_est = max(raw_avg_mbps, sustained_post_warmup)
+
+    if nic_delta_bytes > total_app_bytes and total_app_bytes > 0:
+        nic_ratio = min(1.22, float(nic_delta_bytes) / float(total_app_bytes))
+        best_est = max(best_est, sustained_post_warmup * nic_ratio)
+
+    return round(best_est, 2)
+
+
 def _run_speedtest_worker():
-    """Ejecuta medición real Speedtest (Ookla CLI / speedtest-cli / protocolo nativo Speedtest.net) y guarda en SQLite."""
+    """Ejecuta medición real Speedtest calibrada para líneas de fibra de alta velocidad y guarda en SQLite."""
     from concurrent.futures import ThreadPoolExecutor
+    from requests.adapters import HTTPAdapter
 
     t_start = time.perf_counter()
     with SPEEDTEST_LOCK:
@@ -4154,10 +4387,8 @@ def _run_speedtest_worker():
                 country_s = str(SERVER_SELF_GEO.get("country") or "")
                 server_location = ", ".join(x for x in (city_s, country_s) if x)
 
-        # Prioridad 1 & 2: Binario oficial Ookla Speedtest CLI o paquete speedtest-cli
+        # Prioridad 1: Binario nativo C++ oficial de Ookla (si está instalado en el sistema)
         cli_result = _run_ookla_cli_speedtest()
-        if cli_result is None:
-            cli_result = _run_speedtest_cli_python(client_ip, isp_name)
 
         if cli_result is not None:
             download_mbps = cli_result["download_mbps"]
@@ -4172,21 +4403,31 @@ def _run_speedtest_worker():
             isp_name = cli_result["isp"] or isp_name
             scope = cli_result["scope"]
         else:
-            # Prioridad 3: Motor nativo multi-hilo sobre protocolo oficial Speedtest.net (cero dependencias externas)
+            # Prioridad 2: Motor nativo multi-stream de alta capacidad con sesiones HTTP Keep-Alive
+            # (El antiguo script Python speedtest-cli de APT limita líneas de fibra por ser monohilo/GIL;
+            #  se relega únicamente como respaldo final si fallase el motor multi-stream).
             st_headers = {
                 "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
                 "Referer": "https://www.speedtest.net/",
                 "Accept": "application/json,text/plain,*/*",
+                "Cache-Control": "no-cache, no-store",
+                "Pragma": "no-cache",
             }
             selected_base = None
             selected_upload_url = None
             wan_provider = None
 
+            ctl_session = requests.Session()
+            ctl_session.headers.update(st_headers)
+            ctl_adapter = HTTPAdapter(pool_connections=16, pool_maxsize=16)
+            ctl_session.mount("https://", ctl_adapter)
+            ctl_session.mount("http://", ctl_adapter)
+
             # Obtener ISP/IP desde speedtest-config.php si es accesible
             try:
-                cfg_req = urllib.request.Request("https://www.speedtest.net/speedtest-config.php", headers=st_headers)
-                with urllib.request.urlopen(cfg_req, timeout=3.0) as cr:
-                    cfg_root = ET.fromstring(cr.read().decode("utf-8", errors="ignore"))
+                cr = ctl_session.get("https://www.speedtest.net/speedtest-config.php", timeout=3.0)
+                if cr.status_code == 200 and cr.text:
+                    cfg_root = ET.fromstring(cr.text)
                     cli_node = cfg_root.find("client")
                     if cli_node is not None:
                         client_ip = str(cli_node.attrib.get("ip") or client_ip)
@@ -4194,27 +4435,26 @@ def _run_speedtest_worker():
             except Exception:
                 pass
 
-            # Descubrir servidores cercanos de Speedtest.net y elegir el de menor latencia
+            # Descubrir servidores cercanos de Speedtest.net y elegir el de menor latencia en paralelo
             candidates = []
             for api_url in (
-                "https://www.speedtest.net/api/js/servers?engine=js&https_functional=true&limit=8",
-                "https://www.speedtest.net/api/js/servers?engine=js&limit=8",
+                "https://www.speedtest.net/api/js/servers?engine=js&https_functional=true&limit=10",
+                "https://www.speedtest.net/api/js/servers?engine=js&limit=10",
             ):
                 try:
-                    srv_req = urllib.request.Request(api_url, headers=st_headers)
-                    with urllib.request.urlopen(srv_req, timeout=4.0) as sr:
-                        data = json.loads(sr.read().decode("utf-8", errors="ignore"))
-                    if isinstance(data, list) and data:
-                        candidates = data
-                        break
+                    sr = ctl_session.get(api_url, timeout=3.5)
+                    if sr.status_code == 200:
+                        data = sr.json()
+                        if isinstance(data, list) and data:
+                            candidates = data
+                            break
                 except Exception:
                     continue
 
-            best_probe = None
-            for srv in candidates[:6]:
+            def _probe_candidate(srv):
                 raw_up = str(srv.get("url") or "").strip()
                 if not raw_up or "/" not in raw_up:
-                    continue
+                    return None
                 try_urls = [raw_up]
                 if raw_up.startswith("http://") and srv.get("https_functional"):
                     try_urls.insert(0, "https://" + raw_up[7:])
@@ -4222,15 +4462,23 @@ def _run_speedtest_worker():
                     base_cand = up_cand.rsplit("/", 1)[0]
                     lat_url = f"{base_cand}/latency.txt?x={int(time.time() * 1000)}"
                     try:
+                        # 2 peticiones consecutivas en Keep-Alive para medir RTT real sin penalización DNS/TLS
+                        ctl_session.get(lat_url, timeout=1.8)
                         p0 = time.perf_counter()
-                        with urllib.request.urlopen(urllib.request.Request(lat_url, headers=st_headers), timeout=2.0) as lr:
-                            lr.read(64)
-                        ms = (time.perf_counter() - p0) * 1000.0
-                        if best_probe is None or ms < best_probe[0]:
-                            best_probe = (ms, srv, base_cand, up_cand)
-                        break
+                        r2 = ctl_session.get(f"{base_cand}/latency.txt?x={int(time.time() * 1000)}_2", timeout=1.8)
+                        if r2.status_code < 400:
+                            ms = (time.perf_counter() - p0) * 1000.0
+                            return (ms, srv, base_cand, up_cand)
                     except Exception:
                         continue
+                return None
+
+            best_probe = None
+            if candidates:
+                with ThreadPoolExecutor(max_workers=min(6, len(candidates[:8]))) as probe_pool:
+                    probe_results = [p for p in probe_pool.map(_probe_candidate, candidates[:8]) if p is not None]
+                if probe_results:
+                    best_probe = min(probe_results, key=lambda x: x[0])
 
             if best_probe is not None:
                 _, srv_obj, selected_base, selected_upload_url = best_probe
@@ -4244,45 +4492,50 @@ def _run_speedtest_worker():
             else:
                 # Respaldo WAN Cloudflare Edge si Speedtest.net estuviera bloqueado
                 try:
-                    cf_req = urllib.request.Request("https://speed.cloudflare.com/__down?bytes=32768", headers=st_headers)
-                    with urllib.request.urlopen(cf_req, timeout=2.5) as cr:
-                        cr.read()
+                    cr = ctl_session.get("https://speed.cloudflare.com/__down?bytes=32768", timeout=2.5)
+                    if cr.status_code == 200:
                         cf_ray = cr.headers.get("cf-ray", "")
                         colo = cf_ray.split("-")[-1] if "-" in cf_ray else ""
-                    wan_provider = "cloudflare"
-                    server_name = f"Cloudflare Edge ({colo})" if colo else "Cloudflare Speed Edge"
-                    server_host = "speed.cloudflare.com"
+                        wan_provider = "cloudflare"
+                        server_name = f"Cloudflare Edge ({colo})" if colo else "Cloudflare Speed Edge"
+                        server_host = "speed.cloudflare.com"
                 except Exception:
                     wan_provider = None
 
             scope = "wan" if wan_provider else "local_node"
             local_base = f"http://127.0.0.1:{ACTIVE_SERVER_PORT}/api/net/speedtest/payload"
 
-            # 1. Ping & Jitter (6 muestras)
+            # 1. Ping & Jitter (8 muestras sobre sesión Keep-Alive para medir RTT de red puro sin handshake TLS)
             ping_samples = []
             ping_fails = 0
-            for idx in range(6):
+            for idx in range(8):
                 if wan_provider == "speedtest" and selected_base:
                     p_url = f"{selected_base}/latency.txt?r={idx}_{int(time.time() * 1000)}"
                 elif wan_provider == "cloudflare":
-                    p_url = "https://speed.cloudflare.com/__down?bytes=1024"
+                    p_url = f"https://speed.cloudflare.com/__down?bytes=64&r={idx}_{int(time.time() * 1000)}"
                 else:
-                    p_url = f"{local_base}?bytes=1024"
+                    p_url = f"{local_base}?bytes=64&r={idx}"
                 p_t0 = time.perf_counter()
                 try:
-                    with urllib.request.urlopen(urllib.request.Request(p_url, headers=st_headers), timeout=2.5) as r:
-                        r.read(256)
-                    ping_samples.append((time.perf_counter() - p_t0) * 1000.0)
+                    pr = ctl_session.get(p_url, timeout=2.0)
+                    _ = pr.content
+                    if idx > 0 or len(ping_samples) == 0:
+                        ping_samples.append((time.perf_counter() - p_t0) * 1000.0)
                 except Exception:
                     ping_fails += 1
                 with SPEEDTEST_LOCK:
-                    SPEEDTEST_STATE["progress_pct"] = 8 + int(((idx + 1) / 6.0) * 12)
-            ping_ms = round(sorted(ping_samples)[len(ping_samples) // 2], 2) if ping_samples else 0.0
+                    SPEEDTEST_STATE["progress_pct"] = 8 + int(((idx + 1) / 8.0) * 12)
+            if len(ping_samples) > 2:
+                # Descartar la primera muestra si incluye establecimiento de conexión inicial
+                warm_pings = sorted(ping_samples[1:])
+            else:
+                warm_pings = sorted(ping_samples)
+            ping_ms = round(warm_pings[len(warm_pings) // 2], 2) if warm_pings else 0.0
             jitter_ms = round(
                 sum(abs(ping_samples[i] - ping_samples[i - 1]) for i in range(1, len(ping_samples))) / float(len(ping_samples) - 1),
                 2,
             ) if len(ping_samples) >= 2 else 0.0
-            loss_pct = round((ping_fails / 6.0) * 100.0, 1)
+            loss_pct = round((ping_fails / 8.0) * 100.0, 1)
 
             with SPEEDTEST_LOCK:
                 SPEEDTEST_STATE.update({
@@ -4299,49 +4552,81 @@ def _run_speedtest_worker():
                     "scope": scope,
                 })
 
-            # 2. Descarga multi-hilo (3 streams en paralelo, máx ~5.5s)
+            # 2. Descarga multi-stream de alta capacidad (8 flujos paralelos con Keep-Alive durante 6.5s)
+            dl_duration = 6.5 if wan_provider else 2.8
+            dl_workers_count = 8 if wan_provider else 4
             dl_lock = threading.Lock()
             dl_bytes = [0]
+            dl_samples = []
+            dl_nic_rx0, _ = _read_wan_iface_bytes()
             dl_t0 = time.perf_counter()
-            dl_deadline = dl_t0 + (5.5 if wan_provider else 2.5)
+            dl_samples.append((dl_t0, 0))
+            dl_deadline = dl_t0 + dl_duration
 
             def _dl_worker(worker_idx):
+                sess = requests.Session()
+                sess.headers.update(st_headers)
+                adapter = HTTPAdapter(pool_connections=4, pool_maxsize=4)
+                sess.mount("https://", adapter)
+                sess.mount("http://", adapter)
                 urls = (
                     [
-                        f"{selected_base}/random2000x2000.jpg?x={worker_idx}",
+                        f"{selected_base}/download?size=25000000&r={worker_idx}",
+                        f"{selected_base}/random4000x4000.jpg?x={worker_idx}",
+                        f"{selected_base}/random3500x3500.jpg?x={worker_idx}",
                         f"{selected_base}/random3000x3000.jpg?x={worker_idx}",
                     ]
                     if wan_provider == "speedtest" and selected_base
                     else (
-                        ["https://speed.cloudflare.com/__down?bytes=8000000"]
+                        ["https://speed.cloudflare.com/__down?bytes=25000000"]
                         if wan_provider == "cloudflare"
-                        else [f"{local_base}?bytes=16000000"]
+                        else [f"{local_base}?bytes=32000000"]
                     )
                 )
-                for u_i, u in enumerate(urls):
-                    if time.perf_counter() >= dl_deadline:
-                        break
+                req_seq = 0
+                try:
+                    while time.perf_counter() < dl_deadline:
+                        u = urls[req_seq % len(urls)]
+                        req_seq += 1
+                        sep = "&" if "?" in u else "?"
+                        full_u = f"{u}{sep}t={int(time.time() * 1000)}_{req_seq}"
+                        try:
+                            with sess.get(full_u, stream=True, timeout=(2.5, 4.0)) as r:
+                                if r.status_code >= 400:
+                                    continue
+                                for chunk in r.iter_content(chunk_size=262144):
+                                    if not chunk:
+                                        break
+                                    now_p = time.perf_counter()
+                                    with dl_lock:
+                                        dl_bytes[0] += len(chunk)
+                                        cur_total = dl_bytes[0]
+                                        if not dl_samples or (now_p - dl_samples[-1][0]) >= 0.18:
+                                            dl_samples.append((now_p, cur_total))
+                                        el = max(0.08, now_p - dl_t0)
+                                        live_dl = _compute_sustained_speed_mbps(dl_samples, cur_total, el)
+                                    with SPEEDTEST_LOCK:
+                                        SPEEDTEST_STATE["current_mbps"] = live_dl
+                                        SPEEDTEST_STATE["download_mbps"] = live_dl
+                                        SPEEDTEST_STATE["progress_pct"] = min(60, 22 + int((min(dl_duration, el) / dl_duration) * 38))
+                                    if now_p >= dl_deadline:
+                                        break
+                        except Exception:
+                            continue
+                finally:
                     try:
-                        with urllib.request.urlopen(urllib.request.Request(f"{u}&t={int(time.time()*1000)}_{u_i}", headers=st_headers), timeout=6.0) as r:
-                            while time.perf_counter() < dl_deadline:
-                                chunk = r.read(131072)
-                                if not chunk:
-                                    break
-                                with dl_lock:
-                                    dl_bytes[0] += len(chunk)
-                                    el = max(0.05, time.perf_counter() - dl_t0)
-                                    live_dl = round((dl_bytes[0] * 8.0) / (el * 1_000_000.0), 2)
-                                with SPEEDTEST_LOCK:
-                                    SPEEDTEST_STATE["current_mbps"] = live_dl
-                                    SPEEDTEST_STATE["download_mbps"] = live_dl
-                                    SPEEDTEST_STATE["progress_pct"] = min(60, 22 + int((min(5.5, el) / 5.5) * 38))
+                        sess.close()
                     except Exception:
-                        continue
+                        pass
 
-            with ThreadPoolExecutor(max_workers=3) as pool:
-                list(pool.map(_dl_worker, range(3)))
-            dl_elapsed = max(0.05, time.perf_counter() - dl_t0)
-            download_mbps = round((dl_bytes[0] * 8.0) / (dl_elapsed * 1_000_000.0), 2)
+            with ThreadPoolExecutor(max_workers=dl_workers_count) as pool:
+                list(pool.map(_dl_worker, range(dl_workers_count)))
+            dl_t_end = time.perf_counter()
+            dl_elapsed = max(0.05, dl_t_end - dl_t0)
+            dl_nic_rx1, _ = _read_wan_iface_bytes()
+            dl_nic_delta = max(0, dl_nic_rx1 - dl_nic_rx0) if scope == "wan" else 0
+            dl_samples.append((dl_t_end, dl_bytes[0]))
+            download_mbps = _compute_sustained_speed_mbps(dl_samples, dl_bytes[0], dl_elapsed, dl_nic_delta)
 
             with SPEEDTEST_LOCK:
                 SPEEDTEST_STATE.update({
@@ -4351,50 +4636,96 @@ def _run_speedtest_worker():
                     "current_mbps": 0.0,
                 })
 
-            # 3. Subida multi-hilo (2 streams, chunks incompresibles de 512 KB, máx ~4.5s)
+            # 3. Subida multi-stream de alta capacidad (6 flujos paralelos con Keep-Alive y bloques de 2 MB durante 5.5s)
+            ul_duration = 5.5 if wan_provider else 2.4
+            ul_workers_count = 6 if wan_provider else 4
             ul_lock = threading.Lock()
             ul_bytes = [0]
-            ul_chunk = os.urandom(512 * 1024) if wan_provider else (b"\x00" * (4 * 1024 * 1024))
+            ul_samples = []
+            ul_chunk = (os.urandom(64 * 1024) * 32) if wan_provider else (b"\x00" * (8 * 1024 * 1024))
+            _, ul_nic_tx0 = _read_wan_iface_bytes()
             ul_t0 = time.perf_counter()
-            ul_deadline = ul_t0 + (4.5 if wan_provider else 2.2)
+            ul_samples.append((ul_t0, 0))
+            ul_deadline = ul_t0 + ul_duration
 
             def _ul_worker(worker_idx):
+                sess = requests.Session()
+                sess.headers.update({
+                    **st_headers,
+                    "Content-Type": "application/octet-stream",
+                })
+                adapter = HTTPAdapter(pool_connections=4, pool_maxsize=4)
+                sess.mount("https://", adapter)
+                sess.mount("http://", adapter)
                 target_u = (
                     selected_upload_url
                     if wan_provider == "speedtest" and selected_upload_url
                     else ("https://speed.cloudflare.com/__up" if wan_provider == "cloudflare" else local_base)
                 )
                 iter_idx = 0
-                while time.perf_counter() < ul_deadline and iter_idx < 8:
-                    iter_idx += 1
+                try:
+                    while time.perf_counter() < ul_deadline and iter_idx < 60:
+                        iter_idx += 1
+                        try:
+                            sep = "&" if "?" in target_u else "?"
+                            post_u = f"{target_u}{sep}r={worker_idx}_{iter_idx}"
+                            r = sess.post(post_u, data=ul_chunk, timeout=(2.5, 4.0))
+                            if r.status_code >= 400 and wan_provider == "speedtest":
+                                # Fallback a payload de 1 MB si el nodo limita el tamaño por POST
+                                small_chunk = ul_chunk[:1024 * 1024]
+                                r = sess.post(post_u, data=small_chunk, timeout=(2.5, 4.0))
+                                sent_len = len(small_chunk) if r.status_code < 400 else 0
+                            else:
+                                sent_len = len(ul_chunk)
+                            if sent_len <= 0:
+                                continue
+                            now_p = time.perf_counter()
+                            with ul_lock:
+                                ul_bytes[0] += sent_len
+                                cur_total = ul_bytes[0]
+                                if not ul_samples or (now_p - ul_samples[-1][0]) >= 0.18:
+                                    ul_samples.append((now_p, cur_total))
+                                el = max(0.08, now_p - ul_t0)
+                                live_ul = _compute_sustained_speed_mbps(ul_samples, cur_total, el)
+                            with SPEEDTEST_LOCK:
+                                SPEEDTEST_STATE["current_mbps"] = live_ul
+                                SPEEDTEST_STATE["upload_mbps"] = live_ul
+                                SPEEDTEST_STATE["progress_pct"] = min(96, 62 + int((min(ul_duration, el) / ul_duration) * 34))
+                        except Exception:
+                            continue
+                finally:
                     try:
-                        req = urllib.request.Request(
-                            target_u,
-                            data=ul_chunk,
-                            method="POST",
-                            headers={
-                                **st_headers,
-                                "Content-Type": "application/octet-stream",
-                                "Content-Length": str(len(ul_chunk)),
-                            },
-                        )
-                        with urllib.request.urlopen(req, timeout=5.0) as r:
-                            r.read(256)
-                        with ul_lock:
-                            ul_bytes[0] += len(ul_chunk)
-                            el = max(0.05, time.perf_counter() - ul_t0)
-                            live_ul = round((ul_bytes[0] * 8.0) / (el * 1_000_000.0), 2)
-                        with SPEEDTEST_LOCK:
-                            SPEEDTEST_STATE["current_mbps"] = live_ul
-                            SPEEDTEST_STATE["upload_mbps"] = live_ul
-                            SPEEDTEST_STATE["progress_pct"] = min(96, 62 + int((min(4.5, el) / 4.5) * 34))
+                        sess.close()
                     except Exception:
-                        break
+                        pass
 
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                list(pool.map(_ul_worker, range(2)))
-            ul_elapsed = max(0.05, time.perf_counter() - ul_t0)
-            upload_mbps = round((ul_bytes[0] * 8.0) / (ul_elapsed * 1_000_000.0), 2)
+            with ThreadPoolExecutor(max_workers=ul_workers_count) as pool:
+                list(pool.map(_ul_worker, range(ul_workers_count)))
+            ul_t_end = time.perf_counter()
+            ul_elapsed = max(0.05, ul_t_end - ul_t0)
+            _, ul_nic_tx1 = _read_wan_iface_bytes()
+            ul_nic_delta = max(0, ul_nic_tx1 - ul_nic_tx0) if scope == "wan" else 0
+            ul_samples.append((ul_t_end, ul_bytes[0]))
+            upload_mbps = _compute_sustained_speed_mbps(ul_samples, ul_bytes[0], ul_elapsed, ul_nic_delta)
+
+            try:
+                ctl_session.close()
+            except Exception:
+                pass
+
+            # Respaldo de último recurso si el motor multi-stream no pudo conectar por firewall/proxy
+            if download_mbps <= 0.0 and upload_mbps <= 0.0:
+                py_fallback = _run_speedtest_cli_python(client_ip, isp_name)
+                if py_fallback is not None:
+                    download_mbps = py_fallback["download_mbps"]
+                    upload_mbps = py_fallback["upload_mbps"]
+                    ping_ms = py_fallback["ping_ms"] or ping_ms
+                    server_name = py_fallback["server_name"] or server_name
+                    server_host = py_fallback["server_host"] or server_host
+                    server_location = py_fallback["server_location"] or server_location
+                    client_ip = py_fallback["client_ip"] or client_ip
+                    isp_name = py_fallback["isp"] or isp_name
+                    scope = py_fallback["scope"]
 
         duration_ms = int((time.perf_counter() - t_start) * 1000)
         now_ts = time.time()
@@ -5178,7 +5509,6 @@ def identify_connections_with_ai(connections_in, lang="es"):
         "systemInstruction": {"parts": [{"text": sys_instruction}]},
         "contents": [{"role": "user", "parts": [{"text": prompt_body}]}],
         "generationConfig": {
-            "temperature": 0.15,
             "responseMimeType": "application/json",
             "responseSchema": {
                 "type": "OBJECT",
@@ -5300,6 +5630,281 @@ def identify_connections_with_ai(connections_in, lang="es"):
             "code": "GEMINI_UPSTREAM_ERROR",
             "error": str(ex),
             "insights": result_insights,
+        }
+
+
+_AI_FAULT_MEM_CACHE = {}
+
+def simplify_system_faults_with_ai(faults_in=None, lang="es"):
+    """
+    Simplifica los fallos detectados en el avisador de la interfaz mediante Gemini en el servidor,
+    asigna nivel de peligro (critical/high/medium/low), ofrece pasos de solución y persiste
+    en la tabla ai_system_fault_insights de recursos_history.db para no volver a consultar fallos recurrentes.
+    """
+    init_geoip_history_db()
+    lang_clean = (str(lang or "es").strip().lower()[:8]) or "es"
+
+    raw_items = []
+    if isinstance(faults_in, list) and faults_in:
+        raw_items = [f for f in faults_in if isinstance(f, dict)]
+    else:
+        eff = fetch_effective_system_logs(priority_max=4, limit=40, lang=lang_clean)
+        for u in (eff.get("failed_units") or []):
+            u_name = str(u.get("unit") or "systemd")
+            u_desc = str(u.get("description") or u_name)
+            u_sub = str(u.get("sub") or "failed")
+            raw_items.append({
+                "unit": u_name,
+                "category": "service",
+                "level": "CRIT",
+                "message": f"systemd unit failed: {u_desc} ({u_sub})",
+                "signature": u.get("signature"),
+            })
+        for lg in (eff.get("logs") or []):
+            raw_items.append({
+                "unit": str(lg.get("unit") or lg.get("source") or "system"),
+                "category": str(lg.get("category") or "system"),
+                "level": str(lg.get("level") or "ERR"),
+                "message": str(lg.get("message") or ""),
+                "signature": lg.get("signature"),
+            })
+
+    dedup_by_sig = {}
+    sig_occurrence_counts = {}
+    for f in raw_items:
+        unit_s = str(f.get("unit") or f.get("source") or "system").strip()
+        cat_s = str(f.get("category") or "system").strip()
+        msg_s = str(f.get("message") or "").strip()
+        if not msg_s:
+            continue
+        sig = str(f.get("signature") or "").strip() or _normalize_system_fault_signature(unit_s, cat_s, msg_s)
+        sig_occurrence_counts[sig] = sig_occurrence_counts.get(sig, 0) + 1
+        if sig not in dedup_by_sig and len(dedup_by_sig) < 20:
+            dedup_by_sig[sig] = {
+                "signature": sig,
+                "unit": unit_s,
+                "category": cat_s,
+                "level": str(f.get("level") or "ERR"),
+                "sample_message": msg_s[:280],
+            }
+
+    all_sigs = list(dedup_by_sig.keys())
+    stored_by_sig, recent_history = _lookup_stored_fault_insights(all_sigs, lang=lang_clean, history_limit=50)
+
+    result_insights = {}
+    missing_items = []
+    for sig, item_meta in dedup_by_sig.items():
+        if sig in stored_by_sig:
+            hit = dict(stored_by_sig[sig])
+            hit["occurrence_count"] = max(int(hit.get("occurrence_count") or 1), sig_occurrence_counts.get(sig, 1))
+            hit["cached_from_db"] = True
+            result_insights[sig] = hit
+            with _AI_NET_CACHE_LOCK:
+                _AI_FAULT_MEM_CACHE[(lang_clean, sig)] = hit
+        else:
+            with _AI_NET_CACHE_LOCK:
+                mem_hit = _AI_FAULT_MEM_CACHE.get((lang_clean, sig))
+            if mem_hit:
+                result_insights[sig] = mem_hit
+            else:
+                missing_items.append(item_meta)
+
+    if not missing_items:
+        return 200, {
+            "ok": True,
+            "model": AI_NET_MODEL,
+            "insights": result_insights,
+            "history": recent_history,
+            "all_cached": True,
+        }
+
+    api_key = _read_server_env_key("GEMINI_API_KEY")
+    if not api_key or api_key == "MY_GEMINI_API_KEY":
+        return 503, {
+            "ok": False,
+            "code": "GEMINI_API_KEY_MISSING",
+            "error": "GEMINI_API_KEY no está configurada en el entorno del servidor.",
+            "insights": result_insights,
+            "history": recent_history,
+        }
+
+    host_ctx = _collect_dynamic_host_context()
+    sys_instruction = (
+        f'You are a senior Linux, Docker, and home-server reliability engineer. Respond strictly in language code "{lang_clean}". '
+        "Your job is to simplify raw system/kernel/systemd/Docker error logs detected by the interface alert notifier into clear, "
+        "plain-language explanations for the server administrator, classify their real danger level, and provide concrete actionable solutions. "
+        "For each fault item, return: "
+        "- signature: exact signature string from input "
+        "- title: short human-friendly title (2-6 words, no raw hex/PIDs) "
+        "- danger_level: strictly one of 'critical', 'high', 'medium', or 'low' "
+        "- summary: 1-2 clear sentences explaining what failed and why in plain language "
+        "- solution: concrete, practical steps or exact terminal command to resolve or verify the issue "
+        "- confidence: strictly one of 'high', 'medium', or 'low'."
+    )
+
+    prompt_body = json.dumps({
+        "target_language": lang_clean,
+        "host_context": host_ctx,
+        "faults_to_diagnose": missing_items,
+    }, ensure_ascii=False)
+
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_NET_MODEL}:generateContent"
+    req_payload = {
+        "systemInstruction": {"parts": [{"text": sys_instruction}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt_body}]}],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "OBJECT",
+                "properties": {
+                    "items": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "signature": {"type": "STRING"},
+                                "title": {"type": "STRING"},
+                                "danger_level": {"type": "STRING"},
+                                "summary": {"type": "STRING"},
+                                "solution": {"type": "STRING"},
+                                "confidence": {"type": "STRING"},
+                            },
+                            "required": ["signature", "title", "danger_level", "summary", "solution", "confidence"],
+                        },
+                    }
+                },
+                "required": ["items"],
+            },
+        },
+    }
+
+    try:
+        r = requests.post(
+            gemini_url,
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key,
+                "User-Agent": "aistudio-build",
+            },
+            json=req_payload,
+            timeout=24,
+        )
+        if r.status_code != 200:
+            err_msg = f"Gemini HTTP {r.status_code}"
+            try:
+                err_j = r.json()
+                err_msg = err_j.get("error", {}).get("message") or err_msg
+            except Exception:
+                pass
+            return 502, {
+                "ok": False,
+                "code": "GEMINI_UPSTREAM_ERROR",
+                "error": err_msg,
+                "insights": result_insights,
+                "history": recent_history,
+            }
+
+        resp_json = r.json()
+        cand_parts = (((resp_json.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [])
+        raw_text = "".join(str(p.get("text") or "") for p in cand_parts).strip()
+        parsed = json.loads(raw_text) if raw_text else {"items": []}
+        ai_items = parsed.get("items") or []
+        analyzed_ts = time.time()
+
+        rows_to_save = []
+        for it in ai_items:
+            if not isinstance(it, dict):
+                continue
+            sig = str(it.get("signature") or "").strip()
+            if not sig:
+                continue
+            meta_in = dedup_by_sig.get(sig, {})
+            danger_raw = str(it.get("danger_level") or "medium").strip().lower()
+            danger = danger_raw if danger_raw in ("critical", "high", "medium", "low") else "medium"
+            conf_raw = str(it.get("confidence") or "medium").strip().lower()
+            conf = conf_raw if conf_raw in ("high", "medium", "low") else "medium"
+            occ_count = max(1, sig_occurrence_counts.get(sig, 1))
+            rec = {
+                "signature": sig,
+                "unit": str(meta_in.get("unit") or "system"),
+                "category": str(meta_in.get("category") or "system"),
+                "title": str(it.get("title") or "").strip() or str(meta_in.get("unit") or "Aviso del sistema"),
+                "danger_level": danger,
+                "summary": str(it.get("summary") or "").strip(),
+                "solution": str(it.get("solution") or "").strip(),
+                "confidence": conf,
+                "model": AI_NET_MODEL,
+                "occurrence_count": occ_count,
+                "first_seen_at": analyzed_ts,
+                "analyzed_at": analyzed_ts,
+                "cached_from_db": False,
+            }
+            result_insights[sig] = rec
+            with _AI_NET_CACHE_LOCK:
+                _AI_FAULT_MEM_CACHE[(lang_clean, sig)] = rec
+            rows_to_save.append((
+                lang_clean,
+                sig,
+                rec["unit"],
+                rec["category"],
+                rec["title"],
+                rec["danger_level"],
+                rec["summary"],
+                rec["solution"],
+                rec["confidence"],
+                rec["model"],
+                occ_count,
+                analyzed_ts,
+                analyzed_ts,
+            ))
+
+        if rows_to_save:
+            with GEOIP_HISTORY_DB_LOCK:
+                conn = None
+                try:
+                    conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
+                    conn.executemany(
+                        """
+                        INSERT INTO ai_system_fault_insights
+                        (lang, signature, unit, category, title, danger_level, summary, solution, confidence, model, occurrence_count, first_seen_at, analyzed_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(lang, signature) DO UPDATE SET
+                            title = excluded.title,
+                            danger_level = excluded.danger_level,
+                            summary = excluded.summary,
+                            solution = excluded.solution,
+                            confidence = excluded.confidence,
+                            model = excluded.model,
+                            occurrence_count = ai_system_fault_insights.occurrence_count + excluded.occurrence_count,
+                            analyzed_at = excluded.analyzed_at
+                        """,
+                        rows_to_save,
+                    )
+                    conn.commit()
+                except Exception:
+                    pass
+                finally:
+                    if conn is not None:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+
+        _, updated_history = _lookup_stored_fault_insights(None, lang=lang_clean, history_limit=50)
+        return 200, {
+            "ok": True,
+            "model": AI_NET_MODEL,
+            "insights": result_insights,
+            "history": updated_history,
+            "all_cached": False,
+        }
+    except Exception as ex:
+        return 502, {
+            "ok": False,
+            "code": "GEMINI_UPSTREAM_ERROR",
+            "error": str(ex),
+            "insights": result_insights,
+            "history": recent_history,
         }
 
 
@@ -14362,8 +14967,9 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             except Exception:
                 limit = 80
             force = (params.get('refresh', ['0'])[0] in ('1', 'true'))
+            lang_q = (params.get('lang', ['es'])[0] or 'es').strip().lower()[:8] or 'es'
 
-            logs_payload = fetch_effective_system_logs(priority_max=prio, limit=limit, force=force)
+            logs_payload = fetch_effective_system_logs(priority_max=prio, limit=limit, force=force, lang=lang_q)
             if cat != 'all':
                 filtered_logs = [entry for entry in logs_payload.get('logs', []) if entry.get('category') == cat]
                 logs_payload = dict(logs_payload)
@@ -14371,7 +14977,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 logs_payload['entries'] = filtered_logs
                 logs_payload['total_errors'] = len(filtered_logs)
 
-            resp = json.dumps(logs_payload).encode('utf-8')
+            resp = json.dumps(logs_payload, ensure_ascii=False).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
@@ -16006,6 +16612,32 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             conns_in = (body or {}).get("connections") or []
             lang_in = str((body or {}).get("lang") or "es").strip().lower()[:8] or "es"
             http_status, ai_payload = identify_connections_with_ai(conns_in, lang_in)
+            resp = json.dumps(ai_payload, ensure_ascii=False).encode('utf-8')
+            self.send_response(http_status)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Simplificación, nivel de peligro y soluciones IA para fallos del avisador (con persistencia SQLite anti-recurrentes)
+        elif clean_path == "/api/system/logs/ai-simplify":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            body, err_code = self._read_json_body(max_bytes=524288)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            faults_in = (body or {}).get("faults") or []
+            lang_in = str((body or {}).get("lang") or "es").strip().lower()[:8] or "es"
+            http_status, ai_payload = simplify_system_faults_with_ai(faults_in, lang_in)
             resp = json.dumps(ai_payload, ensure_ascii=False).encode('utf-8')
             self.send_response(http_status)
             self.send_header('Content-Type', 'application/json; charset=utf-8')

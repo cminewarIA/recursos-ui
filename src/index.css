@@ -326,10 +326,6 @@
   .dark .cockpit-subtile {
     border-color: #334155;
   }
-  button.cockpit-subtile:active,
-  a.cockpit-subtile:active {
-    transform: scaleX(1.03) scaleY(0.95);
-  }
 
   .cockpit-segmented {
     background-color: var(--bg-surface);
@@ -429,28 +425,21 @@
     border: 1px solid #0284c7;
     color: #ffffff;
     box-shadow: 0 4px 12px -2px rgba(2, 132, 199, 0.32);
-    transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease, filter 200ms ease;
+    transition: background-color 200ms ease, box-shadow 200ms ease, filter 200ms ease;
   }
   .cockpit-btn-accent:hover:not(:disabled) {
     background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
-    transform: translateY(-1.5px) scaleX(1.015) scaleY(0.985);
     box-shadow: 0 8px 18px -4px rgba(2, 132, 199, 0.42);
-  }
-  .cockpit-btn-accent:active:not(:disabled) {
-    transform: scaleX(1.04) scaleY(0.94);
   }
 
   .cockpit-btn-wol {
     background: #ecfdf5;
     border: 1px solid #6ee7b7;
     color: #047857;
-    transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 180ms ease;
+    transition: background-color 180ms ease, border-color 180ms ease;
   }
   .cockpit-btn-wol:hover:not(:disabled) {
     background: #d1fae5;
-  }
-  .cockpit-btn-wol:active:not(:disabled) {
-    transform: scaleX(1.04) scaleY(0.94);
   }
   [data-theme="dark"] .cockpit-btn-wol,
   .dark .cockpit-btn-wol {
@@ -467,13 +456,10 @@
     background: #fef2f2;
     border: 1px solid #fca5a5;
     color: #b91c1c;
-    transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 180ms ease;
+    transition: background-color 180ms ease, border-color 180ms ease;
   }
   .cockpit-btn-off:hover:not(:disabled) {
     background: #fee2e2;
-  }
-  .cockpit-btn-off:active:not(:disabled) {
-    transform: scaleX(1.04) scaleY(0.94);
   }
   [data-theme="dark"] .cockpit-btn-off,
   .dark .cockpit-btn-off {

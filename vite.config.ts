@@ -27,18 +27,64 @@ interface AiConnInsightRecord {
   analyzed_at: number;
 }
 
+interface AiSystemFaultInsightRecord {
+  signature: string;
+  unit: string;
+  category: string;
+  title: string;
+  danger_level: 'critical' | 'high' | 'medium' | 'low';
+  summary: string;
+  solution: string;
+  confidence: 'high' | 'medium' | 'low';
+  model: string;
+  occurrence_count: number;
+  first_seen_at: number;
+  analyzed_at: number;
+  cached_from_db?: boolean;
+}
+
 const aiNetInsightsCache = new Map<string, { insight: AiConnInsightRecord; cachedAt: number }>();
+const aiFaultInsightsCache = new Map<string, { insight: AiSystemFaultInsightRecord; cachedAt: number }>();
 const AI_NET_CACHE_TTL_MS = 30 * 60 * 1000;
+const AI_FAULT_CACHE_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 días: fallos recurrentes jamás se re-consultan
 const aiInsightsDevPath = path.resolve(ROOT_DIR, 'ai_insights_dev.json');
 let cachedHostSocketsSummary: { ts: number; services: string[] } = { ts: 0, services: [] };
+
+export function normalizeSystemFaultSignature(unitStr: string, categoryStr: string, messageStr: string): string {
+  let u = String(unitStr || 'system').trim().toLowerCase();
+  if (u.includes('@') && u.endsWith('.service')) {
+    u = `${u.split('@')[0]}@.service`;
+  }
+  const c = String(categoryStr || 'system').trim().toLowerCase();
+  const m = String(messageStr || '')
+    .trim()
+    .toLowerCase()
+    .replace(/0x[0-9a-f]+/gi, '0x#')
+    .replace(/\[\s*\d+\s*\]/g, '[#]')
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b/g, '#.#.#.#')
+    .replace(/\b\d+\b/g, '#')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 130);
+  return `${u}|${c}|${m}`;
+}
 
 try {
   if (fs.existsSync(aiInsightsDevPath)) {
     const rawAi = JSON.parse(fs.readFileSync(aiInsightsDevPath, 'utf-8'));
     if (rawAi && typeof rawAi === 'object') {
-      for (const [k, v] of Object.entries(rawAi)) {
+      const connMap = rawAi.connections && typeof rawAi.connections === 'object' ? rawAi.connections : rawAi;
+      for (const [k, v] of Object.entries(connMap)) {
+        if (k === 'connections' || k === 'faults') continue;
         if (v && typeof v === 'object' && 'insight' in v && 'cachedAt' in v) {
           aiNetInsightsCache.set(k, v as { insight: AiConnInsightRecord; cachedAt: number });
+        }
+      }
+      if (rawAi.faults && typeof rawAi.faults === 'object') {
+        for (const [k, v] of Object.entries(rawAi.faults)) {
+          if (v && typeof v === 'object' && 'insight' in v && 'cachedAt' in v) {
+            aiFaultInsightsCache.set(k, v as { insight: AiSystemFaultInsightRecord; cachedAt: number });
+          }
         }
       }
     }
@@ -49,12 +95,16 @@ try {
 
 function saveAiInsightsDev() {
   try {
-    const obj: Record<string, { insight: AiConnInsightRecord; cachedAt: number }> = {};
+    const connections: Record<string, { insight: AiConnInsightRecord; cachedAt: number }> = {};
     for (const [k, v] of aiNetInsightsCache.entries()) {
-      obj[k] = v;
+      connections[k] = v;
+    }
+    const faults: Record<string, { insight: AiSystemFaultInsightRecord; cachedAt: number }> = {};
+    for (const [k, v] of aiFaultInsightsCache.entries()) {
+      faults[k] = v;
     }
     const tmp = `${aiInsightsDevPath}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(obj), 'utf-8');
+    fs.writeFileSync(tmp, JSON.stringify({ connections, faults }), 'utf-8');
     fs.renameSync(tmp, aiInsightsDevPath);
   } catch {
     // Ignore dev cache write errors
@@ -2294,7 +2344,98 @@ const SPEEDTEST_HTTP_HEADERS: Record<string, string> = {
   'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   Referer: 'https://www.speedtest.net/',
   Accept: 'application/json,text/plain,*/*',
+  'Cache-Control': 'no-cache, no-store',
+  Pragma: 'no-cache',
 };
+
+const speedtestHttpAgent = new http.Agent({ keepAlive: true, maxSockets: 16 });
+const speedtestHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: 16 });
+
+function readWanIfaceBytesDev(): { rx: number; tx: number } {
+  let rx = 0;
+  let tx = 0;
+  try {
+    if (fs.existsSync('/proc/net/dev')) {
+      const lines = fs.readFileSync('/proc/net/dev', 'utf-8').split('\n');
+      for (const line of lines) {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx <= 0) continue;
+        const iface = line.slice(0, colonIdx).trim();
+        if (
+          !iface ||
+          iface === 'lo' ||
+          iface.startsWith('docker') ||
+          iface.startsWith('veth') ||
+          iface.startsWith('br-') ||
+          iface.startsWith('virbr') ||
+          iface.startsWith('tun') ||
+          iface.startsWith('tap')
+        ) {
+          continue;
+        }
+        const cols = line
+          .slice(colonIdx + 1)
+          .trim()
+          .split(/\s+/);
+        if (cols.length >= 9) {
+          rx += Number(cols[0]) || 0;
+          tx += Number(cols[8]) || 0;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { rx, tx };
+}
+
+function computeSustainedSpeedMbpsDev(
+  samples: Array<{ tMs: number; bytes: number }>,
+  totalAppBytes: number,
+  totalElapsedSec: number,
+  nicDeltaBytes = 0
+): number {
+  const effectiveTotalBytes = Math.max(totalAppBytes, nicDeltaBytes);
+  const rawAvgMbps = (effectiveTotalBytes * 8) / (Math.max(0.05, totalElapsedSec) * 1_000_000);
+  if (samples.length < 4) {
+    return Math.round(rawAvgMbps * 100) / 100;
+  }
+  const t0 = samples[0].tMs;
+  const intervalsMbps: number[] = [];
+  let postWarmupBytes = 0;
+  let postWarmupSec = 0;
+
+  for (let i = 1; i < samples.length; i++) {
+    const dtSec = (samples[i].tMs - samples[i - 1].tMs) / 1000;
+    const db = Math.max(0, samples[i].bytes - samples[i - 1].bytes);
+    if (dtSec <= 0.02) continue;
+    const instMbps = (db * 8) / (dtSec * 1_000_000);
+    if (samples[i].tMs - t0 >= 750) {
+      intervalsMbps.push(instMbps);
+      postWarmupBytes += db;
+      postWarmupSec += dtSec;
+    }
+  }
+
+  const sustainedPostWarmup =
+    postWarmupSec >= 0.6 ? (postWarmupBytes * 8) / (postWarmupSec * 1_000_000) : rawAvgMbps;
+
+  let bestEst = Math.max(rawAvgMbps, sustainedPostWarmup);
+  if (intervalsMbps.length >= 3) {
+    const sorted = [...intervalsMbps].sort((a, b) => b - a);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const filtered = sorted.filter((x) => x <= Math.max(median * 1.65, rawAvgMbps * 1.5));
+    const pool = filtered.length > 0 ? filtered : sorted;
+    const keepN = Math.max(2, Math.round(pool.length * 0.7));
+    const topMean = pool.slice(0, keepN).reduce((acc, v) => acc + v, 0) / keepN;
+    bestEst = Math.max(bestEst, topMean * 0.96);
+  }
+  if (nicDeltaBytes > totalAppBytes && totalAppBytes > 0) {
+    const nicRatio = Math.min(1.22, nicDeltaBytes / totalAppBytes);
+    bestEst = Math.max(bestEst, sustainedPostWarmup * nicRatio);
+  }
+  return Math.round(bestEst * 100) / 100;
+}
 
 function fetchUrlBytes(
   targetUrl: string,
@@ -2309,6 +2450,7 @@ function fetchUrlBytes(
     const t0 = performance.now();
     const isHttps = targetUrl.startsWith('https://');
     const mod = isHttps ? https : http;
+    const agent = isHttps ? speedtestHttpsAgent : speedtestHttpAgent;
     let settled = false;
     const finish = (ok: boolean, bytes: number, headers: http.IncomingHttpHeaders, text?: string) => {
       if (settled) return;
@@ -2318,13 +2460,14 @@ function fetchUrlBytes(
     try {
       const hdrs: Record<string, string | number> = {
         ...SPEEDTEST_HTTP_HEADERS,
+        Connection: 'keep-alive',
         ...(extraHeaders || {}),
       };
       if (bodyBuf) {
         hdrs['Content-Type'] = 'application/octet-stream';
         hdrs['Content-Length'] = bodyBuf.byteLength;
       }
-      const req = mod.request(targetUrl, { method, timeout: timeoutMs, headers: hdrs }, (res) => {
+      const req = mod.request(targetUrl, { method, timeout: timeoutMs, headers: hdrs, agent }, (res) => {
         let totalBytes = 0;
         const textChunks: Buffer[] = [];
         const collectText = !onChunk;
@@ -2648,40 +2791,60 @@ async function runDevSpeedtestWorker(localBaseUrl: string) {
         scope,
       });
 
-      // 2. Multi-stream Download Mbps
+      // 2. Multi-stream Download Mbps (8 streams in parallel with Keep-Alive + TCP slow-start discard)
       let dlBytesTotal = 0;
+      const dlSamples: Array<{ tMs: number; bytes: number }> = [];
+      const dlNic0 = readWanIfaceBytesDev();
       const dlT0 = performance.now();
-      const dlWindowMs = resolvedProvider ? 5000 : 2200;
+      dlSamples.push({ tMs: dlT0, bytes: 0 });
+      const dlWindowMs = resolvedProvider ? 6000 : 2500;
       const dlDeadline = dlT0 + dlWindowMs;
+      const dlWorkersCount = resolvedProvider ? 8 : 4;
       const runDlStream = async (idx: number) => {
         const urls =
           resolvedProvider === 'speedtest'
-            ? [`${selectedBase}/random2000x2000.jpg?x=${idx}`, `${selectedBase}/random3000x3000.jpg?x=${idx}`]
+            ? [
+                `${selectedBase}/download?size=25000000&r=${idx}`,
+                `${selectedBase}/random4000x4000.jpg?x=${idx}`,
+                `${selectedBase}/random3500x3500.jpg?x=${idx}`,
+                `${selectedBase}/random3000x3000.jpg?x=${idx}`,
+              ]
             : resolvedProvider === 'cloudflare'
-              ? ['https://speed.cloudflare.com/__down?bytes=8000000']
-              : [`${localPayloadUrl}?bytes=16000000`];
-        for (let ui = 0; ui < urls.length; ui++) {
-          if (performance.now() >= dlDeadline) break;
+              ? ['https://speed.cloudflare.com/__down?bytes=25000000']
+              : [`${localPayloadUrl}?bytes=32000000`];
+        let reqSeq = 0;
+        while (performance.now() < dlDeadline) {
+          const u = urls[reqSeq % urls.length];
+          reqSeq++;
+          const sep = u.includes('?') ? '&' : '?';
           await fetchUrlBytes(
-            `${urls[ui]}&t=${Date.now()}_${ui}`,
+            `${u}${sep}t=${Date.now()}_${reqSeq}`,
             'GET',
             undefined,
-            6000,
+            4500,
             (n) => {
               dlBytesTotal += n;
-              const elSec = Math.max(0.05, (performance.now() - dlT0) / 1000);
-              const liveDl = Math.round(((dlBytesTotal * 8) / (elSec * 1_000_000)) * 100) / 100;
+              const nowMs = performance.now();
+              if (dlSamples.length === 0 || nowMs - dlSamples[dlSamples.length - 1].tMs >= 180) {
+                dlSamples.push({ tMs: nowMs, bytes: dlBytesTotal });
+              }
+              const elSec = Math.max(0.08, (nowMs - dlT0) / 1000);
+              const liveDl = computeSustainedSpeedMbpsDev(dlSamples, dlBytesTotal, elSec);
               speedtestState.current_mbps = liveDl;
               speedtestState.download_mbps = liveDl;
-              speedtestState.progress_pct = Math.min(60, 22 + Math.round((Math.min(dlWindowMs, performance.now() - dlT0) / dlWindowMs) * 38));
+              speedtestState.progress_pct = Math.min(60, 22 + Math.round((Math.min(dlWindowMs, nowMs - dlT0) / dlWindowMs) * 38));
             },
             dlDeadline
           );
         }
       };
-      await Promise.all([runDlStream(0), runDlStream(1), runDlStream(2)]);
-      const dlElapsedSec = Math.max(0.05, (performance.now() - dlT0) / 1000);
-      downloadMbps = Math.round(((dlBytesTotal * 8) / (dlElapsedSec * 1_000_000)) * 100) / 100;
+      await Promise.all(Array.from({ length: dlWorkersCount }, (_, idx) => runDlStream(idx)));
+      const dlTEnd = performance.now();
+      const dlElapsedSec = Math.max(0.05, (dlTEnd - dlT0) / 1000);
+      const dlNic1 = readWanIfaceBytesDev();
+      const dlNicDelta = scope === 'wan' ? Math.max(0, dlNic1.rx - dlNic0.rx) : 0;
+      dlSamples.push({ tMs: dlTEnd, bytes: dlBytesTotal });
+      downloadMbps = computeSustainedSpeedMbpsDev(dlSamples, dlBytesTotal, dlElapsedSec, dlNicDelta);
 
       Object.assign(speedtestState, {
         phase: 'upload',
@@ -2690,34 +2853,57 @@ async function runDevSpeedtestWorker(localBaseUrl: string) {
         current_mbps: 0,
       });
 
-      // 3. Multi-stream Upload Mbps
-      const ulBuf = resolvedProvider ? crypto.randomBytes(512 * 1024) : Buffer.alloc(4 * 1024 * 1024);
+      // 3. Multi-stream Upload Mbps (6 streams in parallel with 2 MB buffers + Keep-Alive)
+      const ulBuf = resolvedProvider ? crypto.randomBytes(2 * 1024 * 1024) : Buffer.alloc(8 * 1024 * 1024);
       let ulBytesTotal = 0;
+      const ulSamples: Array<{ tMs: number; bytes: number }> = [];
+      const ulNic0 = readWanIfaceBytesDev();
       const ulT0 = performance.now();
-      const ulWindowMs = resolvedProvider ? 4200 : 2000;
+      ulSamples.push({ tMs: ulT0, bytes: 0 });
+      const ulWindowMs = resolvedProvider ? 5200 : 2200;
       const ulDeadline = ulT0 + ulWindowMs;
-      const runUlStream = async () => {
+      const ulWorkersCount = resolvedProvider ? 6 : 4;
+      const runUlStream = async (workerIdx: number) => {
         const uUrl =
           resolvedProvider === 'speedtest'
             ? selectedUploadUrl
             : resolvedProvider === 'cloudflare'
               ? 'https://speed.cloudflare.com/__up'
               : localPayloadUrl;
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 50; i++) {
           if (performance.now() >= ulDeadline) break;
-          const r = await fetchUrlBytes(uUrl, 'POST', ulBuf, 4500);
-          if (!r.ok) break;
-          ulBytesTotal += ulBuf.byteLength;
-          const elSec = Math.max(0.05, (performance.now() - ulT0) / 1000);
-          const liveUl = Math.round(((ulBytesTotal * 8) / (elSec * 1_000_000)) * 100) / 100;
+          const sep = uUrl.includes('?') ? '&' : '?';
+          const r = await fetchUrlBytes(`${uUrl}${sep}r=${workerIdx}_${i}`, 'POST', ulBuf, 4000, undefined, ulDeadline);
+          if (!r.ok) {
+            if (resolvedProvider === 'speedtest') {
+              const fallbackBuf = ulBuf.subarray(0, 1024 * 1024);
+              const rSmall = await fetchUrlBytes(`${uUrl}${sep}r=${workerIdx}_${i}_s`, 'POST', fallbackBuf, 4000, undefined, ulDeadline);
+              if (!rSmall.ok) continue;
+              ulBytesTotal += fallbackBuf.byteLength;
+            } else {
+              continue;
+            }
+          } else {
+            ulBytesTotal += ulBuf.byteLength;
+          }
+          const nowMs = performance.now();
+          if (ulSamples.length === 0 || nowMs - ulSamples[ulSamples.length - 1].tMs >= 180) {
+            ulSamples.push({ tMs: nowMs, bytes: ulBytesTotal });
+          }
+          const elSec = Math.max(0.08, (nowMs - ulT0) / 1000);
+          const liveUl = computeSustainedSpeedMbpsDev(ulSamples, ulBytesTotal, elSec);
           speedtestState.current_mbps = liveUl;
           speedtestState.upload_mbps = liveUl;
-          speedtestState.progress_pct = Math.min(96, 62 + Math.round((Math.min(ulWindowMs, performance.now() - ulT0) / ulWindowMs) * 34));
+          speedtestState.progress_pct = Math.min(96, 62 + Math.round((Math.min(ulWindowMs, nowMs - ulT0) / ulWindowMs) * 34));
         }
       };
-      await Promise.all([runUlStream(), runUlStream()]);
-      const ulElapsedSec = Math.max(0.05, (performance.now() - ulT0) / 1000);
-      uploadMbps = Math.round(((ulBytesTotal * 8) / (ulElapsedSec * 1_000_000)) * 100) / 100;
+      await Promise.all(Array.from({ length: ulWorkersCount }, (_, idx) => runUlStream(idx)));
+      const ulTEnd = performance.now();
+      const ulElapsedSec = Math.max(0.05, (ulTEnd - ulT0) / 1000);
+      const ulNic1 = readWanIfaceBytesDev();
+      const ulNicDelta = scope === 'wan' ? Math.max(0, ulNic1.tx - ulNic0.tx) : 0;
+      ulSamples.push({ tMs: ulTEnd, bytes: ulBytesTotal });
+      uploadMbps = computeSustainedSpeedMbpsDev(ulSamples, ulBytesTotal, ulElapsedSec, ulNicDelta);
     }
 
     const nowTs = Math.round((Date.now() / 1000) * 1000) / 1000;
@@ -4374,25 +4560,36 @@ function realOsTelemetryMiddleware(): Plugin {
               device_name: 'Sesión Verificada en Tiempo Real',
             },
             version_info: ver,
-            system_errors_summary: {
-              total: geoIpErrorHistory.length,
-              total_errors: geoIpErrorHistory.length,
-              log_errors_count: geoIpErrorHistory.length,
-              failed_units_count: 0,
-              failed_units: [],
-              ack_ts: devLogsAckTs,
-              ack_time_str: devLogsAckTimeStr,
-              counts_by_category: {
-                all: geoIpErrorHistory.length,
+            system_errors_summary: (() => {
+              const aiFaultInsightsObj: Record<string, AiSystemFaultInsightRecord> = {};
+              const aiFaultHistoryArr: AiSystemFaultInsightRecord[] = [];
+              for (const [, val] of aiFaultInsightsCache.entries()) {
+                aiFaultInsightsObj[val.insight.signature] = val.insight;
+                aiFaultHistoryArr.push(val.insight);
+              }
+              aiFaultHistoryArr.sort((a, b) => b.analyzed_at - a.analyzed_at);
+              return {
                 total: geoIpErrorHistory.length,
-                systemd: 0,
-                docker: 0,
-                network: geoIpErrorHistory.length,
-                kernel: 0,
-                auth: 0,
-                app: 0,
-              },
-            },
+                total_errors: geoIpErrorHistory.length,
+                log_errors_count: geoIpErrorHistory.length,
+                failed_units_count: 0,
+                failed_units: [],
+                ack_ts: devLogsAckTs,
+                ack_time_str: devLogsAckTimeStr,
+                ai_fault_insights: aiFaultInsightsObj,
+                ai_fault_history: aiFaultHistoryArr.slice(0, 25),
+                counts_by_category: {
+                  all: geoIpErrorHistory.length,
+                  total: geoIpErrorHistory.length,
+                  systemd: 0,
+                  docker: 0,
+                  network: geoIpErrorHistory.length,
+                  kernel: 0,
+                  auth: 0,
+                  app: 0,
+                },
+              };
+            })(),
             system: {
               hostname: os.hostname(),
               os: osPretty,
@@ -4608,17 +4805,36 @@ function realOsTelemetryMiddleware(): Plugin {
         }
 
         if (url === '/api/system/logs' && req.method === 'GET') {
-          const logs = geoIpErrorHistory.map((err, idx) => ({
-            id: err.id || `err_${idx}`,
-            timestamp: err.ts,
-            date_str: err.time_str,
-            time_str: err.time_str,
-            category: 'network',
-            level: 'ERROR',
-            unit: err.source || 'GeoIP',
-            source: err.source || 'GeoIP',
-            message: `${err.message} (${err.target})`,
-          }));
+          const reqUrlObj = new URL(req.url || '/api/system/logs', 'http://127.0.0.1');
+          const langQ = (reqUrlObj.searchParams.get('lang') || 'es').trim().toLowerCase().slice(0, 8) || 'es';
+          const aiFaultInsightsObj: Record<string, AiSystemFaultInsightRecord> = {};
+          const aiFaultHistoryArr: AiSystemFaultInsightRecord[] = [];
+          for (const [k, val] of aiFaultInsightsCache.entries()) {
+            if (k.startsWith(`${langQ}::`)) {
+              aiFaultInsightsObj[val.insight.signature] = val.insight;
+              aiFaultHistoryArr.push(val.insight);
+            }
+          }
+          aiFaultHistoryArr.sort((a, b) => b.analyzed_at - a.analyzed_at);
+
+          const logs = geoIpErrorHistory.map((err, idx) => {
+            const unitStr = err.source || 'GeoIP';
+            const msgStr = `${err.message} (${err.target})`;
+            const sig = normalizeSystemFaultSignature(unitStr, 'network', msgStr);
+            return {
+              id: err.id || `err_${idx}`,
+              timestamp: err.ts,
+              date_str: err.time_str,
+              time_str: err.time_str,
+              category: 'network',
+              level: 'ERROR',
+              unit: unitStr,
+              source: unitStr,
+              message: msgStr,
+              signature: sig,
+              ai_insight: aiFaultInsightsObj[sig],
+            };
+          });
           res.setHeader('Content-Type', 'application/json');
           res.end(
             JSON.stringify({
@@ -4632,6 +4848,8 @@ function realOsTelemetryMiddleware(): Plugin {
               failed_units: [],
               ack_ts: devLogsAckTs,
               ack_time_str: devLogsAckTimeStr,
+              ai_fault_insights: aiFaultInsightsObj,
+              ai_fault_history: aiFaultHistoryArr,
               counts_by_category: {
                 all: logs.length,
                 total: logs.length,
@@ -4644,6 +4862,232 @@ function realOsTelemetryMiddleware(): Plugin {
               },
             })
           );
+          return;
+        }
+
+        if (url === '/api/system/logs/ai-simplify' && req.method === 'POST') {
+          let rawBody = '';
+          let tooLarge = false;
+          req.on('data', (chunk) => {
+            rawBody += chunk;
+            if (rawBody.length > 512 * 1024) tooLarge = true;
+          });
+          req.on('end', async () => {
+            const sendFaultAiJson = (obj: unknown, status = 200) => {
+              res.statusCode = status;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(obj));
+            };
+            if (tooLarge) {
+              sendFaultAiJson({ ok: false, code: 'PAYLOAD_TOO_LARGE', error: 'Payload exceeds 512 KB limit' }, 413);
+              return;
+            }
+            let parsedBody: Record<string, unknown> = {};
+            try {
+              parsedBody = rawBody ? JSON.parse(rawBody) : {};
+            } catch {
+              sendFaultAiJson({ ok: false, code: 'INVALID_JSON', error: 'Invalid JSON request body' }, 400);
+              return;
+            }
+            const lang = String(parsedBody.lang || 'es').trim().toLowerCase().slice(0, 8) || 'es';
+            const rawFaults = Array.isArray(parsedBody.faults) ? parsedBody.faults : [];
+            const inputFaults: Array<Record<string, unknown>> =
+              rawFaults.length > 0
+                ? rawFaults.filter((f): f is Record<string, unknown> => Boolean(f && typeof f === 'object'))
+                : geoIpErrorHistory.map((err) => ({
+                    unit: err.source || 'GeoIP',
+                    category: 'network',
+                    level: 'ERR',
+                    message: `${err.message} (${err.target})`,
+                  }));
+
+            const dedupBySig = new Map<
+              string,
+              { signature: string; unit: string; category: string; level: string; sample_message: string; count: number }
+            >();
+            for (const f of inputFaults) {
+              const unitS = String(f.unit || f.source || 'system').trim();
+              const catS = String(f.category || 'system').trim();
+              const msgS = String(f.message || '').trim();
+              if (!msgS) continue;
+              const sig = String(f.signature || '').trim() || normalizeSystemFaultSignature(unitS, catS, msgS);
+              const existing = dedupBySig.get(sig);
+              if (existing) {
+                existing.count += 1;
+              } else if (dedupBySig.size < 20) {
+                dedupBySig.set(sig, {
+                  signature: sig,
+                  unit: unitS,
+                  category: catS,
+                  level: String(f.level || 'ERR'),
+                  sample_message: msgS.slice(0, 280),
+                  count: 1,
+                });
+              }
+            }
+
+            const nowMs = Date.now();
+            const resultInsights: Record<string, AiSystemFaultInsightRecord> = {};
+            const missingFaults: Array<{
+              signature: string;
+              unit: string;
+              category: string;
+              level: string;
+              sample_message: string;
+            }> = [];
+
+            for (const [sig, item] of dedupBySig.entries()) {
+              const cacheKey = `${lang}::${sig}`;
+              const cached = aiFaultInsightsCache.get(cacheKey);
+              if (cached && nowMs - cached.cachedAt < AI_FAULT_CACHE_TTL_MS) {
+                resultInsights[sig] = { ...cached.insight, cached_from_db: true };
+              } else {
+                missingFaults.push({
+                  signature: sig,
+                  unit: item.unit,
+                  category: item.category,
+                  level: item.level,
+                  sample_message: item.sample_message,
+                });
+              }
+            }
+
+            const getLangHistory = () => {
+              const arr: AiSystemFaultInsightRecord[] = [];
+              for (const [k, v] of aiFaultInsightsCache.entries()) {
+                if (k.startsWith(`${lang}::`)) arr.push(v.insight);
+              }
+              return arr.sort((a, b) => b.analyzed_at - a.analyzed_at).slice(0, 50);
+            };
+
+            if (missingFaults.length === 0) {
+              sendFaultAiJson(
+                { ok: true, model: AI_NET_MODEL, insights: resultInsights, history: getLangHistory(), all_cached: true },
+                200
+              );
+              return;
+            }
+
+            const apiKey = (process.env.GEMINI_API_KEY || readDotEnvKey('GEMINI_API_KEY')).trim();
+            if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+              sendFaultAiJson(
+                {
+                  ok: false,
+                  code: 'GEMINI_API_KEY_MISSING',
+                  error: 'GEMINI_API_KEY no está configurada en el entorno del servidor.',
+                  insights: resultInsights,
+                  history: getLangHistory(),
+                },
+                503
+              );
+              return;
+            }
+
+            try {
+              const ai = new GoogleGenAI({
+                apiKey,
+                httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+              });
+              const hostSnapshot = getDynamicHostServicesSnapshot();
+              const sysPrompt =
+                `You are a senior Linux, Docker, and home-server reliability engineer. Respond strictly in language code "${lang}". ` +
+                `Your job is to simplify raw system/kernel/systemd/Docker error logs detected by the interface alert notifier into clear, ` +
+                `plain-language explanations for the server administrator, classify their real danger level, and provide concrete actionable solutions. ` +
+                `For each fault item, return: ` +
+                `- signature: exact signature string from input ` +
+                `- title: short human-friendly title (2-6 words, no raw hex/PIDs) ` +
+                `- danger_level: strictly one of 'critical', 'high', 'medium', or 'low' ` +
+                `- summary: 1-2 clear sentences explaining what failed and why in plain language ` +
+                `- solution: concrete, practical steps or exact terminal command to resolve or verify the issue ` +
+                `- confidence: strictly one of 'high', 'medium', or 'low'.`;
+
+              const response = await ai.models.generateContent({
+                model: AI_NET_MODEL,
+                contents: JSON.stringify({
+                  target_language: lang,
+                  hostname: os.hostname(),
+                  host_listening_context: hostSnapshot,
+                  faults_to_diagnose: missingFaults,
+                }),
+                config: {
+                  systemInstruction: sysPrompt,
+                  responseMimeType: 'application/json',
+                  responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                      items: {
+                        type: Type.ARRAY,
+                        items: {
+                          type: Type.OBJECT,
+                          properties: {
+                            signature: { type: Type.STRING },
+                            title: { type: Type.STRING },
+                            danger_level: { type: Type.STRING },
+                            summary: { type: Type.STRING },
+                            solution: { type: Type.STRING },
+                            confidence: { type: Type.STRING },
+                          },
+                          required: ['signature', 'title', 'danger_level', 'summary', 'solution', 'confidence'],
+                        },
+                      },
+                    },
+                    required: ['items'],
+                  },
+                },
+              });
+
+              const rawText = (response.text || '').trim();
+              const parsed = rawText ? (JSON.parse(rawText) as { items?: Array<Record<string, unknown>> }) : { items: [] };
+              const items = Array.isArray(parsed.items) ? parsed.items : [];
+              const analyzedAt = Math.floor(Date.now() / 1000);
+
+              for (const it of items) {
+                const sig = String(it.signature || '').trim();
+                if (!sig) continue;
+                const metaIn = dedupBySig.get(sig);
+                const dangerRaw = String(it.danger_level || 'medium').trim().toLowerCase();
+                const dangerLevel: 'critical' | 'high' | 'medium' | 'low' =
+                  dangerRaw === 'critical' || dangerRaw === 'high' || dangerRaw === 'low' ? dangerRaw : 'medium';
+                const confRaw = String(it.confidence || 'medium').trim().toLowerCase();
+                const confidence: 'high' | 'medium' | 'low' =
+                  confRaw === 'high' || confRaw === 'low' ? confRaw : 'medium';
+                const insight: AiSystemFaultInsightRecord = {
+                  signature: sig,
+                  unit: metaIn?.unit || 'system',
+                  category: metaIn?.category || 'system',
+                  title: String(it.title || '').trim() || metaIn?.unit || 'Aviso del sistema',
+                  danger_level: dangerLevel,
+                  summary: String(it.summary || '').trim(),
+                  solution: String(it.solution || '').trim(),
+                  confidence,
+                  model: AI_NET_MODEL,
+                  occurrence_count: metaIn?.count || 1,
+                  first_seen_at: analyzedAt,
+                  analyzed_at: analyzedAt,
+                  cached_from_db: false,
+                };
+                resultInsights[sig] = insight;
+                aiFaultInsightsCache.set(`${lang}::${sig}`, { insight, cachedAt: Date.now() });
+              }
+              saveAiInsightsDev();
+              sendFaultAiJson(
+                { ok: true, model: AI_NET_MODEL, insights: resultInsights, history: getLangHistory(), all_cached: false },
+                200
+              );
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              sendFaultAiJson(
+                {
+                  ok: false,
+                  code: 'GEMINI_UPSTREAM_ERROR',
+                  error: message || 'Error consultando Gemini AI',
+                  insights: resultInsights,
+                  history: getLangHistory(),
+                },
+                502
+              );
+            }
+          });
           return;
         }
 
@@ -5132,7 +5576,6 @@ function realOsTelemetryMiddleware(): Plugin {
                 contents: JSON.stringify(promptPayload),
                 config: {
                   systemInstruction: sysPrompt,
-                  temperature: 0.15,
                   responseMimeType: 'application/json',
                   responseSchema: {
                     type: Type.OBJECT,

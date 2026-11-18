@@ -24,12 +24,15 @@ import {
   Server,
   ShieldCheck,
   Smartphone,
+  Sparkles,
   Sun,
   Trash2,
   Usb,
 } from 'lucide-react';
 import { COCKPIT_SPRING, MorphPill, ViewStage } from './MotionPrimitives';
 import {
+  AiSimplifyFaultsResponse,
+  AiSystemFaultInsight,
   DexStatusPayload,
   FailedSystemdUnit,
   MetricsPayload,
@@ -147,6 +150,24 @@ export const MoreView: React.FC<MoreViewProps> = ({
   const [sysLogs, setSysLogs] = useState<SystemErrorLogEntry[]>([]);
   const [logsMeta, setLogsMeta] = useState<SystemErrorsSummary | null>(metrics?.system_errors_summary ?? null);
   const [acknowledgingLogs, setAcknowledgingLogs] = useState(false);
+  const [simplifyingFaults, setSimplifyingFaults] = useState(false);
+  const [aiFaultInsights, setAiFaultInsights] = useState<Record<string, AiSystemFaultInsight>>(
+    () => metrics?.system_errors_summary?.ai_fault_insights ?? {}
+  );
+  const [aiFaultHistory, setAiFaultHistory] = useState<AiSystemFaultInsight[]>(
+    () => metrics?.system_errors_summary?.ai_fault_history ?? []
+  );
+
+  useEffect(() => {
+    const incomingInsights = metrics?.system_errors_summary?.ai_fault_insights;
+    if (incomingInsights && Object.keys(incomingInsights).length > 0) {
+      setAiFaultInsights((prev) => ({ ...prev, ...incomingInsights }));
+    }
+    const incomingHist = metrics?.system_errors_summary?.ai_fault_history;
+    if (Array.isArray(incomingHist) && incomingHist.length > 0) {
+      setAiFaultHistory(incomingHist);
+    }
+  }, [metrics?.system_errors_summary?.ai_fault_insights, metrics?.system_errors_summary?.ai_fault_history]);
 
   useEffect(() => {
     const mapped = resolveMoreSubTab(initialSubTab);
@@ -200,9 +221,17 @@ export const MoreView: React.FC<MoreViewProps> = ({
       failed_units?: Array<FailedSystemdUnit | string>;
       ack_ts?: number | null;
       ack_time_str?: string | null;
+      ai_fault_insights?: Record<string, AiSystemFaultInsight>;
+      ai_fault_history?: AiSystemFaultInsight[];
     }>('/api/system/logs?limit=30&refresh=1');
     if (res.ok && res.data) {
       if (Array.isArray(res.data.logs)) setSysLogs(res.data.logs);
+      if (res.data.ai_fault_insights) {
+        setAiFaultInsights((prev) => ({ ...prev, ...res.data!.ai_fault_insights }));
+      }
+      if (Array.isArray(res.data.ai_fault_history)) {
+        setAiFaultHistory(res.data.ai_fault_history);
+      }
       setLogsMeta({
         total: res.data.total_errors,
         total_errors: res.data.total_errors,
@@ -211,9 +240,48 @@ export const MoreView: React.FC<MoreViewProps> = ({
         failed_units: res.data.failed_units,
         ack_ts: res.data.ack_ts,
         ack_time_str: res.data.ack_time_str,
+        ai_fault_insights: res.data.ai_fault_insights,
+        ai_fault_history: res.data.ai_fault_history,
       });
     }
   }, []);
+
+  const handleSimplifyFaultsWithAi = async () => {
+    setSimplifyingFaults(true);
+    const effSummary = logsMeta || metrics?.system_errors_summary;
+    const res = await apiFetchJson<AiSimplifyFaultsResponse>('/api/system/logs/ai-simplify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        logs: sysLogs,
+        failed_units: effSummary?.failed_units ?? [],
+        locale,
+      }),
+    });
+    setSimplifyingFaults(false);
+    if (res.ok && res.data?.status === 'ok') {
+      if (res.data.ai_fault_insights) {
+        setAiFaultInsights((prev) => ({ ...prev, ...res.data!.ai_fault_insights }));
+      }
+      if (Array.isArray(res.data.ai_fault_history)) {
+        setAiFaultHistory(res.data.ai_fault_history);
+      }
+      onNotify(
+        t('more.ai_fault_done_toast', {
+          cached: res.data.cached_count ?? 0,
+          fresh: res.data.newly_analyzed_count ?? 0,
+        })
+      );
+      await loadLogs();
+      onRefreshMetrics();
+    } else {
+      const errMsg =
+        res.data?.error_key === 'network.ai_error_missing_key'
+          ? t('network.ai_error_missing_key')
+          : res.data?.error || res.error || t('more.ack_logs_err');
+      onNotify(errMsg, true);
+    }
+  };
 
   const handleAckSystemLogs = async () => {
     setAcknowledgingLogs(true);
@@ -452,7 +520,6 @@ export const MoreView: React.FC<MoreViewProps> = ({
             const active = subTab === tab.id;
             return (
               <motion.button
-                whileTap={{ scale: 0.97 }}
                 key={tab.id}
                 type="button"
                 onClick={() => setSubTab(tab.id)}
@@ -989,7 +1056,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
             )}
           </section>
 
-          {/* Panel dedicado de Salud y Avisos del Sistema */}
+          {/* Panel dedicado de Salud y Avisos del Sistema + Simplificador IA con persistencia en recursos_history.db */}
           {(() => {
             const effSummary = logsMeta || metrics?.system_errors_summary;
             const failedUnitsList = effSummary?.failed_units ?? [];
@@ -997,8 +1064,47 @@ export const MoreView: React.FC<MoreViewProps> = ({
             const activeTotal = Number(effSummary?.total_errors ?? effSummary?.total ?? (sysLogs.length + failedCount));
             const ackTimeStr = effSummary?.ack_time_str;
             const isHealthy = activeTotal === 0 && failedCount === 0 && sysLogs.length === 0;
+            const mergedInsights: Record<string, AiSystemFaultInsight> = {
+              ...(effSummary?.ai_fault_insights ?? {}),
+              ...aiFaultInsights,
+            };
+            const mergedHistory: AiSystemFaultInsight[] =
+              aiFaultHistory.length > 0
+                ? aiFaultHistory
+                : effSummary?.ai_fault_history ?? Object.values(mergedInsights);
+
+            const renderDangerBadge = (level?: string) => {
+              const norm = String(level || 'medium').toLowerCase();
+              if (norm === 'critical') {
+                return (
+                  <span className="cockpit-pill-rose rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                    {t('more.ai_fault_danger_critical')}
+                  </span>
+                );
+              }
+              if (norm === 'high') {
+                return (
+                  <span className="cockpit-pill-amber rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                    {t('more.ai_fault_danger_high')}
+                  </span>
+                );
+              }
+              if (norm === 'low') {
+                return (
+                  <span className="cockpit-pill-emerald rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                    {t('more.ai_fault_danger_low')}
+                  </span>
+                );
+              }
+              return (
+                <span className="cockpit-pill-cyan rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                  {t('more.ai_fault_danger_medium')}
+                </span>
+              );
+            };
+
             return (
-              <section className="cockpit-bento p-5">
+              <section className="cockpit-bento p-5" data-testid="system-health-panel">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3">
                     <span
@@ -1021,6 +1127,20 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {(sysLogs.length > 0 || failedUnitsList.length > 0) && (
+                      <button
+                        type="button"
+                        data-testid="ai-simplify-faults-btn"
+                        disabled={simplifyingFaults}
+                        onClick={() => void handleSimplifyFaultsWithAi()}
+                        className="cockpit-pill-violet inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+                      >
+                        <Sparkles className={`h-3.5 w-3.5 ${simplifyingFaults ? 'animate-spin' : ''}`} />
+                        <span>
+                          {simplifyingFaults ? t('more.ai_fault_simplifying') : t('more.ai_fault_simplify_btn')}
+                        </span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => void loadLogs()}
@@ -1044,20 +1164,46 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 </div>
 
                 {failedUnitsList.length > 0 && (
-                  <div className="cockpit-pill-amber mt-4 rounded-xl p-3">
+                  <div className="cockpit-pill-amber mt-4 rounded-xl p-3 space-y-2">
                     <p className="text-xs font-semibold">
                       {t('more.failed_units_label', { count: failedUnitsList.length })}
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {failedUnitsList.map((u, idx) => {
-                        const label = typeof u === 'string' ? u : u.unit;
+                        const unitObj = typeof u === 'string' ? { unit: u } : u;
+                        const label = unitObj.unit;
+                        const sig = unitObj.signature || '';
+                        const insight = unitObj.ai_insight || (sig ? mergedInsights[sig] : undefined);
                         return (
-                          <span
+                          <div
                             key={`${label}-${idx}`}
-                            className="cockpit-subtile rounded-lg px-2.5 py-1 font-mono text-[11px] font-semibold text-amber-900 dark:text-amber-200"
+                            className="cockpit-subtile rounded-xl p-3 text-xs text-slate-800 dark:text-slate-100"
                           >
-                            {label}
-                          </span>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-mono text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                {label}
+                              </span>
+                              {insight && renderDangerBadge(insight.danger_level)}
+                            </div>
+                            {insight ? (
+                              <div className="mt-1.5 space-y-1.5">
+                                <p className="font-semibold text-slate-900 dark:text-white">{insight.title}</p>
+                                <p className="text-[11px] text-slate-600 dark:text-slate-300">{insight.summary}</p>
+                                {insight.solution && (
+                                  <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-2.5 py-1.5 text-[11px] text-emerald-950 dark:text-emerald-200">
+                                    <span className="font-semibold">{t('more.ai_fault_solution_label')}: </span>
+                                    <span>{insight.solution}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              unitObj.description && (
+                                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                  {unitObj.description}
+                                </p>
+                              )
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -1067,20 +1213,120 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 {sysLogs.length > 0 ? (
                   <div
                     data-cockpit-scroll-contain="true"
-                    className="cockpit-scroll-panel mt-4 space-y-1.5 overflow-y-auto overscroll-contain pr-1 font-mono text-[11px] text-slate-600 dark:text-slate-300"
+                    className="cockpit-scroll-panel mt-4 space-y-2 overflow-y-auto overscroll-contain pr-1 text-xs"
                   >
-                    {sysLogs.slice(0, 20).map((log, idx) => (
-                      <div key={log.id || `${log.ts || idx}`} className="cockpit-subtile px-3 py-1.5">
-                        <span className="text-slate-400 dark:text-slate-500">[{log.time_str || '--'}]</span>{' '}
-                        <span className="font-semibold text-slate-800 dark:text-slate-100">{log.unit || log.source || 'sys'}:</span>{' '}
-                        <span>{log.message}</span>
-                      </div>
-                    ))}
+                    {sysLogs.slice(0, 20).map((log, idx) => {
+                      const sig = log.signature || '';
+                      const insight = log.ai_insight || (sig ? mergedInsights[sig] : undefined);
+                      return (
+                        <div key={log.id || `${log.ts || idx}`} className="cockpit-subtile p-3 space-y-1.5">
+                          {insight ? (
+                            <>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                                  <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+                                  <span className="font-semibold text-slate-900 dark:text-white">
+                                    {insight.title}
+                                  </span>
+                                  {renderDangerBadge(insight.danger_level)}
+                                  <span className="cockpit-pill-cyan rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold">
+                                    {t('more.ai_fault_cached_badge')}
+                                  </span>
+                                  {(insight.occurrence_count ?? 1) > 1 && (
+                                    <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 tabular-nums">
+                                      {t('more.ai_fault_occurrences', { count: insight.occurrence_count ?? 1 })}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="font-mono text-[10.5px] text-slate-400 dark:text-slate-500 tabular-nums">
+                                  [{log.time_str || '--'}] · {log.unit || log.source || 'sys'}
+                                </span>
+                              </div>
+                              <p className="text-[11.5px] leading-relaxed text-slate-700 dark:text-slate-200">
+                                {insight.summary}
+                              </p>
+                              {insight.solution && (
+                                <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2 text-[11px] leading-relaxed text-emerald-950 dark:text-emerald-200">
+                                  <span className="font-semibold">{t('more.ai_fault_solution_label')}: </span>
+                                  <span>{insight.solution}</span>
+                                </div>
+                              )}
+                              <p className="font-mono text-[10.5px] text-slate-400 dark:text-slate-500 break-all">
+                                {log.message}
+                              </p>
+                            </>
+                          ) : (
+                            <div className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                              <span className="text-slate-400 dark:text-slate-500">[{log.time_str || '--'}]</span>{' '}
+                              <span className="font-semibold text-slate-800 dark:text-slate-100">
+                                {log.unit || log.source || 'sys'}:
+                              </span>{' '}
+                              <span>{log.message}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
                     {t('more.no_logs_clean')}
                   </p>
+                )}
+
+                {mergedHistory.length > 0 && (
+                  <div
+                    className="mt-5 border-t border-slate-200/70 pt-4 dark:border-slate-800"
+                    data-testid="ai-fault-history-list"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                      <div>
+                        <h3 className="inline-flex items-center gap-1.5 font-display text-xs font-semibold text-slate-900 dark:text-white">
+                          <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+                          <span>{t('more.ai_fault_history_title')}</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {t('more.ai_fault_sub')}
+                        </p>
+                      </div>
+                      <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums">
+                        {mergedHistory.length}
+                      </span>
+                    </div>
+                    <div
+                      data-cockpit-scroll-contain="true"
+                      className="cockpit-scroll-panel cockpit-auto-grid-cards max-h-[320px] overflow-y-auto overscroll-contain pr-1"
+                    >
+                      {mergedHistory.slice(0, 12).map((item) => (
+                        <div key={item.signature} className="cockpit-subtile flex flex-col justify-between gap-2 p-3 text-xs">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center justify-between gap-1.5">
+                              <span className="font-semibold text-slate-900 dark:text-white">
+                                {item.title}
+                              </span>
+                              {renderDangerBadge(item.danger_level)}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-slate-500 dark:text-slate-400">
+                              <span>{item.unit || item.category || 'system'}</span>
+                              <span>·</span>
+                              <span>{t('more.ai_fault_occurrences', { count: item.occurrence_count ?? 1 })}</span>
+                              <span>·</span>
+                              <span className="text-sky-600 dark:text-sky-400">{t('more.ai_fault_cached_badge')}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                              {item.summary}
+                            </p>
+                          </div>
+                          {item.solution && (
+                            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-2.5 py-1.5 text-[10.5px] text-emerald-950 dark:text-emerald-200">
+                              <span className="font-semibold">{t('more.ai_fault_solution_label')}: </span>
+                              <span>{item.solution}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </section>
             );

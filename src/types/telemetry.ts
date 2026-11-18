@@ -276,7 +276,9 @@ export interface AiConnectionInsight {
   role: string;
   confidence: 'high' | 'medium' | 'low' | string;
   model?: string;
+  provider?: string;
   analyzed_at?: number;
+  updated_at?: number;
 }
 
 export interface AiIdentifyResponse {
@@ -963,6 +965,34 @@ export interface TrustedDevice {
   device_telemetry?: Record<string, unknown>;
 }
 
+export interface AiSystemFaultInsight {
+  signature: string;
+  unit: string;
+  category: string;
+  title: string;
+  danger_level: 'critical' | 'high' | 'medium' | 'low' | string;
+  summary: string;
+  solution: string;
+  confidence: number;
+  model?: string;
+  occurrence_count?: number;
+  first_seen_at?: number;
+  analyzed_at: number;
+  cached_from_db?: boolean;
+}
+
+export interface AiSimplifyFaultsResponse {
+  status: string;
+  ai_fault_insights: Record<string, AiSystemFaultInsight>;
+  ai_fault_history?: AiSystemFaultInsight[];
+  cached_count: number;
+  newly_analyzed_count: number;
+  total_count: number;
+  model?: string;
+  error?: string;
+  error_key?: string;
+}
+
 export interface SystemErrorLogEntry {
   id?: string;
   ts?: number;
@@ -977,6 +1007,8 @@ export interface SystemErrorLogEntry {
   level?: string;
   priority?: number;
   message?: string;
+  signature?: string;
+  ai_insight?: AiSystemFaultInsight;
 }
 
 export interface FailedSystemdUnit {
@@ -984,6 +1016,8 @@ export interface FailedSystemdUnit {
   active?: string;
   sub?: string;
   description?: string;
+  signature?: string;
+  ai_insight?: AiSystemFaultInsight;
 }
 
 export interface SystemErrorsSummary {
@@ -995,6 +1029,8 @@ export interface SystemErrorsSummary {
   ack_ts?: number | null;
   ack_time_str?: string | null;
   counts_by_category?: Record<string, number>;
+  ai_fault_insights?: Record<string, AiSystemFaultInsight>;
+  ai_fault_history?: AiSystemFaultInsight[];
 }
 
 export interface DexStatusPayload {

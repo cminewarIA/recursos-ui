@@ -118,20 +118,19 @@ interface BentoCardProps {
 }
 
 /**
- * Tarjeta Bento con entrada escalonada en resorte y micro-elevación interactiva.
+ * Tarjeta Bento con entrada escalonada suave sin deformación al pasar el ratón ni al pulsar.
  */
 export const BentoCard: React.FC<BentoCardProps> = ({
   children,
   className = '',
   index = 0,
-  hoverLift = false,
   onClick,
 }) => {
   const prefersReduced = useReducedMotion();
   return (
     <motion.section
-      initial={prefersReduced ? false : { opacity: 0, y: 16, scaleX: 0.96, scaleY: 1.03 }}
-      animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+      initial={prefersReduced ? false : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={
         prefersReduced
           ? { duration: 0.01 }
@@ -140,12 +139,6 @@ export const BentoCard: React.FC<BentoCardProps> = ({
               delay: Math.min(index * 0.035, 0.28),
             }
       }
-      whileHover={
-        hoverLift && !prefersReduced
-          ? { y: -2.5, transition: { type: 'spring', stiffness: 360, damping: 16 } }
-          : undefined
-      }
-      whileTap={onClick && !prefersReduced ? { scaleX: 1.03, scaleY: 0.95 } : undefined}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -172,7 +165,7 @@ interface ViewStageProps {
 }
 
 /**
- * Escenario animado para transiciones fluidas con rebote elástico entre vistas principales y subpestañas.
+ * Escenario animado para transiciones fluidas entre vistas principales y subpestañas.
  */
 export const ViewStage: React.FC<ViewStageProps> = ({ tabKey, children }) => {
   const prefersReduced = useReducedMotion();
@@ -181,12 +174,12 @@ export const ViewStage: React.FC<ViewStageProps> = ({ tabKey, children }) => {
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.div
           key={tabKey}
-          initial={prefersReduced ? false : { opacity: 0, y: 14, scaleX: 0.978, scaleY: 1.022 }}
-          animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+          initial={prefersReduced ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
           exit={
             prefersReduced
               ? undefined
-              : { opacity: 0, y: -6, scale: 0.985, transition: { duration: 0.16, ease: 'easeOut' } }
+              : { opacity: 0, y: -6, transition: { duration: 0.16, ease: 'easeOut' } }
           }
           transition={prefersReduced ? { duration: 0.01 } : COCKPIT_SPRING}
           className="w-full"
@@ -205,7 +198,7 @@ interface AccordionBodyProps {
 }
 
 /**
- * Contenedor colapsable con transición elástica tipo gelatina de altura + escala + opacidad.
+ * Contenedor colapsable con transición limpia de altura + opacidad.
  */
 export const AccordionBody: React.FC<AccordionBodyProps> = ({ open, children, className = '' }) => {
   const prefersReduced = useReducedMotion();
@@ -213,20 +206,18 @@ export const AccordionBody: React.FC<AccordionBodyProps> = ({ open, children, cl
     <AnimatePresence initial={false}>
       {open && (
         <motion.div
-          initial={prefersReduced ? false : { opacity: 0, height: 0, y: -6, scaleY: 0.92 }}
-          animate={{ opacity: 1, height: 'auto', y: 0, scaleY: 1 }}
-          exit={prefersReduced ? undefined : { opacity: 0, height: 0, y: -4, scaleY: 0.95 }}
+          initial={prefersReduced ? false : { opacity: 0, height: 0, y: -4 }}
+          animate={{ opacity: 1, height: 'auto', y: 0 }}
+          exit={prefersReduced ? undefined : { opacity: 0, height: 0, y: -4 }}
           transition={
             prefersReduced
               ? { duration: 0.01 }
               : {
-                  height: { duration: 0.28, ease: [0.34, 1.32, 0.64, 1] },
-                  opacity: { duration: 0.22 },
+                  height: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
+                  opacity: { duration: 0.2 },
                   y: COCKPIT_SPRING,
-                  scaleY: COCKPIT_SPRING,
                 }
           }
-          style={{ transformOrigin: '50% 0%' }}
           className={`overflow-hidden ${className}`}
         >
           {children}

@@ -2555,7 +2555,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             const active = subTab === tab.id;
             return (
               <motion.button
-                whileTap={{ scale: 0.97 }}
                 key={tab.id}
                 type="button"
                 onClick={() => setSubTab(tab.id)}
@@ -2951,7 +2950,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
                 <div className="flex items-center gap-1.5">
                   <motion.button
-                    whileTap={{ scale: 0.92 }}
                     type="button"
                     aria-label={t('network.refresh')}
                     onClick={() => {
@@ -2964,7 +2962,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   </motion.button>
                   {onExpandChart && (
                     <motion.button
-                      whileTap={{ scale: 0.92 }}
                       type="button"
                       aria-label={t('hardware.net.expand_aria')}
                       onClick={openNetwork24hExpanded}
@@ -3413,6 +3410,102 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               </div>
             </section>
           </div>
+
+          {/* Widget 4: Historial de identificaciones IA (recursos_history.db) */}
+          {(() => {
+            const mergedAiMap: Record<string, AiConnectionInsight> = {
+              ...(netHistoryCatalog?.ai_insights ?? {}),
+              ...(mapHistoryData?.ai_insights ?? {}),
+              ...aiInsights,
+            };
+            const q = trafficFilterQuery.trim().toLowerCase();
+            const aiHistoryItems = Object.entries(mergedAiMap)
+              .map(([sig, item]) => ({ ...item, signature: item.signature || sig }))
+              .filter((item) => {
+                if (!q) return true;
+                return (
+                  String(item.app_name || '').toLowerCase().includes(q) ||
+                  String(item.category || '').toLowerCase().includes(q) ||
+                  String(item.summary || '').toLowerCase().includes(q) ||
+                  String(item.role || '').toLowerCase().includes(q) ||
+                  String(item.signature || '').toLowerCase().includes(q)
+                );
+              })
+              .sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0));
+
+            return (
+              <section className="cockpit-bento p-5" data-testid="traffic-ai-history">
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-slate-200/70 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="cockpit-pill-violet inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
+                      <Sparkles className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white truncate">
+                        {t('network.traffic_ai_history_title')}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {t('network.traffic_ai_history_sub')}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                    {aiHistoryItems.length}
+                  </span>
+                </div>
+
+                {aiHistoryItems.length === 0 ? (
+                  <p className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
+                    {t('network.traffic_ai_history_empty')}
+                  </p>
+                ) : (
+                  <div
+                    data-cockpit-scroll-contain="true"
+                    className="cockpit-scroll-panel mt-3 cockpit-auto-grid-cards max-h-[380px] overflow-y-auto overscroll-contain pr-1"
+                  >
+                    {aiHistoryItems.slice(0, 36).map((item) => {
+                      const sigParts = String(item.signature || '').split('|');
+                      const dir = sigParts[0] || '';
+                      const proto = sigParts[1] || '';
+                      const remoteIp = sigParts[3] || '';
+                      const remotePort = sigParts[4] || '';
+                      const domain = sigParts[5] || '';
+                      return (
+                        <div key={item.signature} className="cockpit-subtile flex flex-col justify-between gap-2 p-3.5 text-xs">
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center justify-between gap-1.5">
+                              <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white">
+                                <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+                                <span>{item.app_name}</span>
+                              </span>
+                              <span className="cockpit-pill-cyan rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                                {item.category}
+                              </span>
+                            </div>
+                            <p className="text-[11.5px] leading-relaxed text-slate-700 dark:text-slate-200">
+                              {item.summary}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 pt-2 font-mono text-[10.5px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                            <span className="truncate max-w-full">
+                              {domain || remoteIp || item.role}
+                              {remotePort && remotePort !== '0' ? `:${remotePort}` : ''}
+                              {proto ? ` (${proto})` : ''}
+                            </span>
+                            {dir && (
+                              <span className="shrink-0 uppercase text-[10px] font-semibold text-sky-600 dark:text-sky-400">
+                                {dir === 'incoming' ? t('network.map_direction_in') : t('network.map_direction_out')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            );
+          })()}
         </div>
       )}
 
@@ -3444,7 +3537,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                           return (
                             <motion.button
                               key={modeOpt}
-                              whileTap={{ scale: 0.96 }}
                               type="button"
                               onClick={() => setMapMode(modeOpt)}
                               className={`relative inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${
@@ -3465,7 +3557,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                     </LayoutGroup>
 
                     <motion.button
-                      whileTap={{ scale: 0.96 }}
                       type="button"
                       disabled={aiLoading || geoConnections.filter((c) => !c.is_server_node).length === 0}
                       onClick={() => void handleSimplifyConnectionsWithAi()}
@@ -3477,7 +3568,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
                     {Object.keys(aiInsights).length > 0 && (
                       <motion.button
-                        whileTap={{ scale: 0.96 }}
                         type="button"
                         onClick={() => setAiSimplifiedView((v) => !v)}
                         className={`cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -3491,7 +3581,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                     )}
 
                     <motion.button
-                      whileTap={{ scale: 0.96 }}
                       type="button"
                       onClick={handleFitAllBounds}
                       className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -3500,7 +3589,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                       <span>{t('network.map_fit_all')}</span>
                     </motion.button>
                     <motion.button
-                      whileTap={{ scale: 0.96 }}
                       type="button"
                       onClick={() => {
                         if (mapMode === 'history') {
@@ -3542,7 +3630,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                         return (
                           <motion.button
                             key={hr.id}
-                            whileTap={{ scale: 0.96 }}
                             type="button"
                             onClick={() => setMapHistoryHours(hr.id)}
                             className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${
@@ -3563,7 +3650,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                       </span>
                     </div>
                     <motion.button
-                      whileTap={{ scale: 0.96 }}
                       type="button"
                       disabled={mapHistoryClearing}
                       onClick={() => void handleClearMapHistory()}
@@ -3603,7 +3689,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                       const active = mapFilter === f.id;
                       return (
                         <motion.button
-                          whileTap={{ scale: 0.96 }}
                           key={f.id}
                           type="button"
                           onClick={() => setMapFilter(f.id)}
@@ -3631,7 +3716,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                       aria-label={t('network.map_filter_device_all')}
                       value={mapDeviceFilter}
                       onChange={(e) => setMapDeviceFilter(e.target.value)}
-                      className="cockpit-subtile min-h-[36px] max-w-[200px] px-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 dark:text-slate-100"
+                      className="cockpit-subtile min-h-[36px] min-w-[140px] flex-1 sm:flex-none px-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 dark:text-slate-100"
                     >
                       <option value="all">{t('network.map_filter_device_all')}</option>
                       {availableMapDevices.map((d) => (
@@ -3645,7 +3730,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                       aria-label={t('network.map_filter_service_all')}
                       value={mapServiceFilter}
                       onChange={(e) => setMapServiceFilter(e.target.value)}
-                      className="cockpit-subtile min-h-[36px] max-w-[210px] px-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 dark:text-slate-100"
+                      className="cockpit-subtile min-h-[36px] min-w-[140px] flex-1 sm:flex-none px-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 dark:text-slate-100"
                     >
                       <option value="all">{t('network.map_filter_service_all')}</option>
                       {availableMapServices.map((svc) => (
@@ -3771,7 +3856,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
               <div className="flex flex-wrap items-center gap-2">
                 <motion.button
-                  whileTap={{ scale: 0.96 }}
                   type="button"
                   disabled={aiLoading || geoConnections.filter((c) => !c.is_server_node).length === 0}
                   onClick={() => void handleSimplifyConnectionsWithAi()}
@@ -3782,7 +3866,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 </motion.button>
                 {Object.keys(aiInsights).length > 0 && (
                   <motion.button
-                    whileTap={{ scale: 0.96 }}
                     type="button"
                     onClick={() => setAiSimplifiedView((v) => !v)}
                     className="cockpit-subtile inline-flex min-h-[32px] items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200"
@@ -3909,7 +3992,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                         {remoteIp && !c.is_server_node && (
                           isBanned ? (
                             <motion.button
-                              whileTap={{ scale: 0.95 }}
                               type="button"
                               onClick={() => void handleUnbanIp(remoteIp, c.jail || 'all')}
                               className="cockpit-btn-wol inline-flex min-h-[34px] items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-semibold transition-colors shrink-0"
@@ -3919,7 +4001,6 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                             </motion.button>
                           ) : (
                             <motion.button
-                              whileTap={{ scale: 0.95 }}
                               type="button"
                               onClick={() => void handleBanIp(remoteIp, c.jail)}
                               className="cockpit-btn-off inline-flex min-h-[34px] items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-semibold transition-colors shrink-0"
@@ -4188,10 +4269,10 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                           {item.created_at}
                         </td>
                         <td className="py-2.5 px-3 min-w-[140px]">
-                          <p className="font-medium text-slate-900 dark:text-white truncate max-w-[220px]">
+                          <p className="font-medium text-slate-900 dark:text-white break-words">
                             {item.server_name}
                           </p>
-                          <p className="font-mono text-[10px] text-slate-400 truncate max-w-[220px]">
+                          <p className="font-mono text-[10px] text-slate-400 break-words">
                             {item.scope === 'local_node' ? t('network.speedtest_scope_local') : t('network.speedtest_scope_wan')}
                             {item.isp ? ` · ${item.isp}` : ''}
                           </p>

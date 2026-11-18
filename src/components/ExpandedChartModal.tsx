@@ -797,7 +797,6 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
             {hasDatabaseHistory && (
               <div className="flex items-center gap-1.5" role="group" aria-label={t('charts.touch_mode_aria')}>
                 <motion.button
-                  whileTap={{ scale: 0.95 }}
                   type="button"
                   onClick={() => setInteractionMode('inspect')}
                   className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
@@ -810,7 +809,6 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
                   <span>{t('charts.inspect')}</span>
                 </motion.button>
                 <motion.button
-                  whileTap={{ scale: 0.95 }}
                   type="button"
                   onClick={() => setInteractionMode('pan')}
                   className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${

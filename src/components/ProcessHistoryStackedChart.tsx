@@ -396,7 +396,6 @@ export const ProcessHistoryStackedChart: React.FC<ProcessHistoryStackedChartProp
             </div>
           </LayoutGroup>
           <motion.button
-            whileTap={{ scale: 0.92 }}
             type="button"
             aria-label={t('network.refresh')}
             onClick={() => void fetchHistory(metric, true)}

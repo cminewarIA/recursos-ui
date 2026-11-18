@@ -98,7 +98,6 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
             const active = subTab === tab.id;
             return (
               <motion.button
-                whileTap={{ scale: 0.97 }}
                 key={tab.id}
                 type="button"
                 onClick={() => setSubTab(tab.id)}
