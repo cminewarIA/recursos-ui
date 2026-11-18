@@ -6,10 +6,12 @@ import {
   Bell,
   ChevronDown,
   ChevronUp,
+  Clock,
   Cloud,
   Gauge,
   Globe,
   Globe2,
+  History,
   Image as ImageIcon,
   Lock,
   MapPin,
@@ -34,6 +36,8 @@ import { ExpandChartSpec } from './OverviewView';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
 import {
+  AiConnectionInsight,
+  AiIdentifyResponse,
   DnsTrafficStatsResponse,
   GeoConnectionItem,
   MetricsPayload,
@@ -335,6 +339,19 @@ function getConnIdentityKey(c: GeoConnectionItem, idx = 0): string {
   return c.id || `${dir}:${locIp}:${locPort}->${remIp}:${remPort}:${idx}`;
 }
 
+function getConnAiSignature(c: GeoConnectionItem): string {
+  const dir = String(c.direction || 'outgoing').trim().toLowerCase();
+  const proto = String(c.protocol || 'TCP').trim().toUpperCase();
+  const lPort = Number(c.local_port || 0);
+  const rIp = String(c.remote_ip || c.ip || '').trim();
+  const rPort = Number(c.remote_port || c.port || 0);
+  const dom = String(c.domain || '').trim().toLowerCase();
+  const svc = String(c.service || '').trim();
+  const proc = String(c.process || '').trim();
+  const isp = String(c.isp || c.org || '').trim();
+  return `${dir}|${proto}|${lPort}|${rIp}|${rPort}|${dom}|${svc}|${proc}|${isp}`;
+}
+
 function isHomeDeviceConn(c: GeoConnectionItem, serverLocalIp?: string): boolean {
   if (c.is_server_node) return false;
   const locIp = String(c.local_ip || '').trim();
@@ -487,10 +504,32 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const [trafficFilterQuery, setTrafficFilterQuery] = useState('');
   const [domainsMode, setDomainsMode] = useState<'all' | 'blocked'>('all');
 
-  // Map filters & search (v4.13.0)
+  // Map mode (Live vs History), multi-criteria filters & search
+  const [mapMode, setMapMode] = useState<'live' | 'history'>('live');
+  const [mapHistoryHours, setMapHistoryHours] = useState<'1' | '6' | '24' | '168' | 'all'>('24');
   const [mapFilter, setMapFilter] = useState<MapConnFilter>('all');
+  const [mapDeviceFilter, setMapDeviceFilter] = useState<string>('all');
+  const [mapServiceFilter, setMapServiceFilter] = useState<string>('all');
   const [mapSearchQuery, setMapSearchQuery] = useState('');
+  const [mapHistoryData, setMapHistoryData] = useState<NetHistoryResponse | null>(null);
+  const [mapHistoryLoading, setMapHistoryLoading] = useState(false);
+  const [mapHistoryClearing, setMapHistoryClearing] = useState(false);
   const [mapZoomTick, setMapZoomTick] = useState(0);
+
+  // Server-side Gemini AI connection identification & simplified presentation
+  const [aiInsights, setAiInsights] = useState<Record<string, AiConnectionInsight>>(() => {
+    try {
+      const saved = sessionStorage.getItem(`recursos_ai_conn_insights_v1_${locale}`);
+      return saved ? (JSON.parse(saved) as Record<string, AiConnectionInsight>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiLastModel, setAiLastModel] = useState<string | null>(null);
+  const [aiSimplifiedView, setAiSimplifiedView] = useState(true);
+  const [expandedTechKeys, setExpandedTechKeys] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const mapped = resolveRedSubTab(initialSubTab);
@@ -656,11 +695,82 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
   const serverLocalIp = metrics?.net?.connections_map?.server_node?.ip || metrics?.net?.local_ip || metrics?.system?.local_ip || '';
 
-  // Excluir IPs LAN falsas del mapa (v4.11.1), conservando únicamente conexiones públicas WAN y el nodo servidor
-  const rawGeoConnections = useMemo(() => {
+  const liveGeoConnections = useMemo(() => {
     const list = metrics?.net?.connections_map?.connections ?? [];
     return list.filter((c) => !c.is_lan || c.is_server_node);
   }, [metrics?.net?.connections_map?.connections]);
+
+  const loadMapHistory = useCallback(
+    async (showSpinner = false) => {
+      if (showSpinner) setMapHistoryLoading(true);
+      const params = new URLSearchParams();
+      params.set('limit', '300');
+      if (mapHistoryHours !== 'all') params.set('hours', mapHistoryHours);
+      if (mapServiceFilter !== 'all') params.set('service', mapServiceFilter);
+      if (mapDeviceFilter !== 'all') params.set('device', mapDeviceFilter);
+      if (mapFilter !== 'all' && mapFilter !== 'blocked') params.set('direction', mapFilter);
+      if (mapSearchQuery.trim()) params.set('q', mapSearchQuery.trim());
+
+      const res = await apiFetchJson<NetHistoryResponse>(`/api/net/history?${params.toString()}`);
+      if (res.ok && res.data) {
+        setMapHistoryData(res.data);
+      }
+      if (showSpinner) setMapHistoryLoading(false);
+    },
+    [mapHistoryHours, mapServiceFilter, mapDeviceFilter, mapFilter, mapSearchQuery]
+  );
+
+  useEffect(() => {
+    if (subTab !== 'map' || mapMode !== 'history') return;
+    const debounced = window.setTimeout(() => {
+      void loadMapHistory(true);
+    }, 180);
+    const intervalId = window.setInterval(() => {
+      if (typeof document === 'undefined' || !document.hidden) {
+        void loadMapHistory(false);
+      }
+    }, 15000);
+    return () => {
+      window.clearTimeout(debounced);
+      window.clearInterval(intervalId);
+    };
+  }, [subTab, mapMode, loadMapHistory]);
+
+  const handleClearMapHistory = async () => {
+    setMapHistoryClearing(true);
+    const res = await apiFetchJson<{ success?: boolean; message?: string }>('/api/net/history/clear', {
+      method: 'POST',
+    });
+    setMapHistoryClearing(false);
+    if (res.ok) {
+      onNotify(t('network.map_history_cleared'));
+      await loadMapHistory(true);
+    } else {
+      onNotify(res.error || t('status.signal_error'), true);
+    }
+  };
+
+  // Persist AI insights per locale in sessionStorage cleanly (capped to 200 items)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(`recursos_ai_conn_insights_v1_${locale}`);
+      setAiInsights(saved ? (JSON.parse(saved) as Record<string, AiConnectionInsight>) : {});
+    } catch {
+      setAiInsights({});
+    }
+  }, [locale]);
+
+  const rawGeoConnections = useMemo(() => {
+    if (mapMode === 'history') {
+      const srvNode = metrics?.net?.connections_map?.server_node;
+      const histConns = (mapHistoryData?.connections ?? []).filter((c) => !c.is_lan || c.is_server_node);
+      if (srvNode && !histConns.some((c) => c.is_server_node)) {
+        return [{ ...srvNode, is_server_node: true }, ...histConns];
+      }
+      return histConns;
+    }
+    return liveGeoConnections;
+  }, [mapMode, mapHistoryData?.connections, metrics?.net?.connections_map?.server_node, liveGeoConnections]);
 
   const bannedDetails = useMemo(
     () => metrics?.security?.fail2ban?.banned_details ?? [],
@@ -672,49 +782,76 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
     for (const b of bannedDetails) {
       if (b.ip) set.add(b.ip.trim());
     }
-    for (const c of rawGeoConnections) {
+    for (const c of liveGeoConnections) {
+      const ip = (c.remote_ip || c.ip || '').trim();
+      if (ip && (c.direction === 'blocked' || c.state === 'BANNED')) {
+        set.add(ip);
+      }
+    }
+    for (const c of mapHistoryData?.connections ?? []) {
       const ip = (c.remote_ip || c.ip || '').trim();
       if (ip && (c.direction === 'blocked' || c.state === 'BANNED')) {
         set.add(ip);
       }
     }
     return set;
-  }, [bannedDetails, rawGeoConnections]);
+  }, [bannedDetails, liveGeoConnections, mapHistoryData?.connections]);
 
-  const mapFilterCounts = useMemo(() => {
-    let incoming = 0;
-    let outgoing = 0;
-    let devices = 0;
-    let blocked = 0;
-    for (const c of rawGeoConnections) {
-      if (c.is_server_node) continue;
-      const ip = (c.remote_ip || c.ip || '').trim();
-      const isBlk = c.direction === 'blocked' || c.state === 'BANNED' || (ip ? bannedIpSet.has(ip) : false);
-      if (isBlk) blocked++;
-      else if (c.direction === 'incoming') incoming++;
-      else outgoing++;
-      if (isHomeDeviceConn(c, serverLocalIp)) devices++;
+  const availableMapDevices = useMemo(() => {
+    const devMap = new Map<string, { ip: string; label: string }>();
+    for (const d of mapHistoryData?.devices_catalog ?? []) {
+      const ip = String(d.ip || '').trim();
+      if (!ip) continue;
+      const nm = String(d.name || '').trim();
+      devMap.set(ip, { ip, label: nm && nm !== ip ? `${nm} (${ip})` : ip });
     }
-    return {
-      all: rawGeoConnections.filter((c) => !c.is_server_node).length,
-      incoming,
-      outgoing,
-      devices,
-      blocked,
-    };
-  }, [rawGeoConnections, bannedIpSet, serverLocalIp]);
+    for (const c of [...liveGeoConnections, ...(mapHistoryData?.connections ?? [])]) {
+      if (c.is_server_node) continue;
+      const ip = String(c.local_ip || '').trim();
+      if (!ip) continue;
+      const nm = String(c.local_hostname || '').trim();
+      if (!devMap.has(ip) || (nm && devMap.get(ip)?.label === ip)) {
+        devMap.set(ip, { ip, label: nm && nm !== ip ? `${nm} (${ip})` : ip });
+      }
+    }
+    for (const w of metrics?.wifi_clients ?? []) {
+      const ip = String(w.ip || '').trim();
+      if (!ip) continue;
+      const nm = String(w.name || w.hostname || '').trim();
+      if (!devMap.has(ip)) {
+        devMap.set(ip, { ip, label: nm && nm !== ip ? `${nm} (${ip})` : ip });
+      }
+    }
+    return Array.from(devMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [mapHistoryData?.devices_catalog, mapHistoryData?.connections, liveGeoConnections, metrics?.wifi_clients]);
 
-  const geoConnections = useMemo(() => {
+  const availableMapServices = useMemo(() => {
+    const svcSet = new Set<string>();
+    for (const s of mapHistoryData?.services_catalog ?? []) {
+      const nm = String(s.service || '').trim();
+      if (nm) svcSet.add(nm);
+    }
+    for (const c of [...liveGeoConnections, ...(mapHistoryData?.connections ?? [])]) {
+      if (c.is_server_node) continue;
+      const nm = String(c.service || '').trim();
+      if (nm) svcSet.add(nm);
+    }
+    return Array.from(svcSet).sort((a, b) => a.localeCompare(b));
+  }, [mapHistoryData?.services_catalog, mapHistoryData?.connections, liveGeoConnections]);
+
+  const mapContextFiltered = useMemo(() => {
     const q = mapSearchQuery.trim().toLowerCase();
     return rawGeoConnections.filter((c) => {
       if (c.is_server_node) return true;
-      const ip = (c.remote_ip || c.ip || '').trim();
-      const isBlk = c.direction === 'blocked' || c.state === 'BANNED' || (ip ? bannedIpSet.has(ip) : false);
-      if (mapFilter === 'incoming' && (c.direction !== 'incoming' || isBlk)) return false;
-      if (mapFilter === 'outgoing' && (c.direction === 'incoming' || isBlk)) return false;
-      if (mapFilter === 'devices' && !isHomeDeviceConn(c, serverLocalIp)) return false;
-      if (mapFilter === 'blocked' && !isBlk) return false;
+      if (mapDeviceFilter !== 'all' && String(c.local_ip || '').trim() !== mapDeviceFilter) {
+        return false;
+      }
+      if (mapServiceFilter !== 'all' && String(c.service || '').trim() !== mapServiceFilter) {
+        return false;
+      }
       if (!q) return true;
+      const ip = (c.remote_ip || c.ip || '').trim();
+      const aiMatch = aiInsights[getConnAiSignature(c)];
       return (
         ip.toLowerCase().includes(q) ||
         String(c.domain || '').toLowerCase().includes(q) ||
@@ -724,16 +861,56 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         String(c.city || '').toLowerCase().includes(q) ||
         String(c.country || '').toLowerCase().includes(q) ||
         String(c.isp || c.org || '').toLowerCase().includes(q) ||
-        String(c.process || '').toLowerCase().includes(q)
+        String(c.process || '').toLowerCase().includes(q) ||
+        String(aiMatch?.app_name || '').toLowerCase().includes(q) ||
+        String(aiMatch?.summary || '').toLowerCase().includes(q) ||
+        String(aiMatch?.category || '').toLowerCase().includes(q)
       );
     });
-  }, [rawGeoConnections, mapFilter, mapSearchQuery, bannedIpSet, serverLocalIp]);
+  }, [rawGeoConnections, mapDeviceFilter, mapServiceFilter, mapSearchQuery, aiInsights]);
+
+  const mapFilterCounts = useMemo(() => {
+    let incoming = 0;
+    let outgoing = 0;
+    let devices = 0;
+    let blocked = 0;
+    for (const c of mapContextFiltered) {
+      if (c.is_server_node) continue;
+      const ip = (c.remote_ip || c.ip || '').trim();
+      const isBlk = c.direction === 'blocked' || c.state === 'BANNED' || (ip ? bannedIpSet.has(ip) : false);
+      if (isBlk) blocked++;
+      else if (c.direction === 'incoming') incoming++;
+      else outgoing++;
+      if (isHomeDeviceConn(c, serverLocalIp)) devices++;
+    }
+    return {
+      all: mapContextFiltered.filter((c) => !c.is_server_node).length,
+      incoming,
+      outgoing,
+      devices,
+      blocked,
+    };
+  }, [mapContextFiltered, bannedIpSet, serverLocalIp]);
+
+  const geoConnections = useMemo(() => {
+    return mapContextFiltered.filter((c) => {
+      if (c.is_server_node) return true;
+      const ip = (c.remote_ip || c.ip || '').trim();
+      const isBlk = c.direction === 'blocked' || c.state === 'BANNED' || (ip ? bannedIpSet.has(ip) : false);
+      if (mapFilter === 'incoming' && (c.direction !== 'incoming' || isBlk)) return false;
+      if (mapFilter === 'outgoing' && (c.direction === 'incoming' || isBlk)) return false;
+      if (mapFilter === 'devices' && !isHomeDeviceConn(c, serverLocalIp)) return false;
+      if (mapFilter === 'blocked' && !isBlk) return false;
+      return true;
+    });
+  }, [mapContextFiltered, mapFilter, bannedIpSet, serverLocalIp]);
 
   const serviceBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const c of geoConnections) {
       if (c.is_server_node) continue;
-      const k = c.service || t('hardware.net.geo.direct_traffic');
+      const insight = aiSimplifiedView ? aiInsights[getConnAiSignature(c)] : undefined;
+      const k = insight?.app_name || c.service || t('hardware.net.geo.direct_traffic');
       counts[k] = (counts[k] || 0) + 1;
     }
     const palette = ['#0284c7', '#10b981', '#7c3aed', '#f59e0b', '#0ea5e9', '#ec4899'];
@@ -741,7 +918,69 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
       .map(([name, count], idx) => ({ name, count, color: palette[idx % palette.length] }));
-  }, [geoConnections, t]);
+  }, [geoConnections, aiInsights, aiSimplifiedView, t]);
+
+  const handleSimplifyConnectionsWithAi = useCallback(async () => {
+    const visibleConns = geoConnections.filter((c) => !c.is_server_node).slice(0, 36);
+    if (visibleConns.length === 0) return;
+
+    const batchPayload = visibleConns.slice(0, 24).map((c) => ({
+      signature: getConnAiSignature(c),
+      direction: c.direction || 'outgoing',
+      protocol: c.protocol || 'TCP',
+      local_ip: c.local_ip || '',
+      local_hostname: c.local_hostname || '',
+      local_port: Number(c.local_port || 0),
+      remote_ip: (c.remote_ip || c.ip || '').trim(),
+      remote_port: Number(c.remote_port || c.port || 0),
+      domain: c.domain || '',
+      service: c.service || '',
+      process: c.process || '',
+      isp: c.isp || c.org || '',
+      asn: c.asn || '',
+      city: c.city || '',
+      country: c.country || '',
+    }));
+
+    setAiLoading(true);
+    setAiError(null);
+    const res = await apiFetchJson<AiIdentifyResponse>('/api/net/ai-identify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: locale, connections: batchPayload }),
+    });
+    setAiLoading(false);
+
+    if (res.data?.insights) {
+      setAiInsights((prev) => {
+        const merged = { ...prev, ...res.data!.insights };
+        const entries = Object.entries(merged).slice(-200);
+        const bounded = Object.fromEntries(entries);
+        try {
+          sessionStorage.setItem(`recursos_ai_conn_insights_v1_${locale}`, JSON.stringify(bounded));
+        } catch {
+          // Ignore quota issues
+        }
+        return bounded;
+      });
+    }
+
+    if (res.ok && res.data?.ok) {
+      setAiLastModel(res.data.model || null);
+      setAiSimplifiedView(true);
+      const count = Object.keys(res.data.insights || {}).length;
+      if (count > 0) {
+        onNotify(t('network.ai_identified_count', { count }));
+      }
+    } else {
+      const errMsg =
+        res.data?.code === 'GEMINI_API_KEY_MISSING'
+          ? t('network.ai_error_missing_key')
+          : res.data?.error || res.error || t('status.signal_error');
+      setAiError(errMsg);
+      onNotify(errMsg, true);
+    }
+  }, [geoConnections, locale, onNotify, t]);
 
   const loadSpeedtestData = useCallback(async (showSpinner = false) => {
     if (showSpinner) setSpeedtestLoadingHistory(true);
@@ -1404,7 +1643,8 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           ? `<span style="background:rgba(16,185,129,0.16);color:#10b981;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;">${escapeMapHtml(t('network.map_direction_in'))}</span>`
           : `<span style="background:rgba(14,165,233,0.16);color:#0ea5e9;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;">${escapeMapHtml(t('network.map_direction_out'))}</span>`;
 
-      const svc = escapeMapHtml(c.service || t('hardware.net.geo.conn_generic'));
+      const aiInsight = aiSimplifiedView ? aiInsights[getConnAiSignature(c)] : undefined;
+      const svc = escapeMapHtml(aiInsight?.app_name || c.service || t('hardware.net.geo.conn_generic'));
       const domain = c.domain ? escapeMapHtml(c.domain) : '';
       const localHost = escapeMapHtml(c.local_hostname || (c.local_ip === serverLocalIp ? 'Servidor' : c.local_ip || 'Servidor'));
       const localEndpoint = escapeMapHtml(`${c.local_ip || serverLocalIp || ''}${c.local_port ? `:${c.local_port}` : ''}`);
@@ -1415,6 +1655,24 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       const txSpd = escapeMapHtml(formatSpeed(c.tx_speed || 0));
       const totBytes = escapeMapHtml(formatBytes(c.bytes_total ?? ((c.bytes_received || 0) + (c.bytes_sent || 0))));
       const defJail = inferDefaultJail(c);
+
+      const historyBadgeHtml =
+        c.is_history && c.hit_count
+          ? `<div style="margin-bottom:5px;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 7px;border-radius:7px;background:rgba(245,158,11,0.12);color:#d97706;font-size:10px;font-weight:700;">
+              <span>🕒 ${escapeMapHtml(t('network.map_hits_badge', { count: c.hit_count }))}</span>
+              ${c.last_seen ? `<span style="font-family:ui-monospace,monospace;">${escapeMapHtml(new Date(c.last_seen * 1000).toLocaleString(locale === 'es' ? 'es-ES' : locale))}</span>` : ''}
+            </div>`
+          : '';
+
+      const aiBannerHtml = aiInsight
+        ? `<div style="margin-bottom:6px;padding:6px 8px;border-radius:9px;background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.28);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:2px;">
+              <span style="font-size:10px;font-weight:800;color:#0284c7;">✨ ${escapeMapHtml(aiInsight.category)}</span>
+              <span style="font-size:10px;opacity:.78;">${escapeMapHtml(aiInsight.role)}</span>
+            </div>
+            <div style="font-size:11px;font-weight:500;line-height:1.35;">${escapeMapHtml(aiInsight.summary)}</div>
+          </div>`
+        : '';
 
       const backBtnHtml =
         count > 1
@@ -1443,9 +1701,11 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           <strong style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${svc}</strong>
           ${dirBadge}
         </div>
-        <div style="font-size:11px;opacity:.78;margin-bottom:6px;">📍 ${escapeMapHtml(placeName)}</div>
+        ${aiBannerHtml}
+        ${historyBadgeHtml}
+        <div style="font-size:11px;opacity:.78;margin-bottom:6px;">📍 ${escapeMapHtml(placeName)} · 📱 ${localHost}</div>
         ${
-          domain
+          domain && !aiInsight
             ? `<div style="margin-bottom:4px;padding:3px 7px;border-radius:7px;background:rgba(14,165,233,0.1);font-family:ui-monospace,monospace;font-size:11px;color:#0284c7;word-break:break-all;">🌐 ${domain}</div>`
             : ''
         }
@@ -1461,6 +1721,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             <div style="font-family:ui-monospace,monospace;font-size:10px;opacity:.8;">${remoteEndpoint}</div>
           </div>
         </div>
+        ${domain && aiInsight ? `<div style="font-family:ui-monospace,monospace;font-size:10px;opacity:.72;margin-bottom:3px;word-break:break-all;">🌐 ${domain}</div>` : ''}
         <div style="font-size:10.5px;opacity:.78;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🏢 ${orgAsn}</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:5px 6px;border-radius:8px;background:rgba(148,163,184,0.12);font-family:ui-monospace,monospace;font-size:10.5px;text-align:center;">
           <div>
@@ -1480,25 +1741,29 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       </div>`;
     }
 
-    // Vista Lista de IPs del grupo (count > 1) con selección interactiva (v4.11.0)
+    // Vista Lista de IPs del grupo (count > 1) con selección interactiva (v4.11.0 + IA + Historial)
     const rowsHtml = items
       .map((c, idx) => {
         const connKey = getConnIdentityKey(c, idx);
         const remoteIp = (c.remote_ip || c.ip || '').trim();
         const isBlocked = c.direction === 'blocked' || c.state === 'BANNED' || (remoteIp ? bannedIpSet.has(remoteIp) : false);
         const arrow = isBlocked ? '🛡️' : c.direction === 'incoming' ? '↓' : '↑';
-        const svc = escapeMapHtml(c.service || t('hardware.net.geo.conn_generic'));
-        const domainOrIp = escapeMapHtml(c.domain || remoteIp);
+        const aiInsight = aiSimplifiedView ? aiInsights[getConnAiSignature(c)] : undefined;
+        const svc = escapeMapHtml(aiInsight?.app_name || c.service || t('hardware.net.geo.conn_generic'));
+        const subLine = escapeMapHtml(
+          aiInsight?.summary || `${c.domain || remoteIp}${c.domain && remoteIp ? ` (${remoteIp})` : ''}`
+        );
         const localHost = c.local_hostname && c.local_hostname !== 'Servidor' ? ` · 📱 ${escapeMapHtml(c.local_hostname)}` : '';
+        const hitChip = c.is_history && c.hit_count ? `<span style="color:#d97706;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;">${c.hit_count}×</span>` : '';
         const spd = (c.rx_speed || 0) + (c.tx_speed || 0);
         const spdBadge = spd > 0 ? `<span style="color:#10b981;font-family:ui-monospace,monospace;font-size:10px;">${escapeMapHtml(formatSpeed(spd))}</span>` : '';
         return `<div style="padding:5px 4px;border-top:1px solid rgba(148,163,184,0.2);display:flex;align-items:center;justify-content:space-between;gap:6px;">
           <button type="button" data-select-cluster="${escapeMapHtml(cluster.key)}" data-select-conn="${escapeMapHtml(connKey)}" style="flex:1;min-width:0;text-align:left;background:transparent;border:0;color:inherit;padding:0;cursor:pointer;">
-            <div style="font-weight:700;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${arrow} ${svc}${localHost}</div>
-            <div style="font-family:ui-monospace,monospace;font-size:10.5px;opacity:.86;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${domainOrIp} ${c.domain && remoteIp ? `<span style="opacity:.65;">(${escapeMapHtml(remoteIp)})</span>` : ''}</div>
+            <div style="font-weight:700;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${arrow} ${aiInsight ? '✨ ' : ''}${svc}${localHost}</div>
+            <div style="font-size:10.5px;opacity:.82;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${aiInsight ? '' : 'font-family:ui-monospace,monospace;'}">${subLine}</div>
           </button>
           <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
-            ${spdBadge}
+            ${hitChip}${spdBadge}
             <button type="button" data-select-cluster="${escapeMapHtml(cluster.key)}" data-select-conn="${escapeMapHtml(connKey)}" style="border:1px solid rgba(14,165,233,0.4);background:rgba(14,165,233,0.12);color:#0284c7;border-radius:7px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;">${escapeMapHtml(t('network.map_inspect_conn'))}</button>
           </div>
         </div>`;
@@ -1868,8 +2133,9 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 ? '#8b5cf6'
                 : '#0ea5e9';
 
-        // Etiqueta dinámica priorizando dominio Pi-hole (v4.12.0) y contador de grupo (v4.11.0)
-        const primaryLabel = primary.domain || primary.service || primary.remote_ip || primary.ip || t('hardware.net.geo.conn_generic');
+        // Etiqueta dinámica priorizando IA simplificada, dominio Pi-hole y contador de grupo
+        const primaryInsight = aiSimplifiedView ? aiInsights[getConnAiSignature(primary)] : undefined;
+        const primaryLabel = primaryInsight?.app_name || primary.domain || primary.service || primary.remote_ip || primary.ip || t('hardware.net.geo.conn_generic');
         const arrowPrefix = hasBlocked ? '🛡️' : hasIncoming ? '↓' : '↑';
         const tooltipText = isNode
           ? `● ${t('network.map_server_node_title')} · ${placeName} (${primary.public_ip || primary.ip || ''})`
@@ -1883,14 +2149,14 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
             : null;
         const popupHtml = renderPopupHtmlForCluster(cluster, selectedKeyForCluster);
 
-        const signature = `${lat.toFixed(3)},${lng.toFixed(3)}|${count}|${selectedKeyForCluster || ''}|${fillColor}|${items
+        const signature = `${lat.toFixed(3)},${lng.toFixed(3)}|${count}|${selectedKeyForCluster || ''}|${fillColor}|${aiSimplifiedView ? '1' : '0'}|${items
           .slice(0, 12)
-          .map(
-            (c) =>
-              `${c.remote_ip || c.ip || ''}:${c.domain || ''}:${c.service || ''}:${c.rx_speed || 0}:${c.tx_speed || 0}:${c.bytes_total || 0}:${
-                bannedIpSet.has((c.remote_ip || c.ip || '').trim()) ? '1' : '0'
-              }`
-          )
+          .map((c) => {
+            const aiTag = aiSimplifiedView ? (aiInsights[getConnAiSignature(c)]?.app_name || '') : '';
+            return `${c.remote_ip || c.ip || ''}:${c.domain || ''}:${c.service || ''}:${aiTag}:${c.hit_count || 0}:${c.rx_speed || 0}:${c.tx_speed || 0}:${c.bytes_total || 0}:${
+              bannedIpSet.has((c.remote_ip || c.ip || '').trim()) ? '1' : '0'
+            }`;
+          })
           .join(',')}`;
 
         const existing = registry.get(key);
@@ -2064,7 +2330,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         isRedrawingMapRef.current = false;
       }, 60);
     }
-  }, [geoConnections, metrics?.net?.connections_map?.server_node, bannedIpSet, serverLocalIp, subTab, mapContainerEl, mapZoomTick, t]);
+  }, [geoConnections, metrics?.net?.connections_map?.server_node, bannedIpSet, serverLocalIp, subTab, mapContainerEl, mapZoomTick, aiInsights, aiSimplifiedView, locale, t]);
 
   const handleFitAllBounds = () => {
     const map = mapInstanceRef.current;
@@ -3162,36 +3428,159 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
+                    <LayoutGroup id="map-live-history-mode">
+                      <div className="cockpit-segmented inline-flex rounded-xl p-1">
+                        {(['live', 'history'] as const).map((modeOpt) => {
+                          const active = mapMode === modeOpt;
+                          return (
+                            <motion.button
+                              key={modeOpt}
+                              whileTap={{ scale: 0.96 }}
+                              type="button"
+                              onClick={() => setMapMode(modeOpt)}
+                              className={`relative inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                                active
+                                  ? 'text-sky-700 dark:text-sky-300'
+                                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                              }`}
+                            >
+                              {active && <MorphPill layoutId="map-mode-pill" className="rounded-lg" />}
+                              <span className="relative z-10 inline-flex items-center gap-1">
+                                {modeOpt === 'live' ? <Activity className="h-3.5 w-3.5" /> : <History className="h-3.5 w-3.5" />}
+                                <span>{t(modeOpt === 'live' ? 'network.map_mode_live' : 'network.map_mode_history')}</span>
+                              </span>
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    </LayoutGroup>
+
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      type="button"
+                      disabled={aiLoading || geoConnections.filter((c) => !c.is_server_node).length === 0}
+                      onClick={() => void handleSimplifyConnectionsWithAi()}
+                      className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-sky-400/40 bg-sky-500/12 px-3 py-1.5 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-500/20 disabled:opacity-50 dark:text-sky-300"
+                    >
+                      <Sparkles className={`h-3.5 w-3.5 ${aiLoading ? 'animate-spin' : ''}`} />
+                      <span>{aiLoading ? t('network.ai_identifying') : t('network.ai_identify_btn')}</span>
+                    </motion.button>
+
+                    {Object.keys(aiInsights).length > 0 && (
+                      <motion.button
+                        whileTap={{ scale: 0.96 }}
+                        type="button"
+                        onClick={() => setAiSimplifiedView((v) => !v)}
+                        className={`cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          aiSimplifiedView
+                            ? 'text-indigo-700 dark:text-indigo-300 border-indigo-400/50'
+                            : 'text-slate-600 dark:text-slate-300'
+                        }`}
+                      >
+                        <span>{aiSimplifiedView ? t('network.ai_mode_simple') : t('network.ai_mode_tech')}</span>
+                      </motion.button>
+                    )}
+
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
                       type="button"
                       onClick={handleFitAllBounds}
                       className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       <Maximize2 className="h-3.5 w-3.5" />
                       <span>{t('network.map_fit_all')}</span>
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
                       type="button"
                       onClick={() => {
-                        void apiFetchJson('/api/net/geoip/resolve', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ ips: [], force_sync: true }),
-                        }).then(() => {
-                          onNotify(t('network.locations_updated'));
-                          onRefreshMetrics();
-                        });
+                        if (mapMode === 'history') {
+                          void loadMapHistory(true);
+                        } else {
+                          void apiFetchJson('/api/net/geoip/resolve', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ips: [], force_sync: true }),
+                          }).then(() => {
+                            onNotify(t('network.locations_updated'));
+                            onRefreshMetrics();
+                          });
+                        }
                       }}
                       className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
-                      <RefreshCw className="h-3.5 w-3.5" />
+                      <RefreshCw className={`h-3.5 w-3.5 ${mapHistoryLoading ? 'animate-spin' : ''}`} />
                       <span>{t('network.refresh')}</span>
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
 
-                {/* Barra de Filtros Interactivos + Buscador en Vivo (v4.13.0) */}
-                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+                {/* Barra de Historial Temporal (solo activa en modo Historial) */}
+                {mapMode === 'history' && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400/30 bg-amber-500/8 px-3 py-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      {(
+                        [
+                          { id: '1' as const, label: t('network.map_history_1h') },
+                          { id: '6' as const, label: t('network.map_history_6h') },
+                          { id: '24' as const, label: t('network.map_history_24h') },
+                          { id: '168' as const, label: t('network.map_history_7d') },
+                          { id: 'all' as const, label: t('network.map_history_all') },
+                        ]
+                      ).map((hr) => {
+                        const active = mapHistoryHours === hr.id;
+                        return (
+                          <motion.button
+                            key={hr.id}
+                            whileTap={{ scale: 0.96 }}
+                            type="button"
+                            onClick={() => setMapHistoryHours(hr.id)}
+                            className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                              active
+                                ? 'cockpit-pill-amber ring-1 ring-amber-400/50'
+                                : 'cockpit-subtile text-slate-600 hover:text-slate-900 dark:text-slate-300'
+                            }`}
+                          >
+                            {hr.label}
+                          </motion.button>
+                        );
+                      })}
+                      <span className="ml-1 font-mono text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
+                        {t('network.map_history_summary', {
+                          records: mapHistoryData?.summary?.total_records ?? 0,
+                          hits: mapHistoryData?.summary?.total_hits ?? 0,
+                        })}
+                      </span>
+                    </div>
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      type="button"
+                      disabled={mapHistoryClearing}
+                      onClick={() => void handleClearMapHistory()}
+                      className="cockpit-btn-off inline-flex min-h-[30px] items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>{t('network.map_history_clear')}</span>
+                    </motion.button>
+                  </div>
+                )}
+
+                {aiError && (
+                  <div className="flex items-center justify-between gap-2 rounded-xl border border-rose-400/35 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
+                    <span>{aiError}</span>
+                    <button
+                      type="button"
+                      onClick={() => setAiError(null)}
+                      className="rounded-md px-2 py-0.5 font-semibold hover:bg-rose-500/15"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                {/* Barra de Filtros Interactivos + Selectores Dispositivo/Servicio + Buscador */}
+                <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {(
                       [
@@ -3204,7 +3593,8 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                     ).map((f) => {
                       const active = mapFilter === f.id;
                       return (
-                        <button
+                        <motion.button
+                          whileTap={{ scale: 0.96 }}
                           key={f.id}
                           type="button"
                           onClick={() => setMapFilter(f.id)}
@@ -3222,20 +3612,50 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                           >
                             {f.count}
                           </span>
-                        </button>
+                        </motion.button>
                       );
                     })}
                   </div>
 
-                  <div className="relative min-w-[210px]">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="search"
-                      value={mapSearchQuery}
-                      onChange={(e) => setMapSearchQuery(e.target.value)}
-                      placeholder={t('network.map_search_placeholder')}
-                      className="cockpit-subtile w-full min-h-[36px] pl-8 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
-                    />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      aria-label={t('network.map_filter_device_all')}
+                      value={mapDeviceFilter}
+                      onChange={(e) => setMapDeviceFilter(e.target.value)}
+                      className="cockpit-subtile min-h-[36px] max-w-[200px] px-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 dark:text-slate-100"
+                    >
+                      <option value="all">{t('network.map_filter_device_all')}</option>
+                      {availableMapDevices.map((d) => (
+                        <option key={d.ip} value={d.ip}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      aria-label={t('network.map_filter_service_all')}
+                      value={mapServiceFilter}
+                      onChange={(e) => setMapServiceFilter(e.target.value)}
+                      className="cockpit-subtile min-h-[36px] max-w-[210px] px-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-sky-500 dark:text-slate-100"
+                    >
+                      <option value="all">{t('network.map_filter_service_all')}</option>
+                      {availableMapServices.map((svc) => (
+                        <option key={svc} value={svc}>
+                          {svc}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="relative min-w-[185px] flex-1 sm:flex-none">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="search"
+                        value={mapSearchQuery}
+                        onChange={(e) => setMapSearchQuery(e.target.value)}
+                        placeholder={t('network.map_search_placeholder')}
+                        className="cockpit-subtile w-full min-h-[36px] pl-8 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3327,9 +3747,43 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           </div>
 
           <section className="cockpit-bento p-5">
-            <h3 className="font-display text-base font-semibold text-slate-900 dark:text-white pb-3 border-b border-slate-200/70 dark:border-slate-800">
-              {t('network.detailed_conns')}
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/70 dark:border-slate-800">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                  {t('network.detailed_conns')}
+                </h3>
+                {aiLastModel && Object.keys(aiInsights).length > 0 && (
+                  <span className="cockpit-pill-cyan inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                    <Sparkles className="h-3 w-3" />
+                    <span>{t('network.ai_identified_count', { count: Object.keys(aiInsights).length })}</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  type="button"
+                  disabled={aiLoading || geoConnections.filter((c) => !c.is_server_node).length === 0}
+                  onClick={() => void handleSimplifyConnectionsWithAi()}
+                  className="inline-flex min-h-[32px] items-center gap-1.5 rounded-xl border border-sky-400/40 bg-sky-500/12 px-3 py-1 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-500/20 disabled:opacity-50 dark:text-sky-300"
+                >
+                  <Sparkles className={`h-3.5 w-3.5 ${aiLoading ? 'animate-spin' : ''}`} />
+                  <span>{aiLoading ? t('network.ai_identifying') : t('network.ai_identify_btn')}</span>
+                </motion.button>
+                {Object.keys(aiInsights).length > 0 && (
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    type="button"
+                    onClick={() => setAiSimplifiedView((v) => !v)}
+                    className="cockpit-subtile inline-flex min-h-[32px] items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  >
+                    <span>{aiSimplifiedView ? t('network.ai_mode_simple') : t('network.ai_mode_tech')}</span>
+                  </motion.button>
+                )}
+              </div>
+            </div>
+
             <div className="mt-3 cockpit-auto-grid-cards">
               {geoConnections
                 .filter((c) => !c.is_server_node)
@@ -3349,9 +3803,15 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                     ? { label: t('network.map_direction_in'), cls: 'cockpit-pill-amber' }
                     : { label: t('network.map_direction_out'), cls: 'cockpit-pill-emerald' };
 
+                  const aiSig = getConnAiSignature(c);
+                  const insight = aiInsights[aiSig];
+                  const showSimplified = Boolean(insight && aiSimplifiedView);
+                  const techCardKey = `${remoteIp}-${c.remote_port ?? idx}-${idx}`;
+                  const techExpanded = Boolean(expandedTechKeys[techCardKey]);
+
                   return (
                     <div
-                      key={`${remoteIp}-${c.remote_port ?? idx}-${idx}`}
+                      key={techCardKey}
                       className="cockpit-subtile flex flex-col justify-between gap-2.5 p-3.5 text-xs transition-colors hover:border-sky-400/60"
                     >
                       <div className="flex items-start justify-between gap-2.5">
@@ -3366,60 +3826,129 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                             <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${dirBadge.cls}`}>
                               {dirBadge.label}
                             </span>
-                            <span className="font-semibold text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
-                              {c.service || t('hardware.net.geo.external_conn')}
-                            </span>
+                            {showSimplified && insight ? (
+                              <>
+                                <span className="inline-flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-300 group-hover:underline">
+                                  <Sparkles className="h-3 w-3 shrink-0" />
+                                  <span>{insight.app_name}</span>
+                                </span>
+                                <span className="cockpit-pill-cyan rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
+                                  {insight.category}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="font-semibold text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
+                                {c.service || t('hardware.net.geo.external_conn')}
+                              </span>
+                            )}
+                            {c.is_history && c.hit_count && (
+                              <span className="cockpit-pill-amber rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums">
+                                {t('network.map_hits_badge', { count: c.hit_count })}
+                              </span>
+                            )}
                             <span className="text-slate-400">·</span>
                             <span className="text-slate-600 dark:text-slate-300 truncate">
                               {c.city || t('hardware.net.geo.location_fallback')} {c.country ? `(${c.country})` : ''}
                             </span>
                           </div>
 
-                          <p className="font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-200 truncate">
-                            {remoteIp}{c.remote_port ? `:${c.remote_port}` : ''} {c.org || c.isp ? `· ${c.org || c.isp}` : ''}
-                          </p>
-
-                          {/* Dominio Pi-hole y Dispositivo origen del hogar (v4.12.0 & v4.13.0) */}
-                          {(c.domain || c.local_hostname || isHomeDev) && (
-                            <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
-                              {c.domain && (
-                                <span className="inline-flex items-center gap-1 font-mono text-sky-600 dark:text-sky-400 truncate max-w-full">
-                                  🌐 {c.domain}
-                                </span>
-                              )}
-                              {(c.local_hostname || c.local_ip) && (
-                                <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 truncate max-w-full">
-                                  📱 {c.local_hostname || c.local_ip}{c.local_ip && c.local_hostname && c.local_hostname !== c.local_ip ? ` (${c.local_ip})` : ''}
-                                </span>
-                              )}
+                          {showSimplified && insight ? (
+                            <div className="space-y-1">
+                              <p className="text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100">
+                                {insight.summary}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                {(c.local_hostname || c.local_ip) && (
+                                  <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                                    📱 {c.local_hostname || c.local_ip}
+                                  </span>
+                                )}
+                                <span>{insight.role}</span>
+                                {c.last_seen && (
+                                  <span className="font-mono text-[10px]">
+                                    {t('network.map_last_seen', {
+                                      time: new Date(c.last_seen * 1000).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale),
+                                    })}
+                                  </span>
+                                )}
+                              </div>
                             </div>
+                          ) : (
+                            <>
+                              <p className="font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-200 truncate">
+                                {remoteIp}{c.remote_port ? `:${c.remote_port}` : ''} {c.org || c.isp ? `· ${c.org || c.isp}` : ''}
+                              </p>
+
+                              {(c.domain || c.local_hostname || isHomeDev) && (
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+                                  {c.domain && (
+                                    <span className="inline-flex items-center gap-1 font-mono text-sky-600 dark:text-sky-400 truncate max-w-full">
+                                      🌐 {c.domain}
+                                    </span>
+                                  )}
+                                  {(c.local_hostname || c.local_ip) && (
+                                    <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 truncate max-w-full">
+                                      📱 {c.local_hostname || c.local_ip}{c.local_ip && c.local_hostname && c.local_hostname !== c.local_ip ? ` (${c.local_ip})` : ''}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </>
                           )}
                         </button>
 
                         {remoteIp && !c.is_server_node && (
                           isBanned ? (
-                            <button
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
                               type="button"
                               onClick={() => void handleUnbanIp(remoteIp, c.jail || 'all')}
                               className="cockpit-btn-wol inline-flex min-h-[34px] items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-semibold transition-colors shrink-0"
                             >
                               <Shield className="h-3.5 w-3.5" />
                               <span>{t('network.unblock')}</span>
-                            </button>
+                            </motion.button>
                           ) : (
-                            <button
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
                               type="button"
                               onClick={() => void handleBanIp(remoteIp, c.jail)}
                               className="cockpit-btn-off inline-flex min-h-[34px] items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-semibold transition-colors shrink-0"
                             >
                               <ShieldAlert className="h-3.5 w-3.5" />
                               <span>{t('network.block')}</span>
-                            </button>
+                            </motion.button>
                           )
                         )}
                       </div>
 
-                      {/* Franja simétrica de tráfico en tiempo real por conexión (v10.4.0) */}
+                      {showSimplified && (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedTechKeys((prev) => ({ ...prev, [techCardKey]: !prev[techCardKey] }))
+                            }
+                            className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                          >
+                            {techExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            <span>{t('network.ai_tech_details')}</span>
+                          </button>
+                          {techExpanded && (
+                            <div className="mt-1.5 space-y-0.5 rounded-lg bg-slate-200/50 p-2 font-mono text-[10.5px] text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                              {c.domain && <div className="truncate">🌐 {c.domain}</div>}
+                              <div className="truncate">
+                                {c.local_ip || serverLocalIp}:{c.local_port || 0} → {remoteIp}:{c.remote_port || c.port || 0}
+                              </div>
+                              <div className="truncate">
+                                {c.process || c.protocol || 'TCP'} {c.org || c.isp ? `· ${c.org || c.isp}` : ''}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Franja simétrica de tráfico en tiempo real por conexión */}
                       <div className="mt-0.5 grid grid-cols-3 gap-1.5 border-t border-slate-200/70 pt-2 font-mono text-[11px] tabular-nums dark:border-slate-800">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('network.map_traffic_rx')}</span>

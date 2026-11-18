@@ -1,3 +1,4 @@
+import { GoogleGenAI, Type } from '@google/genai';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { exec, execSync, spawn } from 'child_process';
@@ -13,6 +14,73 @@ import { fileURLToPath } from 'url';
 import { defineConfig, Plugin } from 'vite';
 
 const ROOT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const AI_NET_MODEL = 'gemini-4-hydrogen';
+
+interface AiConnInsightRecord {
+  signature: string;
+  app_name: string;
+  category: string;
+  summary: string;
+  role: string;
+  confidence: 'high' | 'medium' | 'low';
+  model: string;
+  analyzed_at: number;
+}
+
+const aiNetInsightsCache = new Map<string, { insight: AiConnInsightRecord; cachedAt: number }>();
+const AI_NET_CACHE_TTL_MS = 30 * 60 * 1000;
+let cachedHostSocketsSummary: { ts: number; services: string[] } = { ts: 0, services: [] };
+
+function readDotEnvKey(keyName: string): string {
+  for (const fname of ['.env.local', '.env']) {
+    const fpath = path.resolve(ROOT_DIR, fname);
+    try {
+      if (!fs.existsSync(fpath)) continue;
+      const raw = fs.readFileSync(fpath, 'utf-8');
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx <= 0) continue;
+        const k = trimmed.slice(0, eqIdx).trim();
+        if (k !== keyName) continue;
+        const v = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+        if (v) return v;
+      }
+    } catch {
+      // Ignore unreadable env file
+    }
+  }
+  return '';
+}
+
+function getDynamicHostServicesSnapshot(): string[] {
+  const now = Date.now();
+  if (now - cachedHostSocketsSummary.ts < 15000 && cachedHostSocketsSummary.services.length > 0) {
+    return cachedHostSocketsSummary.services;
+  }
+  const services: string[] = [];
+  try {
+    const ssOut = execSync('ss -tulnpH 2>/dev/null || ss -tulnH 2>/dev/null', { timeout: 1200, encoding: 'utf-8' });
+    for (const line of ssOut.split('\n').slice(0, 40)) {
+      const cleaned = line.trim().replace(/\s+/g, ' ');
+      if (cleaned) services.push(cleaned);
+    }
+  } catch {
+    // Best-effort OS socket snapshot
+  }
+  try {
+    const dockerOut = execSync('docker ps --format "{{.Names}} -> {{.Ports}}" 2>/dev/null', { timeout: 1200, encoding: 'utf-8' });
+    for (const line of dockerOut.split('\n').slice(0, 25)) {
+      const cleaned = line.trim();
+      if (cleaned) services.push(`docker: ${cleaned}`);
+    }
+  } catch {
+    // Docker optional
+  }
+  cachedHostSocketsSummary = { ts: now, services };
+  return services;
+}
 
 // Real-time OS Telemetry state for Vite preview server (100% real system calls, zero fake specs)
 let prevCpuTimes: { idle: number; total: number }[] = [];
@@ -4916,45 +4984,264 @@ function realOsTelemetryMiddleware(): Plugin {
           return;
         }
 
+        if (url === '/api/net/ai-identify' && req.method === 'POST') {
+          let rawBody = '';
+          let tooLarge = false;
+          req.on('data', (chunk) => {
+            rawBody += chunk;
+            if (rawBody.length > 512 * 1024) tooLarge = true;
+          });
+          req.on('end', async () => {
+            const sendAiJson = (obj: unknown, status = 200) => {
+              res.statusCode = status;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(obj));
+            };
+
+            if (tooLarge) {
+              sendAiJson({ ok: false, code: 'PAYLOAD_TOO_LARGE', error: 'Payload exceeds 512 KB limit' }, 413);
+              return;
+            }
+
+            let parsedBody: Record<string, unknown> = {};
+            try {
+              parsedBody = rawBody ? JSON.parse(rawBody) : {};
+            } catch {
+              sendAiJson({ ok: false, code: 'INVALID_JSON', error: 'Invalid JSON request body' }, 400);
+              return;
+            }
+
+            const rawConns = Array.isArray(parsedBody.connections) ? parsedBody.connections : [];
+            const lang = String(parsedBody.lang || 'es').trim().toLowerCase().slice(0, 8) || 'es';
+            const inputConns = rawConns
+              .filter((c): c is Record<string, unknown> => Boolean(c && typeof c === 'object'))
+              .slice(0, 24);
+
+            if (inputConns.length === 0) {
+              sendAiJson({ ok: true, model: AI_NET_MODEL, insights: {} }, 200);
+              return;
+            }
+
+            const nowMs = Date.now();
+            const resultInsights: Record<string, AiConnInsightRecord> = {};
+            const missingConns: Array<Record<string, unknown>> = [];
+
+            for (const c of inputConns) {
+              const sig = String(c.signature || '').trim();
+              if (!sig) continue;
+              const cacheKey = `${lang}::${sig}`;
+              const cached = aiNetInsightsCache.get(cacheKey);
+              if (cached && nowMs - cached.cachedAt < AI_NET_CACHE_TTL_MS) {
+                resultInsights[sig] = cached.insight;
+              } else {
+                missingConns.push({
+                  signature: sig,
+                  direction: String(c.direction || 'outgoing'),
+                  protocol: String(c.protocol || 'TCP'),
+                  local_device: String(c.local_hostname || c.local_ip || ''),
+                  local_port: Number(c.local_port || 0),
+                  remote_ip: String(c.remote_ip || ''),
+                  remote_port: Number(c.remote_port || 0),
+                  domain: String(c.domain || ''),
+                  raw_service: String(c.service || ''),
+                  process: String(c.process || ''),
+                  isp: String(c.isp || ''),
+                  asn: String(c.asn || ''),
+                  city: String(c.city || ''),
+                  country: String(c.country || ''),
+                });
+              }
+            }
+
+            if (missingConns.length === 0) {
+              sendAiJson({ ok: true, model: AI_NET_MODEL, insights: resultInsights }, 200);
+              return;
+            }
+
+            const apiKey = (process.env.GEMINI_API_KEY || readDotEnvKey('GEMINI_API_KEY')).trim();
+            if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+              sendAiJson(
+                {
+                  ok: false,
+                  code: 'GEMINI_API_KEY_MISSING',
+                  error: 'GEMINI_API_KEY no está configurada en el entorno del servidor.',
+                  insights: resultInsights,
+                },
+                503
+              );
+              return;
+            }
+
+            try {
+              const ai = new GoogleGenAI({
+                apiKey,
+                httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+              });
+              const hostSnapshot = getDynamicHostServicesSnapshot();
+              const sysPrompt =
+                `You are a Linux & home-server network telemetry analyst. Respond strictly in language code "${lang}". ` +
+                `Your job is to simplify noisy raw network connection telemetry into clear, plain human identifications. ` +
+                `Analyze ALL clues together: domain/rDNS patterns, local_port and remote_port, protocol, process name, ` +
+                `local_device, ISP/ASN, and the host's live listening sockets / running containers provided in host_context. ` +
+                `Examples of analytical reasoning (do not assume them unless supported by the telemetry): ` +
+                `- Dynamic residential ISP hostnames connecting incoming to high local ports often correspond to P2P / BitTorrent peers if a torrent service or high listening port is involved. ` +
+                `- Mobile/cloud domains on :443 from Google/Apple/Microsoft correlate with mobile push notifications, OS telemetry, updates, or cloud APIs. ` +
+                `- Match local_port or process hints against self-hosted media/photo/cloud services when present in host_context. ` +
+                `Keep every field concise: app_name (2-4 words, e.g. "Cliente Torrent P2P", "Google Play / Push", "Emby Streaming"), ` +
+                `category (1-2 words), role (short direction/purpose tag), summary (one crisp sentence <= 95 chars explaining what this connection is doing without raw IP dumps).`;
+
+              const promptPayload = {
+                target_language: lang,
+                hostname: os.hostname(),
+                host_listening_context: hostSnapshot,
+                connections_to_identify: missingConns,
+              };
+
+              const response = await ai.models.generateContent({
+                model: AI_NET_MODEL,
+                contents: JSON.stringify(promptPayload),
+                config: {
+                  systemInstruction: sysPrompt,
+                  temperature: 0.15,
+                  responseMimeType: 'application/json',
+                  responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                      items: {
+                        type: Type.ARRAY,
+                        items: {
+                          type: Type.OBJECT,
+                          properties: {
+                            signature: { type: Type.STRING },
+                            app_name: { type: Type.STRING },
+                            category: { type: Type.STRING },
+                            role: { type: Type.STRING },
+                            summary: { type: Type.STRING },
+                            confidence: { type: Type.STRING },
+                          },
+                          required: ['signature', 'app_name', 'category', 'role', 'summary', 'confidence'],
+                        },
+                      },
+                    },
+                    required: ['items'],
+                  },
+                },
+              });
+
+              const rawText = (response.text || '').trim();
+              const parsed = rawText ? (JSON.parse(rawText) as { items?: Array<Record<string, unknown>> }) : { items: [] };
+              const items = Array.isArray(parsed.items) ? parsed.items : [];
+              const analyzedAt = Math.floor(Date.now() / 1000);
+
+              for (const it of items) {
+                const sig = String(it.signature || '').trim();
+                if (!sig) continue;
+                const confRaw = String(it.confidence || 'medium').toLowerCase();
+                const confidence: 'high' | 'medium' | 'low' =
+                  confRaw === 'high' || confRaw === 'low' ? confRaw : 'medium';
+                const insight: AiConnInsightRecord = {
+                  signature: sig,
+                  app_name: String(it.app_name || '').trim() || 'Servicio de red',
+                  category: String(it.category || '').trim() || 'Red',
+                  role: String(it.role || '').trim() || 'Conexión externa',
+                  summary: String(it.summary || '').trim(),
+                  confidence,
+                  model: AI_NET_MODEL,
+                  analyzed_at: analyzedAt,
+                };
+                resultInsights[sig] = insight;
+                aiNetInsightsCache.set(`${lang}::${sig}`, { insight, cachedAt: Date.now() });
+              }
+
+              if (aiNetInsightsCache.size > 1000) {
+                const oldest = Array.from(aiNetInsightsCache.entries())
+                  .sort((a, b) => a[1].cachedAt - b[1].cachedAt)
+                  .slice(0, aiNetInsightsCache.size - 1000);
+                for (const [k] of oldest) aiNetInsightsCache.delete(k);
+              }
+
+              sendAiJson({ ok: true, model: AI_NET_MODEL, insights: resultInsights }, 200);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              sendAiJson(
+                {
+                  ok: false,
+                  code: 'GEMINI_UPSTREAM_ERROR',
+                  error: message || 'Error consultando Gemini AI',
+                  insights: resultInsights,
+                },
+                502
+              );
+            }
+          });
+          return;
+        }
+
         if (url?.startsWith('/api/net/history')) {
-          if (url === '/api/net/history/clear') {
+          const cleanHistoryPath = url.split('?', 1)[0];
+          if (cleanHistoryPath === '/api/net/history/clear') {
             observedDevNetHistory.clear();
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ success: true, message: 'Historial limpio' }));
             return;
           }
-          const liveMap = buildLiveConnectionsMap(sampleRealNetwork().local_ip);
-          const conns = liveMap && Array.isArray(liveMap.connections) ? liveMap.connections : [];
-          const historyItems =
-            observedDevNetHistory.size > 0
-              ? Array.from(observedDevNetHistory.values())
-              : conns
-                  .filter((c) => !c.is_lan)
-                  .map((c) => ({
-                    key: c.id,
-                    direction: c.direction,
-                    protocol: c.protocol,
-                    local_ip: c.local_ip,
-                    local_hostname: c.local_hostname || os.hostname(),
-                    local_port: c.local_port,
-                    remote_ip: c.remote_ip,
-                    remote_port: c.remote_port,
-                    domain: c.domain || '',
-                    service: c.service || 'Direct',
-                    process: c.process || '',
-                    jail: c.jail || 'caddy-scan',
-                    lat: c.lat,
-                    lng: c.lng,
-                    city: c.city,
-                    country: c.country,
-                    country_code: c.country_code,
-                    isp: c.isp,
-                    asn: c.asn,
-                    hit_count: 1,
-                    bytes_total: Number(c.bytes_total || 0),
-                    first_seen: Math.floor(Date.now() / 1000) - 60,
-                    last_seen: Math.floor(Date.now() / 1000),
-                  }));
+
+          const reqUrlObj = new URL(url, 'http://127.0.0.1');
+          const svcFilter = (reqUrlObj.searchParams.get('service') || '').trim();
+          const devFilter = (reqUrlObj.searchParams.get('device') || '').trim();
+          const dirFilter = (reqUrlObj.searchParams.get('direction') || '').trim().toLowerCase();
+          const qFilter = (reqUrlObj.searchParams.get('q') || '').trim().toLowerCase();
+          const hoursParam = (reqUrlObj.searchParams.get('hours') || '').trim().toLowerCase();
+          const limitNum = Math.max(10, Math.min(1000, Number.parseInt(reqUrlObj.searchParams.get('limit') || '300', 10) || 300));
+
+          const hostLocalIp = sampleRealNetwork().local_ip;
+          const liveMap = buildLiveConnectionsMap(hostLocalIp);
+          const liveConns = liveMap && Array.isArray(liveMap.connections) ? liveMap.connections : [];
+          const nowSecHist = Math.floor(Date.now() / 1000);
+
+          for (const c of liveConns) {
+            if (c.is_lan || !c.remote_ip) continue;
+            const hKey = `${c.remote_ip}|${c.service}|${c.domain || ''}`;
+            const curH = observedDevNetHistory.get(hKey);
+            if (!curH) {
+              observedDevNetHistory.set(hKey, {
+                key: hKey,
+                direction: c.direction,
+                protocol: c.protocol,
+                local_ip: c.local_ip,
+                local_hostname: c.local_hostname || os.hostname(),
+                local_port: c.local_port,
+                remote_ip: c.remote_ip,
+                remote_port: c.remote_port,
+                domain: c.domain || '',
+                service: c.service || 'Direct',
+                process: c.process || '',
+                jail: c.jail || 'caddy-scan',
+                lat: c.lat,
+                lng: c.lng,
+                city: c.city,
+                country: c.country,
+                country_code: c.country_code,
+                isp: c.isp,
+                asn: c.asn,
+                hit_count: 1,
+                bytes_total: Number(c.bytes_total || 0),
+                first_seen: nowSecHist,
+                last_seen: nowSecHist,
+              });
+            }
+          }
+
+          let cutoffTs = 0;
+          if (hoursParam && hoursParam !== 'all' && hoursParam !== 'todo') {
+            const parsedHours = Number.parseFloat(hoursParam);
+            if (Number.isFinite(parsedHours) && parsedHours > 0) {
+              cutoffTs = nowSecHist - parsedHours * 3600;
+            }
+          }
+
+          const allRecorded = Array.from(observedDevNetHistory.values());
+          const timeScopedItems = cutoffTs > 0 ? allRecorded.filter((item) => item.last_seen >= cutoffTs) : allRecorded;
 
           const servicesMap: Record<
             string,
@@ -5002,7 +5289,7 @@ function realOsTelemetryMiddleware(): Plugin {
           let totalHitsSum = 0;
           const uniqueIpsAll = new Set<string>();
 
-          for (const c of historyItems) {
+          for (const c of timeScopedItems) {
             const svc = c.service || 'Direct';
             const dev = c.local_ip || os.hostname();
             const hits = Math.max(1, Number(c.hit_count || 1));
@@ -5091,6 +5378,29 @@ function realOsTelemetryMiddleware(): Plugin {
             devicesMap[dev].last_seen = Math.max(devicesMap[dev].last_seen, c.last_seen);
           }
 
+          const filteredItems = timeScopedItems.filter((c) => {
+            if (svcFilter && svcFilter.toLowerCase() !== 'all' && svcFilter.toLowerCase() !== 'todos') {
+              if (c.service !== svcFilter) return false;
+            }
+            if (devFilter && devFilter.toLowerCase() !== 'all' && devFilter.toLowerCase() !== 'todos') {
+              if (c.local_ip !== devFilter) return false;
+            }
+            if (dirFilter && dirFilter !== 'all' && dirFilter !== 'todas') {
+              if (dirFilter === 'devices') {
+                if (!c.local_ip || c.local_ip === hostLocalIp || c.local_ip === '127.0.0.1' || c.local_ip === '::1') {
+                  return false;
+                }
+              } else if (c.direction !== dirFilter) {
+                return false;
+              }
+            }
+            if (qFilter) {
+              const hay = `${c.service} ${c.domain} ${c.remote_ip} ${c.city} ${c.country} ${c.isp} ${c.local_hostname} ${c.local_ip} ${c.process}`.toLowerCase();
+              if (!hay.includes(qFilter)) return false;
+            }
+            return true;
+          });
+
           const servicesCatalog = Object.values(servicesMap)
             .sort((a, b) => b.total_hits - a.total_hits || b.connections_count - a.connections_count)
             .map((s) => ({
@@ -5147,11 +5457,18 @@ function realOsTelemetryMiddleware(): Plugin {
             countries_catalog: countriesCatalog,
             domains_catalog: domainsCatalog,
             devices_catalog: devicesCatalog,
-            connections: historyItems
+            connections: filteredItems
               .sort((a, b) => b.last_seen - a.last_seen)
-              .slice(0, 300),
+              .slice(0, limitNum)
+              .map((item) => ({
+                ...item,
+                id: `hist_${item.key}`,
+                is_lan: false,
+                is_history: true,
+                state: `HISTORIAL (${Math.max(1, Number(item.hit_count || 1))}x)`,
+              })),
             summary: {
-              total_records: historyItems.length,
+              total_records: timeScopedItems.length,
               total_services: servicesCatalog.length,
               total_unique_ips: uniqueIpsAll.size,
               total_devices: devicesCatalog.length,

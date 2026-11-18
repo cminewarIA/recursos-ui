@@ -2254,6 +2254,42 @@ def _parse_ss_listening_output(stdout_text):
             parsed[port] = {"proc": proc, "pid": pid}
     return parsed, has_proc_info
 
+_DOCKER_PORT_RE = re.compile(r":(\d+)->\d+/(?:tcp|udp)")
+
+def _extract_proc_service_hint(pid, raw_proc=""):
+    """Extrae de forma 100% dinámica la unidad systemd, contenedor o ejecutable real desde /proc/<pid>."""
+    hint = str(raw_proc or "").strip()
+    if not pid:
+        return hint
+    try:
+        cg_path = f"/proc/{int(pid)}/cgroup"
+        if os.path.isfile(cg_path):
+            with open(cg_path, "r", encoding="utf-8", errors="ignore") as f:
+                cg_txt = f.read()
+            m_unit = re.search(r"/system\.slice/([^\s/]+\.service)", cg_txt)
+            if m_unit:
+                unit_base = m_unit.group(1).replace(".service", "")
+                if unit_base and unit_base not in ("docker", "containerd"):
+                    return unit_base
+    except Exception:
+        pass
+    try:
+        cmd_path = f"/proc/{int(pid)}/cmdline"
+        if os.path.isfile(cmd_path):
+            with open(cmd_path, "rb") as f:
+                parts = [p.decode("utf-8", errors="ignore") for p in f.read().split(b"\x00") if p]
+            if parts:
+                exe_base = os.path.basename(parts[0]).strip()
+                if exe_base in ("python", "python3", "node", "nodejs", "java", "dotnet") and len(parts) > 1:
+                    arg_base = os.path.basename(parts[1]).strip()
+                    if arg_base:
+                        return f"{exe_base} ({arg_base})"
+                if exe_base and not hint:
+                    return exe_base
+    except Exception:
+        pass
+    return hint
+
 def update_listening_ports_map(force=False):
     global LISTENING_PORTS_MAP, LAST_LISTENING_SCAN, _SS_NEEDS_SUDO
     now = time.time()
@@ -2284,6 +2320,43 @@ def update_listening_ports_map(force=False):
                 new_map, _ = _parse_ss_listening_output(p_sudo.stdout)
     except Exception:
         pass
+
+    # Enriquecer dinámicamente con cgroup/cmdline real para procesos genéricos
+    for port_k, info in list(new_map.items()):
+        pid = info.get("pid")
+        raw_proc = info.get("proc", "")
+        refined = _extract_proc_service_hint(pid, raw_proc)
+        if refined:
+            info["service_hint"] = refined
+
+    # Correlación dinámica de puertos publicados por contenedores Docker reales en ejecución
+    try:
+        dp = subprocess.run(
+            ['docker', 'ps', '--format', '{{.Names}}\t{{.Ports}}'],
+            capture_output=True, text=True, timeout=2.0
+        )
+        if dp.returncode == 0 and dp.stdout:
+            for dline in dp.stdout.splitlines():
+                if "\t" not in dline:
+                    continue
+                cname, cports = dline.split("\t", 1)
+                cname = cname.strip()
+                if not cname:
+                    continue
+                for m_p in _DOCKER_PORT_RE.finditer(cports):
+                    host_port = int(m_p.group(1))
+                    cur = new_map.get(host_port, {})
+                    cur_proc = str(cur.get("proc") or "")
+                    if not cur or "docker" in cur_proc.lower() or not cur_proc:
+                        new_map[host_port] = {
+                            "proc": cname,
+                            "pid": cur.get("pid"),
+                            "service_hint": f"Docker · {cname}",
+                            "container": cname,
+                        }
+    except Exception:
+        pass
+
     if new_map:
         LISTENING_PORTS_MAP = new_map
     return LISTENING_PORTS_MAP
@@ -2503,6 +2576,21 @@ def init_geoip_history_db():
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_process_history_ts ON process_history(ts DESC);")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS ai_connection_insights (
+                    lang TEXT NOT NULL,
+                    signature TEXT NOT NULL,
+                    app_name TEXT NOT NULL,
+                    category TEXT DEFAULT '',
+                    role TEXT DEFAULT '',
+                    summary TEXT DEFAULT '',
+                    confidence TEXT DEFAULT 'medium',
+                    model TEXT DEFAULT '',
+                    analyzed_at REAL NOT NULL,
+                    PRIMARY KEY (lang, signature)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_conn_analyzed_at ON ai_connection_insights(analyzed_at DESC);")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS speedtest_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4866,6 +4954,318 @@ def clear_connection_history_sqlite():
                 except Exception:
                     pass
 
+AI_NET_MODEL = "gemini-4-hydrogen"
+_AI_NET_MEM_CACHE = {}
+_AI_NET_CACHE_LOCK = threading.Lock()
+_AI_NET_CACHE_TTL_SEC = 1800.0
+
+def _read_server_env_key(key_name):
+    val = os.environ.get(key_name, "").strip()
+    if val:
+        return val
+    for fname in (".env.local", ".env"):
+        fpath = os.path.join(BASE_DIR, fname)
+        try:
+            if not os.path.isfile(fpath):
+                continue
+            with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#") or "=" not in stripped:
+                        continue
+                    k, v = stripped.split("=", 1)
+                    if k.strip() == key_name:
+                        cleaned = v.strip().strip('"').strip("'")
+                        if cleaned:
+                            return cleaned
+        except Exception:
+            pass
+    return ""
+
+def _collect_dynamic_host_context():
+    """Recopila dinámicamente puertos en escucha, contenedores Docker y servicios activos para contexto de IA."""
+    listen_summary = []
+    try:
+        lmap = update_listening_ports_map()
+        for port_k, info in sorted(lmap.items()):
+            lbl = info.get("service_hint") or info.get("proc") or ""
+            if lbl:
+                listen_summary.append(f":{port_k} -> {lbl}")
+    except Exception:
+        pass
+
+    docker_names = []
+    systemd_names = []
+    with METRICS_LOCK:
+        for d in (METRICS_CACHE.get("docker_activities") or [])[:25]:
+            nm = str(d.get("name") or "").strip()
+            if nm:
+                docker_names.append(nm)
+        for s in (METRICS_CACHE.get("systemd_services") or [])[:30]:
+            if s.get("active"):
+                nm = str(s.get("name") or s.get("unit") or "").strip()
+                if nm:
+                    systemd_names.append(nm)
+
+    return {
+        "hostname": HOSTNAME,
+        "listening_ports": listen_summary[:45],
+        "running_containers": docker_names,
+        "active_services": systemd_names,
+    }
+
+def identify_connections_with_ai(connections_in, lang="es"):
+    """Clasifica y simplifica conexiones de red mediante Gemini en el servidor con caché en SQLite."""
+    init_geoip_history_db()
+    if not isinstance(connections_in, list):
+        return 400, {"ok": False, "code": "INVALID_PAYLOAD", "error": "connections debe ser una lista"}
+
+    lang_clean = (str(lang or "es").strip().lower()[:8]) or "es"
+    items = [c for c in connections_in if isinstance(c, dict)][:24]
+    if not items:
+        return 200, {"ok": True, "model": AI_NET_MODEL, "insights": {}}
+
+    now_ts = time.time()
+    result_insights = {}
+    missing_items = []
+    missing_sigs = []
+
+    for c in items:
+        sig = str(c.get("signature") or "").strip()
+        if not sig:
+            continue
+        cache_k = (lang_clean, sig)
+        cached_mem = None
+        with _AI_NET_CACHE_LOCK:
+            cached_mem = _AI_NET_MEM_CACHE.get(cache_k)
+        if cached_mem and (now_ts - cached_mem.get("analyzed_at", 0)) < _AI_NET_CACHE_TTL_SEC:
+            result_insights[sig] = cached_mem
+        else:
+            missing_sigs.append(sig)
+            missing_items.append({
+                "signature": sig,
+                "direction": str(c.get("direction") or "outgoing"),
+                "protocol": str(c.get("protocol") or "TCP"),
+                "local_device": str(c.get("local_hostname") or c.get("local_ip") or ""),
+                "local_port": int(c.get("local_port") or 0),
+                "remote_ip": str(c.get("remote_ip") or ""),
+                "remote_port": int(c.get("remote_port") or 0),
+                "domain": str(c.get("domain") or ""),
+                "raw_service": str(c.get("service") or ""),
+                "process": str(c.get("process") or ""),
+                "isp": str(c.get("isp") or ""),
+                "asn": str(c.get("asn") or ""),
+                "city": str(c.get("city") or ""),
+                "country": str(c.get("country") or ""),
+            })
+
+    # Consultar caché persistente SQLite para firmas que no estaban en memoria
+    if missing_sigs:
+        still_missing = []
+        db_hits = {}
+        with GEOIP_HISTORY_DB_LOCK:
+            conn = None
+            try:
+                conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
+                conn.row_factory = sqlite3.Row
+                placeholders = ",".join("?" for _ in missing_sigs)
+                rows = conn.execute(
+                    f"""
+                    SELECT * FROM ai_connection_insights
+                    WHERE lang = ? AND signature IN ({placeholders}) AND analyzed_at >= ?
+                    """,
+                    [lang_clean] + missing_sigs + [now_ts - _AI_NET_CACHE_TTL_SEC]
+                ).fetchall()
+                for r in rows:
+                    db_hits[r["signature"]] = {
+                        "signature": r["signature"],
+                        "app_name": r["app_name"],
+                        "category": r["category"],
+                        "role": r["role"],
+                        "summary": r["summary"],
+                        "confidence": r["confidence"],
+                        "model": r["model"],
+                        "analyzed_at": float(r["analyzed_at"]),
+                    }
+            except Exception:
+                pass
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+
+        for item in missing_items:
+            sig = item["signature"]
+            if sig in db_hits:
+                result_insights[sig] = db_hits[sig]
+                with _AI_NET_CACHE_LOCK:
+                    _AI_NET_MEM_CACHE[(lang_clean, sig)] = db_hits[sig]
+            else:
+                still_missing.append(item)
+        missing_items = still_missing
+
+    if not missing_items:
+        return 200, {"ok": True, "model": AI_NET_MODEL, "insights": result_insights}
+
+    api_key = _read_server_env_key("GEMINI_API_KEY")
+    if not api_key or api_key == "MY_GEMINI_API_KEY":
+        return 503, {
+            "ok": False,
+            "code": "GEMINI_API_KEY_MISSING",
+            "error": "GEMINI_API_KEY no está configurada en el entorno del servidor.",
+            "insights": result_insights,
+        }
+
+    host_ctx = _collect_dynamic_host_context()
+    sys_instruction = (
+        f'You are a Linux & home-server network telemetry analyst. Respond strictly in language code "{lang_clean}". '
+        "Simplify noisy raw network connection telemetry into clear human identifications. "
+        "Analyze ALL clues together: domain/rDNS patterns, local_port and remote_port, protocol, process name, "
+        "local_device, ISP/ASN, and the host's real listening ports / containers / services in host_context. "
+        "Correlate high local ports and dynamic residential ISP hostnames with local P2P/torrent listeners if active, "
+        "or correlate cloud domains with mobile push/updates/media/photo sync when evidence matches. "
+        "Keep every field concise: app_name (2-4 words), category (1-2 words), role (short direction tag), "
+        "summary (one crisp sentence <= 95 chars explaining what this connection is doing without raw IP dumps)."
+    )
+
+    prompt_body = json.dumps({
+        "target_language": lang_clean,
+        "host_context": host_ctx,
+        "connections_to_identify": missing_items,
+    }, ensure_ascii=False)
+
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{AI_NET_MODEL}:generateContent"
+    req_payload = {
+        "systemInstruction": {"parts": [{"text": sys_instruction}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt_body}]}],
+        "generationConfig": {
+            "temperature": 0.15,
+            "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "OBJECT",
+                "properties": {
+                    "items": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "signature": {"type": "STRING"},
+                                "app_name": {"type": "STRING"},
+                                "category": {"type": "STRING"},
+                                "role": {"type": "STRING"},
+                                "summary": {"type": "STRING"},
+                                "confidence": {"type": "STRING"},
+                            },
+                            "required": ["signature", "app_name", "category", "role", "summary", "confidence"],
+                        },
+                    }
+                },
+                "required": ["items"],
+            },
+        },
+    }
+
+    try:
+        r = requests.post(
+            gemini_url,
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key,
+                "User-Agent": "aistudio-build",
+            },
+            json=req_payload,
+            timeout=22,
+        )
+        if r.status_code != 200:
+            err_msg = f"Gemini HTTP {r.status_code}"
+            try:
+                err_j = r.json()
+                err_msg = err_j.get("error", {}).get("message") or err_msg
+            except Exception:
+                pass
+            return 502, {
+                "ok": False,
+                "code": "GEMINI_UPSTREAM_ERROR",
+                "error": err_msg,
+                "insights": result_insights,
+            }
+
+        resp_json = r.json()
+        cand_parts = (((resp_json.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [])
+        raw_text = "".join(str(p.get("text") or "") for p in cand_parts).strip()
+        parsed = json.loads(raw_text) if raw_text else {"items": []}
+        ai_items = parsed.get("items") or []
+        analyzed_ts = time.time()
+
+        rows_to_save = []
+        for it in ai_items:
+            if not isinstance(it, dict):
+                continue
+            sig = str(it.get("signature") or "").strip()
+            if not sig:
+                continue
+            conf_raw = str(it.get("confidence") or "medium").lower()
+            conf = conf_raw if conf_raw in ("high", "medium", "low") else "medium"
+            rec = {
+                "signature": sig,
+                "app_name": str(it.get("app_name") or "").strip() or "Servicio de red",
+                "category": str(it.get("category") or "").strip() or "Red",
+                "role": str(it.get("role") or "").strip() or "Conexión externa",
+                "summary": str(it.get("summary") or "").strip(),
+                "confidence": conf,
+                "model": AI_NET_MODEL,
+                "analyzed_at": analyzed_ts,
+            }
+            result_insights[sig] = rec
+            with _AI_NET_CACHE_LOCK:
+                _AI_NET_MEM_CACHE[(lang_clean, sig)] = rec
+            rows_to_save.append((
+                lang_clean,
+                sig,
+                rec["app_name"],
+                rec["category"],
+                rec["role"],
+                rec["summary"],
+                rec["confidence"],
+                rec["model"],
+                analyzed_ts,
+            ))
+
+        if rows_to_save:
+            with GEOIP_HISTORY_DB_LOCK:
+                conn = None
+                try:
+                    conn = sqlite3.connect(GEOIP_HISTORY_DB_FILE, timeout=10.0)
+                    conn.executemany(
+                        """
+                        INSERT OR REPLACE INTO ai_connection_insights
+                        (lang, signature, app_name, category, role, summary, confidence, model, analyzed_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        rows_to_save,
+                    )
+                    conn.commit()
+                except Exception:
+                    pass
+                finally:
+                    if conn is not None:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+
+        return 200, {"ok": True, "model": AI_NET_MODEL, "insights": result_insights}
+    except Exception as ex:
+        return 502, {
+            "ok": False,
+            "code": "GEMINI_UPSTREAM_ERROR",
+            "error": str(ex),
+            "insights": result_insights,
+        }
+
+
 def load_geoip_disk_cache():
     """Carga la caché persistente de GeoIP desde SQLite y disco al iniciar el worker."""
     global GEOIP_CACHE, SERVER_SELF_GEO
@@ -5709,7 +6109,15 @@ def fetch_connections_geo_worker():
                         seen_keys.add(dedup_key)
 
                         target_port = loc_port if dir_str == "incoming" else rem_port
-                        svc_label = PORT_SERVICE_LABELS.get(target_port, f"{proto_str} Puerto :{target_port}")
+                        listen_match = listening_map.get(loc_port) or (listening_map.get(rem_port) if dir_str == "outgoing" else None) or {}
+                        resolved_proc = str(listen_match.get("service_hint") or listen_match.get("proc") or "").strip()
+                        base_port_lbl = PORT_SERVICE_LABELS.get(target_port)
+                        if resolved_proc and not base_port_lbl:
+                            svc_label = f"{resolved_proc} (:{target_port})"
+                        elif resolved_proc and base_port_lbl:
+                            svc_label = base_port_lbl
+                        else:
+                            svc_label = base_port_lbl or f"{proto_str} Puerto :{target_port}"
 
                         loc_name = pihole_translator.translate_local(loc_ip, SERVER_LOCAL_IP)
                         ext_dom = pihole_translator.translate_external(rem_ip, rdns_budget)
@@ -5732,7 +6140,7 @@ def fetch_connections_geo_worker():
                             "domain": ext_dom,
                             "state": state_str,
                             "service": svc_label,
-                            "process": "Kernel Conntrack",
+                            "process": resolved_proc or "Kernel Conntrack",
                             "jail": "caddy-scan",
                             "details": details_str
                         })
@@ -15535,6 +15943,32 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             resp = json.dumps({"success": ok, "message": "Historial SQLite de conexiones por servicios vaciado"}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Identificación y simplificación de conexiones mediante Gemini AI en servidor
+        elif clean_path == "/api/net/ai-identify":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            body, err_code = self._read_json_body(max_bytes=524288)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            conns_in = (body or {}).get("connections") or []
+            lang_in = str((body or {}).get("lang") or "es").strip().lower()[:8] or "es"
+            http_status, ai_payload = identify_connections_with_ai(conns_in, lang_in)
+            resp = json.dumps(ai_payload, ensure_ascii=False).encode('utf-8')
+            self.send_response(http_status)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_security_headers()
             self.send_header('Content-Length', str(len(resp)))
             self.end_headers()

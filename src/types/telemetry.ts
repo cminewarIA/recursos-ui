@@ -260,6 +260,31 @@ export interface GeoConnectionItem {
   is_lan?: boolean;
   is_server_node?: boolean;
   status?: string;
+  hit_count?: number;
+  first_seen?: number;
+  last_seen?: number;
+  is_history?: boolean;
+  accuracy_source?: string;
+  geo_status?: string;
+}
+
+export interface AiConnectionInsight {
+  signature: string;
+  app_name: string;
+  category: string;
+  summary: string;
+  role: string;
+  confidence: 'high' | 'medium' | 'low' | string;
+  model?: string;
+  analyzed_at?: number;
+}
+
+export interface AiIdentifyResponse {
+  ok: boolean;
+  model?: string;
+  insights?: Record<string, AiConnectionInsight>;
+  error?: string;
+  code?: string;
 }
 
 export interface ConnectionsMapSummary {
