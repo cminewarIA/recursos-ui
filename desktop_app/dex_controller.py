@@ -6,7 +6,6 @@ Manages USB device detection, Samsung DeX / Android Desktop display mode,
 and low-latency USB video projection via scrcpy + UHID hardware input.
 """
 
-import os
 import shutil
 import subprocess
 import threading

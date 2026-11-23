@@ -136,45 +136,43 @@ const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, on
   const lanTxNow = nic.lan_tx_bytes_sec ?? 0;
 
   return (
-    <div className="cockpit-bento p-4">
+    <div className="cockpit-bento min-w-0 overflow-hidden p-4">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
             {t('hardware.net.iface_title', { name: nic.name })}
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
             {nic.ip || t('hardware.net.no_local_ip')} · {nic.is_up ? t('hardware.net.active') : t('hardware.net.disconnected')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-right font-mono text-[11px] tabular-nums">
-            <div className="text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
-              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
-              ↓ {formatSpeed(wanRxNow)}
-            </div>
-            <div className="text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
-              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
-              ↓ {formatSpeed(lanRxNow)}
-            </div>
-            <div className="text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
-              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
-              ↑ {formatSpeed(wanTxNow)}
-            </div>
-            <div className="text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
-              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
-              ↑ {formatSpeed(lanTxNow)}
-            </div>
-          </div>
-          {onExpandChart && (
-            <button
-              type="button"
-              aria-label={t('hardware.net.inspect_aria', { name: nic.name })}
-              onClick={handleExpand}
-              className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </button>
-          )}
+        {onExpandChart && (
+          <button
+            type="button"
+            aria-label={t('hardware.net.inspect_aria', { name: nic.name })}
+            onClick={handleExpand}
+            className="cockpit-subtile flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <div className="mt-2.5 grid grid-cols-2 gap-x-2.5 gap-y-1 border-t border-slate-200/70 pt-2 font-mono text-[11px] tabular-nums dark:border-slate-800">
+        <div className="min-w-0 truncate text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
+          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+          ↓ {formatSpeed(wanRxNow)}
+        </div>
+        <div className="min-w-0 truncate text-right text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
+          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+          ↓ {formatSpeed(lanRxNow)}
+        </div>
+        <div className="min-w-0 truncate text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
+          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+          ↑ {formatSpeed(wanTxNow)}
+        </div>
+        <div className="min-w-0 truncate text-right text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
+          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+          ↑ {formatSpeed(lanTxNow)}
         </div>
       </div>
       <div className="mt-3">
@@ -260,48 +258,46 @@ const RouterTrafficCard = React.memo<RouterTrafficCardProps>(({ metrics, theme, 
   }, [onExpandChart, expandRouterSpec]);
 
   return (
-    <div className="cockpit-bento p-4" data-testid="router-traffic-widget">
+    <div className="cockpit-bento min-w-0 overflow-hidden p-4" data-testid="router-traffic-widget">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <Router className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
             <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
               {t('network.router_widget_title')}
             </p>
           </div>
-          <p className="truncate text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums" title={`${routerTitle} · ${routerIp}`}>
             {routerTitle} · {routerIp}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-right font-mono text-[11px] tabular-nums">
-            <div className="text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
-              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
-              ↓ {formatSpeed(wanRxNow)}
-            </div>
-            <div className="text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
-              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
-              ↓ {formatSpeed(lanRxNow)}
-            </div>
-            <div className="text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
-              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
-              ↑ {formatSpeed(wanTxNow)}
-            </div>
-            <div className="text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
-              <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
-              ↑ {formatSpeed(lanTxNow)}
-            </div>
-          </div>
-          {onExpandChart && (
-            <button
-              type="button"
-              aria-label={t('hardware.net.inspect_aria', { name: routerTitle })}
-              onClick={handleExpand}
-              className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </button>
-          )}
+        {onExpandChart && (
+          <button
+            type="button"
+            aria-label={t('hardware.net.inspect_aria', { name: routerTitle })}
+            onClick={handleExpand}
+            className="cockpit-subtile flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <div className="mt-2.5 grid grid-cols-2 gap-x-2.5 gap-y-1 border-t border-slate-200/70 pt-2 font-mono text-[11px] tabular-nums dark:border-slate-800">
+        <div className="min-w-0 truncate text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
+          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+          ↓ {formatSpeed(wanRxNow)}
+        </div>
+        <div className="min-w-0 truncate text-right text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
+          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+          ↓ {formatSpeed(lanRxNow)}
+        </div>
+        <div className="min-w-0 truncate text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
+          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
+          ↑ {formatSpeed(wanTxNow)}
+        </div>
+        <div className="min-w-0 truncate text-right text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
+          <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
+          ↑ {formatSpeed(lanTxNow)}
         </div>
       </div>
       <div className="mt-3">
@@ -2896,10 +2892,10 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           {/* 24-Hour Network Traffic Evolution Section */}
           <section
             aria-labelledby="network-24h-history-title"
-            className="cockpit-bento p-5"
+            className="cockpit-bento min-w-0 overflow-hidden p-5"
           >
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div className="min-w-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2.5">
                   <span className="cockpit-pill-cyan inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
                     <ArrowDownUp className="h-4 w-4" />
@@ -2928,50 +2924,48 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 shrink-0">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
-                    <span>{t('hardware.net.wan_download')}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="h-2 w-2 rounded-full bg-[#10b981]" />
-                    <span>{t('hardware.net.wan_upload')}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="h-2 w-2 rounded-full bg-[#6366f1]" />
-                    <span>{t('hardware.net.lan_download')}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
-                    <span>{t('hardware.net.lan_upload')}</span>
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <motion.button
+                  type="button"
+                  aria-label={t('network.refresh')}
+                  onClick={() => {
+                    onRefreshNetHistory24h?.();
+                    void loadTrafficAnalytics(true);
+                  }}
+                  className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                >
+                  <RefreshCw className={`h-4 w-4 ${(netHistoryLoading || trafficLoading) ? 'animate-spin' : ''}`} />
+                </motion.button>
+                {onExpandChart && (
                   <motion.button
                     type="button"
-                    aria-label={t('network.refresh')}
-                    onClick={() => {
-                      onRefreshNetHistory24h?.();
-                      void loadTrafficAnalytics(true);
-                    }}
+                    aria-label={t('hardware.net.expand_aria')}
+                    onClick={openNetwork24hExpanded}
                     className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
                   >
-                    <RefreshCw className={`h-4 w-4 ${(netHistoryLoading || trafficLoading) ? 'animate-spin' : ''}`} />
+                    <Maximize2 className="h-4 w-4" />
                   </motion.button>
-                  {onExpandChart && (
-                    <motion.button
-                      type="button"
-                      aria-label={t('hardware.net.expand_aria')}
-                      onClick={openNetwork24hExpanded}
-                      className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                    </motion.button>
-                  )}
-                </div>
+                )}
               </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
+                <span>{t('hardware.net.wan_download')}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span className="h-2 w-2 rounded-full bg-[#10b981]" />
+                <span>{t('hardware.net.wan_upload')}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span className="h-2 w-2 rounded-full bg-[#6366f1]" />
+                <span>{t('hardware.net.lan_download')}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
+                <span>{t('hardware.net.lan_upload')}</span>
+              </span>
             </div>
 
             {/* Summary KPI row separated by clean hairline divider */}
@@ -3904,60 +3898,63 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   return (
                     <div
                       key={techCardKey}
-                      className="cockpit-subtile flex flex-col justify-between gap-2.5 p-3.5 text-xs transition-colors hover:border-sky-400/60"
+                      className="cockpit-subtile min-w-0 overflow-hidden flex flex-col justify-between gap-2.5 p-3.5 text-xs transition-colors hover:border-sky-400/60"
                     >
-                      <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-start justify-between gap-2.5 min-w-0">
                         <button
                           type="button"
                           disabled={!hasCoords}
                           onClick={() => focusConnectionOnMap(c, idx)}
                           title={hasCoords ? t('network.focus_on_map') : undefined}
-                          className="min-w-0 flex-1 text-left cursor-pointer disabled:cursor-default group"
+                          className="min-w-0 flex-1 overflow-hidden text-left cursor-pointer disabled:cursor-default group"
                         >
-                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${dirBadge.cls}`}>
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1 min-w-0">
+                            <span className={`inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${dirBadge.cls}`}>
                               {dirBadge.label}
                             </span>
                             {showSimplified && insight ? (
                               <>
-                                <span className="inline-flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-300 group-hover:underline">
+                                <span className="inline-flex min-w-0 max-w-full items-center gap-1 font-semibold text-sky-700 dark:text-sky-300 group-hover:underline">
                                   <Sparkles className="h-3 w-3 shrink-0" />
-                                  <span>{insight.app_name}</span>
+                                  <span className="truncate">{insight.app_name}</span>
                                 </span>
-                                <span className="cockpit-pill-cyan rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
+                                <span className="cockpit-pill-cyan shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold">
                                   {insight.category}
                                 </span>
                               </>
                             ) : (
-                              <span className="font-semibold text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
+                              <span
+                                className="min-w-0 max-w-full truncate font-semibold text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors"
+                                title={c.service || t('hardware.net.geo.external_conn')}
+                              >
                                 {c.service || t('hardware.net.geo.external_conn')}
                               </span>
                             )}
                             {c.is_history && c.hit_count && (
-                              <span className="cockpit-pill-amber rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums">
+                              <span className="cockpit-pill-amber shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums">
                                 {t('network.map_hits_badge', { count: c.hit_count })}
                               </span>
                             )}
-                            <span className="text-slate-400">·</span>
-                            <span className="text-slate-600 dark:text-slate-300 truncate">
+                            <span className="text-slate-400 shrink-0">·</span>
+                            <span className="min-w-0 max-w-full text-slate-600 dark:text-slate-300 truncate">
                               {c.city || t('hardware.net.geo.location_fallback')} {c.country ? `(${c.country})` : ''}
                             </span>
                           </div>
 
                           {showSimplified && insight ? (
-                            <div className="space-y-1">
-                              <p className="text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100">
+                            <div className="space-y-1 min-w-0">
+                              <p className="text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100 break-words">
                                 {insight.summary}
                               </p>
-                              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400 min-w-0">
                                 {(c.local_hostname || c.local_ip) && (
-                                  <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
-                                    📱 {c.local_hostname || c.local_ip}
+                                  <span className="inline-flex min-w-0 max-w-full items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                                    <span className="truncate">📱 {c.local_hostname || c.local_ip}</span>
                                   </span>
                                 )}
-                                <span>{insight.role}</span>
+                                <span className="truncate max-w-full">{insight.role}</span>
                                 {c.last_seen && (
-                                  <span className="font-mono text-[10px]">
+                                  <span className="font-mono text-[10px] shrink-0">
                                     {t('network.map_last_seen', {
                                       time: new Date(c.last_seen * 1000).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale),
                                     })}
@@ -3972,14 +3969,14 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                               </p>
 
                               {(c.domain || c.local_hostname || isHomeDev) && (
-                                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] min-w-0">
                                   {c.domain && (
-                                    <span className="inline-flex items-center gap-1 font-mono text-sky-600 dark:text-sky-400 truncate max-w-full">
+                                    <span className="block min-w-0 max-w-full font-mono text-sky-600 dark:text-sky-400 truncate" title={c.domain}>
                                       🌐 {c.domain}
                                     </span>
                                   )}
                                   {(c.local_hostname || c.local_ip) && (
-                                    <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 truncate max-w-full">
+                                    <span className="block min-w-0 max-w-full text-indigo-600 dark:text-indigo-400 truncate">
                                       📱 {c.local_hostname || c.local_ip}{c.local_ip && c.local_hostname && c.local_hostname !== c.local_ip ? ` (${c.local_ip})` : ''}
                                     </span>
                                   )}
@@ -4040,17 +4037,17 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
                       {/* Franja simétrica de tráfico en tiempo real por conexión */}
                       <div className="mt-0.5 grid grid-cols-3 gap-1.5 border-t border-slate-200/70 pt-2 font-mono text-[11px] tabular-nums dark:border-slate-800">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('network.map_traffic_rx')}</span>
-                          <span className="font-semibold text-sky-600 dark:text-sky-400">{formatSpeed(c.rx_speed ?? 0)}</span>
+                        <div className="min-w-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5">
+                          <span className="truncate font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('network.map_traffic_rx')}</span>
+                          <span className="truncate font-semibold text-sky-600 dark:text-sky-400">{formatSpeed(c.rx_speed ?? 0)}</span>
                         </div>
-                        <div className="flex items-center justify-between gap-1 border-x border-slate-200/70 px-2 dark:border-slate-800">
-                          <span className="font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('network.map_traffic_tx')}</span>
-                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatSpeed(c.tx_speed ?? 0)}</span>
+                        <div className="min-w-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 border-x border-slate-200/70 px-1.5 sm:px-2 dark:border-slate-800">
+                          <span className="truncate font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('network.map_traffic_tx')}</span>
+                          <span className="truncate font-semibold text-emerald-600 dark:text-emerald-400">{formatSpeed(c.tx_speed ?? 0)}</span>
                         </div>
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('network.map_traffic_total')}</span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-200">
+                        <div className="min-w-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5">
+                          <span className="truncate font-sans text-[10px] text-slate-400 dark:text-slate-500">{t('network.map_traffic_total')}</span>
+                          <span className="truncate font-semibold text-slate-700 dark:text-slate-200">
                             {formatBytes(c.bytes_total ?? ((c.bytes_received ?? 0) + (c.bytes_sent ?? 0)))}
                           </span>
                         </div>

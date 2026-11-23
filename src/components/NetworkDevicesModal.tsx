@@ -431,7 +431,7 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
 
         {activeTab === 'devices' ? (
           <div className="mt-4 space-y-4">
-            {/* Selector de Bases de Datos: Conectados · Todas · Pi-hole · ASUS · Puerta de enlace / Vodafone */}
+            {/* Selector de Bases de Datos: Conectados · Todas · Pi-hole · Router · Puerta de enlace */}
             <LayoutGroup id="net-db-sources">
               <div className="flex flex-wrap items-center gap-1.5">
                 {(
@@ -720,11 +720,11 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-3 items-center sm:w-[56%]">
-                        <div>
-                          <div className="flex items-center justify-between text-[11px] font-mono tabular-nums">
-                            <span className="text-slate-500 dark:text-slate-400">{t('overview.bw_col_down')}</span>
-                            <span className="font-bold text-sky-700 dark:text-sky-300">{formatSpeed(wanD)}</span>
+                      <div className="grid grid-cols-1 gap-2.5 items-center sm:grid-cols-3 sm:gap-3 sm:w-[56%] min-w-0">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-1 text-[11px] font-mono tabular-nums">
+                            <span className="truncate text-slate-500 dark:text-slate-400">{t('overview.bw_col_down')}</span>
+                            <span className="font-bold text-sky-700 dark:text-sky-300 shrink-0">{formatSpeed(wanD)}</span>
                           </div>
                           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
                             <div
@@ -734,10 +734,10 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                           </div>
                         </div>
 
-                        <div>
-                          <div className="flex items-center justify-between text-[11px] font-mono tabular-nums">
-                            <span className="text-slate-500 dark:text-slate-400">{t('overview.bw_col_up')}</span>
-                            <span className="font-bold text-emerald-700 dark:text-emerald-300">{formatSpeed(wanU)}</span>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-1 text-[11px] font-mono tabular-nums">
+                            <span className="truncate text-slate-500 dark:text-slate-400">{t('overview.bw_col_up')}</span>
+                            <span className="font-bold text-emerald-700 dark:text-emerald-300 shrink-0">{formatSpeed(wanU)}</span>
                           </div>
                           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
                             <div
@@ -747,11 +747,11 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="text-right">
-                          <span className="block text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        <div className="flex items-baseline justify-between sm:block sm:text-right min-w-0">
+                          <span className="block truncate text-[10px] font-medium text-slate-500 dark:text-slate-400">
                             {t('overview.bw_col_lan')}
                           </span>
-                          <span className="font-mono text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
+                          <span className="font-mono text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300 shrink-0">
                             {formatSpeed(lanT)}
                           </span>
                         </div>

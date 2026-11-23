@@ -1099,19 +1099,19 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                 {t('equipment.processes_sub')}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
+              <div className="relative min-w-0 w-full sm:w-auto">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="search"
                   value={procQuery}
                   onChange={(e) => setProcQuery(e.target.value)}
                   placeholder={t('equipment.processes_search')}
-                  className="cockpit-subtile min-h-[40px] pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
+                  className="cockpit-subtile min-h-[40px] w-full sm:w-52 pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
                 />
               </div>
               <LayoutGroup id="proc-sort">
-                <div className="cockpit-subtile flex items-center gap-1 p-1">
+                <div className="cockpit-subtile flex flex-wrap items-center gap-1 p-1 max-w-full">
                   {(['cpu', 'mem', 'vram', 'io'] as const).map((k) => {
                     const active = procSort === k;
                     return (
@@ -1119,7 +1119,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                         key={k}
                         type="button"
                         onClick={() => setProcSort(k)}
-                        className={`relative min-h-[34px] rounded-lg px-2.5 text-xs font-semibold transition-colors ${
+                        className={`relative min-h-[34px] flex-1 sm:flex-initial rounded-lg px-2.5 text-xs font-semibold transition-colors whitespace-nowrap ${
                           active
                             ? 'text-sky-700 dark:text-sky-300'
                             : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'

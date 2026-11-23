@@ -70,7 +70,7 @@ if db_exists:
         ro_conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5.0)
         tables = {r[0] for r in ro_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         ro_conn.close()
-        if {"geoip_locations", "connection_history", "telemetry_history", "ping_history", "process_history", "ai_connection_insights", "speedtest_history"}.issubset(tables):
+        if {"geoip_locations", "connection_history", "telemetry_history", "ping_history", "process_history", "ai_connection_insights", "ai_system_fault_insights", "speedtest_history"}.issubset(tables):
             sys.exit(0)
     except Exception:
         pass
@@ -139,6 +139,19 @@ conn.execute("""
     )
 """)
 conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_conn_analyzed_at ON ai_connection_insights(analyzed_at DESC);")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS ai_system_fault_insights (
+        lang TEXT NOT NULL, signature TEXT NOT NULL,
+        unit TEXT DEFAULT '', category TEXT DEFAULT '',
+        title TEXT NOT NULL, danger_level TEXT DEFAULT 'medium',
+        summary TEXT DEFAULT '', solution TEXT DEFAULT '',
+        confidence TEXT DEFAULT 'medium', model TEXT DEFAULT '',
+        occurrence_count INTEGER DEFAULT 1,
+        first_seen_at REAL NOT NULL, analyzed_at REAL NOT NULL,
+        PRIMARY KEY (lang, signature)
+    )
+""")
+conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_fault_analyzed_at ON ai_system_fault_insights(analyzed_at DESC);")
 conn.execute("""
     CREATE TABLE IF NOT EXISTS speedtest_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

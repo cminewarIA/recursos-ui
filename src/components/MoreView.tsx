@@ -862,7 +862,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
 
           {/* Unified App / Server / GitHub Updater */}
           <section className="cockpit-bento p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
@@ -893,65 +893,9 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       ? t('more.auto_paused_status')
                       : t('more.auto_enabled_status'))}
                 </p>
-
-                {(activeVer?.ubuntu_native_bridge || activeVer?.app_version || activeVer?.server_version) && (
-                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div className="cockpit-subtile px-3 py-2.5">
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                        {t('more.app_ubuntu_card')}
-                      </p>
-                      <p className="mt-0.5 font-mono text-xs font-semibold text-slate-900 dark:text-white">
-                        v{getDisplayVersionString(activeVer.app_version || activeVer.current_version, activeVer.app_display_version)}
-                        {activeVer.app_above_github && (
-                          <span className="ml-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                            {t('more.above_github')}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div
-                      className={`rounded-xl px-3 py-2.5 ${
-                        activeVer.server_needs_update
-                          ? 'cockpit-pill-cyan'
-                          : 'cockpit-subtile'
-                      }`}
-                    >
-                      <p className="text-[10px] font-medium uppercase tracking-wider opacity-75">
-                        {t('more.local_web_card')}
-                      </p>
-                      <p className="mt-0.5 font-mono text-xs font-semibold">
-                        {activeVer.server_reachable === false
-                          ? t('more.no_connection')
-                          : `v${getDisplayVersionString(
-                              activeVer.server_version || activeVer.current_version,
-                              activeVer.server_display_version
-                            )}`}
-                        {activeVer.server_needs_update && (
-                          <span className="ml-1.5 text-[10px] font-medium text-sky-600 dark:text-sky-300">
-                            {t('more.updatable')}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div
-                      className={`rounded-xl px-3 py-2.5 ${
-                        activeVer.github_above_app || activeVer.github_above_server
-                          ? 'cockpit-pill-emerald'
-                          : 'cockpit-subtile'
-                      }`}
-                    >
-                      <p className="text-[10px] font-medium uppercase tracking-wider opacity-75">
-                        {t('more.github_official_card')}
-                      </p>
-                      <p className="mt-0.5 font-mono text-xs font-semibold">
-                        {remoteDisplayVer && remoteDisplayVer !== '0.0.0' ? `v${remoteDisplayVer}` : t('more.no_access')}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
                 <button
                   type="button"
                   onClick={handleToggleAutoUpdate}
@@ -991,6 +935,62 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 </button>
               </div>
             </div>
+
+            {(activeVer?.ubuntu_native_bridge || activeVer?.app_version || activeVer?.server_version) && (
+              <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(100%,170px),1fr))] gap-2.5">
+                <div className="cockpit-subtile min-w-0 px-3 py-2.5">
+                  <p className="truncate text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                    {t('more.app_ubuntu_card')}
+                  </p>
+                  <p className="mt-0.5 truncate font-mono text-xs font-semibold text-slate-900 dark:text-white">
+                    v{getDisplayVersionString(activeVer.app_version || activeVer.current_version, activeVer.app_display_version)}
+                    {activeVer.app_above_github && (
+                      <span className="ml-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                        {t('more.above_github')}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div
+                  className={`min-w-0 rounded-xl px-3 py-2.5 ${
+                    activeVer.server_needs_update
+                      ? 'cockpit-pill-cyan'
+                      : 'cockpit-subtile'
+                  }`}
+                >
+                  <p className="truncate text-[10px] font-medium uppercase tracking-wider opacity-75">
+                    {t('more.local_web_card')}
+                  </p>
+                  <p className="mt-0.5 truncate font-mono text-xs font-semibold">
+                    {activeVer.server_reachable === false
+                      ? t('more.no_connection')
+                      : `v${getDisplayVersionString(
+                          activeVer.server_version || activeVer.current_version,
+                          activeVer.server_display_version
+                        )}`}
+                    {activeVer.server_needs_update && (
+                      <span className="ml-1.5 text-[10px] font-medium text-sky-600 dark:text-sky-300">
+                        {t('more.updatable')}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div
+                  className={`min-w-0 rounded-xl px-3 py-2.5 ${
+                    activeVer.github_above_app || activeVer.github_above_server
+                      ? 'cockpit-pill-emerald'
+                      : 'cockpit-subtile'
+                  }`}
+                >
+                  <p className="truncate text-[10px] font-medium uppercase tracking-wider opacity-75">
+                    {t('more.github_official_card')}
+                  </p>
+                  <p className="mt-0.5 truncate font-mono text-xs font-semibold">
+                    {remoteDisplayVer && remoteDisplayVer !== '0.0.0' ? `v${remoteDisplayVer}` : t('more.no_access')}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {activeVer?.recent_commits && activeVer.recent_commits.length > 0 && (
               <div className="mt-5 border-t border-slate-200/70 pt-4 dark:border-slate-800">
@@ -1104,9 +1104,9 @@ export const MoreView: React.FC<MoreViewProps> = ({
             };
 
             return (
-              <section className="cockpit-bento p-5" data-testid="system-health-panel">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-start gap-3">
+              <section className="cockpit-bento overflow-hidden p-5" data-testid="system-health-panel">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
                     <span
                       className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                         isHealthy ? 'cockpit-pill-emerald' : 'cockpit-pill-amber'
@@ -1114,7 +1114,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     >
                       {isHealthy ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
                     </span>
-                    <div>
+                    <div className="min-w-0">
                       <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
                         {t('more.system_health_title')}
                       </h2>
@@ -1126,7 +1126,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
                     {(sysLogs.length > 0 || failedUnitsList.length > 0) && (
                       <button
                         type="button"
@@ -1219,7 +1219,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       const sig = log.signature || '';
                       const insight = log.ai_insight || (sig ? mergedInsights[sig] : undefined);
                       return (
-                        <div key={log.id || `${log.ts || idx}`} className="cockpit-subtile p-3 space-y-1.5">
+                        <div key={log.id || `${log.ts || idx}`} className="cockpit-subtile overflow-hidden p-3 space-y-1.5">
                           {insight ? (
                             <>
                               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1256,7 +1256,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                               </p>
                             </>
                           ) : (
-                            <div className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            <div className="font-mono text-[11px] text-slate-600 dark:text-slate-300 break-all">
                               <span className="text-slate-400 dark:text-slate-500">[{log.time_str || '--'}]</span>{' '}
                               <span className="font-semibold text-slate-800 dark:text-slate-100">
                                 {log.unit || log.source || 'sys'}:

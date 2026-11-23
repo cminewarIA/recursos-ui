@@ -3068,25 +3068,37 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
             where_clauses = []
             params = []
 
-            if is_all_window:
-                raw_rows = cur.execute("""
-                    SELECT ts, time_str, cpu, gpu, ram, ram_total,
-                           net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
-                           disk_r, disk_w, disk_pct
-                    FROM telemetry_history
-                    ORDER BY ts ASC
-                """).fetchall()
-            elif w_sec is not None:
-                end_ref = b_ts if b_ts is not None else newest_ts
-                start_ref = max(oldest_ts or 0.0, float(end_ref) - w_sec)
-                raw_rows = cur.execute("""
-                    SELECT ts, time_str, cpu, gpu, ram, ram_total,
-                           net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
-                           disk_r, disk_w, disk_pct
-                    FROM telemetry_history
-                    WHERE ts >= ? AND ts <= ?
-                    ORDER BY ts ASC
-                """, (start_ref, end_ref)).fetchall()
+            if is_all_window or w_sec is not None:
+                end_ref = float(newest_ts) if is_all_window else float(b_ts if b_ts is not None else newest_ts)
+                start_ref = float(oldest_ts or 0.0) if is_all_window else max(float(oldest_ts or 0.0), end_ref - float(w_sec))
+                range_cnt_row = cur.execute(
+                    "SELECT COUNT(*) AS c FROM telemetry_history WHERE ts >= ? AND ts <= ?",
+                    (start_ref, end_ref),
+                ).fetchone()
+                range_cnt = int(range_cnt_row["c"] or 0) if range_cnt_row else 0
+                if range_cnt > limit_val * 3 and end_ref > start_ref:
+                    bucket_sec = max(1.0, (end_ref - start_ref) / float(limit_val))
+                    raw_rows = cur.execute("""
+                        SELECT MAX(ts) AS ts, MAX(time_str) AS time_str,
+                               AVG(cpu) AS cpu, AVG(gpu) AS gpu, AVG(ram) AS ram, MAX(ram_total) AS ram_total,
+                               MAX(net_rx) AS net_rx, MAX(net_tx) AS net_tx,
+                               MAX(net_wan_rx) AS net_wan_rx, MAX(net_wan_tx) AS net_wan_tx,
+                               MAX(net_lan_rx) AS net_lan_rx, MAX(net_lan_tx) AS net_lan_tx,
+                               MAX(disk_r) AS disk_r, MAX(disk_w) AS disk_w, MAX(disk_pct) AS disk_pct
+                        FROM telemetry_history
+                        WHERE ts >= ? AND ts <= ?
+                        GROUP BY CAST((ts - ?) / ? AS INTEGER)
+                        ORDER BY ts ASC
+                    """, (start_ref, end_ref, start_ref, bucket_sec)).fetchall()
+                else:
+                    raw_rows = cur.execute("""
+                        SELECT ts, time_str, cpu, gpu, ram, ram_total,
+                               net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
+                               disk_r, disk_w, disk_pct
+                        FROM telemetry_history
+                        WHERE ts >= ? AND ts <= ?
+                        ORDER BY ts ASC
+                    """, (start_ref, end_ref)).fetchall()
             elif a_ts is not None and b_ts is None:
                 raw_rows = cur.execute("""
                     SELECT ts, time_str, cpu, gpu, ram, ram_total,
@@ -3374,21 +3386,32 @@ def query_ping_history_from_sqlite(before_ts=None, after_ts=None, window_sec=Non
                     "series": empty_series,
                 }
 
-            if is_all_window:
-                raw_rows = cur.execute("""
-                    SELECT ts, target_id, target_ip, label, kind, rtt_ms
-                    FROM ping_history
-                    ORDER BY ts ASC
-                """).fetchall()
-            elif w_sec is not None:
-                end_ref = b_ts if b_ts is not None else newest_ts
-                start_ref = max(oldest_ts, float(end_ref) - w_sec)
-                raw_rows = cur.execute("""
-                    SELECT ts, target_id, target_ip, label, kind, rtt_ms
-                    FROM ping_history
-                    WHERE ts >= ? AND ts <= ?
-                    ORDER BY ts ASC
-                """, (start_ref, end_ref)).fetchall()
+            if is_all_window or w_sec is not None:
+                end_ref = float(newest_ts) if is_all_window else float(b_ts if b_ts is not None else newest_ts)
+                start_ref = float(oldest_ts) if is_all_window else max(float(oldest_ts), end_ref - float(w_sec))
+                ping_cnt_row = cur.execute(
+                    "SELECT COUNT(*) AS c FROM ping_history WHERE ts >= ? AND ts <= ?",
+                    (start_ref, end_ref),
+                ).fetchone()
+                ping_cnt = int(ping_cnt_row["c"] or 0) if ping_cnt_row else 0
+                if ping_cnt > limit_val * 12 and end_ref > start_ref:
+                    bucket_sec = max(1.0, (end_ref - start_ref) / float(limit_val))
+                    raw_rows = cur.execute("""
+                        SELECT MAX(ts) AS ts, target_id, MAX(target_ip) AS target_ip,
+                               MAX(label) AS label, MAX(kind) AS kind,
+                               CASE WHEN MAX(rtt_ms) >= 0 THEN AVG(CASE WHEN rtt_ms >= 0 THEN rtt_ms END) ELSE -1.0 END AS rtt_ms
+                        FROM ping_history
+                        WHERE ts >= ? AND ts <= ?
+                        GROUP BY CAST((ts - ?) / ? AS INTEGER), target_id
+                        ORDER BY ts ASC
+                    """, (start_ref, end_ref, start_ref, bucket_sec)).fetchall()
+                else:
+                    raw_rows = cur.execute("""
+                        SELECT ts, target_id, target_ip, label, kind, rtt_ms
+                        FROM ping_history
+                        WHERE ts >= ? AND ts <= ?
+                        ORDER BY ts ASC
+                    """, (start_ref, end_ref)).fetchall()
             else:
                 clauses = []
                 params = []
@@ -4001,7 +4024,16 @@ def fetch_ping_latency_worker():
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, db_rows)
                         if now_ts - last_db_prune > 120.0:
-                            conn.execute("DELETE FROM ping_history WHERE ts < ?", (now_ts - (7 * 86400.0),))
+                            del_age = conn.execute("DELETE FROM ping_history WHERE ts < ?", (now_ts - (7 * 86400.0),)).rowcount or 0
+                            del_cap = 0
+                            cnt_p = conn.execute("SELECT COUNT(*) FROM ping_history").fetchone()[0]
+                            if cnt_p > 180000:
+                                cut_row = conn.execute("SELECT ts FROM ping_history ORDER BY ts DESC LIMIT 1 OFFSET 180000").fetchone()
+                                if cut_row and cut_row[0] is not None:
+                                    del_cap = conn.execute("DELETE FROM ping_history WHERE ts < ?", (cut_row[0],)).rowcount or 0
+                            if (del_age + del_cap) > 5000:
+                                conn.commit()
+                                conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
                             last_db_prune = now_ts
                         conn.commit()
                     except Exception:
@@ -14491,11 +14523,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         self.send_header(
             'Content-Security-Policy',
             f"default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com data: blob:; "
-            f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; "
+            f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://apis.google.com; "
             f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
             f"img-src 'self' data: blob: https: http:; "
-            f"connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
-            f"frame-src 'self' https://*.duckdns.org https://{dom} https://*.{dom}; "
+            f"connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseio.com https://apis.google.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
+            f"frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://*.duckdns.org https://{dom} https://*.{dom}; "
             f"frame-ancestors {csp_ancestors};"
         )
 
@@ -14901,31 +14933,41 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 1b-dict. DICCIONARIO TABULAR CENTRALIZADO (CSV Y JSON DERIVADO AL VUELO + OTA GITHUB)
+        # 1b-dict. DICCIONARIO TABULAR CENTRALIZADO (CSV Y JSON DERIVADO AL VUELO + OTA GITHUB + GZIP)
         elif clean_path == "/api/dictionary":
             if ("refresh=1" in self.path or "refresh=true" in self.path or "sync=1" in self.path):
                 sync_dictionary_from_github(BASE_DIR, force=True, timeout=5.0)
             dict_bytes = get_dictionary_bytes(BASE_DIR)
+            wants_gz = 'gzip' in (self.headers.get('Accept-Encoding') or '').lower() and len(dict_bytes) > 2048
+            out_bytes = gzip.compress(dict_bytes, compresslevel=4) if wants_gz else dict_bytes
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Vary', 'Accept-Encoding')
+            if wants_gz:
+                self.send_header('Content-Encoding', 'gzip')
             self.send_security_headers()
-            self.send_header('Content-Length', str(len(dict_bytes)))
+            self.send_header('Content-Length', str(len(out_bytes)))
             self.end_headers()
-            self.wfile.write(dict_bytes)
+            self.wfile.write(out_bytes)
             return
 
         elif clean_path == "/i18n/dictionary.csv":
             if ("refresh=1" in self.path or "refresh=true" in self.path or "sync=1" in self.path):
                 sync_dictionary_from_github(BASE_DIR, force=True, timeout=5.0)
             csv_bytes = get_dictionary_csv_bytes(BASE_DIR)
+            wants_gz = 'gzip' in (self.headers.get('Accept-Encoding') or '').lower() and len(csv_bytes) > 2048
+            out_bytes = gzip.compress(csv_bytes, compresslevel=4) if wants_gz else csv_bytes
             self.send_response(200)
             self.send_header('Content-Type', 'text/csv; charset=utf-8')
             self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Vary', 'Accept-Encoding')
+            if wants_gz:
+                self.send_header('Content-Encoding', 'gzip')
             self.send_security_headers()
-            self.send_header('Content-Length', str(len(csv_bytes)))
+            self.send_header('Content-Length', str(len(out_bytes)))
             self.end_headers()
-            self.wfile.write(csv_bytes)
+            self.wfile.write(out_bytes)
             return
 
         # 1b. API VERSION & GITHUB SYNC STATUS
@@ -15441,10 +15483,12 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             filename = clean_path.lstrip("/")
             file_path = os.path.join(STATIC_DIR, filename)
             try:
+                rdp_user = (os.environ.get("RECURSOS_RDP_USER") or os.environ.get("USER") or "").strip()
+                rdp_user_line = f"username:s:{rdp_user}\n" if rdp_user else ""
                 if filename == "visipics_externo.rdp":
                     rdp_text = (
                         f"full address:s:{req_domain}:3389\n"
-                        "username:s:servidor\n"
+                        f"{rdp_user_line}"
                         "prompt for credentials:i:0\n"
                         "administrative session:i:1\n"
                         "screen mode id:i:2\n"
@@ -15463,7 +15507,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 elif filename == "visipics.rdp":
                     rdp_text = (
                         f"full address:s:{SERVER_LOCAL_IP}:3389\n"
-                        "username:s:servidor\n"
+                        f"{rdp_user_line}"
                         "prompt for credentials:i:0\n"
                         "administrative session:i:1\n"
                         "screen mode id:i:2\n"
