@@ -445,7 +445,7 @@ fun CockpitDashboard(
                         )
                         isFocusable = true
                         isFocusableInTouchMode = true
-                        setBackgroundColor(android.graphics.Color.parseColor(if (isDark) "#020617" else "#F1F5F9"))
+                        setBackgroundColor(android.graphics.Color.parseColor(if (isDark) "#0A140B" else "#F5F4F2"))
                         setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
                         settings.apply {

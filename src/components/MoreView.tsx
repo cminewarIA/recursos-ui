@@ -1625,7 +1625,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   // ignore
                 }
               }}
-              className="cockpit-manual-frame w-full bg-white dark:bg-[#020617]"
+              className="cockpit-manual-frame w-full bg-white dark:bg-[#0a140b]"
             />
           </div>
         </section>

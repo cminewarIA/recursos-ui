@@ -1,56 +1,93 @@
 @import "tailwindcss";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
 
+/* Alethia Mineral-Obsidian Neutral Scale + Botanical Accent Harmony */
+@theme {
+  --color-slate-50: #f8f8f6;
+  --color-slate-100: #f5f4f2;
+  --color-slate-200: #e4e3dd;
+  --color-slate-300: #cfcfc7;
+  --color-slate-400: #8e988f;
+  --color-slate-500: #5f6c61;
+  --color-slate-600: #425044;
+  --color-slate-700: #29382b;
+  --color-slate-800: #1a281c;
+  --color-slate-900: #111f13;
+  --color-slate-950: #0a140b;
+
+  --color-sky-50: #f0f9eb;
+  --color-sky-100: #e2f5d6;
+  --color-sky-200: #c6f19d;
+  --color-sky-300: #c6f19d;
+  --color-sky-400: #a8e474;
+  --color-sky-500: #3d9a50;
+  --color-sky-600: #1e6b38;
+  --color-sky-700: #16542c;
+  --color-sky-800: #134022;
+  --color-sky-900: #0f1f10;
+  --color-sky-950: #0a140b;
+}
+
 @layer base {
   :root {
-    --font-display: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
-    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    --font-display: 'Geist', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-sans: 'Geist', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-    --bg-canvas: #f1f5f9;
+    /* Alethia Light Editorial Limestone Canvas */
+    --bg-canvas: #f5f4f2;
     --bg-surface: #ffffff;
-    --bg-subtle: #f8fafc;
-    --bg-hover: #e2e8f0;
-    --border-hairline: #e2e8f0;
-    --border-strong: #cbd5e1;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
+    --bg-subtle: #eeede9;
+    --bg-hover: #e5e3dc;
+    --border-hairline: #e0dfda;
+    --border-strong: #c8c6bd;
+    --text-primary: #0f1f10;
+    --text-secondary: #3e4d40;
+    --text-muted: #5f6c61;
 
-    --accent: #0284c7;
-    --accent-blue: #0284c7;
-    --accent-sky: #0ea5e9;
-    --ok: #10b981;
-    --warn: #f59e0b;
-    --danger: #ef4444;
-    --violet: #7c3aed;
+    /* Signature Alethia Botanical Tokens */
+    --alethia-obsidian: #0f1f10;
+    --alethia-obsidian-elevated: #162818;
+    --alethia-lime: #c6f19d;
+    --alethia-lime-soft: #e5f8d3;
+    --alethia-lime-ink: #0f1f10;
 
-    --ui-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
-    --ui-shadow-strong: 0 12px 30px -6px rgba(15, 23, 42, 0.14), 0 4px 10px -4px rgba(15, 23, 42, 0.06);
+    /* Zeus Vision Simplified Semantic Palette */
+    --accent: #1e6b38;
+    --accent-blue: #1e6b38;
+    --accent-sky: #0e7490;
+    --ok: #15803d;
+    --warn: #b45309;
+    --danger: #b91c1c;
+    --violet: #4f46e5;
+
+    --ui-shadow: 0 4px 16px -4px rgba(15, 31, 16, 0.05), 0 1px 3px 0 rgba(15, 31, 16, 0.04);
+    --ui-shadow-strong: 0 14px 34px -8px rgba(15, 31, 16, 0.14), 0 4px 10px -4px rgba(15, 31, 16, 0.06);
   }
 
   [data-theme="dark"],
   .dark {
-    --bg-canvas: #020617;
-    --bg-surface: #0f172a;
-    --bg-subtle: #1e293b;
-    --bg-hover: #334155;
-    --border-hairline: #1e293b;
-    --border-strong: #334155;
-    --text-primary: #f8fafc;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
+    /* Alethia Deep Botanical Obsidian Canvas */
+    --bg-canvas: #0a140b;
+    --bg-surface: #111f13;
+    --bg-subtle: #18291a;
+    --bg-hover: #213624;
+    --border-hairline: rgba(198, 241, 157, 0.12);
+    --border-strong: rgba(198, 241, 157, 0.24);
+    --text-primary: #f5f4f2;
+    --text-secondary: #c8d2c6;
+    --text-muted: #8b9a8c;
 
-    --accent: #38bdf8;
-    --accent-blue: #38bdf8;
-    --accent-sky: #0ea5e9;
-    --ok: #34d399;
+    --accent: #c6f19d;
+    --accent-blue: #c6f19d;
+    --accent-sky: #5eead4;
+    --ok: #86efac;
     --warn: #fbbf24;
-    --danger: #f87171;
-    --violet: #a78bfa;
+    --danger: #fb7185;
+    --violet: #a5b4fc;
 
-    --ui-shadow: 0 10px 24px -6px rgba(2, 6, 23, 0.65), 0 2px 6px -2px rgba(2, 6, 23, 0.45);
-    --ui-shadow-strong: 0 16px 36px -6px rgba(2, 6, 23, 0.8), 0 4px 12px -4px rgba(2, 6, 23, 0.5);
+    --ui-shadow: 0 10px 26px -6px rgba(0, 0, 0, 0.55), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
+    --ui-shadow-strong: 0 18px 40px -8px rgba(0, 0, 0, 0.72), 0 4px 12px -4px rgba(0, 0, 0, 0.48);
   }
 
   html,
@@ -65,7 +102,7 @@
 
   [data-theme="dark"] body,
   .dark body {
-    letter-spacing: 0.006em;
+    letter-spacing: 0.005em;
   }
 
   h1,
@@ -73,6 +110,7 @@
   h3,
   .font-display {
     font-family: var(--font-display);
+    letter-spacing: -0.024em;
     text-wrap: balance;
   }
 
@@ -80,7 +118,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Custom subtle scrollbar */
+  /* Custom subtle mineral scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -89,11 +127,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: #c8c6bd;
     border-radius: 3px;
   }
   [data-theme="dark"] ::-webkit-scrollbar-thumb {
-    background: #334155;
+    background: #29382b;
   }
 }
 
@@ -104,7 +142,7 @@
   }
   50% {
     opacity: 0.45;
-    transform: scale(0.82);
+    transform: scale(0.84);
   }
 }
 
@@ -122,87 +160,44 @@
 @keyframes cockpitFadeSlideUp {
   0% {
     opacity: 0;
-    transform: translateY(14px) scaleX(0.972) scaleY(1.028);
-  }
-  58% {
-    opacity: 1;
-    transform: translateY(-2px) scaleX(1.012) scaleY(0.988);
-  }
-  82% {
-    transform: translateY(1px) scaleX(0.996) scaleY(1.005);
+    transform: translateY(12px) scale(0.988);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scaleX(1) scaleY(1);
+    transform: translateY(0) scale(1);
   }
 }
 
 @keyframes cockpitModalPop {
   0% {
     opacity: 0;
-    transform: translateY(18px) scaleX(0.92) scaleY(1.06);
-  }
-  48% {
-    opacity: 1;
-    transform: translateY(-3px) scaleX(1.026) scaleY(0.974);
-  }
-  74% {
-    transform: translateY(1.5px) scaleX(0.992) scaleY(1.01);
+    transform: translateY(16px) scale(0.96);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scaleX(1) scaleY(1);
+    transform: translateY(0) scale(1);
   }
 }
 
 @keyframes cockpitToastIn {
   0% {
     opacity: 0;
-    transform: translateX(24px) scaleX(0.92) scaleY(1.05);
-  }
-  55% {
-    opacity: 1;
-    transform: translateX(-4px) scaleX(1.025) scaleY(0.978);
-  }
-  80% {
-    transform: translateX(1.5px) scaleX(0.994) scaleY(1.006);
+    transform: translateX(20px) scale(0.96);
   }
   100% {
     opacity: 1;
-    transform: translateX(0) scaleX(1) scaleY(1);
+    transform: translateX(0) scale(1);
   }
 }
 
 @keyframes cockpitTooltipPop {
   0% {
     opacity: 0;
-    transform: translateY(6px) scaleX(0.91) scaleY(1.08);
-  }
-  55% {
-    opacity: 1;
-    transform: translateY(-1px) scaleX(1.03) scaleY(0.97);
+    transform: translateY(5px) scale(0.96);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scaleX(1) scaleY(1);
-  }
-}
-
-@keyframes cockpitShimmer {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(220%);
-  }
-}
-
-@keyframes cockpitAuroraShift {
-  0%, 100% {
-    background-position: 0% 50%, 100% 50%, 0 0, 0 0, 0% 50%;
-  }
-  50% {
-    background-position: 100% 40%, 0% 60%, 0 0, 0 0, 100% 50%;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -221,20 +216,20 @@
     inset: -2px;
     border-radius: 9999px;
     background: currentColor;
-    opacity: 0.55;
+    opacity: 0.52;
     pointer-events: none;
     animation: cockpitPingRing 2.1s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 
   .cockpit-view-enter {
-    animation: cockpitFadeSlideUp 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: cockpitFadeSlideUp 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .cockpit-modal-enter {
-    animation: cockpitModalPop 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: cockpitModalPop 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  /* Evita encadenar el scroll al documento de fondo al llegar al final de una ventana modal o desplegable sin reiniciar scrollY */
+  /* Evita encadenar el scroll al documento de fondo al llegar al final de una ventana modal o desplegable */
   html:has([aria-modal="true"]),
   body:has([aria-modal="true"]),
   html[data-cockpit-modal-open="true"],
@@ -250,73 +245,156 @@
   }
 
   .cockpit-toast-enter {
-    animation: cockpitToastIn 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: cockpitToastIn 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .cockpit-tooltip-enter {
-    animation: cockpitTooltipPop 240ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: cockpitTooltipPop 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
+  /* Alethia Architectural Top Bar */
   .cockpit-topbar {
-    background: rgba(255, 255, 255, 0.92);
-    border: 1.5px solid #cbd5e1;
-    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid var(--border-hairline);
+    border-radius: 16px;
     box-shadow: var(--ui-shadow);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+    transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
   }
   [data-theme="dark"] .cockpit-topbar,
   .dark .cockpit-topbar {
-    background: rgba(15, 23, 42, 0.9);
-    border-color: #334155;
+    background: rgba(15, 31, 16, 0.88);
+    border-color: rgba(198, 241, 157, 0.14);
   }
 
+  /* Alethia Signature Dark Obsidian Hero Command Deck (Alternancia Oscuro -> Mineral Claro) */
   .cockpit-hero {
+    position: relative;
+    overflow: hidden;
     min-width: 0;
     max-width: 100%;
-    background-color: #f8fafc;
+    color: #f5f4f2;
+    background-color: #0f1f10;
     background-image:
-      radial-gradient(640px circle at 92% -10%, rgba(14, 165, 233, 0.16), transparent 58%),
-      radial-gradient(480px circle at 8% 110%, rgba(16, 185, 129, 0.1), transparent 55%),
-      linear-gradient(to right, rgba(148, 163, 184, 0.14) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(148, 163, 184, 0.14) 1px, transparent 1px),
-      linear-gradient(135deg, #f8fafc 0%, #eff6ff 55%, #ecfeff 100%);
-    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px, 100% 100%;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 18px;
-    box-shadow: var(--ui-shadow);
-    transition: transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 240ms ease, box-shadow 240ms ease;
+      radial-gradient(560px circle at 92% -12%, rgba(198, 241, 157, 0.16), transparent 60%),
+      radial-gradient(420px circle at 6% 112%, rgba(74, 155, 86, 0.14), transparent 56%),
+      radial-gradient(rgba(198, 241, 157, 0.11) 1px, transparent 1px),
+      linear-gradient(140deg, #0c190d 0%, #0f1f10 52%, #132515 100%);
+    background-size: 100% 100%, 100% 100%, 24px 24px, 100% 100%;
+    border: 1px solid rgba(198, 241, 157, 0.2);
+    border-radius: 22px;
+    box-shadow: 0 16px 38px -12px rgba(10, 20, 11, 0.42), 0 2px 6px -2px rgba(10, 20, 11, 0.25);
+    transition: border-color 240ms ease, box-shadow 240ms ease;
   }
   [data-theme="dark"] .cockpit-hero,
   .dark .cockpit-hero {
-    background-color: #020617;
-    background-image:
-      radial-gradient(640px circle at 92% -10%, rgba(56, 189, 248, 0.17), transparent 58%),
-      radial-gradient(480px circle at 8% 110%, rgba(16, 185, 129, 0.11), transparent 55%),
-      linear-gradient(to right, rgba(51, 65, 85, 0.25) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(51, 65, 85, 0.25) 1px, transparent 1px),
-      linear-gradient(135deg, #020617 0%, #091a2e 55%, #071f28 100%);
-    border-color: #1e293b;
+    background-color: #0d1a0e;
+    border-color: rgba(198, 241, 157, 0.22);
+    box-shadow: 0 20px 44px -12px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(198, 241, 157, 0.06);
   }
 
+  /* Obsidian glass pill inside Alethia Hero */
+  .alethia-hero-chip {
+    min-width: 0;
+    max-width: 100%;
+    background: rgba(245, 244, 242, 0.06);
+    border: 1px solid rgba(198, 241, 157, 0.18);
+    color: #e9ece7;
+    border-radius: 10px;
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
+  .alethia-hero-chip:hover {
+    background: rgba(198, 241, 157, 0.14);
+    border-color: rgba(198, 241, 157, 0.42);
+    color: #c6f19d;
+  }
+
+  /* Alethia Solid Electric Lime Section Micro-Tag (alethia_2.png & alethia_3.png) */
+  .cockpit-tag-lime {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    background-color: #c6f19d;
+    color: #0f1f10;
+    border-radius: 4px;
+    padding: 0.18rem 0.55rem;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.25;
+  }
+
+  /* Signature Alethia Hairline Button with Nested Square Lime Badge (alethia_1.png & alethia_3.png) */
+  .cockpit-btn-alethia {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-radius: 10px;
+    padding: 0.4rem 0.45rem 0.4rem 0.9rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  }
+  .cockpit-btn-alethia-dark {
+    background: rgba(245, 244, 242, 0.05);
+    border: 1px solid rgba(198, 241, 157, 0.32);
+    color: #f5f4f2;
+  }
+  .cockpit-btn-alethia-dark:hover:not(:disabled) {
+    background: rgba(198, 241, 157, 0.12);
+    border-color: rgba(198, 241, 157, 0.62);
+  }
+  .cockpit-btn-alethia-surface {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+  }
+  .cockpit-btn-alethia-surface:hover:not(:disabled) {
+    border-color: #1e6b38;
+    background: #f5f9f0;
+  }
+  [data-theme="dark"] .cockpit-btn-alethia-surface:hover:not(:disabled),
+  .dark .cockpit-btn-alethia-surface:hover:not(:disabled) {
+    border-color: rgba(198, 241, 157, 0.48);
+    background: rgba(198, 241, 157, 0.08);
+  }
+  .cockpit-btn-alethia-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 6px;
+    background-color: #c6f19d;
+    color: #0f1f10;
+    flex-shrink: 0;
+  }
+
+  /* Clean Editorial Bento Surface (Gestalt Encierro con borde mineral fino) */
   .cockpit-bento {
     min-width: 0;
     max-width: 100%;
     background-color: var(--bg-surface);
-    border: 1.5px solid var(--border-hairline);
+    border: 1px solid var(--border-hairline);
     border-radius: 18px;
     box-shadow: var(--ui-shadow);
-    transition: transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 260ms ease, border-color 240ms ease, background-color 240ms ease;
+    transition: box-shadow 240ms ease, border-color 220ms ease, background-color 220ms ease;
   }
   @media (hover: hover) {
     .cockpit-bento:hover {
-      border-color: rgba(2, 132, 199, 0.35);
+      border-color: rgba(30, 107, 56, 0.34);
       box-shadow: var(--ui-shadow-strong);
     }
     [data-theme="dark"] .cockpit-bento:hover,
     .dark .cockpit-bento:hover {
-      border-color: rgba(56, 189, 248, 0.35);
+      border-color: rgba(198, 241, 157, 0.28);
     }
   }
 
@@ -326,21 +404,21 @@
     background-color: var(--bg-subtle);
     border: 1px solid var(--border-hairline);
     border-radius: 12px;
-    transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
   }
   [data-theme="dark"] .cockpit-subtile,
   .dark .cockpit-subtile {
-    border-color: #334155;
+    border-color: rgba(198, 241, 157, 0.12);
   }
 
   .cockpit-segmented {
     min-width: 0;
     max-width: 100%;
     background-color: var(--bg-surface);
-    border: 1.5px solid var(--border-hairline);
-    border-radius: 18px;
+    border: 1px solid var(--border-hairline);
+    border-radius: 16px;
     box-shadow: var(--ui-shadow);
-    transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 240ms ease;
+    transition: box-shadow 220ms ease, border-color 220ms ease;
   }
 
   /* Barra superior de subapartados autoajustable: jamás recorta ni oculta pestañas al estrechar la ventana */
@@ -369,16 +447,16 @@
 
   /* Contenedores de altura fluida sincronizados al alto y ancho de la ventana */
   .cockpit-chart-compact {
-    height: clamp(82px, 13.5dvh, 140px);
+    height: clamp(86px, 13.8dvh, 144px);
   }
   .cockpit-chart-medium {
-    height: clamp(120px, 22dvh, 230px);
+    height: clamp(124px, 22dvh, 232px);
   }
   .cockpit-chart-tall {
-    height: clamp(148px, 27dvh, 300px);
+    height: clamp(152px, 27dvh, 304px);
   }
   .cockpit-chart-modal {
-    height: clamp(168px, 35dvh, 420px);
+    height: clamp(172px, 35dvh, 420px);
   }
   .cockpit-map-box {
     height: clamp(230px, 46dvh, 560px);
@@ -390,77 +468,100 @@
     max-height: clamp(120px, 30dvh, 280px);
   }
 
+  /* Alethia Floating Obsidian Dock (High-contrast botanical obsidian + electric lime pill) */
   .cockpit-dock {
-    background: rgba(255, 255, 255, 0.94);
-    border: 1.5px solid #cbd5e1;
+    background: rgba(15, 31, 16, 0.94);
+    border: 1px solid rgba(198, 241, 157, 0.22);
     border-radius: 20px;
-    box-shadow: var(--ui-shadow-strong);
+    box-shadow: 0 18px 40px -10px rgba(10, 20, 11, 0.48), 0 0 0 1px rgba(198, 241, 157, 0.08);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
-    transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 240ms ease, border-color 240ms ease;
+    transition: box-shadow 240ms ease, border-color 240ms ease;
   }
   [data-theme="dark"] .cockpit-dock,
   .dark .cockpit-dock {
-    background: rgba(15, 23, 42, 0.92);
-    border-color: #334155;
+    background: rgba(12, 24, 13, 0.95);
+    border-color: rgba(198, 241, 157, 0.26);
   }
 
+  /* Active Pill inside Subtabs / Segmented Controls */
   .cockpit-tab-active {
-    background: #e0f2fe;
-    border: 1px solid #7dd3fc;
-    color: #0369a1;
-    transition: all 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: #e5f8d3;
+    border: 1px solid #9bd86b;
+    color: #0f1f10;
+    transition: all 260ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   [data-theme="dark"] .cockpit-tab-active,
   .dark .cockpit-tab-active {
-    background: #082f49;
-    border-color: #0284c7;
-    color: #7dd3fc;
+    background: rgba(198, 241, 157, 0.16);
+    border-color: rgba(198, 241, 157, 0.46);
+    color: #c6f19d;
+  }
+
+  /* Electric Lime Active Pill inside the Obsidian Floating Dock */
+  .cockpit-dock .cockpit-tab-active {
+    background: #c6f19d;
+    border: 1px solid #d5eebc;
+    color: #0f1f10;
+    box-shadow: 0 4px 14px -4px rgba(198, 241, 157, 0.45);
   }
 
   .cockpit-progress-fill {
     position: relative;
     overflow: hidden;
-    transition: width 620ms cubic-bezier(0.34, 1.38, 0.64, 1), background-color 280ms ease;
+    transition: width 580ms cubic-bezier(0.22, 1, 0.36, 1), background-color 240ms ease;
   }
   .cockpit-progress-fill::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.28) 50%, rgba(255, 255, 255, 0.04) 100%);
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0.04) 100%);
     pointer-events: none;
   }
 
+  /* Primary Alethia Action CTA */
   .cockpit-btn-accent {
-    background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
-    border: 1px solid #0284c7;
-    color: #ffffff;
-    box-shadow: 0 4px 12px -2px rgba(2, 132, 199, 0.32);
-    transition: background-color 200ms ease, box-shadow 200ms ease, filter 200ms ease;
+    background: #0f1f10;
+    border: 1px solid #1e3a20;
+    color: #c6f19d;
+    box-shadow: 0 6px 16px -4px rgba(15, 31, 16, 0.28);
+    transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
   }
   .cockpit-btn-accent:hover:not(:disabled) {
-    background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
-    box-shadow: 0 8px 18px -4px rgba(2, 132, 199, 0.42);
+    background: #172e19;
+    border-color: rgba(198, 241, 157, 0.45);
+    box-shadow: 0 10px 22px -6px rgba(15, 31, 16, 0.38);
+  }
+  [data-theme="dark"] .cockpit-btn-accent,
+  .dark .cockpit-btn-accent {
+    background: #c6f19d;
+    border-color: #d5eebc;
+    color: #0f1f10;
+    box-shadow: 0 6px 18px -4px rgba(198, 241, 157, 0.26);
+  }
+  [data-theme="dark"] .cockpit-btn-accent:hover:not(:disabled),
+  .dark .cockpit-btn-accent:hover:not(:disabled) {
+    background: #d5eebc;
   }
 
   .cockpit-btn-wol {
-    background: #ecfdf5;
-    border: 1px solid #6ee7b7;
-    color: #047857;
+    background: #eaf7de;
+    border: 1px solid #9bd86b;
+    color: #144d23;
     transition: background-color 180ms ease, border-color 180ms ease;
   }
   .cockpit-btn-wol:hover:not(:disabled) {
-    background: #d1fae5;
+    background: #daf2c4;
   }
   [data-theme="dark"] .cockpit-btn-wol,
   .dark .cockpit-btn-wol {
-    background: rgba(6, 78, 59, 0.55);
-    border-color: rgba(16, 185, 129, 0.65);
-    color: #34d399;
+    background: rgba(198, 241, 157, 0.14);
+    border-color: rgba(198, 241, 157, 0.38);
+    color: #c6f19d;
   }
   [data-theme="dark"] .cockpit-btn-wol:hover:not(:disabled),
   .dark .cockpit-btn-wol:hover:not(:disabled) {
-    background: rgba(6, 78, 59, 0.85);
+    background: rgba(198, 241, 157, 0.24);
   }
 
   .cockpit-btn-off {
@@ -474,73 +575,89 @@
   }
   [data-theme="dark"] .cockpit-btn-off,
   .dark .cockpit-btn-off {
-    background: rgba(69, 10, 10, 0.55);
-    border-color: rgba(239, 68, 68, 0.6);
-    color: #fca5a5;
+    background: rgba(127, 29, 29, 0.42);
+    border-color: rgba(251, 113, 133, 0.48);
+    color: #fda4af;
   }
   [data-theme="dark"] .cockpit-btn-off:hover:not(:disabled),
   .dark .cockpit-btn-off:hover:not(:disabled) {
-    background: rgba(69, 10, 10, 0.85);
+    background: rgba(127, 29, 29, 0.65);
+  }
+
+  /* Semantic Pills — Zeus Vision Simplified Palette (High Contrast Light & Dark) */
+  .cockpit-pill-lime {
+    background: #c6f19d;
+    border: 1px solid #a2d972;
+    color: #0f1f10;
+  }
+  [data-theme="dark"] .cockpit-pill-lime,
+  .dark .cockpit-pill-lime {
+    background: #c6f19d;
+    border-color: #d5eebc;
+    color: #0f1f10;
   }
 
   .cockpit-pill-cyan {
-    background: #e0f2fe;
-    border: 1px solid #7dd3fc;
-    color: #0369a1;
+    background: #e9f6de;
+    border: 1px solid #a8dc7a;
+    color: #164f27;
   }
   [data-theme="dark"] .cockpit-pill-cyan,
   .dark .cockpit-pill-cyan {
-    background: rgba(8, 47, 73, 0.78);
-    border-color: rgba(2, 132, 199, 0.65);
-    color: #7dd3fc;
+    background: rgba(198, 241, 157, 0.14);
+    border-color: rgba(198, 241, 157, 0.36);
+    color: #c6f19d;
   }
 
   .cockpit-pill-emerald {
-    background: #ecfdf5;
-    border: 1px solid #6ee7b7;
-    color: #047857;
+    background: #e6f5ee;
+    border: 1px solid #7bd1a8;
+    color: #0f5132;
   }
   [data-theme="dark"] .cockpit-pill-emerald,
   .dark .cockpit-pill-emerald {
-    background: rgba(6, 78, 59, 0.65);
-    border-color: rgba(16, 185, 129, 0.6);
-    color: #34d399;
+    background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(94, 234, 212, 0.36);
+    color: #86efac;
   }
 
   .cockpit-pill-violet {
-    background: #ede9fe;
-    border: 1px solid #c4b5fd;
-    color: #6d28d9;
+    background: #eef0fb;
+    border: 1px solid #c2c8f2;
+    color: #3730a3;
   }
   [data-theme="dark"] .cockpit-pill-violet,
   .dark .cockpit-pill-violet {
-    background: rgba(76, 29, 149, 0.52);
-    border-color: rgba(139, 92, 246, 0.55);
-    color: #c4b5fd;
+    background: rgba(99, 102, 241, 0.18);
+    border-color: rgba(165, 180, 252, 0.38);
+    color: #c7d2fe;
   }
 
   .cockpit-pill-amber {
     background: #fef3c7;
-    border: 1px solid #fcd34d;
-    color: #b45309;
+    border: 1px solid #f5c95c;
+    color: #92400e;
   }
   [data-theme="dark"] .cockpit-pill-amber,
   .dark .cockpit-pill-amber {
-    background: rgba(120, 53, 15, 0.52);
-    border-color: rgba(245, 158, 11, 0.55);
+    background: rgba(180, 83, 9, 0.28);
+    border-color: rgba(251, 191, 36, 0.44);
     color: #fcd34d;
   }
 
-  .cockpit-pill-red {
+  .cockpit-pill-red,
+  .cockpit-pill-rose {
     background: #fef2f2;
     border: 1px solid #fca5a5;
     color: #b91c1c;
   }
   [data-theme="dark"] .cockpit-pill-red,
-  .dark .cockpit-pill-red {
-    background: rgba(69, 10, 10, 0.6);
-    border-color: rgba(239, 68, 68, 0.55);
-    color: #fca5a5;
+  .dark .cockpit-pill-red,
+  [data-theme="dark"] .cockpit-pill-rose,
+  .dark .cockpit-pill-rose {
+    background: rgba(127, 29, 29, 0.42);
+    border-color: rgba(251, 113, 133, 0.45);
+    color: #fda4af;
   }
 
   /* Contenedor fluido de ancho completo alineado entre barra superior y contenido */
@@ -558,9 +675,9 @@
 
   /* Rejilla automática multi-columna fluida proporcional al viewport */
   .cockpit-auto-grid {
-    --cockpit-grid-min: clamp(225px, 20vw, 310px);
+    --cockpit-grid-min: clamp(235px, 21vw, 320px);
     display: grid;
-    gap: clamp(0.5rem, 1.1vw, 0.95rem);
+    gap: clamp(0.55rem, 1.15vw, 1rem);
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cockpit-grid-min)), 1fr));
     align-items: stretch;
   }
@@ -572,7 +689,7 @@
   .cockpit-auto-grid-cards {
     --cockpit-card-min: clamp(275px, 24vw, 370px);
     display: grid;
-    gap: clamp(0.45rem, 0.95vw, 0.85rem);
+    gap: clamp(0.5rem, 1vw, 0.9rem);
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cockpit-card-min)), 1fr));
     align-items: stretch;
   }
@@ -609,40 +726,40 @@
 }
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-  background: rgba(255, 255, 255, 0.96);
-  color: #0f172a;
+  background: rgba(255, 255, 255, 0.97);
+  color: #0f1f10;
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(15, 31, 16, 0.14);
+  box-shadow: 0 14px 32px rgba(15, 31, 16, 0.16);
 }
 .leaflet-popup-content {
   margin: 12px 14px;
 }
 html.dark .leaflet-popup-content-wrapper,
 html.dark .leaflet-popup-tip {
-  background: rgba(15, 23, 42, 0.95);
-  color: #f1f5f9;
-  border-color: rgba(71, 85, 105, 0.65);
-  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.55);
+  background: rgba(15, 31, 16, 0.96);
+  color: #f5f4f2;
+  border-color: rgba(198, 241, 157, 0.24);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.6);
 }
 html.dark .leaflet-popup-close-button {
-  color: #94a3b8 !important;
+  color: #9ba89c !important;
 }
 html.dark .leaflet-popup-close-button:hover {
-  color: #f8fafc !important;
+  color: #c6f19d !important;
 }
 .leaflet-tooltip {
-  background: rgba(15, 23, 42, 0.92);
-  color: #f8fafc;
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(15, 31, 16, 0.95);
+  color: #f5f4f2;
+  border: 1px solid rgba(198, 241, 157, 0.32);
   border-radius: 10px;
   padding: 4px 9px;
   font-size: 11px;
   font-weight: 600;
-  box-shadow: 0 8px 20px rgba(2, 6, 23, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 .cockpit-osm-dark-fallback .leaflet-tile-pane {
-  filter: invert(100%) hue-rotate(180deg) brightness(86%) contrast(92%);
+  filter: invert(100%) hue-rotate(140deg) brightness(86%) contrast(94%);
 }
 
 /* Android TV / Leanback D-Pad Focus Ring & Overscan Safe Scrolling */
@@ -653,9 +770,9 @@ html.dark .leaflet-popup-close-button:hover {
 
 [data-tv="true"] :focus-visible,
 [data-tv="true"] [role="button"]:focus {
-  outline: 3px solid #38bdf8 !important;
+  outline: 3px solid #c6f19d !important;
   outline-offset: 3px !important;
-  box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.24) !important;
+  box-shadow: 0 0 0 6px rgba(198, 241, 157, 0.28) !important;
   scroll-margin-block: 84px;
 }
 
@@ -681,6 +798,7 @@ html.dark .leaflet-popup-close-button:hover {
   .cockpit-dock,
   .cockpit-segmented,
   .cockpit-btn-accent,
+  .cockpit-btn-alethia,
   .cockpit-btn-wol,
   .cockpit-btn-off,
   .cockpit-progress-fill {

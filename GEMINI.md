@@ -48,7 +48,7 @@
        - *En Red Local (Wi-Fi/LAN)*: Comunicación directa con la IP/puerto local a latencia mínima.
        - *Desde el Exterior (Red Móvil / Internet / WAN)*: Conmutación automática exclusivamente hacia el dominio público / DDNS propio del servidor del usuario (aprendido dinámicamente tras emparejarse en su LAN local o configurado manualmente en la app), utilizando la credencial criptográfica del emparejamiento y sin ningún dominio ni dirección WAN/LAN fija del autor incluida en el código o en los instaladores.
   5. **Paridad Visual de Interfaz y Desbloqueo Exclusivo de DeX en Ubuntu**:
-     - **Paridad Estética y Estructural Absoluta**: Al compartir el mismo motor de interfaz HTML5/CSS3/D3.js/Leaflet, todas las interfaces (web y nativas) mantienen idéntica identidad visual, filosofía de diseño (*Apple Liquid Glass + Tesla Touch Cockpit*), paleta de colores, tarjetas, gráficos vectoriales a 60 FPS e iconografía.
+     - **Paridad Estética y Estructural Absoluta**: Al compartir el mismo motor de interfaz HTML5/CSS3/D3.js/Leaflet, todas las interfaces (web y nativas) mantienen idéntica identidad visual, filosofía de diseño (*Alethia Botanical Telemetry × Smart Visual Data — Zeus Vision*), paleta de colores mineral-obsidiana con acento lima eléctrico, tarjetas, gráficos vectoriales a 60 FPS e iconografía.
      - **Diferenciación Funcional Contractual (Desbloqueo de DeX)**:
        - *App Nativa de Ubuntu*: Al disponer de acceso directo a `/dev/uhid`, `scrcpy` y el subsistema USB a través de su puente nativo local, desbloquea dinámicamente el submenú de control DeX / Modo Escritorio Android (`/dex`) con todos sus controles de resolución, tasa de refresco (60 FPS), auto-conexión y modo pantalla completa.
        - *Versión Web y Clientes Externos (incluido Android)*: Todo submenú de DeX permanece estrictamente bloqueado y oculto en la navegación, mostrando únicamente el mensaje pasivo si se consulta: *"Esperando dispositivo para conectarse en su versión nativa"*.
@@ -58,7 +58,7 @@
   1. **Coherencia Estética y Lógica por Dominio Funcional**: Todos los apartados (`/inicio`, `/equipo`, `/red`, `/programas`, `/mas`) y sus subapartados deben mantener estricta coherencia estética y lógica. Cada módulo, gráfica, tabla o control debe residir únicamente en el apartado al que pertenece funcionalmente, sin elementos descontextualizados ni redundancias entre vistas.
   2. **Análisis Obligatorio de Ubicación al Añadir Funciones**: Antes de implementar cualquier nueva funcionalidad, métrica, gráfica o botón, es obligatorio comprobar de forma lógica en qué apartado y subapartado encaja mejor (justificándolo en el plan dentro de `./planes/`) y rehusar dispersarla fuera de su sección natural.
   3. **Escalado Automático al Ancho y Alto de la Ventana Disponible**: Todos los elementos de la interfaz —cabeceras, barras de apartados/subapartados, rejillas Bento, tarjetas, gráficas, mapas, tablas y ventanas emergentes— deben escalar automáticamente tanto al ancho como al alto disponible del viewport (`auto-fit`/`minmax`, distribución envolvente adaptable sin recortes laterales, `clamp()`, alturas fluidas y `ResizeObserver`), asegurando que todo el contenido permanezca visible y legible en cualquier resolución o tamaño de ventana. Queda prohibido usar tamaños rígidos/fijos que recorten o oculten funciones.
-  4. **Simetría Contractual y Ecosistema Homogéneo Universal**: La experiencia entre Web, Ubuntu (`GTK 3 + WebKit2`) y Android/TV (`Jetpack Compose + WebView`) comparte la misma identidad (*Apple Liquid Glass + Tesla Touch Cockpit*), espaciado simétrico, radios, tipografía tabular y física elástica uniforme en cualquier componente nuevo o existente.
+  4. **Simetría Contractual y Ecosistema Homogéneo Universal**: La experiencia entre Web, Ubuntu (`GTK 3 + WebKit2`) y Android/TV (`Jetpack Compose + WebView`) comparte la misma identidad (*Alethia Botanical Telemetry × Smart Visual Data — Zeus Vision*), espaciado simétrico, radios, tipografía tabular (`Geist` + `Geist Mono`) y física elástica uniforme en cualquier componente nuevo o existente.
 
 ## 7. Diccionario Tabular Centralizado del Proyecto, Traducciones y Lecturas de Hardware (`./i18n/dictionary.csv`)
 - **Regla obligatoria**:
@@ -80,3 +80,32 @@
      - Eliminar código muerto, variables/importaciones sin uso, ramas redundantes, claves huérfanas y cachés o ficheros temporales obsoletos.
      - Verificar compilación estricta sin advertencias ni símbolos sin usar (`npx tsc --noEmit --noUnusedLocals --noUnusedParameters`, `python3 -m py_compile`, validación ESLint/reglas, integridad de `./i18n/dictionary.csv`, `npm run build`, empaquetado `.deb` y prueba en vivo de rutas HTTP).
      - Registrar explícitamente los resultados de la depuración en `./planes/walkthrough_v*.md`.
+
+## 10. Mejores Prácticas de Análisis, Narrativa y Visualización de Datos (Estándar Zeus Vision + Ejemplos de Interfaz y Estética Alethia)
+- **Regla obligatoria**: Toda vista, gráfica, tarjeta KPI, tabla o panel del ecosistema debe aplicar de forma estricta las mejores prácticas de análisis y visualización de datos (referencia *Zeus Vision — Mejores prácticas de visualización de datos y análisis*) y los patrones de sus ejemplos de interfaz integrados bajo la dirección visual *Alethia*:
+  1. **Bloque de Análisis Previo — Selección del Gráfico Según la Historia del Dato**:
+     - Nunca elegir una visualización solo por apariencia; asignar cada tipo de gráfico al dato que mejor representa (según los ejemplos de interfaz de referencia):
+       - **Anillos / arcos radiales segmentados con cifra central y estado**: para porcentajes de uso, saturación, cuotas o tasas (CPU, RAM, GPU, ocupación de discos).
+       - **Gráficas de área suavizada con línea discontinua de tendencia/media y picos anotados**: para series temporales en vivo e historial (`TelemetryChart`), permitiendo detectar de inmediato desviaciones sobre la media y picos máximos.
+       - **Barras horizontales proporcionales con valor tabular alineado a la derecha**: para rankings y comparativas por origen (procesos por consumo, dispositivos por velocidad de descarga/carga, tráfico por interfaz).
+       - **Micro-histogramas y barras apiladas por periodo con rejilla sutil**: para composición temporal y evolución de consumo sin ruido visual de líneas excesivas.
+       - **Tablas analíticas compactas de alta legibilidad**: cabeceras sobrias, columnas alineadas, filas limpias y cifras `tabular-nums`.
+  2. **Uso de Colores Efectivos, Semánticos y Simplificados (Ley del Contraste)**:
+     - Mantener una paleta sobria y consistente que reduzca la carga cognitiva: neutrales minerales (`#F5F4F2` / `#FFFFFF`) en tema claro y obsidiana botánica (`#0A140B` / `#0F1F10` / `#122014`) en tema oscuro, reservando el acento protagonista lima botánico eléctrico (`#C6F19D` / `#1E6B38`) para el dato activo y las señales de foco.
+     - Aplicar semántica inequívoca sin excesos cromáticos: verde/botánico para estado óptimo o positivo, ámbar para carga elevada o aviso, y rojo/coral exclusivamente para degradación o fallo crítico.
+     - Garantizar siempre la **ley del contraste** entre cifras, ejes, etiquetas y fondos; prohibido usar colores chillones sin propósito comunicativo o rellenos recargados que dificulten leer los datos.
+  3. **Narrativa Detrás de los Datos (*Data Storytelling*) y Despliegue por Capas (Alethia + Zeus)**:
+     - Estructurar cada pantalla en **tres capas progresivas con ruta directa al dato**:
+       1. *Capa 1 — Impacto ejecutivo y acceso directo*: cabecera de estado global con alternancia oscuro→claro, KPIs protagonistas con variación/estado comprensibles en 1 segundo y accesos clicables directos (dispositivos, velocidad global, alertas, detalle).
+       2. *Capa 2 — Contexto temporal y tendencia*: módulos de telemetría equilibrados con línea de media/tendencia, píldora de pico directo y pie narrativo compacto (`Media · Pico · Actual`).
+       3. *Capa 3 — Desglose técnico profundo*: tablas ordenables, listas de procesos, mapas y diagnósticos IA bajo demanda.
+  4. **Principios de Diseño de la Gestalt**:
+     - **Proximidad**: agrupar métricas relacionadas dentro de módulos y sub-bloques coherentes sin mezclar dominios.
+     - **Semejanza**: emplear la misma anatomía de tarjeta, micro-etiquetas técnicas (`Geist Mono`), píldoras y barras para magnitudes equivalentes.
+     - **Encierro y cierre**: delimitar bloques con bordes finos, radios consistentes y espacio negativo equilibrado que separe secciones sin saturar el lienzo.
+  5. **Pilares de Visualización Efectiva en Pantalla**:
+     - **Claridad**: lo simple funciona mejor; un golpe de vista debe responder si el sistema está sano, dónde está el cuello de botella y si exige acción.
+     - **Legibilidad**: tipografía limpia (`Geist` + `Geist Mono` con `tabular-nums`), jerarquía marcada y cero fondos ruidosos detrás de textos o gráficas.
+     - **Equilibrio**: distribución balanceada del espacio sin zonas sobrecargadas junto a áreas vacías ni decoraciones superfluas en ejes o etiquetas.
+     - **Simplificación del color**: limitar el número de tonos simultáneos en pantalla para focalizar la atención en lo relevante.
+     - **Transmisión del mensaje apropiado**: evitar ambigüedades mediante etiquetas directas en picos, comparativas actual/media y filtros discretos y consistentes.

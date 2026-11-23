@@ -2,34 +2,34 @@ package com.cminewar.recursoscockpit.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Asset-Unified Bento Cockpit Palette (Light & Dark matching docs/assets/*.svg)
-val CockpitBgLight = Color(0xFFF1F5F9)
+// Alethia Botanical Telemetry x Smart Visual Data (Zeus Vision) Palette
+val CockpitBgLight = Color(0xFFF5F4F2)
 val CockpitCardLight = Color(0xFFFFFFFF)
-val CockpitCardElevatedLight = Color(0xFFF8FAFC)
-val CockpitBorderLight = Color(0xFFE2E8F0)
+val CockpitCardElevatedLight = Color(0xFFEEEDE9)
+val CockpitBorderLight = Color(0xFFE0DFDA)
 
-val CockpitBgDark = Color(0xFF020617)
-val CockpitCardDark = Color(0xFF0F172A)
-val CockpitCardElevatedDark = Color(0xFF1E293B)
-val CockpitBorderDark = Color(0xFF1E293B)
+val CockpitBgDark = Color(0xFF0A140B)
+val CockpitCardDark = Color(0xFF111F13)
+val CockpitCardElevatedDark = Color(0xFF18291A)
+val CockpitBorderDark = Color(0xFF263B28)
 
 val CockpitBg = CockpitBgLight
 val CockpitCard = CockpitCardLight
 val CockpitCardElevated = CockpitCardElevatedLight
 val CockpitBorder = CockpitBorderLight
-val CockpitDockBg = Color(0xEBFFFFFF)
+val CockpitDockBg = Color(0xF00F1F10)
 
-val NeonBlue = Color(0xFF0284C7)
-val NeonSky = Color(0xFF0EA5E9)
-val NeonGreen = Color(0xFF10B981)
-val NeonOrange = Color(0xFFD97706)
-val NeonAmber = Color(0xFFF59E0B)
-val NeonRed = Color(0xFFEF4444)
-val NeonPurple = Color(0xFF7C3AED)
-val NeonCyan = Color(0xFF0284C7)
+val NeonBlue = Color(0xFF1E6B38)
+val NeonSky = Color(0xFFC6F19D)
+val NeonGreen = Color(0xFF15803D)
+val NeonOrange = Color(0xFFB45309)
+val NeonAmber = Color(0xFFFBBF24)
+val NeonRed = Color(0xFFDC2626)
+val NeonPurple = Color(0xFF4F46E5)
+val NeonCyan = Color(0xFF0E7490)
 
-val TextPrimary = Color(0xFF0F172A)
-val TextSecondary = Color(0xFF475569)
-val TextMuted = Color(0xFF64748B)
-val TextPrimaryDark = Color(0xFFF8FAFC)
-val TextSecondaryDark = Color(0xFF94A3B8)
+val TextPrimary = Color(0xFF0F1F10)
+val TextSecondary = Color(0xFF3E4D40)
+val TextMuted = Color(0xFF5F6C61)
+val TextPrimaryDark = Color(0xFFF5F4F2)
+val TextSecondaryDark = Color(0xFFC8D2C6)

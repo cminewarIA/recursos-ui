@@ -251,7 +251,7 @@ export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
       }
     > = {
       cpu: {
-        accentClass: 'bg-[#0284c7] dark:bg-[#38bdf8]',
+        accentClass: 'bg-[#1e6b38] dark:bg-[#c6f19d]',
         pillClass: 'cockpit-pill-cyan',
         iconEl: <Cpu className="h-4 w-4" />,
         titleKey: 'equipment.active_procs.cpu_title',
@@ -283,7 +283,7 @@ export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
         emptyKey: 'equipment.active_procs.empty_storage',
       },
       net: {
-        accentClass: 'bg-[#0284c7] dark:bg-[#38bdf8]',
+        accentClass: 'bg-[#1e6b38] dark:bg-[#c6f19d]',
         pillClass: 'cockpit-pill-cyan',
         iconEl: <Network className="h-4 w-4" />,
         titleKey: 'equipment.active_procs.net_title',

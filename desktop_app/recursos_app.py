@@ -546,47 +546,47 @@ def encode_telemetry_header(telemetry_dict):
 
 NATIVE_CSS = b"""
 window {
-    background-color: #f1f5f9;
-    color: #0f172a;
+    background-color: #f5f4f2;
+    color: #0f1f10;
 }
 headerbar {
     background-image: none;
     background-color: #ffffff;
-    color: #0f172a;
-    border-bottom: 1px solid #e2e8f0;
+    color: #0f1f10;
+    border-bottom: 1px solid #e0dfda;
     min-height: 48px;
     padding: 0 10px;
 }
 headerbar .title {
-    color: #0f172a;
+    color: #0f1f10;
     font-weight: 700;
 }
 headerbar .subtitle {
-    color: #475569;
+    color: #3e4d40;
     font-size: 11px;
 }
 headerbar button {
-    color: #0f172a;
+    color: #0f1f10;
     transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 headerbar:backdrop {
     background-color: #ffffff;
-    color: #0f172a;
+    color: #0f1f10;
 }
 headerbar:backdrop .title {
-    color: #0f172a;
+    color: #0f1f10;
 }
 headerbar:backdrop .subtitle {
-    color: #64748b;
+    color: #5f6c61;
 }
 headerbar button.titlebutton,
 headerbar .titlebutton,
 headerbar:backdrop button.titlebutton,
 headerbar:backdrop .titlebutton {
     background-image: none;
-    background-color: #f8fafc;
-    color: #0f172a;
-    border: 1px solid #cbd5e1;
+    background-color: #eeede9;
+    color: #0f1f10;
+    border: 1px solid #c8c6bd;
     border-radius: 9999px;
     min-width: 28px;
     min-height: 28px;
@@ -597,9 +597,9 @@ headerbar:backdrop .titlebutton {
 }
 headerbar button.titlebutton:hover,
 headerbar .titlebutton:hover {
-    background-color: #e0f2fe;
-    border-color: #7dd3fc;
-    color: #0369a1;
+    background-color: #e5f8d3;
+    border-color: #9bd86b;
+    color: #0f1f10;
 }
 headerbar button.titlebutton.close,
 headerbar .titlebutton.close,
@@ -611,15 +611,15 @@ headerbar:backdrop .titlebutton.close {
 }
 headerbar button.titlebutton.close:hover,
 headerbar .titlebutton.close:hover {
-    background-color: #ef4444;
-    border-color: #dc2626;
+    background-color: #dc2626;
+    border-color: #b91c1c;
     color: #ffffff;
 }
 headerbar button.titlebutton image,
 headerbar .titlebutton image,
 headerbar:backdrop button.titlebutton image,
 headerbar:backdrop .titlebutton image {
-    color: #0f172a;
+    color: #0f1f10;
     opacity: 1;
     -gtk-icon-style: symbolic;
     -gtk-icon-shadow: none;
@@ -635,59 +635,60 @@ headerbar .titlebutton.close:hover image {
     color: #ffffff;
 }
 .btn-nav image {
-    color: #0f172a;
+    color: #0f1f10;
     -gtk-icon-style: symbolic;
 }
 .launcher-hero {
-    background-image: linear-gradient(135deg, #f8fafc, #eff6ff 55%, #ecfeff);
-    border: 1px solid #cbd5e1;
+    background-image: linear-gradient(135deg, #0c190d, #0f1f10 55%, #162818);
+    border: 1px solid #2b452d;
     border-radius: 20px;
     padding: 20px 24px;
-    box-shadow: 0 10px 26px -10px rgba(15, 23, 42, 0.10);
+    color: #f5f4f2;
+    box-shadow: 0 12px 28px -10px rgba(10, 20, 11, 0.35);
 }
 .launcher-card {
     background-color: #ffffff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #e0dfda;
     border-radius: 18px;
     padding: 20px;
-    box-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 6px 18px -8px rgba(15, 31, 16, 0.08);
     transition: all 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .launcher-card:hover {
-    border-color: #7dd3fc;
-    box-shadow: 0 12px 26px -8px rgba(2, 132, 199, 0.14);
+    border-color: #9bd86b;
+    box-shadow: 0 12px 26px -8px rgba(30, 107, 56, 0.14);
 }
 .launcher-title {
     font-size: 20px;
     font-weight: 800;
-    color: #0f172a;
+    color: #0f1f10;
 }
 .launcher-subtitle {
     font-size: 13px;
-    color: #475569;
+    color: #3e4d40;
 }
 .badge-ready {
-    background-color: #d1fae5;
-    border: 1px solid #6ee7b7;
-    color: #065f46;
+    background-color: #c6f19d;
+    border: 1px solid #9bd86b;
+    color: #0f1f10;
     border-radius: 9999px;
     padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-lan {
-    background-color: #d1fae5;
-    border: 1px solid #6ee7b7;
-    color: #065f46;
+    background-color: #e5f8d3;
+    border: 1px solid #9bd86b;
+    color: #144d23;
     border-radius: 9999px;
     padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-wan {
-    background-color: #e0f2fe;
-    border: 1px solid #7dd3fc;
-    color: #0369a1;
+    background-color: #e6f5ee;
+    border: 1px solid #7bd1a8;
+    color: #0f5132;
     border-radius: 9999px;
     padding: 4px 11px;
     font-weight: 700;
@@ -704,62 +705,63 @@ headerbar .titlebutton.close:hover image {
 }
 .badge-scanning {
     background-color: #fef3c7;
-    border: 1px solid #fcd34d;
-    color: #b45309;
+    border: 1px solid #f5c95c;
+    color: #92400e;
     border-radius: 9999px;
     padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .badge-local {
-    background-color: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    color: #475569;
+    background-color: #eeede9;
+    border: 1px solid #c8c6bd;
+    color: #3e4d40;
     border-radius: 9999px;
     padding: 4px 11px;
     font-weight: 700;
     font-size: 11px;
 }
 .btn-primary {
-    background-image: linear-gradient(135deg, #0284c7, #0ea5e9);
-    color: #ffffff;
+    background-image: linear-gradient(135deg, #0f1f10, #173019);
+    color: #c6f19d;
     font-weight: 700;
     border-radius: 12px;
     padding: 10px 18px;
-    border: none;
-    box-shadow: 0 6px 14px -4px rgba(2, 132, 199, 0.35);
+    border: 1px solid #2c4a2e;
+    box-shadow: 0 6px 14px -4px rgba(15, 31, 16, 0.32);
     transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .btn-primary:hover {
-    background-image: linear-gradient(135deg, #0369a1, #0284c7);
+    background-image: linear-gradient(135deg, #173019, #1e6b38);
+    color: #f5f4f2;
 }
 .btn-nav {
     background-image: none;
-    background-color: #f8fafc;
-    color: #0f172a;
+    background-color: #eeede9;
+    color: #0f1f10;
     font-weight: 600;
     border-radius: 10px;
     padding: 6px 12px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid #c8c6bd;
     transition: all 180ms ease;
 }
 .btn-nav:hover {
-    background-color: #e0f2fe;
-    border-color: #7dd3fc;
-    color: #0369a1;
+    background-color: #e5f8d3;
+    border-color: #9bd86b;
+    color: #0f1f10;
 }
 .btn-dex {
     background-image: none;
-    background-color: #e0f2fe;
-    color: #0369a1;
+    background-color: #c6f19d;
+    color: #0f1f10;
     font-weight: 700;
     border-radius: 10px;
     padding: 6px 12px;
-    border: 1px solid #7dd3fc;
+    border: 1px solid #9bd86b;
     transition: all 180ms ease;
 }
 .btn-dex:hover {
-    background-color: #bae6fd;
+    background-color: #d5eebc;
 }
 """
 

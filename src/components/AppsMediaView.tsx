@@ -459,7 +459,7 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                           initial={{ width: 0 }}
                           animate={{ width: `${pct}%` }}
                           transition={{ duration: 0.5, ease: COCKPIT_EASE }}
-                          className="cockpit-progress-fill h-full rounded-full bg-[#0284c7] dark:bg-[#38bdf8]"
+                          className="cockpit-progress-fill h-full rounded-full bg-[#1e6b38] dark:bg-[#c6f19d]"
                         />
                       </div>
                       <p className="mt-1.5 text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">

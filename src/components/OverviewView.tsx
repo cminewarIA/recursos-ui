@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-  Activity,
   AlertTriangle,
   ArrowDownUp,
   ChevronDown,
@@ -21,6 +20,12 @@ import {
   Wifi,
 } from 'lucide-react';
 import { AccordionBody, AnimatedMetricValue, COCKPIT_EASE, COCKPIT_SPRING } from './MotionPrimitives';
+import {
+  AlethiaActionButton,
+  AlethiaSectionTag,
+  ChartNarrativeFooter,
+  RadialKpiGauge,
+} from './DataVizPrimitives';
 import { NetworkDevicesModal, NetworkInspectTab } from './NetworkDevicesModal';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import {
@@ -96,18 +101,39 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
     const pillClass = isRem
       ? 'cockpit-pill-violet'
       : isNet
-        ? 'cockpit-pill-cyan'
+        ? 'cockpit-pill-emerald'
         : 'cockpit-pill-amber';
-    const readColor = isRem ? '#7c3aed' : isNet ? '#0284c7' : '#f59e0b';
-    const writeColor = isRem ? '#a855f7' : isNet ? '#06b6d4' : '#ea580c';
+    const isDark = theme === 'dark';
+    const readColor = isRem
+      ? isDark
+        ? '#a5b4fc'
+        : '#4f46e5'
+      : isNet
+        ? isDark
+          ? '#5eead4'
+          : '#0e7490'
+        : isDark
+          ? '#fbbf24'
+          : '#b45309';
+    const writeColor = isRem
+      ? isDark
+        ? '#c7d2fe'
+        : '#6366f1'
+      : isNet
+        ? isDark
+          ? '#c6f19d'
+          : '#1e6b38'
+        : isDark
+          ? '#fdba74'
+          : '#d97706';
     const barClass =
       pct >= 90
-        ? 'bg-[#ef4444]'
+        ? 'bg-[#dc2626] dark:bg-[#fb7185]'
         : isRem
-          ? 'bg-[#7c3aed] dark:bg-[#a78bfa]'
+          ? 'bg-[#4f46e5] dark:bg-[#a5b4fc]'
           : isNet
-            ? 'bg-[#0284c7] dark:bg-[#38bdf8]'
-            : 'bg-[#f59e0b] dark:bg-[#fbbf24]';
+            ? 'bg-[#0e7490] dark:bg-[#5eead4]'
+            : 'bg-[#b45309] dark:bg-[#fbbf24]';
 
     const devStr = String(d.device || '');
     const netHost = isNet
@@ -243,7 +269,7 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
         <div>
           <div className="flex items-start justify-between gap-2.5">
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
                 <span className={`${pillClass} inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md`}>
                   {isRem ? (
                     <Usb className="h-3 w-3" />
@@ -253,11 +279,10 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
                     <HardDrive className="h-3 w-3" />
                   )}
                 </span>
-                <span className="truncate font-semibold text-slate-700 dark:text-slate-200">
+                <span className="font-semibold text-slate-800 dark:text-slate-100">
                   {widgetTitle}
                 </span>
-                <span aria-hidden="true">·</span>
-                <span className={`shrink-0 text-[11px] ${statusClass}`}>{statusText}</span>
+                <span className={`shrink-0 text-[10.5px] font-medium ${statusClass}`}>{statusText}</span>
               </div>
 
               <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
@@ -296,14 +321,25 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
               </div>
             </div>
 
-            <motion.button
-              type="button"
-              aria-label={t('hardware.storage.expand_aria', { name: widgetTitle })}
-              onClick={() => onExpandChart(expandSpec)}
-              className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-amber-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-amber-300"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </motion.button>
+            <div className="flex items-center gap-2 shrink-0">
+              {isMounted && (
+                <RadialKpiGauge
+                  value={pct}
+                  size={44}
+                  strokeWidth={4.5}
+                  theme={theme}
+                  color={pct >= 90 ? undefined : readColor}
+                />
+              )}
+              <motion.button
+                type="button"
+                aria-label={t('hardware.storage.expand_aria', { name: widgetTitle })}
+                onClick={() => onExpandChart(expandSpec)}
+                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </motion.button>
+            </div>
           </div>
 
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
@@ -327,6 +363,7 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
             theme={theme}
             onExpandClick={() => onExpandChart(expandSpec)}
           />
+          <ChartNarrativeFooter data={diskSeries[0]?.data ?? []} unit="MB/s" decimals={2} />
         </div>
       </motion.article>
     );
@@ -658,17 +695,26 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     };
   }, [wifiSummary?.router_history_20m, metrics?.net?.router_history_20m, routerWanAvailable, locale]);
 
+  const isDarkTheme = theme === 'dark';
+  const cpuChartColor = isDarkTheme ? '#c6f19d' : '#1e6b38';
+  const ramChartColor = isDarkTheme ? '#5eead4' : '#0e7490';
+  const gpuChartColor = isDarkTheme ? '#a5b4fc' : '#4f46e5';
+  const wanRxChartColor = isDarkTheme ? '#c6f19d' : '#1e6b38';
+  const wanTxChartColor = isDarkTheme ? '#5eead4' : '#0e7490';
+  const lanRxChartColor = isDarkTheme ? '#93c5fd' : '#4f46e5';
+  const lanTxChartColor = isDarkTheme ? '#fbbf24' : '#b45309';
+
   const cpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'cpu', metricKey: 'cpu', label: t('hardware.cpu.title'), data: cpuHist, color: '#0284c7', unit: '%' }],
-    [cpuHist, t]
+    () => [{ id: 'cpu', metricKey: 'cpu', label: t('hardware.cpu.title'), data: cpuHist, color: cpuChartColor, unit: '%' }],
+    [cpuHist, cpuChartColor, t]
   );
   const ramSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'ram', metricKey: 'ram', label: t('hardware.ram.title'), data: ramHist, color: '#10b981', unit: '%' }],
-    [ramHist, t]
+    () => [{ id: 'ram', metricKey: 'ram', label: t('hardware.ram.title'), data: ramHist, color: ramChartColor, unit: '%' }],
+    [ramHist, ramChartColor, t]
   );
   const gpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.title'), data: gpuHist, color: '#7c3aed', unit: '%' }],
-    [gpuHist, t]
+    () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.title'), data: gpuHist, color: gpuChartColor, unit: '%' }],
+    [gpuHist, gpuChartColor, t]
   );
   const wanSeries: ChartSeries[] = useMemo(
     () => [
@@ -677,7 +723,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         metricKey: 'net_wan_rx',
         label: t('hardware.net.wan_download'),
         data: routerLiveWindow ? routerLiveWindow.wanRx : netWanRxHist,
-        color: '#0284c7',
+        color: wanRxChartColor,
         unit: 'MB/s',
         decimals: 2,
         fillAlpha: 0.16,
@@ -687,13 +733,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         metricKey: 'net_wan_tx',
         label: t('hardware.net.wan_upload'),
         data: routerLiveWindow ? routerLiveWindow.wanTx : netWanTxHist,
-        color: '#10b981',
+        color: wanTxChartColor,
         unit: 'MB/s',
         decimals: 2,
         fillAlpha: 0.08,
       },
     ],
-    [routerLiveWindow, netWanRxHist, netWanTxHist, t]
+    [routerLiveWindow, netWanRxHist, netWanTxHist, wanRxChartColor, wanTxChartColor, t]
   );
   const lanSeries: ChartSeries[] = useMemo(
     () => [
@@ -702,7 +748,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         metricKey: 'net_lan_rx',
         label: t('hardware.net.lan_download'),
         data: routerLiveWindow ? routerLiveWindow.lanRx : netLanRxHist,
-        color: '#6366f1',
+        color: lanRxChartColor,
         unit: 'MB/s',
         decimals: 2,
         fillAlpha: 0.14,
@@ -712,13 +758,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         metricKey: 'net_lan_tx',
         label: t('hardware.net.lan_upload'),
         data: routerLiveWindow ? routerLiveWindow.lanTx : netLanTxHist,
-        color: '#f59e0b',
+        color: lanTxChartColor,
         unit: 'MB/s',
         decimals: 2,
         fillAlpha: 0.08,
       },
     ],
-    [routerLiveWindow, netLanRxHist, netLanTxHist, t]
+    [routerLiveWindow, netLanRxHist, netLanTxHist, lanRxChartColor, lanTxChartColor, t]
   );
 
   const wanTimestamps = routerLiveWindow ? routerLiveWindow.timestamps : timestamps;
@@ -767,30 +813,35 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   }, [localFaultHistory, metrics?.system_errors_summary?.ai_fault_history, metrics?.system_errors_summary?.ai_fault_insights]);
 
   return (
-    <div className="space-y-[clamp(0.85rem,2dvh,1.5rem)]">
-      {/* Hero Telemetry Summary Banner (matching docs/assets/hero-banner.svg) */}
+    <div className="space-y-[clamp(1rem,2.2dvh,1.75rem)]">
+      {/* CAPA 1 — Alethia Obsidian Command Deck: Impacto ejecutivo + ruta directa al dato */}
       <motion.section
-        initial={{ opacity: 0, y: 14 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={COCKPIT_SPRING}
-        className="cockpit-hero p-[clamp(0.85rem,1.8vw,1.5rem)]"
+        className="cockpit-hero p-[clamp(1rem,2.1vw,1.75rem)]"
       >
-        <div className="relative z-10 flex flex-col justify-between gap-[clamp(0.65rem,1.5vw,1rem)] sm:flex-row sm:items-center">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="cockpit-pill-cyan inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
-                <span className="h-1.5 w-1.5 rounded-full bg-sky-500 text-sky-500 cockpit-live-dot cockpit-live-ring" />
+        <div className="relative z-10 flex flex-col justify-between gap-[clamp(0.85rem,1.8vw,1.5rem)] lg:flex-row lg:items-center">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <AlethiaSectionTag pulse tone={overallBusy ? 'danger' : totalErrors > 0 ? 'amber' : 'lime'}>
+                {totalErrors > 0 || overallBusy ? t('overview.hero_alert_tag') : t('overview.hero_verified_tag')}
+              </AlethiaSectionTag>
+              <span className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-[#c6f19d]/90">
                 {metrics?.system?.hostname || t('overview.default_host')}
               </span>
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="hidden sm:inline text-[#6e8270]" aria-hidden="true">·</span>
+              <span className="text-xs font-medium text-[#b2c0b3]">
                 {t('overview.subtitle')}
               </span>
             </div>
-            <h1 className="mt-2 font-display text-[clamp(1.2rem,2vw+0.55rem,1.875rem)] font-bold tracking-tight text-slate-900 dark:text-white">
+
+            <h1 className="mt-3 font-display text-[clamp(1.3rem,2.3vw+0.6rem,2.15rem)] font-semibold leading-[1.12] tracking-tight text-[#f5f4f2]">
               {overallBusy ? t('overview.high_load_banner') : t('overview.all_normal_banner')}
             </h1>
-            <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-              <span className="cockpit-subtile inline-flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[11px] tabular-nums">
+
+            <div className="mt-3.5 flex flex-wrap items-center gap-2 text-xs">
+              <span className="alethia-hero-chip inline-flex min-h-[36px] items-center gap-1.5 px-3 py-1 font-mono text-[11px] tabular-nums">
                 {t('overview.uptime_badge', { uptime: metrics?.system?.uptime_str || '--' })}
               </span>
               <motion.button
@@ -798,18 +849,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 data-testid="banner-devices-btn"
                 title={t('overview.devices_inspect_hint')}
                 onClick={() => setDevicesModalMode('devices')}
-                className="cockpit-subtile inline-flex min-h-[34px] items-center gap-1.5 px-3 py-1 font-mono text-[11px] font-semibold tabular-nums transition-colors hover:bg-sky-500/10 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:text-sky-300 cursor-pointer"
+                className="alethia-hero-chip inline-flex min-h-[36px] items-center gap-1.5 px-3 py-1 font-mono text-[11px] font-semibold tabular-nums cursor-pointer"
               >
-                <Wifi className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                <Wifi className="h-3.5 w-3.5 text-[#c6f19d] shrink-0" />
                 <span>{t('overview.connected_devices_count', { count: onlineWifi.length })}</span>
-                <ChevronRight className="h-3 w-3 opacity-60 shrink-0" />
+                <ChevronRight className="h-3 w-3 text-[#c6f19d]/75 shrink-0" />
               </motion.button>
               <motion.button
                 type="button"
                 data-testid="banner-speed-btn"
                 title={t('overview.internet_rate_inspect_hint')}
                 onClick={() => setDevicesModalMode('bandwidth')}
-                className="cockpit-subtile inline-flex min-h-[34px] items-center gap-1.5 px-3 py-1 font-mono text-[11px] font-semibold tabular-nums transition-colors hover:bg-emerald-500/10 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:text-emerald-300 cursor-pointer"
+                className="alethia-hero-chip inline-flex min-h-[36px] items-center gap-1.5 px-3 py-1 font-mono text-[11px] font-semibold tabular-nums cursor-pointer"
               >
                 <span>
                   {t('overview.internet_rate_badge', {
@@ -818,43 +869,65 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   })}
                 </span>
                 {metrics?.wifi_summary?.router_wan_available && (
-                  <span className="hidden sm:inline-block rounded bg-sky-500/12 px-1.5 py-0.5 text-[10px] font-sans font-semibold text-sky-700 dark:text-sky-300">
+                  <span className="hidden sm:inline-block rounded bg-[#c6f19d]/20 px-1.5 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.05em] text-[#c6f19d]">
                     {t('overview.router_global_badge')}
                   </span>
                 )}
-                <ChevronRight className="h-3 w-3 opacity-60 shrink-0" />
+                <ChevronRight className="h-3 w-3 text-[#c6f19d]/75 shrink-0" />
               </motion.button>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Executive Zeus Vision Radial Pulse Strip + Signature Alethia CTA */}
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 shrink-0">
+            <div className="inline-flex items-center gap-3.5 rounded-2xl border border-[#c6f19d]/16 bg-[#162818]/80 px-3.5 py-2.5 backdrop-blur-sm">
+              <RadialKpiGauge
+                value={cpuPct}
+                size={46}
+                strokeWidth={4.5}
+                invertedDark
+                label={t('overview.exec_cpu')}
+              />
+              <RadialKpiGauge
+                value={ramPct}
+                size={46}
+                strokeWidth={4.5}
+                invertedDark
+                label={t('overview.exec_ram')}
+              />
+              <RadialKpiGauge
+                value={storageSummary.localPercent}
+                size={46}
+                strokeWidth={4.5}
+                invertedDark
+                label={t('overview.exec_storage')}
+              />
+            </div>
+
             {totalErrors > 0 ? (
               <motion.button
                 type="button"
                 onClick={() => setShowErrorsDetail((v) => !v)}
-                className="cockpit-pill-amber inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-opacity hover:opacity-90"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-amber-400/45 bg-amber-500/18 px-4 py-2 font-mono text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/28 cursor-pointer"
               >
-                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-300" />
                 <span>
                   {totalErrors} {totalErrors === 1 ? t('time.recent_notice') : t('time.recent_notices')}
                 </span>
                 {showErrorsDetail ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </motion.button>
             ) : (
-              <motion.button
-                type="button"
+              <AlethiaActionButton
+                label={t('overview.see_equipment_detail')}
+                variant="dark"
                 onClick={() => onNavigate('equipo')}
-                className="cockpit-btn-accent inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap"
-              >
-                <Activity className="h-4 w-4 shrink-0" />
-                <span>{t('overview.see_equipment_detail')}</span>
-              </motion.button>
+              />
             )}
           </div>
         </div>
 
         <AccordionBody open={showErrorsDetail}>
-          <div className="mt-4 border-t border-slate-200/70 pt-4 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300 space-y-3">
+          <div className="mt-4 border-t border-[#c6f19d]/15 pt-4 text-xs text-[#d6ded6] space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>{t('overview.errors_banner', { count: totalErrors })}</span>
               <div className="flex flex-wrap items-center gap-2">
@@ -863,7 +936,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   data-testid="overview-ai-simplify-faults-btn"
                   disabled={simplifyingOverviewFaults}
                   onClick={() => void handleOverviewSimplifyFaults()}
-                  className="cockpit-pill-violet inline-flex min-h-[34px] items-center gap-1.5 rounded-xl px-3 py-1 text-[11px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-[#c6f19d]/35 bg-[#c6f19d]/14 px-3 py-1 font-mono text-[11px] font-semibold text-[#c6f19d] transition-colors hover:bg-[#c6f19d]/22 disabled:opacity-50 cursor-pointer"
                 >
                   <Sparkles className={`h-3.5 w-3.5 ${simplifyingOverviewFaults ? 'animate-spin' : ''}`} />
                   <span>
@@ -873,7 +946,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onNavigate('mas', 'logs')}
-                  className="font-semibold text-sky-600 hover:underline dark:text-sky-400"
+                  className="font-mono text-[11px] font-semibold text-[#c6f19d] hover:underline cursor-pointer"
                 >
                   {t('overview.open_full_log')}
                 </button>
@@ -900,16 +973,19 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                           ? t('more.ai_fault_danger_low')
                           : t('more.ai_fault_danger_medium');
                   return (
-                    <div key={item.signature} className="cockpit-subtile p-3 space-y-1.5 text-xs">
+                    <div
+                      key={item.signature}
+                      className="rounded-xl border border-[#c6f19d]/18 bg-[#162818]/90 p-3 space-y-1.5 text-xs"
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-1.5">
-                        <span className="font-semibold text-slate-900 dark:text-white">{item.title}</span>
+                        <span className="font-semibold text-[#f5f4f2]">{item.title}</span>
                         <span className={`${pillCls} rounded-full px-2 py-0.5 text-[10px] font-bold uppercase`}>
                           {dangerLabel}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-300">{item.summary}</p>
+                      <p className="text-[11px] text-[#c5d1c6]">{item.summary}</p>
                       {item.solution && (
-                        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-2.5 py-1.5 text-[10.5px] text-emerald-950 dark:text-emerald-200">
+                        <div className="rounded-lg border border-[#c6f19d]/28 bg-[#c6f19d]/10 px-2.5 py-1.5 text-[10.5px] text-[#e6f5d8]">
                           <span className="font-semibold">{t('more.ai_fault_solution_label')}: </span>
                           <span>{item.solution}</span>
                         </div>
@@ -923,8 +999,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </AccordionBody>
       </motion.section>
 
-      {/* Primary & Independent Real-Time Telemetry Widgets: Responsive Auto-Fit Multi-Column Grid */}
-      <section aria-label={t('overview.perf_grid_aria')} className="cockpit-auto-grid">
+      {/* CAPA 2 — Telemetría en vivo con anillos KPI Zeus + tendencia y picos anotados */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 px-0.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <AlethiaSectionTag>{t('overview.layer_live_tag')}</AlethiaSectionTag>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              {t('overview.layer_live_sub')}
+            </p>
+          </div>
+        </div>
+
+        <section aria-label={t('overview.perf_grid_aria')} className="cockpit-auto-grid">
         {/* 1. Procesador (CPU) */}
         <motion.article
           initial={{ opacity: 0, y: 16 }}
@@ -935,13 +1021,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div>
             <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
                   <span className="cockpit-pill-cyan inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
                     <Cpu className="h-3 w-3" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">{t('hardware.cpu.title')}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className={`shrink-0 text-[11px] ${cpuTone.textClass}`}>{cpuTone.label}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">{t('hardware.cpu.title')}</span>
+                  <span className={`shrink-0 text-[10.5px] font-medium ${cpuTone.textClass}`}>{cpuTone.label}</span>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
                   <AnimatedMetricValue
@@ -961,25 +1046,28 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   })}
                 </p>
               </div>
-              <motion.button
-                type="button"
-                aria-label={t('hardware.cpu.expand_aria')}
-                onClick={() =>
-                  onExpandChart({
-                    title: t('hardware.cpu.chart_live_title'),
-                    subtitle: metrics?.cpu?.model || t('hardware.cpu.main_fallback'),
-                    series: cpuSeries,
-                    timestamps,
-                    epochTs,
-                    leftUnit: '%',
-                    maxLeft: 100,
-                    chartKind: 'cpu',
-                  })
-                }
-                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-              </motion.button>
+              <div className="flex items-center gap-2 shrink-0">
+                <RadialKpiGauge value={cpuPct} size={44} strokeWidth={4.5} theme={theme} />
+                <motion.button
+                  type="button"
+                  aria-label={t('hardware.cpu.expand_aria')}
+                  onClick={() =>
+                    onExpandChart({
+                      title: t('hardware.cpu.chart_live_title'),
+                      subtitle: metrics?.cpu?.model || t('hardware.cpu.main_fallback'),
+                      series: cpuSeries,
+                      timestamps,
+                      epochTs,
+                      leftUnit: '%',
+                      maxLeft: 100,
+                      chartKind: 'cpu',
+                    })
+                  }
+                  className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </motion.button>
+              </div>
             </div>
 
             {/* Sleek spring horizontal progress bar */}
@@ -988,7 +1076,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(2, Math.min(100, cpuPct))}%` }}
                 transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
-                className="cockpit-progress-fill h-full rounded-full bg-[#0284c7] dark:bg-[#38bdf8]"
+                className="cockpit-progress-fill h-full rounded-full bg-[#1e6b38] dark:bg-[#c6f19d]"
               />
             </div>
           </div>
@@ -1015,6 +1103,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 })
               }
             />
+            <ChartNarrativeFooter data={cpuHist} unit="%" decimals={1} />
           </div>
         </motion.article>
 
@@ -1028,13 +1117,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div>
             <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
                   <span className="cockpit-pill-emerald inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
                     <MemoryStick className="h-3 w-3" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">{t('hardware.ram.title')}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className={`shrink-0 text-[11px] ${ramTone.textClass}`}>{ramTone.label}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">{t('hardware.ram.title')}</span>
+                  <span className={`shrink-0 text-[10.5px] font-medium ${ramTone.textClass}`}>{ramTone.label}</span>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
                   <AnimatedMetricValue
@@ -1051,28 +1139,37 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   {t('overview.ram_free_ready', { avail: formatBytes(metrics?.ram?.available_bytes) })}
                 </p>
               </div>
-              <motion.button
-                type="button"
-                aria-label={t('hardware.ram.expand_aria')}
-                onClick={() =>
-                  onExpandChart({
-                    title: t('hardware.ram.chart_live_title'),
-                    subtitle: t('hardware.ram.used_of_total', {
-                      used: formatBytes(ramUsed),
-                      total: formatBytes(ramTotal),
-                    }),
-                    series: ramSeries,
-                    timestamps,
-                    epochTs,
-                    leftUnit: '%',
-                    maxLeft: 100,
-                    chartKind: 'ram',
-                  })
-                }
-                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-emerald-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-emerald-300"
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-              </motion.button>
+              <div className="flex items-center gap-2 shrink-0">
+                <RadialKpiGauge
+                  value={ramPct}
+                  size={44}
+                  strokeWidth={4.5}
+                  theme={theme}
+                  color={ramPct >= 70 ? undefined : ramChartColor}
+                />
+                <motion.button
+                  type="button"
+                  aria-label={t('hardware.ram.expand_aria')}
+                  onClick={() =>
+                    onExpandChart({
+                      title: t('hardware.ram.chart_live_title'),
+                      subtitle: t('hardware.ram.used_of_total', {
+                        used: formatBytes(ramUsed),
+                        total: formatBytes(ramTotal),
+                      }),
+                      series: ramSeries,
+                      timestamps,
+                      epochTs,
+                      leftUnit: '%',
+                      maxLeft: 100,
+                      chartKind: 'ram',
+                    })
+                  }
+                  className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </motion.button>
+              </div>
             </div>
 
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
@@ -1080,7 +1177,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(2, Math.min(100, ramPct))}%` }}
                 transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
-                className="cockpit-progress-fill h-full rounded-full bg-[#10b981] dark:bg-[#34d399]"
+                className="cockpit-progress-fill h-full rounded-full bg-[#0e7490] dark:bg-[#5eead4]"
               />
             </div>
           </div>
@@ -1110,6 +1207,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 })
               }
             />
+            <ChartNarrativeFooter data={ramHist} unit="%" decimals={1} />
           </div>
         </motion.article>
 
@@ -1123,13 +1221,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div>
             <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
                   <span className="cockpit-pill-violet inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
                     <Monitor className="h-3 w-3" />
                   </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">{t('hardware.gpu.title')}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className={`shrink-0 text-[11px] ${gpuAvail ? gpuTone.textClass : 'text-slate-500 dark:text-slate-400'}`}>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">{t('hardware.gpu.title')}</span>
+                  <span className={`shrink-0 text-[10.5px] font-medium ${gpuAvail ? gpuTone.textClass : 'text-slate-500 dark:text-slate-400'}`}>
                     {gpuAvail ? gpuTone.label : t('hardware.gpu.idle')}
                   </span>
                 </div>
@@ -1154,25 +1251,34 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     : t('hardware.gpu.integrated_no_media')}
                 </p>
               </div>
-              <motion.button
-                type="button"
-                aria-label={t('hardware.gpu.expand_aria')}
-                onClick={() =>
-                  onExpandChart({
-                    title: t('hardware.gpu.chart_live_title'),
-                    subtitle: metrics?.gpu?.name || t('hardware.gpu.system_fallback'),
-                    series: gpuSeries,
-                    timestamps,
-                    epochTs,
-                    leftUnit: '%',
-                    maxLeft: 100,
-                    chartKind: 'gpu',
-                  })
-                }
-                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-violet-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-violet-300"
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-              </motion.button>
+              <div className="flex items-center gap-2 shrink-0">
+                <RadialKpiGauge
+                  value={gpuAvail ? gpuPct : 0}
+                  size={44}
+                  strokeWidth={4.5}
+                  theme={theme}
+                  color={gpuAvail && gpuPct >= 70 ? undefined : gpuChartColor}
+                />
+                <motion.button
+                  type="button"
+                  aria-label={t('hardware.gpu.expand_aria')}
+                  onClick={() =>
+                    onExpandChart({
+                      title: t('hardware.gpu.chart_live_title'),
+                      subtitle: metrics?.gpu?.name || t('hardware.gpu.system_fallback'),
+                      series: gpuSeries,
+                      timestamps,
+                      epochTs,
+                      leftUnit: '%',
+                      maxLeft: 100,
+                      chartKind: 'gpu',
+                    })
+                  }
+                  className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </motion.button>
+              </div>
             </div>
 
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
@@ -1180,7 +1286,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(gpuAvail ? 2 : 0, Math.min(100, gpuPct))}%` }}
                 transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
-                className="cockpit-progress-fill h-full rounded-full bg-[#7c3aed] dark:bg-[#a78bfa]"
+                className="cockpit-progress-fill h-full rounded-full bg-[#4f46e5] dark:bg-[#a5b4fc]"
               />
             </div>
           </div>
@@ -1207,6 +1313,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 })
               }
             />
+            <ChartNarrativeFooter data={gpuHist} unit="%" decimals={1} />
           </div>
         </motion.article>
 
@@ -1248,10 +1355,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <span aria-hidden="true">·</span>
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#0284c7]" /> {t('hardware.net.wan_download')}
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: wanRxChartColor }} /> {t('hardware.net.wan_download')}
                     </span>
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#10b981]" /> {t('hardware.net.wan_upload')}
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: wanTxChartColor }} /> {t('hardware.net.wan_upload')}
                     </span>
                   </span>
                 </div>
@@ -1270,7 +1377,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     chartKind: routerLiveWindow ? 'router' : 'net',
                   })
                 }
-                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
               >
                 <Maximize2 className="h-3.5 w-3.5" />
               </motion.button>
@@ -1283,7 +1390,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   width: `${Math.max(4, Math.min(100, ((wanRxBytes + wanTxBytes) / (1024 * 1024)) * 2.5))}%`,
                 }}
                 transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
-                className="cockpit-progress-fill h-full rounded-full bg-gradient-to-r from-[#0284c7] to-[#10b981]"
+                className="cockpit-progress-fill h-full rounded-full bg-gradient-to-r from-[#1e6b38] to-[#0e7490] dark:from-[#c6f19d] dark:to-[#5eead4]"
               />
             </div>
           </div>
@@ -1309,6 +1416,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 })
               }
             />
+            <ChartNarrativeFooter data={wanSeries[0]?.data ?? []} unit="MB/s" decimals={2} />
           </div>
         </motion.article>
 
@@ -1355,10 +1463,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <span aria-hidden="true">·</span>
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#6366f1]" /> {t('hardware.net.lan_download')}
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: lanRxChartColor }} /> {t('hardware.net.lan_download')}
                     </span>
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#f59e0b]" /> {t('hardware.net.lan_upload')}
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: lanTxChartColor }} /> {t('hardware.net.lan_upload')}
                     </span>
                   </span>
                 </div>
@@ -1377,7 +1485,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     chartKind: routerLiveWindow ? 'router' : 'net',
                   })
                 }
-                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-indigo-300"
+                className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
               >
                 <Maximize2 className="h-3.5 w-3.5" />
               </motion.button>
@@ -1390,7 +1498,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   width: `${Math.max(4, Math.min(100, ((lanRxBytes + lanTxBytes) / (1024 * 1024)) * 2.5))}%`,
                 }}
                 transition={{ type: 'spring', stiffness: 210, damping: 14, mass: 0.7 }}
-                className="cockpit-progress-fill h-full rounded-full bg-gradient-to-r from-[#6366f1] to-[#f59e0b]"
+                className="cockpit-progress-fill h-full rounded-full bg-gradient-to-r from-[#4f46e5] to-[#b45309] dark:from-[#93c5fd] dark:to-[#fbbf24]"
               />
             </div>
           </div>
@@ -1416,6 +1524,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 })
               }
             />
+            <ChartNarrativeFooter data={lanSeries[0]?.data ?? []} unit="MB/s" decimals={2} />
           </div>
         </motion.article>
 
@@ -1437,16 +1546,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           })}
         </AnimatePresence>
       </section>
+      </div>
 
-      {/* Quick Control Row: Aparatos en casa con botones simétricos Encender / Apagar */}
+      {/* CAPA 3 — Control Rápido: Aparatos en casa con botones simétricos Encender / Apagar */}
       <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ ...COCKPIT_SPRING, delay: 0.18 }}
+        transition={{ ...COCKPIT_SPRING, delay: 0.16 }}
         className="cockpit-bento p-5"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
-          <div>
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+          <div className="space-y-1">
+            <AlethiaSectionTag>{t('overview.layer_devices_tag')}</AlethiaSectionTag>
             <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
               {t('overview.home_devices_title')}
             </h2>
@@ -1454,13 +1565,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {t('overview.home_devices_sub')}
             </p>
           </div>
-          <motion.button
-            type="button"
+          <AlethiaActionButton
+            label={`${t('overview.view_all')} (${metrics?.wifi_clients?.length ?? 0})`}
+            variant="surface"
             onClick={() => onNavigate('red')}
-            className="cockpit-subtile min-h-[40px] px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-sky-300 whitespace-nowrap"
-          >
-            {t('overview.view_all')} ({metrics?.wifi_clients?.length ?? 0})
-          </motion.button>
+          />
         </div>
 
         {controllableClients.length === 0 ? (

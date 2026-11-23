@@ -277,7 +277,7 @@ export const ProcessHistoryStackedChart: React.FC<ProcessHistoryStackedChartProp
     if (hoverIdx !== null && hoverIdx >= 0 && hoverIdx < n) {
       const hx = getX(hoverIdx);
       ctx.save();
-      ctx.strokeStyle = isDark ? 'rgba(56,189,248,0.65)' : 'rgba(2,132,199,0.6)';
+      ctx.strokeStyle = isDark ? 'rgba(198,241,157,0.65)' : 'rgba(30,107,56,0.55)';
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 3]);
       ctx.beginPath();
@@ -292,7 +292,7 @@ export const ProcessHistoryStackedChart: React.FC<ProcessHistoryStackedChartProp
         ctx.arc(hx, hy, 3.2, 0, Math.PI * 2);
         ctx.fillStyle = row.series.color;
         ctx.fill();
-        ctx.strokeStyle = isDark ? '#0f172a' : '#ffffff';
+        ctx.strokeStyle = isDark ? '#111f13' : '#ffffff';
         ctx.lineWidth = 1.25;
         ctx.stroke();
       }
@@ -334,7 +334,7 @@ export const ProcessHistoryStackedChart: React.FC<ProcessHistoryStackedChartProp
       entries.push({
         label: t('equipment.process_history_total'),
         value: formatStackedValue(metric, totalAtIdx),
-        color: '#38bdf8',
+        color: '#c6f19d',
       });
     }
 

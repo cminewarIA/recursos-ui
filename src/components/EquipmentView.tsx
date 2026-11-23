@@ -66,21 +66,26 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
   const timestamps = useMemo(() => hist?.timestamps ?? [], [hist?.timestamps]);
   const epochTs = useMemo(() => hist?.epoch_ts ?? [], [hist?.epoch_ts]);
 
+  const isDarkTheme = theme === 'dark';
+  const primaryBotanical = isDarkTheme ? '#c6f19d' : '#1e6b38';
+  const secondaryTeal = isDarkTheme ? '#5eead4' : '#0e7490';
+  const tertiaryIndigo = isDarkTheme ? '#a5b4fc' : '#4f46e5';
+
   const cpuCores = useMemo(() => metrics?.cpu?.per_core_percent ?? [], [metrics?.cpu?.per_core_percent]);
   const cpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'cpu', metricKey: 'cpu', label: t('equipment.sort_cpu'), data: hist?.cpu ?? [], color: '#0284c7', unit: '%' }],
-    [hist?.cpu, t]
+    () => [{ id: 'cpu', metricKey: 'cpu', label: t('equipment.sort_cpu'), data: hist?.cpu ?? [], color: primaryBotanical, unit: '%' }],
+    [hist?.cpu, primaryBotanical, t]
   );
   const ramSeries: ChartSeries[] = useMemo(
     () => [
-      { id: 'ram', metricKey: 'ram', label: t('hardware.ram.active_series'), data: hist?.ram ?? [], color: '#10b981', unit: '%' },
-      { id: 'ram_tot', metricKey: 'ram_total', label: t('hardware.ram.total_cached_series'), data: hist?.ram_total ?? [], color: '#7c3aed', unit: '%', fillAlpha: 0, dashed: true },
+      { id: 'ram', metricKey: 'ram', label: t('hardware.ram.active_series'), data: hist?.ram ?? [], color: secondaryTeal, unit: '%' },
+      { id: 'ram_tot', metricKey: 'ram_total', label: t('hardware.ram.total_cached_series'), data: hist?.ram_total ?? [], color: tertiaryIndigo, unit: '%', fillAlpha: 0, dashed: true },
     ],
-    [hist?.ram, hist?.ram_total, t]
+    [hist?.ram, hist?.ram_total, secondaryTeal, tertiaryIndigo, t]
   );
   const gpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.series_compute'), data: hist?.gpu ?? [], color: '#7c3aed', unit: '%' }],
-    [hist?.gpu, t]
+    () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.series_compute'), data: hist?.gpu ?? [], color: tertiaryIndigo, unit: '%' }],
+    [hist?.gpu, tertiaryIndigo, t]
   );
 
   // Sub-gráficas de GPU dinámicamente activadas/desactivadas según capacidades reales de la tarjeta
@@ -176,7 +181,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
         id: 'gpu_vram_pct',
         label: t('hardware.gpu.series_vram_pct'),
         data: pickNumeric(gHist.map((b) => b.vram_pct), [Number(gpu?.vram_percent ?? 0), Number(gpu?.vram_percent ?? 0)]),
-        color: '#0284c7',
+        color: '#1e6b38',
         unit: '%',
         decimals: 1,
       });
@@ -311,7 +316,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
         id: 'gpu_clk_gfx',
         label: t('hardware.gpu.series_clock_gfx'),
         data: pickNumeric(gHist.map((b) => b.clock_gfx), [Number(gpu.clock_graphics_mhz), Number(gpu.clock_graphics_mhz)]),
-        color: '#0284c7',
+        color: '#1e6b38',
         unit: 'MHz',
         decimals: 0,
       });
@@ -367,7 +372,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               id: 'gpu_pcie_rx',
               label: t('hardware.gpu.series_pcie_rx'),
               data: pickNumeric(gHist.map((b) => b.pcie_rx), [pcieRxMb, pcieRxMb]),
-              color: '#0284c7',
+              color: '#1e6b38',
               unit: 'MB/s',
               decimals: 2,
             },
@@ -550,7 +555,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                             {
                               label: t('hardware.cpu.usage_current'),
                               value: formatPct(val),
-                              color: val >= 85 ? '#ef4444' : val >= 60 ? '#f59e0b' : '#0284c7',
+                              color: val >= 85 ? '#dc2626' : val >= 60 ? '#d97706' : primaryBotanical,
                             },
                           ],
                         })
@@ -563,7 +568,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                           className="w-full rounded-md transition-all duration-150"
                           style={{
                             height: `${Math.max(8, Math.min(100, val))}%`,
-                            backgroundColor: val >= 85 ? '#ef4444' : val >= 60 ? '#f59e0b' : '#0284c7',
+                            backgroundColor: val >= 85 ? '#dc2626' : val >= 60 ? '#d97706' : primaryBotanical,
                           }}
                         />
                       </div>
@@ -1008,7 +1013,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               const isMounted = d.mounted !== false;
               const pct = Math.min(100, Math.max(0, Number(d.percent || 0)));
               const barColor =
-                pct >= 88 ? '#ef4444' : isRem ? '#7c3aed' : isNet ? '#0284c7' : '#f59e0b';
+                pct >= 88 ? '#dc2626' : isRem ? tertiaryIndigo : isNet ? secondaryTeal : '#d97706';
               return (
                 <div
                   key={`${d.mountpoint}-${d.device || idx}`}

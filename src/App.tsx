@@ -490,48 +490,69 @@ export function App() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] pb-[clamp(4.5rem,11dvh,6.75rem)]">
         <div id="cockpit-scroll-stage" data-cockpit-jelly-stage="true">
-          {/* Clean Frameless Brand Header with Enlarged Transparent CMineWar Emblem */}
+          {/* Alethia Editorial Top Header with Brand, Desktop Mono Nav & Telemetry Controls */}
           <motion.div
-            initial={{ opacity: 0, y: -12 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.42, ease: COCKPIT_EASE }}
-            className="cockpit-shell pt-[clamp(0.45rem,1.3dvh,1rem)]"
+            transition={{ duration: 0.38, ease: COCKPIT_EASE }}
+            className="cockpit-shell pt-[clamp(0.5rem,1.4dvh,1.1rem)]"
           >
-          <header className="flex flex-wrap items-center justify-between gap-[clamp(0.5rem,1.5vw,1rem)] py-1">
-            {/* Zone 1: Brand with enlarged transparent CMineWar emblem scaled to both vw and dvh */}
+          <header className="cockpit-topbar flex flex-wrap items-center justify-between gap-[clamp(0.5rem,1.5vw,1rem)] px-[clamp(0.75rem,1.6vw,1.25rem)] py-[clamp(0.45rem,0.9dvh,0.7rem)]">
+            {/* Zone 1: Brand with CMineWar emblem */}
             <motion.button
               type="button"
               onClick={() => navigateTo('inicio')}
-              className="flex min-w-0 items-center gap-[clamp(0.55rem,1.3vw,1rem)] text-left"
+              className="flex min-w-0 items-center gap-[clamp(0.55rem,1.2vw,0.9rem)] text-left cursor-pointer"
             >
               {!logoBroken ? (
                 <img
                   src="/recursos-cockpit.png"
                   alt={t('app.brand_alt')}
                   onError={() => setLogoBroken(true)}
-                  className="h-[clamp(2.65rem,min(7vw,10.5dvh),6.25rem)] w-[clamp(2.65rem,min(7vw,10.5dvh),6.25rem)] shrink-0 object-contain drop-shadow-[0_4px_14px_rgba(14,165,233,0.26)] dark:drop-shadow-[0_6px_18px_rgba(56,189,248,0.34)]"
+                  className="h-[clamp(2.25rem,min(5vw,7.5dvh),3.5rem)] w-[clamp(2.25rem,min(5vw,7.5dvh),3.5rem)] shrink-0 object-contain drop-shadow-[0_4px_12px_rgba(30,107,56,0.22)] dark:drop-shadow-[0_4px_16px_rgba(198,241,157,0.28)]"
                 />
               ) : (
-                <div className="flex h-[clamp(2.65rem,min(7vw,10.5dvh),6.25rem)] w-[clamp(2.65rem,min(7vw,10.5dvh),6.25rem)] shrink-0 items-center justify-center">
-                  <Activity className="h-[clamp(1.5rem,3.5vw,2.5rem)] w-[clamp(1.5rem,3.5vw,2.5rem)] text-sky-600 dark:text-sky-400" />
+                <div className="flex h-[clamp(2.25rem,min(5vw,7.5dvh),3.5rem)] w-[clamp(2.25rem,min(5vw,7.5dvh),3.5rem)] shrink-0 items-center justify-center rounded-xl bg-[#0f1f10] text-[#c6f19d]">
+                  <Activity className="h-5 w-5" />
                 </div>
               )}
               <div className="min-w-0 leading-tight">
-                <span className="block truncate font-display text-[clamp(1rem,1.3vw+0.55rem,1.5rem)] font-bold tracking-tight text-slate-900 dark:text-white">
+                <span className="block truncate font-display text-[clamp(1rem,1.15vw+0.55rem,1.35rem)] font-bold tracking-tight text-slate-900 dark:text-[#f5f4f2]">
                   {t('app.brand')}
                 </span>
-                <span className="mt-0.5 block truncate font-mono text-[clamp(0.625rem,0.5vw+0.42rem,0.75rem)] font-medium text-slate-500 dark:text-slate-400">
+                <span className="mt-0.5 block truncate font-mono text-[clamp(0.625rem,0.45vw+0.42rem,0.72rem)] uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
                   {metrics?.system?.hostname || t('app.cockpit_fallback')} · {theme === 'dark' ? t('app.theme_dark') : t('app.theme_light')}
                 </span>
               </div>
             </motion.button>
 
-            {/* Zone 2: Live Health Pill + Quick Theme + Version Pill */}
+            {/* Zone 2: Alethia Desktop Monospace Top Navigation (xl+ only for zero crowding) */}
+            <nav aria-label={t('nav.bottom_aria')} className="hidden xl:flex items-center gap-1">
+              {navItems.map((item) => {
+                const active = activeTab === item.id;
+                return (
+                  <button
+                    key={`top-${item.id}`}
+                    type="button"
+                    onClick={() => navigateTo(item.id)}
+                    className={`relative inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors cursor-pointer ${
+                      active
+                        ? 'bg-[#0f1f10] text-[#c6f19d] dark:bg-[#c6f19d] dark:text-[#0f1f10]'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-[#c6f19d]'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Zone 3: Live Health Pill + Quick Theme + Alethia Version Pill */}
             <div className="flex items-center gap-2 shrink-0">
               <motion.button
                 type="button"
                 onClick={() => navigateTo(topbarErrors > 0 ? 'mas' : 'inicio', topbarErrors > 0 ? 'logs' : undefined)}
-                className={`hidden sm:inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-colors whitespace-nowrap ${
+                className={`hidden sm:inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 py-1 font-mono text-[11px] font-semibold tracking-[0.03em] transition-colors whitespace-nowrap cursor-pointer ${
                   connError || topbarErrors > 0 ? 'cockpit-pill-amber' : 'cockpit-pill-emerald'
                 }`}
               >
@@ -539,7 +560,7 @@ export function App() {
                   className={`h-2 w-2 rounded-full ${
                     connError || topbarErrors > 0
                       ? 'bg-amber-500 text-amber-500'
-                      : 'bg-emerald-500 text-emerald-500 cockpit-live-dot cockpit-live-ring'
+                      : 'bg-[#1e6b38] dark:bg-[#c6f19d] text-[#1e6b38] dark:text-[#c6f19d] cockpit-live-dot cockpit-live-ring'
                   }`}
                 />
                 <span>
@@ -557,7 +578,7 @@ export function App() {
                 type="button"
                 aria-label={theme === 'dark' ? t('app.toggle_to_light') : t('app.toggle_to_dark')}
                 onClick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="cockpit-subtile flex min-h-[38px] min-w-[38px] items-center justify-center text-slate-600 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+                className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-700 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-200 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
               >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
@@ -568,7 +589,7 @@ export function App() {
                     transition={{ duration: 0.2 }}
                     className="inline-flex"
                   >
-                    {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-sky-700" />}
+                    {theme === 'dark' ? <Sun className="h-4 w-4 text-[#c6f19d]" /> : <Moon className="h-4 w-4 text-[#0f1f10]" />}
                   </motion.span>
                 </AnimatePresence>
               </motion.button>
@@ -587,12 +608,14 @@ export function App() {
                     : `v${displayVersion}`
                 }
                 className={`${
-                  updateAvailable ? 'cockpit-pill-emerald' : 'cockpit-pill-cyan'
-                } inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3 py-1 font-mono text-xs font-semibold tabular-nums transition-opacity hover:opacity-90 whitespace-nowrap`}
+                  updateAvailable ? 'cockpit-pill-lime' : 'cockpit-subtile text-slate-800 dark:text-[#f5f4f2]'
+                } inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-[11px] font-bold tabular-nums transition-opacity hover:opacity-90 whitespace-nowrap cursor-pointer`}
               >
-                {updateAvailable && (
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 cockpit-live-dot" />
-                )}
+                <span
+                  className={`h-2 w-2 rounded-[3px] ${
+                    updateAvailable ? 'bg-[#0f1f10] cockpit-live-dot' : 'bg-[#c6f19d] ring-1 ring-[#0f1f10]/20'
+                  }`}
+                />
                 <span>v{displayVersion}</span>
               </motion.button>
             </div>
@@ -687,12 +710,12 @@ export function App() {
         </main>
         </div>
 
-        {/* Centered Floating Glassmorphic Dock with Spring Morph Pill */}
+        {/* Alethia Obsidian Floating Dock with Electric Lime Spring Morph Pill */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.1, ease: COCKPIT_EASE }}
-          className="pointer-events-none fixed inset-x-0 bottom-[clamp(0.4rem,1.2dvh,0.85rem)] z-40 flex justify-center px-[clamp(0.5rem,1.5vw,1rem)]"
+          transition={{ duration: 0.42, delay: 0.08, ease: COCKPIT_EASE }}
+          className="pointer-events-none fixed inset-x-0 bottom-[clamp(0.45rem,1.25dvh,0.9rem)] z-40 flex justify-center px-[clamp(0.5rem,1.5vw,1rem)]"
         >
           <LayoutGroup id="dock-nav">
             <nav
@@ -707,21 +730,21 @@ export function App() {
                     type="button"
                     title={item.label}
                     onClick={() => navigateTo(item.id)}
-                    className={`relative flex min-h-[clamp(38px,6dvh,50px)] min-w-0 w-full flex-col items-center justify-center gap-0.5 rounded-[14px] px-0.5 sm:px-1.5 py-[clamp(0.2rem,0.5dvh,0.35rem)] transition-colors ${
+                    className={`relative flex min-h-[clamp(38px,6dvh,50px)] min-w-0 w-full flex-col items-center justify-center gap-0.5 rounded-[14px] px-0.5 sm:px-1.5 py-[clamp(0.2rem,0.5dvh,0.35rem)] transition-colors cursor-pointer ${
                       active
-                        ? 'text-sky-700 dark:text-sky-300 font-semibold'
-                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                        ? 'text-[#0f1f10] font-bold'
+                        : 'text-[#aebaa9] hover:text-[#f5f4f2]'
                     }`}
                   >
                     {active && <MorphPill layoutId="dock-active-pill" className="rounded-[14px]" />}
                     <motion.span
-                      animate={{ scale: active ? 1.08 : 1, y: active ? -1 : 0 }}
+                      animate={{ scale: active ? 1.06 : 1, y: active ? -1 : 0 }}
                       transition={COCKPIT_SPRING}
                       className="relative z-10 inline-flex shrink-0"
                     >
                       {item.icon}
                     </motion.span>
-                    <span className="relative z-10 w-full max-w-full text-center text-[clamp(9px,0.75vw+4px,11px)] font-semibold leading-[1.1] tracking-tight truncate">
+                    <span className="relative z-10 w-full max-w-full text-center font-mono text-[clamp(8.5px,0.7vw+4px,10.5px)] font-semibold uppercase tracking-[0.04em] leading-[1.1] truncate">
                       {item.label}
                     </span>
                   </motion.button>
@@ -814,7 +837,7 @@ export function App() {
               transition={COCKPIT_SPRING}
               className="cockpit-bento cockpit-toast-enter fixed right-4 top-20 z-50 max-w-xs px-4 py-3 text-xs font-medium text-slate-900 dark:text-white"
             >
-              <span className={toast.isError ? 'text-rose-600 dark:text-rose-400' : 'text-sky-700 dark:text-sky-300'}>
+              <span className={toast.isError ? 'text-rose-600 dark:text-rose-400' : 'text-[#1e6b38] dark:text-[#c6f19d]'}>
                 {toast.message}
               </span>
             </motion.div>

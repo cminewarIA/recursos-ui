@@ -98,7 +98,7 @@ const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, on
     const timestamps = hist2h.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale));
     const epochTs = hist2h.map((b) => Math.round(b.t / 1000));
     const series: ChartSeries[] = [
-      { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: '#0284c7', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
+      { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: theme === 'dark' ? '#c6f19d' : '#1e6b38', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
       { id: 'wan_tx', metricKey: 'net_wan_tx', label: t('hardware.net.wan_upload'), data: wanTxData, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
       { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.10 },
       { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.06 },
@@ -114,7 +114,7 @@ const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, on
       nicName: nic.name,
     };
     return { nicSeries: series, nicTimestamps: timestamps, nicEpochTs: epochTs, expandNicSpec: spec };
-  }, [hist2h, nic.name, nic.ip, locale, t]);
+  }, [hist2h, nic.name, nic.ip, locale, theme, t]);
 
   const formatNicLabel = useCallback(
     (idx: number) => {
@@ -226,7 +226,7 @@ const RouterTrafficCard = React.memo<RouterTrafficCardProps>(({ metrics, theme, 
     const timestamps = routerHist.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale));
     const epochTs = routerHist.map((b) => Math.round(b.t / 1000));
     const series: ChartSeries[] = [
-      { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: '#0284c7', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
+      { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: theme === 'dark' ? '#c6f19d' : '#1e6b38', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
       { id: 'wan_tx', metricKey: 'net_wan_tx', label: t('hardware.net.wan_upload'), data: wanTxData, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
       { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.10 },
       { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.06 },
@@ -241,7 +241,7 @@ const RouterTrafficCard = React.memo<RouterTrafficCardProps>(({ metrics, theme, 
       chartKind: 'router',
     };
     return { routerSeries: series, routerTimestamps: timestamps, routerEpochTs: epochTs, expandRouterSpec: spec };
-  }, [routerHist, routerTitle, routerIp, locale, t]);
+  }, [routerHist, routerTitle, routerIp, locale, theme, t]);
 
   const formatRouterLabel = useCallback(
     (idx: number) => {
@@ -913,7 +913,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       const k = insight?.app_name || c.service || t('hardware.net.geo.direct_traffic');
       counts[k] = (counts[k] || 0) + 1;
     }
-    const palette = ['#0284c7', '#10b981', '#7c3aed', '#f59e0b', '#0ea5e9', '#ec4899'];
+    const palette = ['#1e6b38', '#0e7490', '#4f46e5', '#d97706', '#2e8b47', '#be185d'];
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
@@ -1037,7 +1037,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         metricKey: 'net_wan_rx',
         label: t('hardware.net.wan_download'),
         data: wanRxData,
-        color: '#0284c7',
+        color: theme === 'dark' ? '#c6f19d' : '#1e6b38',
         unit: 'MB/s',
         decimals: 2,
         fillAlpha: 0.16,
@@ -1089,7 +1089,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       peakLanRxMb,
       peakLanTxMb,
     };
-  }, [netHistory24h, metrics?.history, t]);
+  }, [netHistory24h, metrics?.history, theme, t]);
 
   const openNetwork24hExpanded = useCallback(() => {
     if (!onExpandChart) return;
@@ -1646,7 +1646,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         ? `<span style="background:rgba(239,68,68,0.16);color:#ef4444;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;">${escapeMapHtml(t('network.map_direction_blocked'))}</span>`
         : c.direction === 'incoming'
           ? `<span style="background:rgba(16,185,129,0.16);color:#10b981;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;">${escapeMapHtml(t('network.map_direction_in'))}</span>`
-          : `<span style="background:rgba(14,165,233,0.16);color:#0ea5e9;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;">${escapeMapHtml(t('network.map_direction_out'))}</span>`;
+          : `<span style="background:rgba(30,107,56,0.16);color:#1e6b38;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;">${escapeMapHtml(t('network.map_direction_out'))}</span>`;
 
       const aiInsight = aiSimplifiedView ? aiInsights[getConnAiSignature(c)] : undefined;
       const svc = escapeMapHtml(aiInsight?.app_name || c.service || t('hardware.net.geo.conn_generic'));
@@ -1670,9 +1670,9 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           : '';
 
       const aiBannerHtml = aiInsight
-        ? `<div style="margin-bottom:6px;padding:6px 8px;border-radius:9px;background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.28);">
+        ? `<div style="margin-bottom:6px;padding:6px 8px;border-radius:9px;background:rgba(30,107,56,0.12);border:1px solid rgba(30,107,56,0.28);">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:2px;">
-              <span style="font-size:10px;font-weight:800;color:#0284c7;">✨ ${escapeMapHtml(aiInsight.category)}</span>
+              <span style="font-size:10px;font-weight:800;color:#1e6b38;">✨ ${escapeMapHtml(aiInsight.category)}</span>
               <span style="font-size:10px;opacity:.78;">${escapeMapHtml(aiInsight.role)}</span>
             </div>
             <div style="font-size:11px;font-weight:500;line-height:1.35;">${escapeMapHtml(aiInsight.summary)}</div>
@@ -1681,7 +1681,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
       const backBtnHtml =
         count > 1
-          ? `<button type="button" data-back-cluster="${escapeMapHtml(cluster.key)}" style="margin-bottom:7px;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(14,165,233,0.35);background:rgba(14,165,233,0.1);color:#0284c7;border-radius:8px;padding:3px 9px;font-size:10.5px;font-weight:700;cursor:pointer;width:100%;justify-content:center;">${escapeMapHtml(t('network.map_back_to_list', { count }))}</button>`
+          ? `<button type="button" data-back-cluster="${escapeMapHtml(cluster.key)}" style="margin-bottom:7px;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(30,107,56,0.35);background:rgba(30,107,56,0.1);color:#1e6b38;border-radius:8px;padding:3px 9px;font-size:10.5px;font-weight:700;cursor:pointer;width:100%;justify-content:center;">${escapeMapHtml(t('network.map_back_to_list', { count }))}</button>`
           : '';
 
       const actionHtml = remoteIp
@@ -1711,7 +1711,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         <div style="font-size:11px;opacity:.78;margin-bottom:6px;">📍 ${escapeMapHtml(placeName)} · 📱 ${localHost}</div>
         ${
           domain && !aiInsight
-            ? `<div style="margin-bottom:4px;padding:3px 7px;border-radius:7px;background:rgba(14,165,233,0.1);font-family:ui-monospace,monospace;font-size:11px;color:#0284c7;word-break:break-all;">🌐 ${domain}</div>`
+            ? `<div style="margin-bottom:4px;padding:3px 7px;border-radius:7px;background:rgba(30,107,56,0.1);font-family:ui-monospace,monospace;font-size:11px;color:#1e6b38;word-break:break-all;">🌐 ${domain}</div>`
             : ''
         }
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10.5px;margin-bottom:6px;">
@@ -1735,7 +1735,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           </div>
           <div>
             <div style="font-size:9.5px;opacity:.7;">${escapeMapHtml(t('network.map_traffic_tx'))}</div>
-            <div style="font-weight:700;color:#0ea5e9;">${txSpd}</div>
+            <div style="font-weight:700;color:#1e6b38;">${txSpd}</div>
           </div>
           <div>
             <div style="font-size:9.5px;opacity:.7;">${escapeMapHtml(t('network.map_traffic_total'))}</div>
@@ -1769,7 +1769,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
           </button>
           <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
             ${hitChip}${spdBadge}
-            <button type="button" data-select-cluster="${escapeMapHtml(cluster.key)}" data-select-conn="${escapeMapHtml(connKey)}" style="border:1px solid rgba(14,165,233,0.4);background:rgba(14,165,233,0.12);color:#0284c7;border-radius:7px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;">${escapeMapHtml(t('network.map_inspect_conn'))}</button>
+            <button type="button" data-select-cluster="${escapeMapHtml(cluster.key)}" data-select-conn="${escapeMapHtml(connKey)}" style="border:1px solid rgba(30,107,56,0.4);background:rgba(30,107,56,0.12);color:#1e6b38;border-radius:7px;padding:2px 7px;font-size:10px;font-weight:700;cursor:pointer;">${escapeMapHtml(t('network.map_inspect_conn'))}</button>
           </div>
         </div>`;
       })
@@ -1778,7 +1778,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
     return `<div style="min-width:255px;max-width:335px;font-size:12px;line-height:1.36;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
         <strong style="font-size:12.5px;">🔀 ${escapeMapHtml(placeName)}</strong>
-        <span style="background:rgba(14,165,233,0.16);color:#0284c7;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:700;font-family:ui-monospace,monospace;">${count}</span>
+        <span style="background:rgba(30,107,56,0.16);color:#1e6b38;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:700;font-family:ui-monospace,monospace;">${count}</span>
       </div>
       <div data-cockpit-scroll-contain="true" style="max-height:225px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px;">${rowsHtml}</div>
     </div>`;
@@ -2070,7 +2070,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 ? '#10b981'
                 : hasDevice
                   ? '#8b5cf6'
-                  : '#0ea5e9';
+                  : '#2e8b47';
             L.polyline(
               [
                 [srvLat, srvLng],
@@ -2127,7 +2127,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               ? '#059669'
               : hasDevice
                 ? '#7c3aed'
-                : '#0284c7';
+                : '#1e6b38';
         const fillColor = isNode
           ? '#10b981'
           : hasBlocked
@@ -2136,7 +2136,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               ? '#10b981'
               : hasDevice
                 ? '#8b5cf6'
-                : '#0ea5e9';
+                : '#2e8b47';
 
         // Etiqueta dinámica priorizando IA simplificada, dominio Pi-hole y contador de grupo
         const primaryInsight = aiSimplifiedView ? aiInsights[getConnAiSignature(primary)] : undefined;
@@ -2228,8 +2228,8 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
         const hitMarker = L.circleMarker([lat, lng], {
           radius: hitRadius,
-          color: '#38bdf8',
-          fillColor: '#38bdf8',
+          color: '#c6f19d',
+          fillColor: '#c6f19d',
           opacity: 0,
           fillOpacity: 0.01,
           weight: 0,
@@ -2951,7 +2951,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
             <div className="mt-3 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
               <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
+                <span className="h-2 w-2 rounded-full bg-[#1e6b38] dark:bg-[#c6f19d]" />
                 <span>{t('hardware.net.wan_download')}</span>
               </span>
               <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
@@ -4246,61 +4246,108 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                 {t('network.speedtest_history_empty')}
               </p>
             ) : (
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200/70 text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                      <th className="py-2.5 pr-3 font-medium">{t('network.speedtest_col_date')}</th>
-                      <th className="py-2.5 px-3 font-medium">{t('network.speedtest_col_server')}</th>
-                      <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_dl')}</th>
-                      <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_ul')}</th>
-                      <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_ping')}</th>
-                      <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_jitter')}</th>
-                      <th className="py-2.5 pl-2 text-right font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
-                    {speedtestHistory.items.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                        <td className="py-2.5 pr-3 font-mono text-[11px] tabular-nums text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                          {item.created_at}
-                        </td>
-                        <td className="py-2.5 px-3 min-w-[140px]">
-                          <p className="font-medium text-slate-900 dark:text-white break-words">
+              <>
+                {/* Tarjetas compactas en móvil / tablet estrecho (cero scroll horizontal ni desbordamientos) */}
+                <div className="mt-3 space-y-2 md:hidden">
+                  {speedtestHistory.items.map((item) => (
+                    <div key={`m-${item.id}`} className="cockpit-subtile p-3 space-y-2 text-xs">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 dark:text-white break-words">
                             {item.server_name}
                           </p>
-                          <p className="font-mono text-[10px] text-slate-400 break-words">
-                            {item.scope === 'local_node' ? t('network.speedtest_scope_local') : t('network.speedtest_scope_wan')}
-                            {item.isp ? ` · ${item.isp}` : ''}
+                          <p className="font-mono text-[10.5px] tabular-nums text-slate-500 dark:text-slate-400 break-words">
+                            {item.created_at} · {item.scope === 'local_node' ? t('network.speedtest_scope_local') : t('network.speedtest_scope_wan')}
                           </p>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-semibold tabular-nums text-sky-600 dark:text-sky-400 whitespace-nowrap">
-                          {item.download_mbps.toFixed(1)} Mbps
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-semibold tabular-nums text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                          {item.upload_mbps.toFixed(1)} Mbps
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                          {item.ping_ms.toFixed(1)} ms
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                          {item.jitter_ms.toFixed(1)} ms
-                        </td>
-                        <td className="py-2.5 pl-2 text-right">
-                          <button
-                            type="button"
-                            aria-label={t('network.speedtest_delete_row')}
-                            onClick={() => void handleClearSpeedtestHistory(item.id)}
-                            className="cockpit-subtile inline-flex min-h-[32px] min-w-[32px] items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
+                        </div>
+                        <button
+                          type="button"
+                          aria-label={t('network.speedtest_delete_row')}
+                          onClick={() => void handleClearSpeedtestHistory(item.id)}
+                          className="cockpit-subtile inline-flex min-h-[32px] min-w-[32px] shrink-0 items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5 font-mono text-[11px] tabular-nums">
+                        <div className="rounded-lg bg-white/70 px-2 py-1 dark:bg-slate-900/60">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">{t('network.speedtest_col_dl')}: </span>
+                          <strong className="text-sky-600 dark:text-sky-400">{item.download_mbps.toFixed(1)} Mbps</strong>
+                        </div>
+                        <div className="rounded-lg bg-white/70 px-2 py-1 dark:bg-slate-900/60">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">{t('network.speedtest_col_ul')}: </span>
+                          <strong className="text-emerald-600 dark:text-emerald-400">{item.upload_mbps.toFixed(1)} Mbps</strong>
+                        </div>
+                        <div className="rounded-lg bg-white/70 px-2 py-1 dark:bg-slate-900/60">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">{t('network.speedtest_col_ping')}: </span>
+                          <strong className="text-slate-700 dark:text-slate-200">{item.ping_ms.toFixed(1)} ms</strong>
+                        </div>
+                        <div className="rounded-lg bg-white/70 px-2 py-1 dark:bg-slate-900/60">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">{t('network.speedtest_col_jitter')}: </span>
+                          <strong className="text-slate-600 dark:text-slate-300">{item.jitter_ms.toFixed(1)} ms</strong>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Tabla analítica limpia en escritorio (md+) */}
+                <div className="mt-3 hidden overflow-x-auto md:block">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200/70 text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                        <th className="py-2.5 pr-3 font-medium">{t('network.speedtest_col_date')}</th>
+                        <th className="py-2.5 px-3 font-medium">{t('network.speedtest_col_server')}</th>
+                        <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_dl')}</th>
+                        <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_ul')}</th>
+                        <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_ping')}</th>
+                        <th className="py-2.5 px-3 text-right font-medium">{t('network.speedtest_col_jitter')}</th>
+                        <th className="py-2.5 pl-2 text-right font-medium"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
+                      {speedtestHistory.items.map((item) => (
+                        <tr key={item.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                          <td className="py-2.5 pr-3 font-mono text-[11px] tabular-nums text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                            {item.created_at}
+                          </td>
+                          <td className="py-2.5 px-3 min-w-[140px]">
+                            <p className="font-medium text-slate-900 dark:text-white break-words">
+                              {item.server_name}
+                            </p>
+                            <p className="font-mono text-[10px] text-slate-400 break-words">
+                              {item.scope === 'local_node' ? t('network.speedtest_scope_local') : t('network.speedtest_scope_wan')}
+                              {item.isp ? ` · ${item.isp}` : ''}
+                            </p>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-semibold tabular-nums text-sky-600 dark:text-sky-400 whitespace-nowrap">
+                            {item.download_mbps.toFixed(1)} Mbps
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-semibold tabular-nums text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                            {item.upload_mbps.toFixed(1)} Mbps
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                            {item.ping_ms.toFixed(1)} ms
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                            {item.jitter_ms.toFixed(1)} ms
+                          </td>
+                          <td className="py-2.5 pl-2 text-right">
+                            <button
+                              type="button"
+                              aria-label={t('network.speedtest_delete_row')}
+                              onClick={() => void handleClearSpeedtestHistory(item.id)}
+                              className="cockpit-subtile inline-flex min-h-[32px] min-w-[32px] items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </section>
         </div>

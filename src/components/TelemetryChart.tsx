@@ -37,6 +37,8 @@ interface TelemetryChartProps {
   onExpandClick?: () => void;
   interactionMode?: 'inspect' | 'pan';
   onPanDeltaSteps?: (deltaSteps: number) => void;
+  showAverageLine?: boolean;
+  showPeakBadge?: boolean;
 }
 
 let cachedMeasureCtx: CanvasRenderingContext2D | null = null;
@@ -155,6 +157,8 @@ function areTelemetryChartPropsEqual(prev: TelemetryChartProps, next: TelemetryC
     prev.intervalSec !== next.intervalSec ||
     prev.significantDelta !== next.significantDelta ||
     prev.interactionMode !== next.interactionMode ||
+    prev.showAverageLine !== next.showAverageLine ||
+    prev.showPeakBadge !== next.showPeakBadge ||
     prev.emptyMessage !== next.emptyMessage ||
     prev.className !== next.className ||
     Boolean(prev.onExpandClick) !== Boolean(next.onExpandClick) ||
@@ -398,6 +402,8 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
   onExpandClick,
   interactionMode = 'inspect',
   onPanDeltaSteps,
+  showAverageLine = true,
+  showPeakBadge = true,
 }) => {
   const { t } = useI18n();
   const resolvedEmptyMessage = emptyMessage ?? t('charts.empty_collecting');
@@ -493,7 +499,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     const w = size.width;
     const h = size.height;
     const compact = h < 110;
-    const fontAxis = `${compact ? '600 9.5px' : '600 10px'} ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
+    const fontAxis = `${compact ? '600 9.5px' : '600 10px'} "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
     const gridFracs = compact ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
     const leftLabels = gridFracs.map((f) =>
       formatAxisTick(computedMaxLeft * (1 - f), leftUnit, f === 0)
@@ -668,11 +674,11 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    const gridColor = theme === 'dark' ? 'rgba(51, 65, 85, 0.55)' : 'rgba(203, 213, 225, 0.85)';
-    const topLineColor = theme === 'dark' ? 'rgba(71, 85, 105, 0.7)' : 'rgba(203, 213, 225, 0.95)';
-    const axisLabelColor = theme === 'dark' ? 'rgba(148, 163, 184, 0.9)' : 'rgba(100, 116, 139, 0.95)';
-    const peakLabelColor = theme === 'dark' ? 'rgba(125, 211, 252, 0.98)' : 'rgba(2, 132, 199, 0.98)';
-    const crosshairColor = theme === 'dark' ? 'rgba(56, 189, 248, 0.5)' : 'rgba(2, 132, 199, 0.42)';
+    const gridColor = theme === 'dark' ? 'rgba(198, 241, 157, 0.11)' : 'rgba(15, 31, 16, 0.09)';
+    const topLineColor = theme === 'dark' ? 'rgba(198, 241, 157, 0.2)' : 'rgba(15, 31, 16, 0.16)';
+    const axisLabelColor = theme === 'dark' ? 'rgba(158, 174, 159, 0.92)' : 'rgba(95, 108, 97, 0.95)';
+    const peakLabelColor = theme === 'dark' ? 'rgba(198, 241, 157, 0.98)' : 'rgba(30, 107, 56, 0.98)';
+    const crosshairColor = theme === 'dark' ? 'rgba(198, 241, 157, 0.55)' : 'rgba(30, 107, 56, 0.45)';
 
     // Horizontal grid lines + Left/Right Y-axis scale labels
     ctx.font = fontAxis;
@@ -792,7 +798,120 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
       ctx.restore();
     }
 
-    const dotBgFill = theme === 'dark' ? '#0f172a' : '#ffffff';
+    const dotBgFill = theme === 'dark' ? '#111f13' : '#ffffff';
+
+    // 2.5 Zeus Vision + Alethia: Dashed mean reference line (primary) & true global peak callout pill (all left-axis solid series)
+    const solidLeftGeoms = computedSeriesGeometry.filter((g) => g.s.axis !== 'right' && !g.s.dashed && g.pts.length >= 2);
+    if (solidLeftGeoms.length > 0 && revealFrac >= 1) {
+      const denomScale = Math.max(0.0001, computedMaxLeft);
+
+      // Dashed mean line on the series with highest peak (most visually significant)
+      let globalPeakVal = -Infinity;
+      let globalPeakOrigIdx = -1;
+      let globalPeakSeries: ChartSeries | null = null;
+      let globalPeakAvg = 0;
+      let globalPeakValidN = 0;
+
+      for (const geom of solidLeftGeoms) {
+        const sData = geom.s.data;
+        let sum = 0;
+        let validN = 0;
+        let sPeakVal = -Infinity;
+        let sPeakIdx = -1;
+        for (let i = 0; i < sData.length; i++) {
+          const v = Number(sData[i]);
+          if (!Number.isFinite(v)) continue;
+          sum += v;
+          validN += 1;
+          if (v > sPeakVal) {
+            sPeakVal = v;
+            sPeakIdx = i;
+          }
+        }
+        if (sPeakVal > globalPeakVal) {
+          globalPeakVal = sPeakVal;
+          globalPeakOrigIdx = sPeakIdx;
+          globalPeakSeries = geom.s;
+          globalPeakAvg = validN > 0 ? sum / validN : 0;
+          globalPeakValidN = validN;
+        }
+      }
+
+      if (showAverageLine && globalPeakValidN >= 4 && globalPeakAvg > 0.001) {
+        const avgRatio = Math.max(0, Math.min(1, globalPeakAvg / denomScale));
+        const avgY = Math.round(padT + plotH - avgRatio * plotH) + 0.5;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(padL, avgY);
+        ctx.lineTo(padL + plotW, avgY);
+        ctx.strokeStyle = theme === 'dark' ? 'rgba(198, 241, 157, 0.36)' : 'rgba(30, 107, 56, 0.30)';
+        ctx.lineWidth = 1.15;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (
+        showPeakBadge &&
+        hoverIdx === null &&
+        globalPeakSeries &&
+        globalPeakVal > 0.01 &&
+        globalPeakOrigIdx >= 0 &&
+        plotW >= 180 &&
+        plotH >= 64
+      ) {
+        const peakRatio = Math.max(0, Math.min(1, globalPeakVal / denomScale));
+        const globalPeakIdx = sampleCount - globalPeakSeries.data.length + globalPeakOrigIdx;
+        const peakX = getXForGlobalIndex(globalPeakIdx);
+        const peakY = padT + plotH - peakRatio * plotH;
+        const pUnit = globalPeakSeries.unit ?? leftUnit;
+        const peakText = formatAxisTick(globalPeakVal, pUnit, true);
+
+        ctx.save();
+        ctx.font = '700 9.5px "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
+        const textW = ctx.measureText(peakText).width;
+        const pillW = Math.ceil(textW) + 12;
+        const pillH = 16;
+        const rawX = peakX - pillW / 2;
+        const clampedX = Math.max(padL + 3, Math.min(padL + plotW - pillW - 3, rawX));
+        const preferAbove = peakY - pillH - 6 >= padT + 1;
+        const clampedY = preferAbove
+          ? peakY - pillH - 5
+          : Math.min(padT + plotH - pillH - 3, peakY + 6);
+
+        // Peak point ring
+        ctx.beginPath();
+        ctx.arc(peakX, peakY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = theme === 'dark' ? '#c6f19d' : '#0f1f10';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = dotBgFill;
+        ctx.stroke();
+
+        // Rounded Alethia pill badge
+        const r = 4;
+        ctx.beginPath();
+        ctx.moveTo(clampedX + r, clampedY);
+        ctx.lineTo(clampedX + pillW - r, clampedY);
+        ctx.quadraticCurveTo(clampedX + pillW, clampedY, clampedX + pillW, clampedY + r);
+        ctx.lineTo(clampedX + pillW, clampedY + pillH - r);
+        ctx.quadraticCurveTo(clampedX + pillW, clampedY + pillH, clampedX + pillW - r, clampedY + pillH);
+        ctx.lineTo(clampedX + r, clampedY + pillH);
+        ctx.quadraticCurveTo(clampedX, clampedY + pillH, clampedX, clampedY + pillH - r);
+        ctx.lineTo(clampedX, clampedY + r);
+        ctx.quadraticCurveTo(clampedX, clampedY, clampedX + r, clampedY);
+        ctx.closePath();
+
+        ctx.fillStyle = theme === 'dark' ? '#c6f19d' : '#0f1f10';
+        ctx.fill();
+
+        ctx.fillStyle = theme === 'dark' ? '#0f1f10' : '#c6f19d';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(peakText, clampedX + pillW / 2, clampedY + pillH / 2 + 0.5);
+        ctx.restore();
+      }
+    }
 
     // 3. Draw pulsing live tip beacon STRICTLY ON TOP OF all lines and right ON the final knot
     const pulseWave = 0.5 + 0.5 * Math.sin(animPhaseRef.current * Math.PI * 2);
@@ -868,7 +987,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
         ctx.fill();
       }
     }
-  }, [axisLayout, computedSeriesGeometry, getXForGlobalIndex, leftUnit, hasRightAxis, sampleCount, theme, hoverIdx]);
+  }, [axisLayout, computedSeriesGeometry, computedMaxLeft, getXForGlobalIndex, leftUnit, hasRightAxis, sampleCount, theme, hoverIdx, showAverageLine, showPeakBadge]);
 
   drawChartRef.current = drawChart;
 
