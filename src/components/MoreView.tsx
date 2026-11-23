@@ -86,6 +86,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
     user: fbUser,
     firestoreConnected,
     authPending,
+    authError,
+    bridgeSessionCode,
+    isBridgeMode,
+    firebaseProjectId,
     syncingNow,
     autoSync,
     lastSyncAt,
@@ -93,6 +97,9 @@ export const MoreView: React.FC<MoreViewProps> = ({
     syncedSpeedtests,
     syncedPingHistory,
     signInWithGoogle,
+    signInWithGoogleRedirect,
+    signInViaAuthorizedBridge,
+    signInWithGoogleToken,
     signOutFirebase,
     setAutoSyncEnabled,
     syncPreferences,
@@ -104,6 +111,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
   const manualIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
   const [langSearch, setLangSearch] = useState('');
+  const [tokenPasteInput, setTokenPasteInput] = useState('');
   const langPickerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -793,11 +801,159 @@ export const MoreView: React.FC<MoreViewProps> = ({
             </div>
 
             {!fbUser ? (
-              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                {t('firebase.not_signed_in_hint')}
-              </p>
+              <div className="mt-3 space-y-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t('firebase.not_signed_in_hint')}
+                </p>
+
+                {authError && (
+                  <div
+                    data-testid="firebase-auth-error-panel"
+                    className="cockpit-subtile space-y-2.5 border border-amber-500/35 bg-amber-500/5 p-3.5 text-xs"
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="font-semibold text-slate-900 dark:text-white">
+                          {authError.isUnauthorizedDomain
+                            ? t('firebase.unauthorized_domain_title', { domain: authError.hostname })
+                            : t('firebase.sign_in_error')}
+                        </p>
+                        <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                          {authError.isUnauthorizedDomain
+                            ? t('firebase.unauthorized_domain_desc', { domain: authError.hostname })
+                            : authError.isPopupBlocked
+                              ? t('firebase.popup_blocked_desc')
+                              : authError.message}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        data-testid="firebase-bridge-signin-btn"
+                        onClick={() => void signInViaAuthorizedBridge()}
+                        className="cockpit-btn-accent inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span>
+                          {authError.isLoopbackIp
+                            ? t('firebase.switch_localhost_btn')
+                            : t('firebase.bridge_signin_btn')}
+                        </span>
+                      </button>
+
+                      {!authError.isUnauthorizedDomain && (
+                        <button
+                          type="button"
+                          data-testid="firebase-redirect-signin-btn"
+                          onClick={() => void signInWithGoogleRedirect()}
+                          className="cockpit-subtile inline-flex min-h-[36px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-sky-700 dark:text-slate-200 dark:hover:text-sky-300"
+                        >
+                          <LogIn className="h-3.5 w-3.5" />
+                          <span>{t('firebase.redirect_signin_btn')}</span>
+                        </button>
+                      )}
+
+                      {authError.isUnauthorizedDomain && (
+                        <>
+                          <button
+                            type="button"
+                            data-testid="firebase-copy-domain-btn"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(authError.hostname);
+                                onNotify(t('firebase.domain_copied'));
+                              } catch {
+                                // ignore
+                              }
+                            }}
+                            className="cockpit-subtile inline-flex min-h-[36px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-sky-700 dark:text-slate-200 dark:hover:text-sky-300"
+                          >
+                            <Globe className="h-3.5 w-3.5" />
+                            <span>{t('firebase.copy_domain_btn', { domain: authError.hostname })}</span>
+                          </button>
+
+                          {firebaseProjectId && (
+                            <a
+                              href={`https://console.firebase.google.com/project/${firebaseProjectId}/authentication/settings`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="cockpit-subtile inline-flex min-h-[36px] items-center gap-1.5 px-3 text-xs font-semibold text-sky-700 hover:underline dark:text-sky-300"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              <span>{t('firebase.open_console_btn')}</span>
+                            </a>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                      <input
+                        type="text"
+                        data-testid="firebase-token-input"
+                        value={tokenPasteInput}
+                        onChange={(e) => setTokenPasteInput(e.target.value)}
+                        placeholder={t('firebase.token_paste_placeholder')}
+                        className="cockpit-subtile min-h-[36px] flex-1 px-3 font-mono text-[11px] text-slate-800 outline-none focus:border-sky-500 dark:text-slate-100"
+                      />
+                      <button
+                        type="button"
+                        data-testid="firebase-token-submit-btn"
+                        disabled={authPending || !tokenPasteInput.trim()}
+                        onClick={async () => {
+                          const ok = await signInWithGoogleToken(tokenPasteInput);
+                          if (ok) {
+                            setTokenPasteInput('');
+                            onNotify(t('firebase.sign_in_ok'));
+                          } else {
+                            onNotify(t('firebase.sign_in_error'), true);
+                          }
+                        }}
+                        className="cockpit-subtile inline-flex min-h-[36px] shrink-0 items-center justify-center gap-1.5 px-3.5 text-xs font-semibold text-sky-700 hover:bg-sky-500/10 disabled:opacity-50 dark:text-sky-300"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        <span>{t('firebase.token_apply_btn')}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="mt-4 space-y-3">
+                {(isBridgeMode || bridgeSessionCode) && bridgeSessionCode && (
+                  <div
+                    data-testid="firebase-bridge-code-box"
+                    className="cockpit-subtile flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border border-emerald-500/35 bg-emerald-500/5 p-3 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        {t('firebase.bridge_ready_title')}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-300">
+                        {t('firebase.bridge_ready_desc')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="firebase-copy-bridge-code-btn"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(bridgeSessionCode);
+                          onNotify(t('firebase.bridge_code_copied'));
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      className="cockpit-btn-accent inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span>{t('firebase.bridge_copy_code_btn')}</span>
+                    </button>
+                  </div>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-semibold">

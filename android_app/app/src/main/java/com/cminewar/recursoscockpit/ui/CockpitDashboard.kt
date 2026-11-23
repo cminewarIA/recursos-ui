@@ -450,6 +450,7 @@ fun CockpitDashboard(
 
                         settings.apply {
                             javaScriptEnabled = true
+                            javaScriptCanOpenWindowsAutomatically = true
                             domStorageEnabled = true
                             databaseEnabled = true
                             mediaPlaybackRequiresUserGesture = false
@@ -464,7 +465,8 @@ fun CockpitDashboard(
                                 textZoom = 110
                             }
                             val tvSuffix = if (isTvDevice) "; AndroidTV" else ""
-                            userAgentString = "$userAgentString RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (NativeHTML; FullAccess$tvSuffix)"
+                            val cleanBaseUa = userAgentString.replace("; wv", "").replace("Version/4.0 ", "")
+                            userAgentString = "$cleanBaseUa RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (NativeHTML; FullAccess$tvSuffix)"
                         }
 
                         addJavascriptInterface(

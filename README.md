@@ -71,55 +71,68 @@
 
 <img src="./docs/assets/cockpit-ui-preview.svg" alt="Vista general interactiva de la interfaz Recursos Cockpit" width="100%" />
 
-Toda la plataforma se organiza en **5 vistas simétricas** conectadas por una barra inferior táctil fija. Su diseño de ancho completo (`.cockpit-shell`) aprovecha toda la pantalla en monitores medianos, grandes o ultrawide sin márgenes desperdiciados, adaptando automáticamente el número de widgets y tarjetas en paralelo (`.cockpit-auto-grid` y `.cockpit-auto-grid-cards`) mediante CSS Grid fluido y `ResizeObserver`, manteniendo la información cotidiana al frente y los detalles avanzados de ingeniería ordenados en desplegables (*Ver detalles técnicos*).
+Toda la plataforma se organiza en **5 dominios funcionales sin duplicidades**, respaldados por una **barra lateral izquierda colapsable en escritorio (`md+`)** y un **dock táctil flotante en móviles (`< md`)**. Su diseño de ancho completo (`.cockpit-shell`) aprovecha toda la pantalla sin márgenes desperdiciados, adaptando automáticamente el número de widgets y tarjetas en paralelo (`.cockpit-auto-grid` y `.cockpit-auto-grid-cards`) mediante CSS Grid fluido y `ResizeObserver`, manteniendo la información ejecutiva en primer plano y los desgloses técnicos accesibles bajo demanda.
 
 <details open>
-<summary><b>🟢 Vista 1 · <code>/inicio</code> — Tablero Principal, Almacenamiento Independiente y Control de Equipos</b> <i>(Desplegado por defecto · Pulsa otras vistas para explorar)</i></summary>
+<summary><b>🟢 Vista 1 · <code>/inicio</code> — HUD Ejecutivo de Telemetría y Cargas Activas</b> <i>(Desplegado por defecto · Pulsa otras vistas para explorar)</i></summary>
 
-1. **Cabecera Despejada sin Barra de Navegación Superior, Logotipo Ampliado y Tema**: Presenta el logotipo oficial **CMineWar** de gran formato (`80px` en móvil y `112px` en escritorio) con transparencia RGBA real directa sobre el lienzo (y favicon *edge-to-edge* de contraste optimizado para llenar al máximo la pestaña del navegador), el modo de conexión (`LAN` directa o `WAN` cifrada TLS), transiciones animadas solapadas (`MorphPill`, `ViewStage` `popLayout`, valores tabulares animados) unificadas en las 4 interfaces (Web, Ubuntu GTK 3, Android Compose y Manual) y el botón para alternar entre diseño **Claro Minimalista** y **Modo Oscuro** (`recursos_theme`).
-2. **Tarjetas KPI y Widgets Compactos en Paralelo Automático (`auto-fit`)**: Rejilla fluida simétrica (`--cockpit-grid-min: 245px / 265px`) que aprovecha cada pantalla agrupando más widgets compactos y legibles en paralelo con gráficas HiDPI de **5 minutos** (`112px` en tablero, ampliables al detalle al tocar en la **Inspección Táctil**) para **Procesador (CPU)**, **Memoria RAM + ZRAM**, **GPU / Gráficos**, **Red e Internet** (4 curvas simultáneas segmentadas en tiempo real por IP destino/origen RFC1918: **Bajada Externa WAN**, **Subida Externa WAN**, **Bajada Interna LAN** y **Subida Interna LAN**) y **cada unidad de almacenamiento por separado**.
-3. **Gráficas HiDPI de 5 Minutos en Inicio con Curvas Limpias y Escalas X/Y**: Todas las gráficas de `/inicio` muestran los últimos **5 minutos** en cubetas de `5s` que preservan picos reales mediante interpolación monótona Fritsch–Carlson; mantienen la **curva fluida sin saturación de puntos**, mostrando el marcador vivo al final y el punto exacto de muestreo al inspeccionar **siempre encima de la línea**, con ejes X/Y visibles y la **Pantalla de Inspección Táctil** (con bloqueo hermético de desplazamiento de fondo mediante captura de rueda, sujeción de borde y `overscroll-contain`) para ampliar o retroceder (`En vivo · 5 min`, `20 min`, `1 h`, `6 h`, `24 h`, `Todo`) por todo `recursos_history.db`.
-4. **Encendido y Apagado Simétrico de Equipos**: Junto a cada equipo detectado dinámicamente en la LAN dispones de dos botones simétricos:
-   - **`Encender`**: envía paquetes mágicos **Wake-on-LAN (WoL)** a todas las subredes activas.
-   - **`Apagar`**: abre confirmación segura y lanza señal remota **Sleep-on-LAN / SSH `BatchMode` / RPC / Webhook**, protegiendo automáticamente al propio servidor anfitrión frente a auto-apagados accidentales.
-
-</details>
-
-<details>
-<summary><b>🔵 Vista 2 · <code>/equipo</code> — Silicio por Núcleo, Multi-Gráfica GPU, ZRAM y Historial 24 h Apilado de Procesos</b></summary>
-
-1. **Descubrimiento Dinámico de Hardware (`Zero-Hardcoding`)**: Los hilos lógicos del procesador, sensores térmicos (`/sys/class/hwmon`, `/sys/class/thermal`), capacidades GPU (`nvidia-smi` XML + `pmon` / `sysfs DRM`) y particiones físicas (`psutil.disk_partitions(all=True)`) se detectan al vuelo sin listas estáticas.
-2. **Multi-Gráfica Dinámica GPU y Desglose RAM + ZRAM**: En el apartado **Gráfica** se muestran sub-gráficas estilo monitor de sistema (**Cómputo 3D**, **VRAM y controlador**, **Video Enc/Dec**, **Potencia y temperatura**, **Relojes** y **Bus PCIe RX/TX**) activadas automáticamente según los sensores reales disponibles en la tarjeta gráfica instalada, mientras **Memoria** separa RAM ocupada, caché recuperable y tasa de compresión ZRAM.
-3. **Procesos Consumidores Activos e Historial 24 h Apilado**: Debajo de cada gráfica en **Procesador**, **Memoria**, **Gráfica** y **Almacenamiento** —y también al pie de cada **ventana de inspección táctil**— se muestran los procesos consumidores activos; además, en **Programas en marcha** se integra el **gráfico de áreas apiladas de las últimas 24 horas** (`GET /api/metrics/process-history`) conmutando entre **CPU**, **RAM**, **VRAM** y **E/S** para el **Top 6 + Otros**.
+1. **Cabecera Editorial y Barra Lateral Colapsable**: En escritorio (`md+`), una barra lateral izquierda colapsable (64px contraída / 224px expandida) proporciona acceso instantáneo a los 5 dominios y maximiza el espacio vertical disponible para gráficas analíticas. En móviles (`< md`), un dock táctil inferior con física elástica `MorphPill` garantiza navegación cómoda a una mano.
+2. **Medidores Angulares Ejecutivos (HUD)**: 4 cuadrantes angulares con valores en tipografía tabular (`tabular-nums`): **Procesador (CPU)**, **Memoria RAM + ZRAM**, **Almacenamiento Consolidado** y **Caudal de Red WAN/LAN**, permitiendo una evaluación ejecutiva del servidor en menos de 1 segundo.
+3. **Curvas HiDPI Vivas de 5 Minutos**: Series temporales continuas con interpolación monótona Fritsch-Carlson, media anotada y pico directo, con ampliación instantánea mediante la **Pantalla de Inspección Táctil** hacia el historial SQLite completo (`recursos_history.db`).
+4. **Banner Inteligente de Avisos con Asistencia IA**: Si se detectan alertas críticas o unidades systemd degradadas, el HUD muestra un aviso prioritario con clasificación de peligro (`critical`, `high`, `medium`, `low`) y acceso directo a la solución asistida por IA.
+5. **Resumen de Cargas de Trabajo**: Visión sintética de procesos activos, contenedores Docker y descargas en curso, con enlace directo hacia `/programas` (eliminando listas redundantes de dispositivos LAN).
 
 </details>
 
 <details>
-<summary><b>🟣 Vista 3 · <code>/red</code> — Router en Vivo, Latencia Ping, Test Speedtest.net, Mapa GeoIP y Escudo Fail2ban</b></summary>
+<summary><b>🔵 Vista 2 · <code>/equipo</code> — Silicio y Hardware Físico (`cpu`, `ram`, `gpu`, `storage`)</b></summary>
 
-1. **Tarjetas en Vivo del Router, Latencia Ping con Historial Persistente y Consumo Independiente por Dispositivo**: En **Aparatos en casa** convive la tarjeta de **Tráfico del router** junto a las interfaces físicas, la gráfica en tiempo real de **latencia media (ping)** hacia la puerta de enlace y nodos externos —con persistencia de hasta 7 días en SQLite (`ping_history`), sincronización en **Cloud Firestore** (`pingHistory`) y navegación histórica completa en Inspección Táctil (`GET /api/net/ping-history`)—, y tarjetas individuales por equipo con su propio **consumo WAN/LAN y ordenado en directo** (*Descarga*, *Subida*, *LAN*, *Nombre*).
-2. **Subapartado Dedicado `Historial de tráfico` (`/red` → *Historial de tráfico*)**: Centraliza de forma exclusiva la evolución de **Tráfico de Red 24 h (WAN/LAN)** (retirada de las demás vistas globales), junto con tarjetas analíticas simétricas de **Dominios más utilizados** (consultas DNS 24 h de Pi-hole, porcentaje bloqueado y destinos externos observados), **Servicios más usados** (`services_catalog`), **Países con más conexiones** (`countries_catalog` con bandera regional e `Intl.DisplayNames`), **Historial de identificaciones IA (`ai_connection_insights` en `recursos_history.db`)** consultable y enfocable en el mapa, buscador transversal en vivo y **Curiosidades de tu red** (nodo conectado más lejano en km mediante fórmula del semiverseno con tiempo teórico de ida y vuelta de la luz en fibra de sílice, volumen integrado 24 h WAN/LAN con equivalencia en vídeo HD, ráfaga pico con balance DL/UL y huella global de ISP/bloqueos).
-3. **Test de Velocidad Oficial (`Speedtest.net`) Calibrado Multi-Flujo e Historial SQLite + Nube**: Subpestaña dedicada **Test de velocidad** (`/api/net/speedtest/*`) con medición completa de **Descarga**, **Subida**, **Ping**, **Jitter** y pérdida de paquetes mediante motor `Speedtest.net` priorizando el binario nativo C++ de Ookla y un motor paralelo **Keep-Alive multi-flujo (8 flujos de bajada + 6 flujos de subida de 2 MB con descarte de arranque lento TCP de 750 ms y contraste con el contador físico `/proc/net/dev`)** e **historial persistente en SQLite (`speedtest_history`) sincronizado en tiempo real con Cloud Firestore**.
-4. **Mapa OpenStreetMap + Leaflet, Historial/Filtros Multi-Criterio y Simplificación IA**: Agrupa y desagrupa dinámicamente conexiones remotas públicas (`latLngToLayerPoint < 48px`), mantiene popups abiertos en vivo, alterna entre vista **En vivo** e **Historial persistente** (`1 h`–`Todo`, limpieza desde la UI vía `GET /api/net/history` y `POST /api/net/history/clear`) con selectores dinámicos de **Dispositivo**, **Servicio** y **Dirección**, integra **identificación y simplificación IA del lado servidor** (`POST /api/net/ai-identify` con Gemini y correlación dinámica de sockets/Docker/systemd) tanto en popups del mapa como en **Conexiones detalladas** (vista simple con desplegable *Detalles técnicos*), distingue **`Cable LAN`**, **`Wi-Fi 5 GHz / 6 GHz`** y **`Wi-Fi 2.4 GHz`**, integra estadísticas **Pi-hole** (caché TTL `18s`), sincronización **DuckDNS** y baneo directo **Fail2ban**, con contención de scroll y efecto elástico tipo gelatina exclusivamente en los topes de scroll (`edge`).
-
-</details>
-
-<details>
-<summary><b>🟠 Vista 4 · <code>/programas</code> — Docker, Unidades Systemd, qBittorrent, Emby y Bot Telegram</b></summary>
-
-1. **Contenedores Docker e Hilos Systemd**: Monitoriza el estado real (`active` / `running`), consumo numérico seguro de CPU/RAM e imagen de cada contenedor, permitiendo reiniciar servicios autorizados con confirmación.
-2. **Ecosistema Multimedia (`qBittorrent` y `Emby`)**: Muestra progreso porcentual normalizado (`0..100 %`), velocidades de descarga/subida, catálogo indexado y añadidos recientes.
-3. **Control del Bot de Telegram**: Estado en vivo (`online`/`running`), marca temporal de última actividad, gestión de lista blanca autorizada y prueba de envío de alertas.
+1. **Descubrimiento Dinámico de Hardware (`Zero-Hardcoding`)**: Hilos lógicos de CPU, sensores térmicos (`/sys/class/hwmon`), GPUs dinámicas (`nvidia-smi` + `sysfs DRM`) y particiones físicas (`psutil.disk_partitions(all=True)`) detectados en tiempo de ejecución.
+2. **Subpestañas de Silicio Especializadas**:
+   - **`cpu`**: Frecuencia por núcleo, curvas de temperatura, carga por hilo y atajo directo a procesos en `/programas/processes`.
+   - **`ram`**: Desglose de memoria física, caché recuperable, buffers del kernel y compresión ZRAM.
+   - **`gpu`**: Métricas de cómputo 3D, VRAM, decodificador de vídeo, temperatura, relojes y bus PCIe.
+   - **`storage`**: Tarjetas independientes por disco físico y partición montada, con transporte (`NVMe`, `SATA`, `USB`) y tasa de lectura/escritura en tiempo real.
 
 </details>
 
 <details>
-<summary><b>⚙️ Vista 5 · <code>/mas</code> — Actualizador GitHub OTA, Salud del Sistema, Dispositivos HMAC, Manual y DeX USB</b></summary>
+<summary><b>🟠 Vista 3 · <code>/programas</code> — Cargas de Trabajo de Software (`processes`, `containers`, `services`, `media`, `bots`)</b></summary>
 
-1. **Actualizador GitHub OTA Resiliente, Nube Firebase y Salud del Sistema con Diagnóstico IA**: Compara la versión y el commit local/remoto de forma asíncrona (`get_version_info_cached_async()`), registra automáticamente `safe.directory` en Git, filtra artefactos de compilación (`static/index.html`, `dist/`, bases de datos SQLite y bóvedas JSON) para no bloquear jamás la auto-actualización local, y aplica un respaldo directo por tarball HTTPS (`codeload.github.com`) + reconstrucción del frontend si `git pull` falla o no existe `.git`; integra la tarjeta de **Nube y Sincronización Firebase** (autenticación Google + Cloud Firestore con reglas `firestore.rules` y esquema `firebase-blueprint.json` para sincronizar preferencias, nodos en vivo, muestras de latencia ping y tests de velocidad vía `onSnapshot`) y la tarjeta de **Salud y avisos del sistema** con detalle de unidades `systemd` fallidas, bitácora `journalctl`, marcado persistente de revisión (`POST /api/system/logs/ack`) y **Simplificación y Diagnóstico IA de Fallos (`POST /api/system/logs/ai-simplify`)**, que clasifica el nivel de peligro (`critical`, `high`, `medium`, `low`), explica la causa en lenguaje claro, propone soluciones paso a paso y persiste cada firma normalizada en `ai_system_fault_insights` dentro de `recursos_history.db` para resolver fallos recurrentes al instante sin volver a consultar a la IA.
-2. **Inventario Agrupado de Dispositivos (`HMAC`)**: Agrupa clientes navegadores y apps nativas bajo el mismo dispositivo físico (`MAC` / `hardware_id`) mostrando su certificado vigente y nivel de acceso (`FULL_NATIVE_ACCESS` vs `WEB_SANDBOX`).
-3. **Manual Interactivo Embebido**: Integra directamente `/manual` dentro del panel sin salir de la sesión y sincronizando el tema Claro/Oscuro vía `postMessage`.
-4. **Pantalla Móvil USB (`DeX` — Exclusivo Ubuntu `.deb`)**: Desbloquea resolución, tasa a `60 FPS`, auto-conexión USB y pantalla completa únicamente en la aplicación nativa de Ubuntu Linux.
+1. **Centralización Completa de Software**: Todo el software en ejecución reside ahora exclusivamente en `/programas`, resolviendo la anterior dispersión de procesos y bots.
+2. **5 Subpestañas Especializadas**:
+   - **`processes`**: Gráfico de áreas apiladas de 24 horas (`ProcessHistoryStackedChart`) para CPU, RAM, VRAM y E/S junto al inspector de procesos en vivo con búsqueda instantánea y detalle PID.
+   - **`containers`**: Monitorización de contenedores Docker (estado `running`/`exited`, imagen, uso de CPU y memoria).
+   - **`services`**: Unidades Systemd prioritarias con control de ciclo de vida (`start`, `restart`, `stop`) protegido por confirmación.
+   - **`media`**: Telemetría de clientes de descarga (`qBittorrent`) y servidores multimedia (`Emby`), mostrando progreso y velocidades activas.
+   - **`bots`**: Estado del bot de Telegram de avisos del sistema, verificación de conectividad y log de actividad en vivo.
+
+</details>
+
+<details>
+<summary><b>🟣 Vista 4 · <code>/red</code> — Red y Ciberseguridad (`live`, `devices`, `map`, `traffic`, `speedtest`, `shield`)</b></summary>
+
+1. **Subpestañas Reorganizadas por Dominio**:
+   - **`live`**: Interfaces de red físicas (NICs) con caudal WAN/LAN segmentado y gráfica en tiempo real de latencia ping persistida en SQLite.
+   - **`devices`**: Inventario unificado de red local (LAN) con detección de tipo de enlace (`Cable LAN`, `5 GHz`, `2.4 GHz`), consumo en vivo, Wake-on-LAN (`WoL`) y apagado remoto seguro.
+   - **`map`**: Mapa Leaflet interactivo con geolocalización de IPs remotas, clustering dinámico y filtros por servicio/dispositivo.
+   - **`traffic`**: Historial analítico de 24 horas, dominios DNS más consultados (Pi-hole) y análisis de tráfico asistido por IA.
+   - **`speedtest`**: Test de velocidad multi-flujo (`Speedtest.net`) con contraste físico `/proc/net/dev` e historial SQLite consultable.
+   - **`shield`**: Ciberseguridad consolidada con estadísticas de Fail2ban, sincronización DuckDNS y bloqueos de Pi-hole.
+
+</details>
+
+<details>
+<summary><b>⚙️ Vista 5 · <code>/mas</code> — Sistema, Nube y Puente Nativo (`settings`, `cloud`, `health`, `updates`, `security`, `dex`, `manual`)</b></summary>
+
+1. **7 Subpestañas Claras y Descongestionales**:
+   - **`settings`**: Preferencias de tema (Claro / Oscuro) y selector de idioma con soporte para 31 idiomas sincronizados vía OTA desde `dictionary.csv`.
+   - **`cloud`**: Sincronización en la nube mediante Firebase Firestore y Google Sign-In con **Cloud Auth Bridge** para autenticación fiable tanto en dominios locales como en previews iframe.
+   - **`health`**: Registro del sistema (`journalctl`), avisos activos y diagnóstico preventivo IA de fallos con persistencia de soluciones en `recursos_history.db`.
+   - **`updates`**: Gestor de actualizaciones del sistema para paquetes Debian (`.deb`) de Ubuntu y sincronización Web OTA vía GitHub.
+   - **`security`**: Bóveda de tokens, claves HMAC-SHA256 y gestión de dispositivos de confianza.
+   - **`dex`**: Conexión de pantalla móvil USB (DeX a 60 FPS) disponible exclusivamente en el cliente nativo de Ubuntu Linux.
+   - **`manual`**: Manual interactivo completo con simuladores en vivo sobre `<canvas>` y explorador de API REST.
 
 </details>
 

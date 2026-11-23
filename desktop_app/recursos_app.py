@@ -3078,10 +3078,39 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         return False
 
     def _on_webview_create(self, _webview, navigation_action):
-        """Open target=_blank / external links safely in system browser without leaving the cockpit blank."""
+        """Support Firebase/Google OAuth popup windows inside a related WebKit2 WebView while opening external links in the system browser."""
         try:
             req = navigation_action.get_request() if navigation_action else None
-            uri = req.get_uri() if req else ""
+            uri = (req.get_uri() if req else "") or ""
+            uri_lower = uri.lower()
+            is_oauth_popup = (
+                not uri
+                or uri_lower.startswith("about:blank")
+                or "accounts.google.com" in uri_lower
+                or "firebaseapp.com" in uri_lower
+                or "googleapis.com" in uri_lower
+                or "firebase_auth_bridge=1" in uri_lower
+                or ".run.app" in uri_lower
+            )
+            if is_oauth_popup and HAS_WEBKIT2 and WebKit2 is not None and hasattr(WebKit2.WebView, "new_with_related_view"):
+                popup_win = Gtk.Window(title="Google Sign-In · Recursos Cockpit")
+                popup_win.set_default_size(560, 680)
+                popup_win.set_Transient_for(self) if hasattr(popup_win, "set_Transient_for") else popup_win.set_transient_for(self)
+                popup_win.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+                popup_wv = WebKit2.WebView.new_with_related_view(_webview)
+                p_settings = popup_wv.get_settings()
+                p_settings.set_enable_javascript(True)
+                if hasattr(p_settings, "set_javascript_can_open_windows_automatically"):
+                    p_settings.set_javascript_can_open_windows_automatically(True)
+                if hasattr(p_settings, "set_user_agent"):
+                    p_settings.set_user_agent(
+                        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+                    )
+                popup_wv.connect("close", lambda *_args: popup_win.destroy())
+                popup_win.add(popup_wv)
+                popup_win.show_all()
+                return popup_wv
             if uri and (uri.startswith("http://") or uri.startswith("https://")):
                 subprocess.Popen(
                     ["xdg-open", uri],
@@ -3379,20 +3408,23 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         home_scroll.add(center_box)
         self.main_stack.add_named(home_scroll, "home")
 
-        # Page 2: WebKit2 Unified Interface
+        # Page 2: WebKit2 Unified Interface (use localhost so Firebase Auth recognizes authorized domain)
         initial_view = "dex" if self.start_in_dex else "inicio"
-        target_uri = f"http://127.0.0.1:{self.bridge_port}/?env=ubuntu_native&view={initial_view}"
+        target_uri = f"http://localhost:{self.bridge_port}/?env=ubuntu_native&view={initial_view}"
 
         if HAS_WEBKIT2 and WebKit2 is not None:
             self.webview = WebKit2.WebView()
             settings = self.webview.get_settings()
             settings.set_enable_javascript(True)
             settings.set_enable_webgl(True)
+            if hasattr(settings, "set_javascript_can_open_windows_automatically"):
+                settings.set_javascript_can_open_windows_automatically(True)
             if hasattr(settings, "set_enable_smooth_scrolling"):
                 settings.set_enable_smooth_scrolling(True)
             if hasattr(settings, "set_user_agent"):
                 settings.set_user_agent(
-                    f"Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/605.1.15 "
+                    f"Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 "
+                    f"(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 "
                     f"RecursosCockpit-Linux/{get_app_version()} (Ubuntu; NativeHTML)"
                 )
             if hasattr(WebKit2, "HardwareAccelerationPolicy") and hasattr(

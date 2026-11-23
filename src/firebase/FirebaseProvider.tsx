@@ -8,10 +8,16 @@ import React, {
   useState,
 } from 'react';
 import {
+  browserPopupRedirectResolver,
+  getRedirectResult,
+  GoogleAuthProvider,
   onAuthStateChanged,
+  signInWithCredential,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
+  type UserCredential,
 } from 'firebase/auth';
 import {
   collection,
@@ -29,6 +35,7 @@ import {
 import {
   auth,
   db,
+  firebaseConfig,
   googleProvider,
   handleFirestoreError,
   OperationType,
@@ -104,11 +111,27 @@ export interface SyncedPingSampleDoc {
   updatedAt?: Timestamp | null;
 }
 
+export interface FirebaseAuthErrorState {
+  code: string;
+  message: string;
+  hostname: string;
+  isLoopbackIp: boolean;
+  isUnauthorizedDomain: boolean;
+  isPopupBlocked: boolean;
+}
+
+const AUTHORIZED_CLOUD_BRIDGE_URL =
+  'https://ais-pre-qupjek7aieunjnqnr3nezb-829837265398.europe-west2.run.app';
+
 interface FirebaseContextValue {
   user: User | null;
   authReady: boolean;
   firestoreConnected: boolean;
   authPending: boolean;
+  authError: FirebaseAuthErrorState | null;
+  bridgeSessionCode: string | null;
+  isBridgeMode: boolean;
+  firebaseProjectId: string;
   syncingNow: boolean;
   autoSync: boolean;
   lastSyncAt: string | null;
@@ -117,6 +140,10 @@ interface FirebaseContextValue {
   syncedSpeedtests: SyncedSpeedTestDoc[];
   syncedPingHistory: SyncedPingSampleDoc[];
   signInWithGoogle: () => Promise<boolean>;
+  signInWithGoogleRedirect: () => Promise<boolean>;
+  signInViaAuthorizedBridge: () => Promise<boolean>;
+  signInWithGoogleToken: (rawCodeOrToken: string) => Promise<boolean>;
+  clearAuthError: () => void;
   signOutFirebase: () => Promise<void>;
   setAutoSyncEnabled: (enabled: boolean, currentTheme: ThemeMode, currentLocale: string) => Promise<void>;
   syncPreferences: (next: { theme: ThemeMode; locale: string; autoSync?: boolean }) => Promise<void>;
@@ -133,11 +160,55 @@ function tsToMillis(ts?: Timestamp | null): number {
   return ts.toMillis();
 }
 
+function parseFirebaseAuthError(error: unknown): FirebaseAuthErrorState {
+  const rawCode =
+    error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: unknown }).code || '')
+      : '';
+  const rawMsg = error instanceof Error ? error.message : String(error || '');
+  const code = rawCode || (rawMsg.includes('unauthorized-domain') ? 'auth/unauthorized-domain' : 'auth/error');
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  const isLoopbackIp = hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
+  const isUnauthorizedDomain =
+    code.includes('unauthorized-domain') || rawMsg.toLowerCase().includes('unauthorized-domain');
+  const isPopupBlocked =
+    code.includes('popup-blocked') ||
+    code.includes('cancelled-popup-request') ||
+    code.includes('operation-not-supported-in-this-environment') ||
+    rawMsg.toLowerCase().includes('popup-blocked');
+  return {
+    code,
+    message: rawMsg,
+    hostname,
+    isLoopbackIp,
+    isUnauthorizedDomain,
+    isPopupBlocked,
+  };
+}
+
+function encodeBridgeSessionPayload(idToken?: string | null, accessToken?: string | null): string | null {
+  if (!idToken && !accessToken) return null;
+  try {
+    return btoa(
+      JSON.stringify({
+        type: 'RECURSOS_FIREBASE_GOOGLE_CREDENTIAL',
+        idToken: idToken || null,
+        accessToken: accessToken || null,
+        ts: Date.now(),
+      })
+    );
+  } catch {
+    return idToken || accessToken || null;
+  }
+}
+
 export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [firestoreConnected, setFirestoreConnected] = useState(true);
   const [authPending, setAuthPending] = useState(false);
+  const [authError, setAuthError] = useState<FirebaseAuthErrorState | null>(null);
+  const [bridgeSessionCode, setBridgeSessionCode] = useState<string | null>(null);
   const [syncingNow, setSyncingNow] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
@@ -150,6 +221,11 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const workspaceReadyUidRef = useRef<string | null>(null);
   const workspacePromiseRef = useRef<Promise<void> | null>(null);
 
+  const isBridgeMode = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('firebase_auth_bridge') === '1';
+  }, []);
+
   useEffect(() => {
     let active = true;
     void testConnection().then((ok) => {
@@ -158,22 +234,6 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => {
       active = false;
     };
-  }, []);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setAuthReady(true);
-      if (!nextUser) {
-        workspaceReadyUidRef.current = null;
-        workspacePromiseRef.current = null;
-        setSyncedPreferences(null);
-        setSyncedNodes([]);
-        setSyncedSpeedtests([]);
-        setSyncedPingHistory([]);
-      }
-    });
-    return () => unsub();
   }, []);
 
   const ensureWorkspaceReady = useCallback(
@@ -279,6 +339,100 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     []
   );
 
+  const handleCredentialResult = useCallback(
+    async (cred: UserCredential | null): Promise<boolean> => {
+      if (!cred?.user) return false;
+      setAuthError(null);
+      setFirestoreConnected(true);
+      try {
+        const oauthCred = GoogleAuthProvider.credentialFromResult(cred);
+        if (oauthCred && (oauthCred.idToken || oauthCred.accessToken)) {
+          const encoded = encodeBridgeSessionPayload(oauthCred.idToken, oauthCred.accessToken);
+          if (encoded) setBridgeSessionCode(encoded);
+          if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
+            const targetOrigin =
+              new URLSearchParams(window.location.search).get('origin') || '*';
+            window.opener.postMessage(
+              {
+                type: 'RECURSOS_FIREBASE_GOOGLE_CREDENTIAL',
+                idToken: oauthCred.idToken || null,
+                accessToken: oauthCred.accessToken || null,
+                code: encoded,
+              },
+              targetOrigin
+            );
+          }
+        }
+      } catch {
+        // Ignore credential extraction issues
+      }
+      try {
+        await ensureWorkspaceReady(cred.user);
+      } catch (wsErr) {
+        console.warn('Firebase workspace bootstrap warning (user stays signed in):', wsErr);
+      }
+      return true;
+    },
+    [ensureWorkspaceReady]
+  );
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (nextUser) => {
+      setUser(nextUser);
+      setAuthReady(true);
+      if (nextUser) {
+        setAuthError(null);
+        void ensureWorkspaceReady(nextUser).catch(() => {
+          // Non-fatal background workspace init
+        });
+      } else {
+        workspaceReadyUidRef.current = null;
+        workspacePromiseRef.current = null;
+        setSyncedPreferences(null);
+        setSyncedNodes([]);
+        setSyncedSpeedtests([]);
+        setSyncedPingHistory([]);
+      }
+    });
+    void getRedirectResult(auth, browserPopupRedirectResolver)
+      .then((res) => {
+        if (res?.user) {
+          void handleCredentialResult(res);
+        }
+      })
+      .catch((err) => {
+        if (err) {
+          console.warn('Firebase getRedirectResult warning:', err);
+        }
+      });
+    return () => unsub();
+  }, [ensureWorkspaceReady, handleCredentialResult]);
+
+  // Listen for postMessage from Cloud Auth Bridge popup
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type !== 'RECURSOS_FIREBASE_GOOGLE_CREDENTIAL') return;
+      const idToken = typeof data.idToken === 'string' && data.idToken ? data.idToken : null;
+      const accessToken = typeof data.accessToken === 'string' && data.accessToken ? data.accessToken : null;
+      if (!idToken && !accessToken) return;
+      setAuthPending(true);
+      const credential = GoogleAuthProvider.credential(idToken, accessToken);
+      void signInWithCredential(auth, credential)
+        .then((cred) => handleCredentialResult(cred))
+        .catch((err) => {
+          setAuthError(parseFirebaseAuthError(err));
+        })
+        .finally(() => {
+          setAuthPending(false);
+        });
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [handleCredentialResult]);
+
   // Attach real-time Firestore onSnapshot listeners ONLY when auth is ready & user is authenticated
   useEffect(() => {
     if (!authReady || !user || !user.emailVerified) return;
@@ -365,25 +519,122 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const signInWithGoogle = useCallback(async (): Promise<boolean> => {
     setAuthPending(true);
+    setAuthError(null);
     try {
-      const cred = await signInWithPopup(auth, googleProvider);
-      if (cred.user) {
-        await ensureWorkspaceReady(cred.user);
-      }
-      setFirestoreConnected(true);
-      return Boolean(cred.user);
+      const cred = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+      return await handleCredentialResult(cred);
     } catch (error) {
+      if (auth.currentUser) {
+        try {
+          await ensureWorkspaceReady(auth.currentUser);
+        } catch {
+          // ignore
+        }
+        return true;
+      }
+      const parsed = parseFirebaseAuthError(error);
+      setAuthError(parsed);
       console.error('Firebase Google Sign-In error:', error);
+      // If popup was blocked on an already-authorized domain, automatically try redirect
+      if (parsed.isPopupBlocked && !parsed.isUnauthorizedDomain) {
+        try {
+          await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
+          return true;
+        } catch (redirErr) {
+          setAuthError(parseFirebaseAuthError(redirErr));
+        }
+      }
       return false;
     } finally {
       setAuthPending(false);
     }
-  }, [ensureWorkspaceReady]);
+  }, [ensureWorkspaceReady, handleCredentialResult]);
+
+  const signInWithGoogleRedirect = useCallback(async (): Promise<boolean> => {
+    setAuthPending(true);
+    setAuthError(null);
+    try {
+      await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
+      return true;
+    } catch (error) {
+      setAuthError(parseFirebaseAuthError(error));
+      return false;
+    } finally {
+      setAuthPending(false);
+    }
+  }, []);
+
+  const signInViaAuthorizedBridge = useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined') return false;
+    // If on 127.0.0.1, localhost is already authorized by Firebase on the exact same machine
+    if (window.location.hostname === '127.0.0.1') {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.hostname = 'localhost';
+      nextUrl.searchParams.set('view', 'mas');
+      window.location.href = nextUrl.toString();
+      return true;
+    }
+    const bridgeUrl = new URL(AUTHORIZED_CLOUD_BRIDGE_URL);
+    bridgeUrl.searchParams.set('view', 'mas');
+    bridgeUrl.searchParams.set('firebase_auth_bridge', '1');
+    bridgeUrl.searchParams.set('origin', window.location.origin);
+    const a = document.createElement('a');
+    a.href = bridgeUrl.toString();
+    a.target = '_blank';
+    a.rel = 'opener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return true;
+  }, []);
+
+  const signInWithGoogleToken = useCallback(
+    async (rawCodeOrToken: string): Promise<boolean> => {
+      const trimmed = String(rawCodeOrToken || '').trim();
+      if (!trimmed) return false;
+      setAuthPending(true);
+      setAuthError(null);
+      try {
+        let idToken: string | null = null;
+        let accessToken: string | null = null;
+        try {
+          const decoded = trimmed.startsWith('{') ? trimmed : atob(trimmed);
+          const parsed = JSON.parse(decoded) as { idToken?: string | null; accessToken?: string | null };
+          idToken = parsed.idToken || null;
+          accessToken = parsed.accessToken || null;
+        } catch {
+          if (trimmed.split('.').length === 3) {
+            idToken = trimmed;
+          } else {
+            accessToken = trimmed;
+          }
+        }
+        if (!idToken && !accessToken) {
+          throw new Error('Invalid Google session token');
+        }
+        const credential = GoogleAuthProvider.credential(idToken, accessToken);
+        const cred = await signInWithCredential(auth, credential);
+        return await handleCredentialResult(cred);
+      } catch (error) {
+        setAuthError(parseFirebaseAuthError(error));
+        return false;
+      } finally {
+        setAuthPending(false);
+      }
+    },
+    [handleCredentialResult]
+  );
+
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
+  }, []);
 
   const signOutFirebase = useCallback(async () => {
     setAuthPending(true);
     try {
       await signOut(auth);
+      setBridgeSessionCode(null);
+      setAuthError(null);
     } finally {
       setAuthPending(false);
     }
@@ -652,6 +903,10 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       authReady,
       firestoreConnected,
       authPending,
+      authError,
+      bridgeSessionCode,
+      isBridgeMode,
+      firebaseProjectId: firebaseConfig.projectId,
       syncingNow,
       autoSync,
       lastSyncAt,
@@ -660,6 +915,10 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       syncedSpeedtests,
       syncedPingHistory,
       signInWithGoogle,
+      signInWithGoogleRedirect,
+      signInViaAuthorizedBridge,
+      signInWithGoogleToken,
+      clearAuthError,
       signOutFirebase,
       setAutoSyncEnabled,
       syncPreferences,
@@ -673,6 +932,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       authReady,
       firestoreConnected,
       authPending,
+      authError,
+      bridgeSessionCode,
+      isBridgeMode,
       syncingNow,
       autoSync,
       lastSyncAt,
@@ -681,6 +943,10 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       syncedSpeedtests,
       syncedPingHistory,
       signInWithGoogle,
+      signInWithGoogleRedirect,
+      signInViaAuthorizedBridge,
+      signInWithGoogleToken,
+      clearAuthError,
       signOutFirebase,
       setAutoSyncEnabled,
       syncPreferences,
