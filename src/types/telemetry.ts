@@ -1116,6 +1116,7 @@ declare global {
     __RECURSOS_CONN_MODE__?: string;
     __RECURSOS_NODE_URL__?: string;
     __RECURSOS_DEVICE_TELEMETRY__?: Record<string, unknown>;
+    __RECURSOS_INITIAL_THEME__?: ThemeMode;
     AndroidBridge?: {
       getAppVersion?: () => string;
       reconnect?: () => void;
@@ -1123,6 +1124,8 @@ declare global {
     RecursosAndroidBridge?: {
       getDeviceToken?: () => string;
       onTokenUpdated?: (token: string) => void;
+      onThemeChanged?: (theme: ThemeMode) => void;
+      getPreferredTheme?: () => string;
       getConnectionMode?: () => string;
       getActiveNodeUrl?: () => string;
       getDeviceTelemetryJson?: () => string;
@@ -1132,6 +1135,9 @@ declare global {
     webkit?: {
       messageHandlers?: {
         recursosNative?: {
+          postMessage: (msg: unknown) => void;
+        };
+        recursosTheme?: {
           postMessage: (msg: unknown) => void;
         };
       };

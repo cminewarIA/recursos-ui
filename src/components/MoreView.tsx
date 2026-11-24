@@ -7,8 +7,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Cloud,
-  CloudOff,
   Download,
   ExternalLink,
   GitCommit,
@@ -16,12 +14,9 @@ import {
   Languages,
   Laptop,
   Lock,
-  LogIn,
-  LogOut,
   Moon,
   RefreshCw,
   Search,
-  Server,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -43,17 +38,16 @@ import {
   VersionInfo,
 } from '../types/telemetry';
 import { apiFetchJson, detectNativeEnvironment } from '../utils/api';
-import { formatSpeed, getDisplayVersionString } from '../utils/formatters';
+import { getDisplayVersionString } from '../utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion } from '../utils/version';
 import { useI18n } from '../i18n';
-import { useFirebase } from '../firebase/FirebaseProvider';
 
 type MoreSubTab = 'updates' | 'devices' | 'manual' | 'dex';
 
 function resolveMoreSubTab(hint?: string): MoreSubTab | undefined {
   if (!hint) return undefined;
   const h = hint.toLowerCase();
-  if (['updates', 'actualizaciones', 'logs', 'sistema', 'version', 'settings', 'ajustes', 'cloud', 'nube', 'health', 'salud'].includes(h)) return 'updates';
+  if (['updates', 'actualizaciones', 'logs', 'sistema', 'version', 'settings', 'ajustes', 'health', 'salud'].includes(h)) return 'updates';
   if (['devices', 'dispositivos', 'nodos', 'security', 'seguridad'].includes(h)) return 'devices';
   if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(h)) return 'manual';
   if (h === 'dex') return 'dex';
@@ -84,30 +78,6 @@ export const MoreView: React.FC<MoreViewProps> = ({
   onSubTabChange,
 }) => {
   const { locale, supportedLocales, localeNames, otaSource, isSyncingLanguages, setLocale, syncFromGitHub, t } = useI18n();
-  const {
-    user: fbUser,
-    firestoreConnected,
-    authPending,
-    authError,
-    bridgeSessionCode,
-    isBridgeMode,
-    firebaseProjectId,
-    syncingNow,
-    autoSync,
-    lastSyncAt,
-    syncedNodes,
-    syncedSpeedtests,
-    syncedPingHistory,
-    signInWithGoogle,
-    signInWithGoogleRedirect,
-    signInViaAuthorizedBridge,
-    signInWithGoogleToken,
-    signOutFirebase,
-    setAutoSyncEnabled,
-    syncPreferences,
-    syncHostSnapshot,
-    syncPingSnapshot,
-  } = useFirebase();
   const { isUbuntuNative, isNativeApp } = detectNativeEnvironment();
   const [subTab, setSubTab] = useState<MoreSubTab>(() => resolveMoreSubTab(initialSubTab) || 'updates');
 
@@ -118,7 +88,6 @@ export const MoreView: React.FC<MoreViewProps> = ({
   const manualIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
   const [langSearch, setLangSearch] = useState('');
-  const [tokenPasteInput, setTokenPasteInput] = useState('');
   const langPickerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -726,301 +695,6 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 </div>
               </div>
             </div>
-          </section>
-
-          {/* Firebase Cloud Firestore Sync Card */}
-          <section className="cockpit-bento p-5" data-testid="firebase-sync-card">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between pb-4 border-b border-slate-200/70 dark:border-slate-800">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="inline-flex items-center gap-2 font-display text-base font-semibold text-slate-900 dark:text-white">
-                    {firestoreConnected ? (
-                      <Cloud className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                    ) : (
-                      <CloudOff className="h-4 w-4 text-amber-500" />
-                    )}
-                    <span>{t('firebase.sync_title')}</span>
-                  </h2>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 font-mono text-[10.5px] font-semibold ${
-                      firestoreConnected ? 'cockpit-pill-emerald' : 'cockpit-pill-amber'
-                    }`}
-                  >
-                    {firestoreConnected ? t('firebase.connected_badge') : t('firebase.offline_badge')}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {t('firebase.sync_desc')}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {fbUser ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={syncingNow}
-                      onClick={async () => {
-                        try {
-                          await syncPreferences({ theme, locale });
-                          await syncHostSnapshot(metrics, true, false);
-                          await syncPingSnapshot(metrics);
-                          onNotify(t('firebase.sync_ok'));
-                        } catch {
-                          onNotify(t('firebase.error_boundary_title'), true);
-                        }
-                      }}
-                      className="cockpit-btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold transition-all disabled:opacity-50"
-                    >
-                      <RefreshCw className={`h-3.5 w-3.5 ${syncingNow ? 'animate-spin' : ''}`} />
-                      <span>{syncingNow ? t('firebase.syncing') : t('firebase.sync_now')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={authPending}
-                      onClick={() => void signOutFirebase()}
-                      className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-rose-600 dark:text-slate-200 dark:hover:text-rose-400 transition-colors"
-                    >
-                      <LogOut className="h-3.5 w-3.5" />
-                      <span>{t('firebase.sign_out')}</span>
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    data-testid="firebase-signin-btn"
-                    disabled={authPending}
-                    onClick={async () => {
-                      const ok = await signInWithGoogle();
-                      if (ok) {
-                        onNotify(t('firebase.sign_in_ok'));
-                      } else {
-                        onNotify(t('firebase.sign_in_error'), true);
-                      }
-                    }}
-                    className="cockpit-btn-accent inline-flex min-h-[40px] items-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-50"
-                  >
-                    <LogIn className="h-4 w-4" />
-                    <span>{authPending ? t('firebase.signing_in') : t('firebase.sign_in_google')}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {!fbUser ? (
-              <div className="mt-3 space-y-3">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {t('firebase.not_signed_in_hint')}
-                </p>
-
-                {authError && (
-                  <div
-                    data-testid="firebase-auth-error-panel"
-                    className="cockpit-subtile space-y-2.5 border border-amber-500/35 bg-amber-500/5 p-3.5 text-xs"
-                  >
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <p className="font-semibold text-slate-900 dark:text-white">
-                          {authError.isUnauthorizedDomain
-                            ? t('firebase.unauthorized_domain_title', { domain: authError.hostname })
-                            : t('firebase.sign_in_error')}
-                        </p>
-                        <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
-                          {authError.isUnauthorizedDomain
-                            ? t('firebase.unauthorized_domain_desc', { domain: authError.hostname })
-                            : authError.isPopupBlocked
-                              ? t('firebase.popup_blocked_desc')
-                              : authError.message}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        data-testid="firebase-bridge-signin-btn"
-                        onClick={() => void signInViaAuthorizedBridge()}
-                        className="cockpit-btn-accent inline-flex min-h-[36px] items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        <span>
-                          {authError.isLoopbackIp
-                            ? t('firebase.switch_localhost_btn')
-                            : t('firebase.bridge_signin_btn')}
-                        </span>
-                      </button>
-
-                      {!authError.isUnauthorizedDomain && (
-                        <button
-                          type="button"
-                          data-testid="firebase-redirect-signin-btn"
-                          onClick={() => void signInWithGoogleRedirect()}
-                          className="cockpit-subtile inline-flex min-h-[36px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-sky-700 dark:text-slate-200 dark:hover:text-sky-300"
-                        >
-                          <LogIn className="h-3.5 w-3.5" />
-                          <span>{t('firebase.redirect_signin_btn')}</span>
-                        </button>
-                      )}
-
-                      {authError.isUnauthorizedDomain && (
-                        <>
-                          <button
-                            type="button"
-                            data-testid="firebase-copy-domain-btn"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(authError.hostname);
-                                onNotify(t('firebase.domain_copied'));
-                              } catch {
-                                // ignore
-                              }
-                            }}
-                            className="cockpit-subtile inline-flex min-h-[36px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-sky-700 dark:text-slate-200 dark:hover:text-sky-300"
-                          >
-                            <Globe className="h-3.5 w-3.5" />
-                            <span>{t('firebase.copy_domain_btn', { domain: authError.hostname })}</span>
-                          </button>
-
-                          {firebaseProjectId && (
-                            <a
-                              href={`https://console.firebase.google.com/project/${firebaseProjectId}/authentication/settings`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="cockpit-subtile inline-flex min-h-[36px] items-center gap-1.5 px-3 text-xs font-semibold text-sky-700 hover:underline dark:text-sky-300"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              <span>{t('firebase.open_console_btn')}</span>
-                            </a>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
-                      <input
-                        type="text"
-                        data-testid="firebase-token-input"
-                        value={tokenPasteInput}
-                        onChange={(e) => setTokenPasteInput(e.target.value)}
-                        placeholder={t('firebase.token_paste_placeholder')}
-                        className="cockpit-subtile min-h-[36px] flex-1 px-3 font-mono text-[11px] text-slate-800 outline-none focus:border-sky-500 dark:text-slate-100"
-                      />
-                      <button
-                        type="button"
-                        data-testid="firebase-token-submit-btn"
-                        disabled={authPending || !tokenPasteInput.trim()}
-                        onClick={async () => {
-                          const ok = await signInWithGoogleToken(tokenPasteInput);
-                          if (ok) {
-                            setTokenPasteInput('');
-                            onNotify(t('firebase.sign_in_ok'));
-                          } else {
-                            onNotify(t('firebase.sign_in_error'), true);
-                          }
-                        }}
-                        className="cockpit-subtile inline-flex min-h-[36px] shrink-0 items-center justify-center gap-1.5 px-3.5 text-xs font-semibold text-sky-700 hover:bg-sky-500/10 disabled:opacity-50 dark:text-sky-300"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        <span>{t('firebase.token_apply_btn')}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {(isBridgeMode || bridgeSessionCode) && bridgeSessionCode && (
-                  <div
-                    data-testid="firebase-bridge-code-box"
-                    className="cockpit-subtile flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border border-emerald-500/35 bg-emerald-500/5 p-3 text-xs"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-900 dark:text-white">
-                        {t('firebase.bridge_ready_title')}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-300">
-                        {t('firebase.bridge_ready_desc')}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      data-testid="firebase-copy-bridge-code-btn"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(bridgeSessionCode);
-                          onNotify(t('firebase.bridge_code_copied'));
-                        } catch {
-                          // ignore
-                        }
-                      }}
-                      className="cockpit-btn-accent inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      <span>{t('firebase.bridge_copy_code_btn')}</span>
-                    </button>
-                  </div>
-                )}
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-semibold">
-                      {t('firebase.signed_in_as', { name: fbUser.displayName || fbUser.email || fbUser.uid })}
-                    </span>
-                    <span className="cockpit-pill-violet rounded-full px-2.5 py-0.5 font-mono text-[10.5px] font-semibold">
-                      {t('firebase.synced_speedtests_title', { count: syncedSpeedtests.length })}
-                    </span>
-                    <span className="cockpit-pill-emerald rounded-full px-2.5 py-0.5 font-mono text-[10.5px] font-semibold">
-                      {t('firebase.synced_ping_title', { count: syncedPingHistory.length })}
-                    </span>
-                    {lastSyncAt && (
-                      <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
-                        {t('firebase.last_sync', { time: lastSyncAt })}
-                      </span>
-                    )}
-                  </div>
-                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-200">
-                    <input
-                      type="checkbox"
-                      checked={autoSync}
-                      onChange={(e) => void setAutoSyncEnabled(e.target.checked, theme, locale)}
-                      className="h-4 w-4 rounded accent-sky-600"
-                    />
-                    <span>{t('firebase.auto_sync_label')}</span>
-                  </label>
-                </div>
-
-                {syncedNodes.length > 0 && (
-                  <div className="pt-1">
-                    <p className="mb-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                      {t('firebase.synced_nodes_title', { count: syncedNodes.length })}
-                    </p>
-                    <div className="cockpit-auto-grid-cards">
-                      {syncedNodes.slice(0, 6).map((node) => (
-                        <div key={node.nodeId} className="cockpit-subtile flex items-center justify-between gap-2 px-3 py-2.5 text-xs">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <Server className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
-                              <span className="truncate font-semibold text-slate-900 dark:text-white">
-                                {node.hostname}
-                              </span>
-                            </div>
-                            <p className="mt-0.5 font-mono text-[10.5px] text-slate-500 dark:text-slate-400 tabular-nums">
-                              v{node.appVersion} · ↓ {formatSpeed(node.wanRxBps)} · ↑ {formatSpeed(node.wanTxBps)}
-                            </p>
-                          </div>
-                          <div className="text-right font-mono text-[11px] font-semibold tabular-nums shrink-0 text-slate-700 dark:text-slate-200">
-                            <span>CPU {node.cpuPercent.toFixed(0)}%</span>
-                            <span className="block text-[10px] text-slate-500 dark:text-slate-400">
-                              RAM {node.ramPercent.toFixed(0)}%
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </section>
 
           {/* Unified App / Server / GitHub Updater */}

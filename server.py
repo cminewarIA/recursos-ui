@@ -14610,11 +14610,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         self.send_header(
             'Content-Security-Policy',
             f"default-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com data: blob:; "
-            f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://apis.google.com; "
+            f"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; "
             f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
             f"img-src 'self' data: blob: https: http:; "
-            f"connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseio.com https://apis.google.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
-            f"frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://*.duckdns.org https://{dom} https://*.{dom}; "
+            f"connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://autocomplete.clearbit.com https://cdn.simpleicons.org https://www.google.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.openstreetmap.de https://tile.openstreetmap.de https://server.arcgisonline.com http://ip-api.com https://ip-api.com ws: wss: https://*.duckdns.org https://{dom}; "
+            f"frame-src 'self' https://*.duckdns.org https://{dom} https://*.{dom}; "
             f"frame-ancestors {csp_ancestors};"
         )
 

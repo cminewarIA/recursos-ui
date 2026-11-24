@@ -215,7 +215,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         tab: 'mas',
         subTab: 'updates',
         icon: <Download className="h-4 w-4 text-blue-400" />,
-        hint: 'OTA · Cloud · Logs',
+        hint: 'OTA · Idiomas · Logs',
       },
       {
         id: 'nav-more-devices',

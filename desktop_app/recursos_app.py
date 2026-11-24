@@ -544,17 +544,18 @@ def encode_telemetry_header(telemetry_dict):
         return ""
 
 
-NATIVE_CSS = b"""
+NATIVE_CSS_LIGHT = b"""
 window {
     background-color: #f5f4f2;
     color: #0f1f10;
+    font-family: "Geist", "Inter", "Ubuntu", sans-serif;
 }
 headerbar {
     background-image: none;
     background-color: #ffffff;
     color: #0f1f10;
     border-bottom: 1px solid #e0dfda;
-    min-height: 48px;
+    min-height: 44px;
     padding: 0 10px;
 }
 headerbar .title {
@@ -562,7 +563,7 @@ headerbar .title {
     font-weight: 700;
 }
 headerbar .subtitle {
-    color: #3e4d40;
+    color: #5f6c61;
     font-size: 11px;
 }
 headerbar button {
@@ -641,17 +642,26 @@ headerbar .titlebutton.close:hover image {
 .launcher-hero {
     background-image: linear-gradient(135deg, #0c190d, #0f1f10 55%, #162818);
     border: 1px solid #2b452d;
-    border-radius: 20px;
-    padding: 20px 24px;
+    border-radius: 22px;
+    padding: 24px 28px;
     color: #f5f4f2;
-    box-shadow: 0 12px 28px -10px rgba(10, 20, 11, 0.35);
+    box-shadow: 0 14px 32px -10px rgba(10, 20, 11, 0.36);
+}
+.launcher-hero .launcher-title {
+    font-size: 21px;
+    font-weight: 800;
+    color: #f5f4f2;
+}
+.launcher-hero .launcher-subtitle {
+    font-size: 13px;
+    color: #c8d2c6;
 }
 .launcher-card {
     background-color: #ffffff;
     border: 1px solid #e0dfda;
     border-radius: 18px;
     padding: 20px;
-    box-shadow: 0 6px 18px -8px rgba(15, 31, 16, 0.08);
+    box-shadow: 0 4px 16px -4px rgba(15, 31, 16, 0.06);
     transition: all 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .launcher-card:hover {
@@ -661,6 +671,11 @@ headerbar .titlebutton.close:hover image {
 .launcher-title {
     font-size: 20px;
     font-weight: 800;
+    color: #0f1f10;
+}
+.launcher-card-title {
+    font-size: 15px;
+    font-weight: 700;
     color: #0f1f10;
 }
 .launcher-subtitle {
@@ -765,6 +780,246 @@ headerbar .titlebutton.close:hover image {
 }
 """
 
+NATIVE_CSS_DARK = b"""
+window {
+    background-color: #0a140b;
+    color: #f5f4f2;
+    font-family: "Geist", "Inter", "Ubuntu", sans-serif;
+}
+headerbar {
+    background-image: none;
+    background-color: #111f13;
+    color: #f5f4f2;
+    border-bottom: 1px solid rgba(198, 241, 157, 0.14);
+    min-height: 44px;
+    padding: 0 10px;
+}
+headerbar .title {
+    color: #f5f4f2;
+    font-weight: 700;
+}
+headerbar .subtitle {
+    color: #8b9a8c;
+    font-size: 11px;
+}
+headerbar button {
+    color: #f5f4f2;
+    transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+headerbar:backdrop {
+    background-color: #111f13;
+    color: #f5f4f2;
+}
+headerbar:backdrop .title {
+    color: #f5f4f2;
+}
+headerbar:backdrop .subtitle {
+    color: #8b9a8c;
+}
+headerbar button.titlebutton,
+headerbar .titlebutton,
+headerbar:backdrop button.titlebutton,
+headerbar:backdrop .titlebutton {
+    background-image: none;
+    background-color: #18291a;
+    color: #f5f4f2;
+    border: 1px solid rgba(198, 241, 157, 0.18);
+    border-radius: 9999px;
+    min-width: 28px;
+    min-height: 28px;
+    margin: 0 3px;
+    padding: 2px;
+    box-shadow: none;
+    opacity: 1;
+}
+headerbar button.titlebutton:hover,
+headerbar .titlebutton:hover {
+    background-color: #213624;
+    border-color: rgba(198, 241, 157, 0.42);
+    color: #c6f19d;
+}
+headerbar button.titlebutton.close,
+headerbar .titlebutton.close,
+headerbar:backdrop button.titlebutton.close,
+headerbar:backdrop .titlebutton.close {
+    background-color: #34161a;
+    border-color: rgba(251, 113, 133, 0.38);
+    color: #fb7185;
+}
+headerbar button.titlebutton.close:hover,
+headerbar .titlebutton.close:hover {
+    background-color: #dc2626;
+    border-color: #fb7185;
+    color: #ffffff;
+}
+headerbar button.titlebutton image,
+headerbar .titlebutton image,
+headerbar:backdrop button.titlebutton image,
+headerbar:backdrop .titlebutton image {
+    color: #f5f4f2;
+    opacity: 1;
+    -gtk-icon-style: symbolic;
+    -gtk-icon-shadow: none;
+}
+headerbar button.titlebutton.close image,
+headerbar .titlebutton.close image,
+headerbar:backdrop button.titlebutton.close image,
+headerbar:backdrop .titlebutton.close image {
+    color: #fb7185;
+}
+headerbar button.titlebutton.close:hover image,
+headerbar .titlebutton.close:hover image {
+    color: #ffffff;
+}
+.btn-nav image {
+    color: #f5f4f2;
+    -gtk-icon-style: symbolic;
+}
+.launcher-hero {
+    background-image: linear-gradient(135deg, #0f1f10, #162818 58%, #1d3620);
+    border: 1px solid rgba(198, 241, 157, 0.22);
+    border-radius: 22px;
+    padding: 24px 28px;
+    color: #f5f4f2;
+    box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.65);
+}
+.launcher-hero .launcher-title {
+    font-size: 21px;
+    font-weight: 800;
+    color: #f5f4f2;
+}
+.launcher-hero .launcher-subtitle {
+    font-size: 13px;
+    color: #c8d2c6;
+}
+.launcher-card {
+    background-color: #111f13;
+    border: 1px solid rgba(198, 241, 157, 0.14);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: 0 10px 26px -6px rgba(0, 0, 0, 0.55);
+    transition: all 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.launcher-card:hover {
+    border-color: rgba(198, 241, 157, 0.36);
+    box-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.68);
+}
+.launcher-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #f5f4f2;
+}
+.launcher-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f5f4f2;
+}
+.launcher-subtitle {
+    font-size: 13px;
+    color: #c8d2c6;
+}
+.badge-ready {
+    background-color: #c6f19d;
+    border: 1px solid #a8e474;
+    color: #0f1f10;
+    border-radius: 9999px;
+    padding: 4px 11px;
+    font-weight: 700;
+    font-size: 11px;
+}
+.badge-lan {
+    background-color: rgba(198, 241, 157, 0.14);
+    border: 1px solid rgba(198, 241, 157, 0.34);
+    color: #c6f19d;
+    border-radius: 9999px;
+    padding: 4px 11px;
+    font-weight: 700;
+    font-size: 11px;
+}
+.badge-wan {
+    background-color: rgba(94, 234, 212, 0.14);
+    border: 1px solid rgba(94, 234, 212, 0.32);
+    color: #5eead4;
+    border-radius: 9999px;
+    padding: 4px 11px;
+    font-weight: 700;
+    font-size: 11px;
+}
+.badge-revoked {
+    background-color: rgba(251, 113, 133, 0.14);
+    border: 1px solid rgba(251, 113, 133, 0.36);
+    color: #fb7185;
+    border-radius: 9999px;
+    padding: 4px 11px;
+    font-weight: 700;
+    font-size: 11px;
+}
+.badge-scanning {
+    background-color: rgba(251, 191, 36, 0.14);
+    border: 1px solid rgba(251, 191, 36, 0.34);
+    color: #fbbf24;
+    border-radius: 9999px;
+    padding: 4px 11px;
+    font-weight: 700;
+    font-size: 11px;
+}
+.badge-local {
+    background-color: #18291a;
+    border: 1px solid rgba(198, 241, 157, 0.18);
+    color: #c8d2c6;
+    border-radius: 9999px;
+    padding: 4px 11px;
+    font-weight: 700;
+    font-size: 11px;
+}
+.btn-primary {
+    background-image: none;
+    background-color: #c6f19d;
+    color: #0f1f10;
+    font-weight: 700;
+    border-radius: 12px;
+    padding: 10px 18px;
+    border: 1px solid #a8e474;
+    box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.45);
+    transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.btn-primary:hover {
+    background-color: #d7f7b7;
+    color: #0a140b;
+}
+.btn-nav {
+    background-image: none;
+    background-color: #18291a;
+    color: #f5f4f2;
+    font-weight: 600;
+    border-radius: 10px;
+    padding: 6px 12px;
+    border: 1px solid rgba(198, 241, 157, 0.18);
+    transition: all 180ms ease;
+}
+.btn-nav:hover {
+    background-color: #213624;
+    border-color: rgba(198, 241, 157, 0.42);
+    color: #c6f19d;
+}
+.btn-dex {
+    background-image: none;
+    background-color: #c6f19d;
+    color: #0f1f10;
+    font-weight: 700;
+    border-radius: 10px;
+    padding: 6px 12px;
+    border: 1px solid #a8e474;
+    transition: all 180ms ease;
+}
+.btn-dex:hover {
+    background-color: #d7f7b7;
+}
+"""
+
+NATIVE_CSS = NATIVE_CSS_LIGHT
+
+
 
 def _is_valid_wan_domain(dom):
     """Valida que el dominio público detectado sea un DNS real y no una IP LAN ni .local."""
@@ -809,6 +1064,7 @@ class ServerConnectionManager:
         self._last_release_check_ts = 0.0
         self._cached_release_meta = {}
         self.is_revoked = False
+        self.ui_theme = "light"
         self._last_net_io = psutil.net_io_counters() if psutil else None
         self._last_net_ts = time.time()
         self.github_update_info = None
@@ -853,6 +1109,9 @@ class ServerConnectionManager:
                     self.wan_domain = str(data.get("wan_domain", "") or os.environ.get("RECURSOS_WAN_DOMAIN", "")).strip()
                     self.auto_install_enabled = bool(data.get("auto_install_enabled", True))
                     self.is_revoked = data.get("is_revoked", False)
+                    saved_theme = str(data.get("ui_theme", "") or "").strip().lower()
+                    if saved_theme in ("light", "dark"):
+                        self.ui_theme = saved_theme
         except Exception:
             pass
 
@@ -869,6 +1128,7 @@ class ServerConnectionManager:
                         "wan_domain": self.wan_domain,
                         "auto_install_enabled": self.auto_install_enabled,
                         "is_revoked": self.is_revoked,
+                        "ui_theme": self.ui_theme,
                         "hardware_id": self.device_telemetry.get("hardware_id", ""),
                     },
                     f,
@@ -2179,10 +2439,17 @@ class LocalHtmlBridgeServer:
       o responde con telemetría local de silicio si no hay conexión externa.
     """
 
-    def __init__(self, conn_mgr: ServerConnectionManager, dex: DexController, on_deb_relaunch=None):
+    def __init__(
+        self,
+        conn_mgr: ServerConnectionManager,
+        dex: DexController,
+        on_deb_relaunch=None,
+        on_theme_change=None,
+    ):
         self.conn_mgr = conn_mgr
         self.dex = dex
         self.on_deb_relaunch = on_deb_relaunch
+        self.on_theme_change = on_theme_change
         self.html_path = resolve_bundled_html_path()
         self.server = None
         self.port = 0
@@ -2215,6 +2482,7 @@ class LocalHtmlBridgeServer:
                 token_js = json.dumps(parent.conn_mgr.device_token or "")
                 mode_js = json.dumps(parent.conn_mgr.connection_mode or "LOCAL")
                 node_js = json.dumps(parent.conn_mgr.active_url or "local")
+                theme_js = json.dumps(parent.conn_mgr.ui_theme if parent.conn_mgr.ui_theme in ("light", "dark") else "light")
                 dev_info_js = json.dumps(parent.conn_mgr.refresh_device_telemetry(), ensure_ascii=False)
                 auth_cfg_js = json.dumps(
                     {
@@ -2241,6 +2509,7 @@ class LocalHtmlBridgeServer:
                     f"window.__INITIAL_APP_VERSION__ = '{app_ver}';"
                     f"window.__INITIAL_DISPLAY_VERSION__ = '{disp_ver}';"
                     "window.__INITIAL_APP_HASH__ = 'HEAD';"
+                    f"window.__RECURSOS_INITIAL_THEME__ = {theme_js};"
                     f"window.__RECURSOS_DEVICE_TOKEN__ = {token_js};"
                     f"window.__RECURSOS_CONN_MODE__ = {mode_js};"
                     f"window.__RECURSOS_NODE_URL__ = {node_js};"
@@ -2767,6 +3036,24 @@ class LocalHtmlBridgeServer:
                     return
                 raw_body = self.rfile.read(length) if length > 0 else b"{}"
 
+                if clean_path == "/api/native/theme":
+                    try:
+                        payload = json.loads(raw_body.decode("utf-8"))
+                    except Exception:
+                        payload = {}
+                    next_theme = str(payload.get("theme") or "").strip().lower()
+                    if next_theme in ("light", "dark"):
+                        if parent.conn_mgr.ui_theme != next_theme:
+                            parent.conn_mgr.ui_theme = next_theme
+                            parent.conn_mgr._save_config()
+                        if parent.on_theme_change:
+                            try:
+                                parent.on_theme_change(next_theme)
+                            except Exception:
+                                pass
+                    self._send_json({"ok": True, "theme": parent.conn_mgr.ui_theme})
+                    return
+
                 if clean_path == "/api/dex/start":
                     try:
                         payload = json.loads(raw_body.decode("utf-8"))
@@ -3010,17 +3297,26 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         self.start_in_dex = start_in_dex
         self.webview = None
         self.main_stack = None
+        self._css_provider = None
+        self._current_theme = "light"
         self._webview_uri_loaded = False
         self._pending_nav_view = "dex" if start_in_dex else None
         self._target_webview_uri = ""
 
-        self._apply_css()
-        self._set_app_icon()
-
         self.dex = DexController(on_status_change=self._on_dex_status_callback)
         self.conn_mgr = ServerConnectionManager()
+        self._current_theme = self.conn_mgr.ui_theme if self.conn_mgr.ui_theme in ("light", "dark") else "light"
+        self._apply_css(self._current_theme)
+        self._set_app_icon()
+
         relaunch_cb = lambda: GLib.idle_add(self._reexec_after_update)
-        self.bridge = LocalHtmlBridgeServer(self.conn_mgr, self.dex, on_deb_relaunch=relaunch_cb)
+        theme_cb = lambda th: GLib.idle_add(self._apply_theme, th)
+        self.bridge = LocalHtmlBridgeServer(
+            self.conn_mgr,
+            self.dex,
+            on_deb_relaunch=relaunch_cb,
+            on_theme_change=theme_cb,
+        )
         self.bridge_port = self.bridge.start()
 
         self._build_headerbar()
@@ -3028,9 +3324,10 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
         self.connect("key-press-event", self._on_key_press)
         self.connect("destroy", lambda *_: self.bridge.stop())
+        auto_enter_web = bool(self.start_in_dex or self.conn_mgr.saved_host or self.conn_mgr.wan_domain)
         if hasattr(self, "btn_back_home"):
             self.btn_back_home.set_no_show_all(True)
-            self.btn_back_home.set_visible(bool(self.start_in_dex))
+            self.btn_back_home.set_visible(auto_enter_web)
         self.show_all()
 
         GLib.idle_add(self._refresh_config_labels)
@@ -3039,6 +3336,8 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         self.conn_mgr.start_auto_update_watcher(on_deb_installed_cb=relaunch_cb)
         if self.start_in_dex:
             self._connect_and_open_webview(target_view="dex")
+        elif auto_enter_web:
+            self._connect_and_open_webview(target_view="inicio")
         GLib.timeout_add(3000, self._refresh_connection_badge)
 
     def _connect_and_open_webview(self, target_view="inicio"):
@@ -3078,39 +3377,10 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         return False
 
     def _on_webview_create(self, _webview, navigation_action):
-        """Support Firebase/Google OAuth popup windows inside a related WebKit2 WebView while opening external links in the system browser."""
+        """Open external target=_blank links cleanly in the Ubuntu system browser."""
         try:
             req = navigation_action.get_request() if navigation_action else None
             uri = (req.get_uri() if req else "") or ""
-            uri_lower = uri.lower()
-            is_oauth_popup = (
-                not uri
-                or uri_lower.startswith("about:blank")
-                or "accounts.google.com" in uri_lower
-                or "firebaseapp.com" in uri_lower
-                or "googleapis.com" in uri_lower
-                or "firebase_auth_bridge=1" in uri_lower
-                or ".run.app" in uri_lower
-            )
-            if is_oauth_popup and HAS_WEBKIT2 and WebKit2 is not None and hasattr(WebKit2.WebView, "new_with_related_view"):
-                popup_win = Gtk.Window(title="Google Sign-In · Recursos Cockpit")
-                popup_win.set_default_size(560, 680)
-                popup_win.set_Transient_for(self) if hasattr(popup_win, "set_Transient_for") else popup_win.set_transient_for(self)
-                popup_win.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
-                popup_wv = WebKit2.WebView.new_with_related_view(_webview)
-                p_settings = popup_wv.get_settings()
-                p_settings.set_enable_javascript(True)
-                if hasattr(p_settings, "set_javascript_can_open_windows_automatically"):
-                    p_settings.set_javascript_can_open_windows_automatically(True)
-                if hasattr(p_settings, "set_user_agent"):
-                    p_settings.set_user_agent(
-                        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 "
-                        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-                    )
-                popup_wv.connect("close", lambda *_args: popup_win.destroy())
-                popup_win.add(popup_wv)
-                popup_win.show_all()
-                return popup_wv
             if uri and (uri.startswith("http://") or uri.startswith("https://")):
                 subprocess.Popen(
                     ["xdg-open", uri],
@@ -3176,20 +3446,62 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
                 except Exception:
                     pass
 
-    def _apply_css(self):
+    def _apply_css(self, theme_name=None):
+        normalized = str(theme_name or self._current_theme or "light").strip().lower()
+        is_dark = normalized == "dark"
+        self._current_theme = "dark" if is_dark else "light"
         try:
             gtk_settings = Gtk.Settings.get_default()
             if gtk_settings is not None:
-                gtk_settings.set_property("gtk-application-prefer-dark-theme", False)
+                gtk_settings.set_property("gtk-application-prefer-dark-theme", is_dark)
         except Exception:
             pass
-        provider = Gtk.CssProvider()
-        provider.load_from_data(NATIVE_CSS)
         screen = Gdk.Screen.get_default()
         if screen:
+            if self._css_provider is not None:
+                try:
+                    Gtk.StyleContext.remove_provider_for_screen(screen, self._css_provider)
+                except Exception:
+                    pass
+            provider = Gtk.CssProvider()
+            provider.load_from_data(NATIVE_CSS_DARK if is_dark else NATIVE_CSS_LIGHT)
             Gtk.StyleContext.add_provider_for_screen(
                 screen, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
+            self._css_provider = provider
+        if self.webview and HAS_WEBKIT2 and hasattr(self.webview, "set_background_color"):
+            try:
+                rgba = Gdk.RGBA()
+                rgba.parse("#0a140b" if is_dark else "#f5f4f2")
+                self.webview.set_background_color(rgba)
+            except Exception:
+                pass
+
+    def _apply_theme(self, theme_name):
+        normalized = str(theme_name or "").strip().lower()
+        if normalized not in ("light", "dark"):
+            return False
+        if self.conn_mgr.ui_theme != normalized:
+            self.conn_mgr.ui_theme = normalized
+            self.conn_mgr._save_config()
+        if normalized != self._current_theme or self._css_provider is None:
+            self._apply_css(normalized)
+        return False
+
+    def _on_webkit_theme_message(self, _manager, js_result):
+        try:
+            raw_val = ""
+            if hasattr(js_result, "get_js_value"):
+                js_val = js_result.get_js_value()
+                if js_val and hasattr(js_val, "to_string"):
+                    raw_val = str(js_val.to_string() or "")
+            elif isinstance(js_result, str):
+                raw_val = js_result
+            raw_val = raw_val.strip().lower()
+            if raw_val in ("light", "dark"):
+                self._apply_theme(raw_val)
+        except Exception:
+            pass
 
     def _build_headerbar(self):
         hb = Gtk.HeaderBar()
@@ -3329,7 +3641,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         card1.get_style_context().add_class("launcher-card")
         c1_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         c1_t = Gtk.Label(label=i18n_t("native_ubuntu.opt1_title"), xalign=0)
-        c1_t.set_attributes(None)
+        c1_t.get_style_context().add_class("launcher-card-title")
         c1_d = Gtk.Label(
             label=i18n_t("native_ubuntu.opt1_desc"),
             xalign=0,
@@ -3352,6 +3664,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         c2_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         c2_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         c2_t = Gtk.Label(label=i18n_t("native_ubuntu.opt2_title"), xalign=0)
+        c2_t.get_style_context().add_class("launcher-card-title")
         self.lbl_node_info = Gtk.Label(
             label=i18n_t("native_ubuntu.checking_local"),
             xalign=0,
@@ -3389,6 +3702,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         card3.get_style_context().add_class("launcher-card")
         c3_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         c3_t = Gtk.Label(label=i18n_t("native_ubuntu.opt3_title"), xalign=0)
+        c3_t.get_style_context().add_class("launcher-card-title")
         c3_header.pack_start(c3_t, True, True, 0)
         btn_forget = Gtk.Button(label=i18n_t("native_ubuntu.forget_conn"))
         btn_forget.get_style_context().add_class("btn-nav")
@@ -3408,12 +3722,24 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         home_scroll.add(center_box)
         self.main_stack.add_named(home_scroll, "home")
 
-        # Page 2: WebKit2 Unified Interface (use localhost so Firebase Auth recognizes authorized domain)
+        # Page 2: WebKit2 Unified Interface (single canonical Web UI)
         initial_view = "dex" if self.start_in_dex else "inicio"
         target_uri = f"http://localhost:{self.bridge_port}/?env=ubuntu_native&view={initial_view}"
 
         if HAS_WEBKIT2 and WebKit2 is not None:
-            self.webview = WebKit2.WebView()
+            ucm = None
+            try:
+                if hasattr(WebKit2, "UserContentManager") and hasattr(WebKit2.WebView, "new_with_user_content_manager"):
+                    ucm = WebKit2.UserContentManager()
+                    ucm.register_script_message_handler("recursosTheme")
+                    ucm.connect("script-message-received::recursosTheme", self._on_webkit_theme_message)
+            except Exception:
+                ucm = None
+            self.webview = (
+                WebKit2.WebView.new_with_user_content_manager(ucm)
+                if ucm is not None
+                else WebKit2.WebView()
+            )
             settings = self.webview.get_settings()
             settings.set_enable_javascript(True)
             settings.set_enable_webgl(True)
@@ -3436,7 +3762,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
             if hasattr(self.webview, "set_background_color"):
                 rgba = Gdk.RGBA()
-                rgba.parse("#f6f7f9")
+                rgba.parse("#0a140b" if self._current_theme == "dark" else "#f5f4f2")
                 self.webview.set_background_color(rgba)
 
             self._target_webview_uri = target_uri

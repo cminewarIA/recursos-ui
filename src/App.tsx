@@ -20,7 +20,6 @@ import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/a
 import { formatCanonicalRoute, normalizeSubTabForView, resolveAppRoute } from './utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion, isRemoteVersionHigher } from './utils/version';
 import { useI18n } from './i18n';
-import { useFirebase } from './firebase/FirebaseProvider';
 import { installCockpitScrollContainment } from './utils/scrollContain';
 
 interface ToastState {
@@ -30,25 +29,23 @@ interface ToastState {
 }
 
 export function App() {
-  const { t, locale, setLocale } = useI18n();
-  const {
-    user: fbUser,
-    autoSync: fbAutoSync,
-    syncedPreferences: fbPrefs,
-    syncPreferences: fbSyncPreferences,
-    syncHostSnapshot: fbSyncHostSnapshot,
-    syncPingSnapshot: fbSyncPingSnapshot,
-  } = useFirebase();
+  const { t } = useI18n();
   const [theme, setTheme] = useState<ThemeMode>(() => {
     try {
-      return localStorage.getItem('recursos_theme') === 'dark' ? 'dark' : 'light';
+      const stored = localStorage.getItem('recursos_theme');
+      if (stored === 'dark' || stored === 'light') return stored;
+      const nativePref =
+        window.__RECURSOS_INITIAL_THEME__ ||
+        window.RecursosAndroidBridge?.getPreferredTheme?.();
+      if (nativePref === 'dark' || nativePref === 'light') return nativePref;
+      if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+      return 'light';
     } catch {
       return 'light';
     }
   });
-  const applyingRemotePrefRef = useRef(false);
-  const lastNodeSyncMsRef = useRef(0);
-  const lastPingSyncMsRef = useRef(0);
 
   const [activeTab, setActiveTab] = useState<MainTabId>(() => {
     if (typeof window !== 'undefined') {
@@ -118,7 +115,7 @@ export function App() {
     }, 3600);
   }, []);
 
-  // Sync theme with DOM & localStorage
+  // Sync theme with DOM, localStorage & native shells (Android WebView + Ubuntu GTK3/WebKit2)
   const applyTheme = useCallback((next: ThemeMode) => {
     setTheme(next);
     try {
@@ -131,35 +128,32 @@ export function App() {
       if (next === 'dark') document.documentElement.classList.add('dark');
       else document.documentElement.classList.remove('dark');
     }
+    if (typeof window !== 'undefined') {
+      try {
+        window.RecursosAndroidBridge?.onThemeChanged?.(next);
+      } catch {
+        // ignore
+      }
+      try {
+        window.webkit?.messageHandlers?.recursosTheme?.postMessage?.(next);
+      } catch {
+        // ignore
+      }
+      if (detectNativeEnvironment().isUbuntuNative) {
+        void fetch('/api/native/theme', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ theme: next }),
+        }).catch(() => {
+          // ignore
+        });
+      }
+    }
   }, []);
 
   useEffect(() => {
     applyTheme(theme);
   }, [applyTheme, theme]);
-
-  // Apply remote Cloud Firestore preferences when received via real-time onSnapshot
-  useEffect(() => {
-    if (!fbUser?.emailVerified || !fbPrefs) return;
-    applyingRemotePrefRef.current = true;
-    if (fbPrefs.theme && fbPrefs.theme !== theme) {
-      applyTheme(fbPrefs.theme);
-    }
-    if (fbPrefs.locale && fbPrefs.locale !== locale) {
-      setLocale(fbPrefs.locale);
-    }
-    const id = window.setTimeout(() => {
-      applyingRemotePrefRef.current = false;
-    }, 50);
-    return () => window.clearTimeout(id);
-  }, [fbUser?.emailVerified, fbPrefs, theme, locale, applyTheme, setLocale]);
-
-  // Persist local theme/locale changes to Cloud Firestore when authenticated
-  useEffect(() => {
-    if (!fbUser?.emailVerified || applyingRemotePrefRef.current) return;
-    void fbSyncPreferences({ theme, locale }).catch(() => {
-      // Structured Firestore error already logged by handleFirestoreError
-    });
-  }, [fbUser?.emailVerified, theme, locale, fbSyncPreferences]);
 
   // Fetch telemetry
   const fetchMetrics = useCallback(async () => {
@@ -489,28 +483,6 @@ export function App() {
   const cpuNow = Number(metrics?.cpu?.usage_percent ?? 0);
   const ramNow = Number(metrics?.ram?.percent ?? 0);
   const isHealthy = !connError && topbarErrors === 0 && cpuNow < 88 && ramNow < 90;
-
-  // Throttled live host telemetry snapshot sync to Cloud Firestore (every 20s when autoSync enabled)
-  useEffect(() => {
-    if (!fbUser?.emailVerified || !fbAutoSync || !metrics) return;
-    const nowMs = Date.now();
-    if (nowMs - lastNodeSyncMsRef.current < 20_000) return;
-    lastNodeSyncMsRef.current = nowMs;
-    void fbSyncHostSnapshot(metrics, isHealthy, Boolean(connError)).catch(() => {
-      // Structured Firestore error logged by handleFirestoreError
-    });
-  }, [fbUser?.emailVerified, fbAutoSync, metrics, isHealthy, connError, fbSyncHostSnapshot]);
-
-  // Throttled ping latency history snapshot sync to Cloud Firestore (every 60s when autoSync enabled)
-  useEffect(() => {
-    if (!fbUser?.emailVerified || !fbAutoSync || !metrics?.net?.ping_latency?.targets?.length) return;
-    const nowMs = Date.now();
-    if (nowMs - lastPingSyncMsRef.current < 60_000) return;
-    lastPingSyncMsRef.current = nowMs;
-    void fbSyncPingSnapshot(metrics).catch(() => {
-      // Structured Firestore error logged by handleFirestoreError
-    });
-  }, [fbUser?.emailVerified, fbAutoSync, metrics, fbSyncPingSnapshot]);
 
   const currentRoutePath = formatCanonicalRoute(activeTab, subTabHint);
 

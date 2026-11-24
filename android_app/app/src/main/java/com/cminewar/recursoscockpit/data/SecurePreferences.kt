@@ -43,11 +43,16 @@ class SecurePreferences(context: Context) {
         get() = prefs.getBoolean(KEY_CERT_REVOKED, false)
         set(value) = prefs.edit().putBoolean(KEY_CERT_REVOKED, value).apply()
 
+    var uiTheme: String
+        get() = prefs.getString(KEY_UI_THEME, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_UI_THEME, value).apply()
+
     companion object {
         private const val KEY_DEVICE_TOKEN = "device_token"
         private const val KEY_SAVED_HOST = "saved_host"
         private const val KEY_MANUAL_PORT = "manual_port"
         private const val KEY_WAN_DOMAIN = "wan_domain"
         private const val KEY_CERT_REVOKED = "cert_revoked"
+        private const val KEY_UI_THEME = "ui_theme"
     }
 }

@@ -3,6 +3,7 @@ package com.cminewar.recursoscockpit
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.lifecycle.lifecycleScope
 import com.cminewar.recursoscockpit.data.*
@@ -28,12 +29,24 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val dictRevision = I18nDictionary.catalogRevision
-            RecursosCockpitTheme {
+            val systemDark = isSystemInDarkTheme()
+            var uiThemePref by remember { mutableStateOf(securePreferences.uiTheme) }
+            val isDarkTheme = when (uiThemePref) {
+                "dark" -> true
+                "light" -> false
+                else -> systemDark
+            }
+
+            RecursosCockpitTheme(darkTheme = isDarkTheme) {
                 var connectionMode by remember { mutableStateOf(ConnectionMode.CONNECTING) }
                 var activeUrl by remember { mutableStateOf("") }
                 var scanningMessage by remember(dictRevision) {
                     mutableStateOf(
-                        I18nDictionary.t(this@MainActivity, "native_android.searching_wifi", "Buscando tu servidor en la red Wi-Fi...")
+                        I18nDictionary.t(
+                            this@MainActivity,
+                            "native_android.searching_wifi",
+                            "Buscando tu servidor en la red Wi-Fi..."
+                        )
                     )
                 }
 
@@ -109,6 +122,13 @@ class MainActivity : ComponentActivity() {
                     connectionMode = connectionMode,
                     activeUrl = activeUrl,
                     scanningMessage = scanningMessage,
+                    isDarkTheme = isDarkTheme,
+                    onThemeChanged = { nextTheme ->
+                        if (nextTheme == "dark" || nextTheme == "light") {
+                            securePreferences.uiTheme = nextTheme
+                            uiThemePref = nextTheme
+                        }
+                    },
                     deviceTelemetryProvider = { apiService.getDeviceTelemetryJson() },
                     webViewHeadersProvider = { apiService.buildWebViewAuthHeaders() },
                     onRefresh = { triggerDiscoveryAndRefresh() }
