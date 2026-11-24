@@ -7985,6 +7985,26 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
             except Exception:
                 pass
 
+        # Limpiar APKs obsoletos en dist/ que no correspondan a la versión activa
+        try:
+            dist_dir_ota = os.path.join(BASE_DIR, "dist")
+            expected_apk_name = f"recursos-cockpit_{new_ver}.apk"
+            if os.path.isdir(dist_dir_ota):
+                for stale_apk in glob.glob(os.path.join(dist_dir_ota, "recursos-cockpit_*.apk")):
+                    if os.path.basename(stale_apk) != expected_apk_name:
+                        try:
+                            os.remove(stale_apk)
+                        except OSError:
+                            pass
+                canonical_link = os.path.join(dist_dir_ota, "recursos-cockpit.apk")
+                if os.path.lexists(canonical_link) and not os.path.isfile(os.path.join(dist_dir_ota, expected_apk_name)):
+                    try:
+                        os.remove(canonical_link)
+                    except OSError:
+                        pass
+        except Exception:
+            pass
+
         in_perm_cooldown = (time.time() < AUTO_INSTALL_STATE.get("perm_cooldown_until", 0.0))
         desktop_installed = os.path.isfile("/usr/bin/recursos-cockpit")
         should_install_deb = bool(desktop_installed or is_manual or trigger_source == "local_package_detected")
@@ -15760,15 +15780,10 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             if requested_name in ["recursos-cockpit.deb", "app.deb", "app_deb"]:
                 if os.path.isfile(canonical_deb):
                     deb_file = canonical_deb
-                else:
-                    candidates = sorted(glob.glob(os.path.join(dist_dir, "recursos-cockpit_*.deb")), reverse=True)
-                    deb_file = candidates[0] if candidates else None
             else:
                 specific_file = os.path.join(dist_dir, requested_name)
                 if os.path.isfile(specific_file):
                     deb_file = specific_file
-                elif os.path.isfile(canonical_deb):
-                    deb_file = canonical_deb
 
             if deb_file and os.path.isfile(deb_file):
                 try:
@@ -15778,6 +15793,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     self.send_header('Content-Type', 'application/vnd.debian.binary-package')
                     self.send_header('Content-Disposition', f'attachment; filename="{out_fname}"')
                     self.send_header('Content-Length', str(fsize))
+                    self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
                     self.send_security_headers()
                     self.end_headers()
                     with open(deb_file, 'rb') as f:
@@ -15787,10 +15803,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 except Exception as e:
                     print(f"[DOWNLOAD DEB ERROR] {e}")
 
-            # Redirigir a la release oficial de GitHub si no está disponible localmente
+            # Redirigir a la release oficial de GitHub si el .deb de la versión activa no está localmente
             github_deb = f"https://github.com/cminewarIA/recursos-ui/releases/download/v{current_ver}/recursos-cockpit_{current_ver}_amd64.deb"
             self.send_response(302)
             self.send_header('Location', github_deb)
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             self.send_security_headers()
             self.end_headers()
             return
@@ -15805,17 +15822,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             requested_name = os.path.basename(clean_path)
             apk_file = None
             if requested_name in ["recursos-cockpit.apk", "app.apk", "app_apk"]:
+                # Nunca servir una APK de una versión anterior almacenada en dist/
                 if os.path.isfile(canonical_apk):
                     apk_file = canonical_apk
-                else:
-                    candidates = sorted(glob.glob(os.path.join(dist_dir, "recursos-cockpit_*.apk")), reverse=True)
-                    apk_file = candidates[0] if candidates else None
             else:
                 specific_file = os.path.join(dist_dir, requested_name)
                 if os.path.isfile(specific_file):
                     apk_file = specific_file
-                elif os.path.isfile(canonical_apk):
-                    apk_file = canonical_apk
 
             if apk_file and os.path.isfile(apk_file):
                 try:
@@ -15825,6 +15838,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     self.send_header('Content-Type', 'application/vnd.android.package-archive')
                     self.send_header('Content-Disposition', f'attachment; filename="{out_fname}"')
                     self.send_header('Content-Length', str(fsize))
+                    self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
                     self.send_security_headers()
                     self.end_headers()
                     with open(apk_file, 'rb') as f:
@@ -15834,10 +15848,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 except Exception as e:
                     print(f"[DOWNLOAD APK ERROR] {e}")
 
-            # Redirigir a la release oficial de GitHub si no está disponible localmente
+            # Redirigir a la release oficial de GitHub para obtener siempre el APK firmado de la versión activa
             github_apk = f"https://github.com/cminewarIA/recursos-ui/releases/download/v{current_ver}/recursos-cockpit_{current_ver}.apk"
             self.send_response(302)
             self.send_header('Location', github_apk)
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             self.send_security_headers()
             self.end_headers()
             return

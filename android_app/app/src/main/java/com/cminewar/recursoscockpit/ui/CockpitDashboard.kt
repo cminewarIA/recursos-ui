@@ -3,9 +3,11 @@ package com.cminewar.recursoscockpit.ui
 import android.annotation.SuppressLint
 import android.app.UiModeManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
@@ -43,6 +45,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -165,6 +169,8 @@ fun CockpitDashboard(
     activeUrl: String,
     scanningMessage: String,
     isDarkTheme: Boolean,
+    serverVersion: String = "",
+    availableApkUpdateVersion: String = "",
     onThemeChanged: (String) -> Unit,
     deviceTelemetryProvider: () -> String,
     webViewHeadersProvider: () -> Map<String, String> = { emptyMap() },
@@ -180,6 +186,8 @@ fun CockpitDashboard(
     var lastLoadedToken by remember { mutableStateOf("") }
     var retryBtnFocused by remember { mutableStateOf(false) }
     var revokedBtnFocused by remember { mutableStateOf(false) }
+    var updateBtnFocused by remember { mutableStateOf(false) }
+    var updateBannerDismissed by remember(availableApkUpdateVersion) { mutableStateOf(false) }
 
     val latestMode by rememberUpdatedState(connectionMode)
     val latestUrl by rememberUpdatedState(activeUrl)
@@ -316,6 +324,9 @@ fun CockpitDashboard(
 
     fun reloadWithAuthHeaders(wv: WebView?) {
         val targetWv = wv ?: return
+        try {
+            targetWv.clearCache(true)
+        } catch (_: Exception) {}
         if (activeUrl.isNotEmpty()) {
             syncWebViewAuthCookie(activeUrl, targetWv)
             lastLoadedBaseUrl = activeUrl
@@ -340,6 +351,21 @@ fun CockpitDashboard(
                 wv.loadUrl(activeUrl, webViewHeadersProvider())
             } else {
                 injectNativeContext(wv)
+            }
+        }
+    }
+
+    // Invalidar caché de WebView automáticamente cuando el servidor cambia de versión
+    LaunchedEffect(serverVersion, activeUrl) {
+        val wv = webViewRef ?: return@LaunchedEffect
+        if (serverVersion.isNotBlank() && serverVersion != securePreferences.lastServerVersion) {
+            val hadPrevious = securePreferences.lastServerVersion.isNotBlank()
+            securePreferences.lastServerVersion = serverVersion
+            try {
+                wv.clearCache(true)
+            } catch (_: Exception) {}
+            if (hadPrevious && activeUrl.isNotEmpty()) {
+                reloadWithAuthHeaders(wv)
             }
         }
     }
@@ -376,7 +402,7 @@ fun CockpitDashboard(
                         databaseEnabled = true
                         mediaPlaybackRequiresUserGesture = false
                         mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                        cacheMode = WebSettings.LOAD_DEFAULT
+                        cacheMode = WebSettings.LOAD_NO_CACHE
                         useWideViewPort = true
                         loadWithOverviewMode = true
                         setSupportZoom(false)
@@ -388,6 +414,17 @@ fun CockpitDashboard(
                         val tvSuffix = if (isTvDevice) "; AndroidTV" else ""
                         val cleanBaseUa = userAgentString.replace("; wv", "").replace("Version/4.0 ", "")
                         userAgentString = "$cleanBaseUa RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (NativeHTML; FullAccess$tvSuffix)"
+                    }
+
+                    setDownloadListener { downloadUrl, _, _, _, _ ->
+                        if (!downloadUrl.isNullOrBlank()) {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl)).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
                     }
 
                     addJavascriptInterface(
@@ -673,6 +710,98 @@ fun CockpitDashboard(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
+                }
+            }
+        }
+
+        // Aviso discreto Alethia cuando existe una APK más reciente que la instalada
+        AnimatedVisibility(
+            visible = availableApkUpdateVersion.isNotBlank() &&
+                !updateBannerDismissed &&
+                !showConnectionOverlay &&
+                connectionMode != ConnectionMode.REVOKED,
+            enter = fadeIn(tween(240)) + slideInVertically(initialOffsetY = { 48 }),
+            exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { 48 })
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(paletteCard)
+                    .border(1.dp, accentPillBorder, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        tint = accentPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = I18nDictionary.t(
+                                context,
+                                "native_android.apk_update_title",
+                                "Nueva app Android disponible"
+                            ),
+                            color = paletteTextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${formatDisplayVersion()} → v$availableApkUpdateVersion",
+                            color = paletteTextSecondary,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isDarkTheme) AlethiaLime else AlethiaObsidian)
+                            .border(
+                                width = if (updateBtnFocused) 2.dp else 1.dp,
+                                color = if (updateBtnFocused) accentPrimary else Color.Transparent,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .onFocusChanged { updateBtnFocused = it.isFocused }
+                            .focusable()
+                            .clickable {
+                                val targetApkUrl = if (activeUrl.isNotBlank()) {
+                                    "${activeUrl.trimEnd('/')}/download/recursos-cockpit.apk"
+                                } else {
+                                    "https://github.com/cminewarIA/recursos-ui/releases/download/v$availableApkUpdateVersion/recursos-cockpit_$availableApkUpdateVersion.apk"
+                                }
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetApkUrl)).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            text = I18nDictionary.t(context, "native_android.apk_update_action", "Actualizar"),
+                            color = if (isDarkTheme) AlethiaObsidian else AlethiaLime,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = paletteTextSecondary,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clickable { updateBannerDismissed = true }
+                    )
                 }
             }
         }

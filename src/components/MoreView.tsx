@@ -78,7 +78,15 @@ export const MoreView: React.FC<MoreViewProps> = ({
   onSubTabChange,
 }) => {
   const { locale, supportedLocales, localeNames, otaSource, isSyncingLanguages, setLocale, syncFromGitHub, t } = useI18n();
-  const { isUbuntuNative, isNativeApp } = detectNativeEnvironment();
+  const { isUbuntuNative, isAndroidNative, isNativeApp } = detectNativeEnvironment();
+  const installedAndroidVersion = useMemo(() => {
+    if (!isAndroidNative || typeof window === 'undefined') return '';
+    const tel = window.__RECURSOS_DEVICE_TELEMETRY__ as { app_version?: string } | undefined;
+    const raw = String(tel?.app_version || '').trim().replace(/^v/i, '');
+    if (raw) return raw;
+    const uaMatch = (navigator.userAgent || '').match(/RecursosCockpit-Android\/([0-9.]+)/i);
+    return uaMatch ? uaMatch[1] : '';
+  }, [isAndroidNative]);
   const [subTab, setSubTab] = useState<MoreSubTab>(() => resolveMoreSubTab(initialSubTab) || 'updates');
 
   const handleSelectSubTab = (id: MoreSubTab) => {
@@ -1169,43 +1177,61 @@ export const MoreView: React.FC<MoreViewProps> = ({
             );
           })()}
 
-          {/* Native apps download (shown in Web browser only) */}
-          {!isNativeApp && (
+          {/* Native apps download (Web shows Ubuntu + Android; Android native also exposes APK update) */}
+          {(!isNativeApp || isAndroidNative) && (
             <section className="cockpit-bento p-5">
-              <div className="pb-4 border-b border-slate-200/70 dark:border-slate-800">
-                <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                  {t('more.native_apps_title')}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {t('more.devices_desc')}
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
+                <div>
+                  <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                    {t('more.native_apps_title')}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('more.devices_desc')}
+                  </p>
+                </div>
+                <span className="cockpit-pill-emerald rounded-lg px-2.5 py-1 font-mono text-[11px] font-bold tabular-nums">
+                  v{displayVer}
+                </span>
               </div>
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <a
-                  href="/download/recursos-cockpit.deb"
-                  className="cockpit-subtile flex min-h-[60px] items-center justify-between px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:border-sky-400 dark:text-slate-100"
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="cockpit-pill-cyan inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
-                      <Laptop className="h-5 w-5" />
+              <div className={`mt-4 grid grid-cols-1 gap-3 ${!isAndroidNative ? 'sm:grid-cols-2' : ''}`}>
+                {!isAndroidNative && (
+                  <a
+                    href="/download/recursos-cockpit.deb"
+                    className="cockpit-subtile flex min-h-[60px] items-center justify-between px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:border-sky-400 dark:text-slate-100"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="cockpit-pill-cyan inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+                        <Laptop className="h-5 w-5" />
+                      </span>
+                      <span>
+                        <span className="block">{t('more.ubuntu_app')}</span>
+                        <span className="font-normal text-slate-500 dark:text-slate-400">{t('more.ubuntu_app_sub')}</span>
+                      </span>
                     </span>
-                    <span>
-                      <span className="block">{t('more.ubuntu_app')}</span>
-                      <span className="font-normal text-slate-500 dark:text-slate-400">{t('more.ubuntu_app_sub')}</span>
-                    </span>
-                  </span>
-                  <Download className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                </a>
+                    <Download className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                  </a>
+                )}
                 <a
                   href="/download/recursos-cockpit.apk"
-                  className="cockpit-subtile flex min-h-[60px] items-center justify-between px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:border-emerald-400 dark:text-slate-100"
+                  className={`cockpit-subtile flex min-h-[60px] items-center justify-between px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:border-emerald-400 dark:text-slate-100 ${
+                    installedAndroidVersion && installedAndroidVersion !== displayVer
+                      ? 'ring-1 ring-[#1e6b38]/40 dark:ring-[#c6f19d]/40'
+                      : ''
+                  }`}
                 >
                   <span className="flex items-center gap-3">
                     <span className="cockpit-pill-emerald inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
                       <Smartphone className="h-5 w-5" />
                     </span>
                     <span>
-                      <span className="block">{t('more.android_app')}</span>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span>{t('more.android_app')}</span>
+                        {installedAndroidVersion && installedAndroidVersion !== displayVer && (
+                          <span className="cockpit-pill-lime rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums">
+                            v{installedAndroidVersion} → v{displayVer}
+                          </span>
+                        )}
+                      </span>
                       <span className="font-normal text-slate-500 dark:text-slate-400">{t('more.android_app_sub')}</span>
                     </span>
                   </span>

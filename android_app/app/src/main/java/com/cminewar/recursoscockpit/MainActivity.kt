@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
             RecursosCockpitTheme(darkTheme = isDarkTheme) {
                 var connectionMode by remember { mutableStateOf(ConnectionMode.CONNECTING) }
                 var activeUrl by remember { mutableStateOf("") }
+                var serverVersion by remember { mutableStateOf(securePreferences.lastServerVersion) }
                 var scanningMessage by remember(dictRevision) {
                     mutableStateOf(
                         I18nDictionary.t(
@@ -50,10 +51,19 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                fun updateDetectedServerVersion(candidate: String?) {
+                    val clean = candidate?.trim()?.removePrefix("v")?.removePrefix("V") ?: ""
+                    if (clean.isNotEmpty() && clean != serverVersion) {
+                        serverVersion = clean
+                    }
+                }
+
                 suspend fun finalizeConnectedEndpoint(endpoint: ResolvedEndpoint) {
                     if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN) {
                         apiService.registerDeviceWithServer(endpoint.url)
-                        val (_, isRevoked) = apiService.fetchMetrics(endpoint.url)
+                        val (metricsData, isRevoked) = apiService.fetchMetrics(endpoint.url)
+                        val vInfo = metricsData?.versionInfo
+                        updateDetectedServerVersion(vInfo?.currentVersion ?: vInfo?.localVersion ?: vInfo?.version)
                         activeUrl = endpoint.url
                         connectionMode = if (isRevoked || securePreferences.isCertRevoked) {
                             ConnectionMode.REVOKED
@@ -106,6 +116,9 @@ class MainActivity : ComponentActivity() {
                                     scanningMessage = msg
                                 }
                                 finalizeConnectedEndpoint(newEndpoint)
+                            } else {
+                                val vInfo = data.versionInfo
+                                updateDetectedServerVersion(vInfo?.currentVersion ?: vInfo?.localVersion ?: vInfo?.version)
                             }
                         } else {
                             val newEndpoint = discoveryManager.resolveActiveNode { msg ->
@@ -117,12 +130,22 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val availableApkUpdateVersion = remember(serverVersion) {
+                    if (serverVersion.isNotBlank() && apiService.isRemoteVersionNewer(serverVersion, BuildConfig.VERSION_NAME)) {
+                        serverVersion
+                    } else {
+                        ""
+                    }
+                }
+
                 CockpitDashboard(
                     securePreferences = securePreferences,
                     connectionMode = connectionMode,
                     activeUrl = activeUrl,
                     scanningMessage = scanningMessage,
                     isDarkTheme = isDarkTheme,
+                    serverVersion = serverVersion,
+                    availableApkUpdateVersion = availableApkUpdateVersion,
                     onThemeChanged = { nextTheme ->
                         if (nextTheme == "dark" || nextTheme == "light") {
                             securePreferences.uiTheme = nextTheme

@@ -33,7 +33,8 @@ import kotlin.math.roundToInt
 data class HealthCheckResult(
     val isOnline: Boolean,
     val isRevoked: Boolean = false,
-    val isRecursosServer: Boolean = false
+    val isRecursosServer: Boolean = false,
+    val serverVersion: String = ""
 )
 
 class ApiService(
@@ -311,9 +312,28 @@ class ApiService(
         }
     }
 
+    fun isRemoteVersionNewer(remoteVer: String, localVer: String): Boolean {
+        fun parseParts(raw: String): List<Int> {
+            return raw.trim().removePrefix("v").removePrefix("V")
+                .split(".")
+                .map { it.takeWhile { ch -> ch.isDigit() }.toIntOrNull() ?: 0 }
+        }
+        val r = parseParts(remoteVer)
+        val l = parseParts(localVer)
+        val maxLen = maxOf(r.size, l.size, 3)
+        for (i in 0 until maxLen) {
+            val rv = r.getOrElse(i) { 0 }
+            val lv = l.getOrElse(i) { 0 }
+            if (rv != lv) return rv > lv
+        }
+        return false
+    }
+
     fun buildWebViewAuthHeaders(): Map<String, String> {
         val headers = mutableMapOf(
-            "X-Recursos-Client" to "android_native"
+            "X-Recursos-Client" to "android_native",
+            "Cache-Control" to "no-cache",
+            "Pragma" to "no-cache"
         )
         val telemetryB64 = getEncodedTelemetryHeader()
         if (telemetryB64.isNotEmpty()) {
@@ -352,12 +372,17 @@ class ApiService(
             httpClient.newCall(reqBuilder.build()).execute().use { response ->
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: ""
+                    var detectedVer = ""
                     try {
                         val jsonObj = org.json.JSONObject(body)
                         learnWanDomain(jsonObj.optString("public_domain", ""))
+                        detectedVer = jsonObj.optString("current_version", "")
+                            .ifBlank { jsonObj.optString("local_version", "") }
+                            .ifBlank { jsonObj.optString("version", "") }
+                            .trim()
                     } catch (_: Exception) {}
                     val isRecursos = body.contains("Recursos") || body.contains("version") || body.contains("current_version")
-                    HealthCheckResult(isOnline = true, isRevoked = false, isRecursosServer = isRecursos)
+                    HealthCheckResult(isOnline = true, isRevoked = false, isRecursosServer = isRecursos, serverVersion = detectedVer)
                 } else if (response.code == 403) {
                     val body = response.body?.string() ?: ""
                     val isLocked = body.contains("locked") || body.contains("denegado") || body.isEmpty()

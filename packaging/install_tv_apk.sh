@@ -13,12 +13,20 @@ VERSION="$(tr -d '[:space:]' < "$PROJECT_ROOT/VERSION")"
 PKG_ID="com.cminewar.recursoscockpit"
 
 APK_PATH="${1:-$PROJECT_ROOT/dist/recursos-cockpit_${VERSION}.apk}"
-if [ ! -f "$APK_PATH" ] && [ -f "$PROJECT_ROOT/dist/recursos-cockpit.apk" ]; then
-    APK_PATH="$PROJECT_ROOT/dist/recursos-cockpit.apk"
+if [ -z "${1:-}" ] && [ ! -f "$APK_PATH" ]; then
+    mkdir -p "$PROJECT_ROOT/dist"
+    GITHUB_APK_URL="https://github.com/cminewarIA/recursos-ui/releases/download/v${VERSION}/recursos-cockpit_${VERSION}.apk"
+    echo "📥 Descargando APK oficial firmada v${VERSION} desde GitHub Releases..."
+    if command -v curl >/dev/null 2>&1 && curl -fsSL -o "${APK_PATH}.tmp" "$GITHUB_APK_URL"; then
+        mv -f "${APK_PATH}.tmp" "$APK_PATH"
+        ln -sf "recursos-cockpit_${VERSION}.apk" "$PROJECT_ROOT/dist/recursos-cockpit.apk"
+    else
+        rm -f "${APK_PATH}.tmp"
+    fi
 fi
 
 if [ ! -f "$APK_PATH" ]; then
-    echo "❌ No se encontró la APK a instalar ($APK_PATH). Ejecuta primero: bash packaging/build_apk.sh" >&2
+    echo "❌ No se encontró la APK oficial v${VERSION} ($APK_PATH). Compila con 'bash packaging/build_apk.sh' o verifica conexión a GitHub Releases." >&2
     exit 1
 fi
 

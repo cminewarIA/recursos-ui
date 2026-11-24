@@ -14,6 +14,8 @@ enum class ConnectionMode {
 
 data class VersionInfo(
     @SerializedName("version") val version: String = "",
+    @SerializedName("current_version") val currentVersion: String? = null,
+    @SerializedName("local_version") val localVersion: String? = null,
     @SerializedName("repo") val repo: String? = null,
     @SerializedName("local_hash") val localHash: String? = null,
     @SerializedName("public_domain") val publicDomain: String? = null,
