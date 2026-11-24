@@ -47,27 +47,27 @@ export const FloatingTooltip: React.FC<{ data: FloatingTooltipData | null }> = (
       ref={boxRef}
       role="tooltip"
       style={{ left: `${pos.left}px`, top: `${pos.top}px` }}
-      className="cockpit-tooltip-enter pointer-events-none fixed z-[9999] min-w-[182px] max-w-[272px] rounded-xl border border-[#c6f19d]/25 bg-[#0f1f10]/96 px-3 py-2.5 text-xs text-[#f5f4f2] shadow-2xl backdrop-blur-md transition-opacity duration-100"
+      className="cockpit-tooltip-enter pointer-events-none fixed z-[9999] min-w-[182px] max-w-[272px] rounded-xl border border-slate-200/90 bg-white/96 px-3 py-2.5 text-xs text-slate-900 shadow-xl backdrop-blur-md transition-opacity duration-100 dark:border-[#c6f19d]/25 dark:bg-[#0f1f10]/96 dark:text-[#f5f4f2] dark:shadow-2xl"
     >
-      <div className="mb-1.5 flex items-baseline justify-between gap-2 border-b border-[#c6f19d]/15 pb-1">
-        <span className="font-mono text-[11px] font-semibold tabular-nums text-[#f5f4f2]">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2 border-b border-slate-200/80 pb-1 dark:border-[#c6f19d]/15">
+        <span className="font-mono text-[11px] font-semibold tabular-nums text-slate-900 dark:text-[#f5f4f2]">
           {data.title}
         </span>
         {data.subtitle ? (
-          <span className="font-mono text-[10.5px] text-[#9eb09f]">{data.subtitle}</span>
+          <span className="font-mono text-[10.5px] text-slate-500 dark:text-[#9eb09f]">{data.subtitle}</span>
         ) : null}
       </div>
       <div className="space-y-1">
         {data.entries.map((entry, idx) => (
           <div key={`${entry.label}-${idx}`} className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-1.5 text-[#d4ddd3]">
+            <span className="flex items-center gap-1.5 text-slate-600 dark:text-[#d4ddd3]">
               <span
                 className="inline-block h-2 w-2 shrink-0 rounded-full"
                 style={{ backgroundColor: entry.color }}
               />
               <span className="truncate">{entry.label}</span>
             </span>
-            <span className="font-mono text-[11px] font-semibold tabular-nums text-[#c6f19d]">
+            <span className="font-mono text-[11px] font-semibold tabular-nums text-[#1e6b38] dark:text-[#c6f19d]">
               {entry.value}
             </span>
           </div>

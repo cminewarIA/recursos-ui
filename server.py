@@ -14170,6 +14170,93 @@ VALID_WEB_ROUTES = {
     "/dex"
 }
 
+VALID_WEB_PREFIXES = (
+    "/inicio",
+    "/equipo",
+    "/hardware",
+    "/red",
+    "/network",
+    "/programas",
+    "/apps",
+    "/software",
+    "/workloads",
+    "/mas",
+    "/more",
+    "/resumen",
+    "/procesador",
+    "/cpu",
+    "/memoria",
+    "/ram",
+    "/grafica",
+    "/gpu",
+    "/almacenamiento",
+    "/storage",
+    "/discos",
+    "/seguridad",
+    "/security",
+    "/escudo",
+    "/shield",
+    "/aplicaciones",
+    "/contenedores",
+    "/containers",
+    "/docker",
+    "/servicios",
+    "/services",
+    "/systemd",
+    "/multimedia",
+    "/media",
+    "/descargas",
+    "/downloads",
+    "/procesos",
+    "/processes",
+    "/bots",
+    "/telegram",
+    "/sistema",
+    "/version",
+    "/actualizaciones",
+    "/updates",
+    "/dispositivos",
+    "/devices",
+    "/nodos",
+    "/dns",
+    "/duckdns",
+    "/pihole",
+    "/speedtest",
+    "/testdevelocidad",
+    "/velocidad",
+    "/mapa",
+    "/map",
+    "/geoip",
+    "/trafico",
+    "/traffic",
+    "/historial",
+    "/history",
+    "/dex",
+    "/ajustes",
+    "/settings",
+    "/cloud",
+    "/nube",
+    "/health",
+    "/salud",
+    "/logs",
+)
+
+def is_valid_web_route(path_str):
+    if not path_str:
+        return False
+    clean = "/" + str(path_str).strip("/").lower()
+    if clean in ("/", "/index.html"):
+        return True
+    if clean.startswith("/api/") or clean.startswith("/assets/"):
+        return False
+    parts = [s for s in clean.strip("/").split("/") if s]
+    if len(parts) > 2:
+        return False
+    last_seg = parts[-1] if parts else ""
+    if "." in last_seg and not last_seg.endswith(".html"):
+        return False
+    return any(clean == p or clean.startswith(p + "/") for p in VALID_WEB_PREFIXES)
+
 def send_wol_magic_packet(mac_str, target_ip="", details_out=None):
     """
     Envía paquetes mágicos Wake-on-LAN multivía y multired calculando
@@ -14608,7 +14695,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 f'<script>window.__INITIAL_APP_VERSION__ = "{current_ver}"; window.__INITIAL_DISPLAY_VERSION__ = "{disp_ver}"; window.__INITIAL_APP_HASH__ = "{local_sha}";</script>'
             )
             if '</head>' in content_str:
-                content_str = content_str.replace('</head>', f'{build_injection}\n</head>', 1)
+                head_before, head_after = content_str.rsplit('</head>', 1)
+                content_str = f'{head_before}{build_injection}\n</head>{head_after}'
             content = content_str.encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -15470,9 +15558,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self._serve_html_with_bootstrap(auth, manual_path, is_dashboard=False)
             return
 
-        # 3. RUTAS WEB LIMPIAS MULTIPÁGINA (History API + Acceso Directo)
-        elif clean_path in VALID_WEB_ROUTES:
+        # 3. RUTAS WEB LIMPIAS MULTIPÁGINA (History API + Acceso Directo a Submenús)
+        elif clean_path in VALID_WEB_ROUTES or is_valid_web_route(clean_path):
             index_path = os.path.join(STATIC_DIR, "index.html")
+            if not os.path.isfile(index_path):
+                index_path = os.path.join(BASE_DIR, "dist", "index.html")
             if not os.path.isfile(index_path):
                 index_path = os.path.join(BASE_DIR, "index.html")
             self._serve_html_with_bootstrap(auth, index_path, is_dashboard=True)
@@ -15582,6 +15672,70 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.send_security_headers()
             self.end_headers()
             self.wfile.write(b"Icon Not Found")
+            return
+
+        # 4a-bis. ARCHIVOS ESTÁTICOS DE BUNDLE VITE (/assets/*)
+        elif clean_path.startswith("/assets/"):
+            rel_asset = os.path.normpath(clean_path[len("/assets/"):]).lstrip("/\\")
+            if not rel_asset or rel_asset.startswith("..") or "/../" in f"/{rel_asset}/":
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                self.wfile.write(b"Forbidden")
+                return
+
+            candidate_dirs = [
+                os.path.join(BASE_DIR, "dist", "assets"),
+                os.path.join(STATIC_DIR, "assets"),
+                STATIC_DIR,
+                os.path.join(BASE_DIR, "dist"),
+                os.path.join(BASE_DIR, "desktop_app", "assets"),
+            ]
+            target_file = None
+            for cdir in candidate_dirs:
+                cand = os.path.join(cdir, rel_asset)
+                if os.path.isfile(cand):
+                    target_file = cand
+                    break
+
+            if target_file:
+                try:
+                    ext = os.path.splitext(target_file)[1].lower()
+                    mime_map = {
+                        ".js": "application/javascript; charset=utf-8",
+                        ".mjs": "application/javascript; charset=utf-8",
+                        ".css": "text/css; charset=utf-8",
+                        ".svg": "image/svg+xml",
+                        ".png": "image/png",
+                        ".jpg": "image/jpeg",
+                        ".jpeg": "image/jpeg",
+                        ".webp": "image/webp",
+                        ".ico": "image/x-icon",
+                        ".woff2": "font/woff2",
+                        ".woff": "font/woff",
+                        ".ttf": "font/ttf",
+                        ".json": "application/json; charset=utf-8",
+                        ".map": "application/json; charset=utf-8",
+                    }
+                    mime_type = mime_map.get(ext, "application/octet-stream")
+                    fsize = os.path.getsize(target_file)
+                    self.send_response(200)
+                    self.send_header('Content-Type', mime_type)
+                    self.send_header('Cache-Control', 'public, max-age=31536000, immutable')
+                    self.send_security_headers()
+                    self.send_header('Content-Length', str(fsize))
+                    self.end_headers()
+                    with open(target_file, 'rb') as f:
+                        while chunk := f.read(65536):
+                            self.wfile.write(chunk)
+                    return
+                except Exception as e:
+                    print(f"[ASSET SERVE ERROR] {rel_asset}: {e}")
+
+            self.send_response(404)
+            self.send_security_headers()
+            self.end_headers()
+            self.wfile.write(b"Asset Not Found")
             return
 
         # 4b. DESCARGA DIRECTA DE LA APP NATIVA PARA LINUX (.deb)

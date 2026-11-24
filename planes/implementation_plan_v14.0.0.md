@@ -1,145 +1,110 @@
-# Rediseño Integral de la Interfaz — Recursos Cockpit v14.0.0
+# Rediseño Mayor Integral de Interfaz y Arquitectura Modular v14.0.0
 
-Rediseño global de la interfaz de Recursos Cockpit hacia una estética **Mission Control / Industrial Cyberpunk** de alta densidad, con navegación lateral colapsable en escritorio, cabecera unificada conforme al Top Bar Contract, instrumentación HUD de precisión con medidores radiales y micro-barras de saturación, y escalado fluido sin desbordamientos en las 5 vistas canónicas.
+Rediseño completo de la interfaz visual de Recursos Cockpit eliminando la barra lateral restrictiva, restaurando el diseño de ancho completo con cabecera editorial despejada y dock flotante elástico, incorporando pestañas modulares independientes con barra de búsqueda rápida transversal (`Ctrl+K`), y resolviendo el arranque del servidor local `python3 server.py` para garantizar visualización inmediata sin pantallas en blanco.
 
----
-
-## User Review & Critical Decisions
+## Decisiones Críticas y Preferencias Confirmadas
 
 > [!IMPORTANT]
-> Al haber continuado sin seleccionar opciones en el cuestionario interactivo, se adoptan las direcciones arquitectónicas recomendadas por la normativa de diseño y las reglas del proyecto (`GEMINI.md`):
-
-- **Dirección estética seleccionada**: **Mission Control & Industrial Cyberpunk Telemetry** (Obsidiana profunda `#0B0F17` / `#0F172A`, superficies estructurales de grafito mate `#1E293B`, acentos de precisión cian eléctrico `#06B6D4` / `#38BDF8`, indicadores de alerta en ámbar `#F59E0B` y coral `#EF4444`, complementado con un modo claro arquitectónico de alta pureza `#F8FAFC`).
-- **Navegación y lienzo de trabajo**: En pantallas de escritorio (`md+`), la navegación principal pasa a una **barra lateral izquierda fija y colapsable** ($64\text{px}$ compacta / $240\text{px}$ expandida) que libera la totalidad de la altura vertical de la pantalla para gráficas y datos. En dispositivos móviles y pantallas estrechas (`< 768px`), se mantiene un dock inferior refinado con acceso táctil optimizado de $\ge 44\text{px}$.
-- **Disciplina visual Anti-Slop**: Supresión total de píldoras estáticas y badges decorativos sobre metadatos; los datos secundarios se muestran como texto limpio con separadores tipográficos (`·`, `/`) y cifras numéricas estrictamente tabulares (`tabular-nums`).
-- **Cero pérdida funcional y persistencia única**: Se preservan al 100% todos los módulos, histórico SQLite local (`recursos_history.db`), simplificación y diagnóstico IA de fallos y conexiones, sincronización Firebase, y herramientas de red/hardware en sus 5 apartados lógicos.
+> **Decisiones confirmadas por el usuario en Fase 1:**
+> 1. **Estructura y Navegación**: Barra superior limpia con dock flotante y ancho completo (se retira la barra lateral fija que restaba espacio y se restaura el lienzo 100% full-width).
+> 2. **Organización de Submenús**: Pestañas modulares independientes con buscador rápido por dominio (`Ctrl+K` y caja de filtro reactiva).
+> 3. **Entorno Local**: Servidor `python3 server.py` en navegador (se asegura servicio de `/assets/*` y compatibilidad total del bundle `static/index.html` sin pantallas en blanco).
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Visión General y Concepto Central
 
-- **Qué hace**: Proporciona un centro de mando y observabilidad integral para servidores domésticos y de laboratorio en tiempo real (CPU, núcleos, GPU, RAM/ZRAM, discos independientes, tráfico WAN/LAN separado, topología de red, mapa GeoIP interactivo, Docker, Systemd, Speedtest y diagnóstico inteligente de fallos con IA).
-- **Público objetivo**: Administradores de sistemas, desarrolladores, usuarios de home lab (NAS, Docker, media servers) y entusiastas del hardware que demandan lectura instantánea sin fricción visual ni saturación.
-- **Propuesta de valor clave**: Transformar la telemetría del servidor en una experiencia de instrumentación de cabina aeronáutica/industrial, donde cada píxel transmite un dato útil, las series temporales ofrecen contexto inmediato (media, pico y actual) y las acciones críticas (reinicio, apagado, Wake-on-LAN) responden en menos de 200 ms.
-
----
-
-## 2. User Experience & Visual Design
-
-### Key User Flows
-
-1. **Revisión Ejecutiva (0 a 3 segundos)**:
-   - El usuario abre la aplicación y visualiza inmediatamente en `/inicio` la barra de estado superior con salud global, latencia de red y carga crítica.
-   - En la zona Hero, medidores angulares y porcentuales de CPU, memoria y almacenamiento muestran el estado de los recursos principales de un solo vistazo.
-2. **Exploración y Filtrado Profundo (3 a 30 segundos)**:
-   - Con un clic o atajo en la barra lateral, el usuario conmuta entre `/inicio`, `/equipo`, `/red`, `/programas` y `/mas`.
-   - En `/red`, alterna entre el tráfico exterior (WAN) y local (LAN), inspecciona las conexiones en el mapa interactivo agrupado por GeoIP o consulta el historial persistente de Speedtest y diagnósticos IA.
-3. **Inspección Técnica y Diagnóstico Asistido**:
-   - Al hacer clic en cualquier gráfica o alerta, se abre el modal de inspección táctil (`ExpandedChartModal`) sin saltos de scroll en el fondo, con zoom temporal (`5m` a `Todo`) y modo cursor de precisión.
-   - En `/mas` y en el avisador de fallos, la IA clasifica el nivel de peligro y sugiere soluciones ejecutables en 1 clic.
-
-### Visual Identity & Theme
-
-- **Aesthetic Direction**: *Industrial Cyberpunk Mission Control* — sobrio, funcional, con ritmo de cuadrícula estricto y geometría refinada.
-- **Color Palette & Mood**:
-  - *Modo Oscuro*: Fondo base Canvas `#0B0F17`, superficies Bento `#111827` con bordes sutiles `rgba(56, 189, 248, 0.12)`, acento primario cian eléctrico `#06B6D4` / `#38BDF8`, estado nominal esmeralda `#10B981`, advertencia ámbar `#F59E0B`, fallo crítico coral `#EF4444`.
-  - *Modo Claro*: Fondo base Canvas `#F8FAFC`, superficies `#FFFFFF` con bordes `#E2E8F0`, acento primario azul marino/cobalto `#0284C7` y textos de alto contraste `#0F172A`.
-  - *Regla 60-30-10*: 60% lienzo neutro, 30% superficies estructurales Bento, 10% acento funcional focalizado en botones activos, barras de progreso y cursores.
-- **Typography & Hierarchy**:
-  - *Fuente de Interfaz y Encabezados*: `Plus Jakarta Sans` / `Outfit` para títulos limpios y lectura humana sin estridencias mecánicas.
-  - *Fuente de Datos, Telemetría y Código*: `JetBrains Mono` / `Geist Mono` con `font-variant-numeric: tabular-nums` para que contadores, IPs, velocidades y porcentajes permanezcan perfectamente alineados verticalmente.
-  - *Escala Tipográfica*: Títulos Hero `clamp(1.75rem, 2.8vw, 2.5rem)`, títulos de sección `16px–20px` con tracking `-0.02em`, métricas primarias `24px–32px tabular-nums`, texto base `14px`, metadatos discretos `11px–12px`.
-- **Component Styling & Layout**:
-  - Rejilla adaptativa universal `.cockpit-auto-grid` basada en `minmax(clamp(260px, 22vw, 360px), 1fr)`.
-  - Contenedores planos de elevación única con bordes hairline (`1px solid var(--border)`).
-  - Eliminación de bordes gruesos asimétricos y de píldoras estáticas. Los indicadores de estado se presentan con etiquetas sobrias mono o insignias semánticas con texto explícito (accesibilidad para daltonismo).
-
-### Interactive Feedback & Motion
-
-- Transiciones fluidas en $\le 180\text{ms}$ utilizando curvas de desaceleración `cubic-bezier(0.16, 1, 0.3, 1)`.
-- Respuesta elástica WAAPI confinada exclusivamente a los topes de scroll (`edge`), protegiendo los modales con `overscroll-contain`.
-- Resaltado sutil en `:focus-visible` con anillo cian para navegación por teclado y control remoto de Android TV.
+- **Experiencia de Usuario**: Una consola de telemetría de misión crítica de alta fidelidad (*Zeus Vision*), visualmente limpia y ligera, con paleta mineral-obsidiana (`#F5F4F2` / `#0A140B`), tipografía tabular `Geist` + `Geist Mono`, acento verde botánico (`#1E6B38` / `#C6F19D`), animaciones elásticas sin gelatina invasiva en puntero (reservada exclusivamente a topes de scroll).
+- **Cero Redundancias**: Cada módulo y subsistema reside estrictamente en su dominio natural:
+  - `/inicio`: HUD Ejecutivo (4 medidores angulares en `auto-fit`, curvas HiDPI de 5 min en vivo, avisos prioritarios con solución IA y resumen de cargas).
+  - `/equipo`: Silicio físico (`cpu`, `ram`, `gpu`, `storage`).
+  - `/programas`: Cargas de software (`processes` con gráfico apilado 24h e inspector PID, `containers` Docker, `services` Systemd con control start/stop, `media` qBittorrent & Emby, `bots` Telegram con test y log vivo).
+  - `/red`: Red y ciberseguridad (`live` interfaces y ping, `devices` inventario LAN unificado con WoL/apagado, `map` GeoIP Leaflet, `traffic` telemetría 24h & DNS IA, `speedtest` multi-flujo, `shield` Fail2ban, DuckDNS y Pi-hole).
+  - `/mas`: Sistema y nube (`settings` tema y 31 idiomas OTA, `cloud` Firebase con Cloud Auth Bridge, `health` logs journalctl y diagnóstico IA, `updates` .deb y OTA, `security` HMAC y tokens, `dex` USB nativo, `manual` interactivo).
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. Experiencia de Usuario y Diseño Visual
 
-- **Decisión 1: Barra lateral colapsable en escritorio frente a dock inferior permanente**:
-  - *Enfoque*: En pantallas de escritorio y tablets apaisadas (`md+`), la navegación se traslada al lateral izquierdo con modo compacto de iconos y modo extendido. En móvil (`< 768px`), se preserva el dock flotante inferior.
-  - *Por qué*: En monitores 1080p y portátiles 16:9 / 16:10, la altura vertical es el recurso más escaso para ver series temporales completas sin hacer scroll; una barra lateral aprovecha el espacio horizontal excedente.
-  - *Alternativa descartada*: Mantener barra inferior en monitores ultrawide, lo que desperdiciaba franjas laterales de más de 400px.
-- **Decisión 2: Instrumentación HUD Vectorial en vez de gráficos pesados Canvas**:
-  - *Enfoque*: Medidores SVG vectoriales limpios y D3 para curvas de área continua, calculados con interpolación monótona Fritsch-Carlson y memoización de umbral.
-  - *Por qué*: Consumo de CPU inferior al 1%, escalado nítido en pantallas 4K/Retina y renderizado inmediato sin pausas.
-- **Decisión 3: Criterio de Versión `v14.0.0` (`MAJOR`) conforme a `GEMINI.md`**:
-  - *Enfoque*: Al tratarse de un rediseño completo de la interfaz, el sistema de diseño y la disposición de navegación, se eleva la versión canónica a `14.0.0` restableciendo `MINOR` y `PATCH` a 0.
-  - *Depuración obligatoria*: Auditoría de imports sin uso, verificación estricta de tipos (`tsc`), validación de diccionario en 31 idiomas y reconstrucción de paquetes nativos `.deb` y `.apk`.
-
----
-
-## 4. Technical Architecture & Data Strategy
-
+### A. Anatomía Visual de Ancho Completo
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Recursos Cockpit v14.0.0                        │
-│                                                                        │
-│   ┌───────────────────┐  ┌──────────────────────────────────────────┐  │
-│   │   Sidebar Nav     │  │  Top Bar (Brand · Breadcrumb · Actions)  │  │
-│   │   (Icons / Labels)│  └──────────────────────────────────────────┘  │
-│   │                   │  ┌──────────────────────────────────────────┐  │
-│   │   [01] Inicio     │  │  Main ViewStage (AnimatePresence)        │  │
-│   │   [02] Equipo     │  │  ┌────────────────────────────────────┐  │  │
-│   │   [03] Red        │  │  │ Dynamic Bento Grid Layout          │  │  │
-│   │   [04] Programas  │  │  │ ┌──────────────┐ ┌───────────────┐ │  │  │
-│   │   [05] Más        │  │  │ │ HUD Gauge    │ │ TelemetryChart│ │  │  │
-│   │                   │  │  │ └──────────────┘ └───────────────┘ │  │  │
-│   │   [Collapse/Exp]  │  │  └────────────────────────────────────┘  │  │
-│   └───────────────────┘  └──────────────────────────────────────────┘  │
-└────────────────────────────────────┬───────────────────────────────────┘
-                                     │ HTTP SSE / Polling (~1.5s)
-                                     ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                       Backend Host (server.py)                         │
-│  - Endpoint /api/metrics con Byte-Splicing en caché (~17 ms)           │
-│  - Captura POSIX (ss, conntrack, /sys, psutil, procfs)                 │
-│  - Persistencia única SQLite WAL (recursos_history.db)                 │
-│  - Motor Speedtest Multi-stream Keep-Alive                             │
-│  - Diagnóstico y simplificación IA (Gemini API)                        │
-└────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [Emblema] Recursos Cockpit  ·  HOST.LAN  [Buscador Ctrl+K]  [Salud] [Tema] [v14.0.0] │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ [Pestaña 1]  [Pestaña 2]  [Pestaña 3] ...                   [Filtro rápido]  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│    REJILLA BENTO FLUIDA 100% VIEWPORT (Tarjetas, Gráficos HiDPI, Tablas)    │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+              [ 🏠 Inicio  ·  ⚡ Equipo  ·  📦 Programas  ·  🌐 Red  ·  ⚙️ Más ]
 ```
 
-### Component & State Architecture
-
-1. **`src/App.tsx`**:
-   - Orquesta la navegación lateral en escritorio (`sidebarOpen`, `toggleSidebar`), el Top Bar de 3 zonas y el ViewStage principal.
-   - Conecta el estado global de telemetría (`MetricsPayload`), tema (`light`/`dark`), idioma y sincronización Firebase.
-2. **`src/components/NavigationSidebar.tsx`** *(Nuevo componente)*:
-   - Barra de navegación lateral fija en escritorio con tooltip flotante de atajos, iconos semánticos y transición fluida.
-   - En pantallas móviles conmuta automáticamente a navegación táctil inferior sin recortes.
-3. **`src/components/OverviewView.tsx`**:
-   - Reorganizado en una jerarquía clara:
-     1. *Banda de Control Ejecutivo*: 4 indicadores HUD vectoriales angulares (`CPU`, `RAM`, `Disco Primario`, `Red Total`).
-     2. *Rejilla de Telemetría Dinámica*: Curvas de uso temporal en cubetas de 5s con anotación de media y pico, y desglose independiente por cada unidad de disco física.
-     3. *Gestión de Dispositivos Domésticos*: Tarjetas de equipos activos con métricas de ancho de banda y botones simétricos de encendido (WoL) y apagado seguro.
-4. **`src/components/EquipmentView.tsx`**:
-   - Silicio por núcleo en micro-rejilla dinámica, telemetría GPU multivariante (3D, VRAM, Video, Temp, PCIe) y áreas apiladas de procesos de 24h.
-5. **`src/components/NetworkSecurityView.tsx`**:
-   - Medición WAN vs LAN desacoplada, histórico de Speedtest calibrado, mapa Leaflet GeoIP interactivo con clusters fluidos e histórico de identificaciones IA persistido en `recursos_history.db`.
-6. **`src/components/AppsMediaView.tsx`** y **`src/components/MoreView.tsx`**:
-   - Monitorización de Docker/Systemd/qBittorrent/Emby, y panel de configuración con diagnósticos IA de fallos, dispositivos HMAC y sincronización en la nube.
+1. **Cabecera Editorial Despejada**:
+   - Logotipo oficial CMineWar de alta resolución con hostname y estado del nodo en un solo renglón tipográfico no invasivo.
+   - Buscador rápido global (`Ctrl+K`) para saltar instantáneamente a cualquier subsistema, proceso, IP, disco o ajuste.
+   - Indicadores ejecutivos: Punto vivo de latencia/salud, interruptor de tema Claro/Oscuro y píldora de versión canónica `v14.0.0`.
+2. **Pestañas Modulares con Buscador Rápido**:
+   - Segmented control sutil en la parte superior de cada vista con indicador de transición animado.
+   - Input de filtrado instantáneo para acotar procesos, contenedores, dispositivos LAN o dominios sin paginación ni recortes.
+3. **Dock Flotante Obsidiana**:
+   - Dock ergonómico centrado inferior con física de muelle `MorphPill` (`stiffness: 440, damping: 36`), accesible tanto en móviles como en pantallas ultra-anchas sin comerse los laterales de las gráficas.
 
 ---
 
-## 5. Implementation Phases & Verification Steps
+## 3. Solución al Servidor Local `python3 server.py` (Cero Pantallas en Blanco)
 
-1. **Fase 1: Sistema de Diseño & Tokens CSS (`src/index.css`)**:
-   - Configuración de paleta *Mission Control* (Obsidiana `#0B0F17` / Cian `#06B6D4` / Grafito `#1E293B`), tipografía `Plus Jakarta Sans` + `JetBrains Mono` con `tabular-nums`, y variables `@theme` completas para modo claro y oscuro.
-2. **Fase 2: Componente de Navegación Lateral & Top Bar Contract (`src/components/NavigationSidebar.tsx`, `src/App.tsx`)**:
-   - Creación de la barra lateral colapsable en escritorio y adaptación del dock en móvil.
-   - Refactorización de la cabecera superior en 3 zonas estrictas sin sobrecarga visual.
-3. **Fase 3: Rediseño de Vistas y Componentes de Telemetría (`src/components/*`)**:
-   - Adaptación de tarjetas Bento, medidores angulares y gráficas de `/inicio`, `/equipo`, `/red`, `/programas` y `/mas` bajo los nuevos patrones anti-slop.
-4. **Fase 4: Diccionario i18n & Actualización de Versión (`./VERSION` -> `14.0.0`)**:
-   - Incorporación de nuevas claves de navegación y opciones en las 33 columnas de `./i18n/dictionary.csv`.
-5. **Fase 5: Depuración Estricta, Compilación y Empaquetado**:
-   - `npx tsc --noEmit --noUnusedLocals --noUnusedParameters`, `npx eslint firestore.rules`, `python3 -m py_compile`, `npm run build` y empaquetado `build_deb.sh`.
+### Diagnóstico de la Pantalla en Blanco
+1. **Falta de ruta para `/assets/*` en `server.py`**:
+   `server.py` no contaba con un manejador HTTP para servir archivos bajo `/assets/` generados por Vite (`dist/assets/*.js` y `dist/assets/*.css`). Al solicitar el bundle en compilaciones estándar, devolvía `404 Not Found`.
+2. **Inyección en `static/index.html`**:
+   El plugin `emitStandaloneStaticHtmlPlugin` en `vite.config.ts` debe generar un bundle verdaderamente autocontenido que garantice renderizado inmediato tanto si se sirve desde `static/index.html` inlined como si se resuelven recursos desde `dist/assets/`.
+3. **Manejador universal en `server.py`**:
+   Añadir en `server.py` soporte nativo para servir cualquier archivo estático desde `dist/assets/`, `static/` y `dist/` con `Content-Type` exacto (`application/javascript`, `text/css`, `image/png`, `font/woff2`) y cabeceras de caché seguras.
+
+---
+
+## 4. Arquitectura Técnica y Mapeo de Componentes
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                           App.tsx                            │
+│  - Gestor de Ruta activa (MainTabId)                         │
+│  - TopBar Editorial + Global Search (Ctrl+K) Modal           │
+│  - Dock Flotante (MorphPill)                                 │
+└──────────────┬───────────────────────────────────────────────┘
+               │
+     ┌─────────┴────────┬───────────────────┬──────────────┬─────────────┐
+     ▼                  ▼                   ▼              ▼             ▼
+OverviewView      EquipmentView       AppsMediaView   NetworkSecurity   MoreView
+(HUD Ejecutivo)   (Silicio)           (Workloads)     (Red & Escudo)   (Sistema & Cloud)
+ - 4 Medidores    - Subtabs:          - Subtabs:      - Subtabs:       - Subtabs:
+   Angulares        cpu, ram,           processes,      live, devices,   settings, cloud,
+ - Curvas 5 min     gpu, storage        containers,     map, traffic,    health, updates,
+ - Alertas IA     - Filtro silicio      services,       speedtest,       security, dex,
+ - Resumen soft     por sensor          media, bots     shield           manual
+                                      - Search bar    - Search bar     - Search bar
+```
+
+### Plan de Archivos a Modificar
+- **`src/components/NavigationSidebar.tsx`**: Retirar su fijación forzada de sidebar lateral en escritorio; adaptar para mantener el dock flotante unificado y accesible con full-width viewport.
+- **`src/App.tsx`**: Eliminar el padding restrictivo (`pl-56` / `pl-16`), restaurar el lienzo simétrico `100%` ancho, integrar la cabecera limpia con botón/atajo de búsqueda rápida (`Ctrl+K`) y restaurar el dock flotante con `MorphPill`.
+- **`src/components/GlobalSearchModal.tsx`**: Componente de búsqueda transversal (`Ctrl+K`) para saltar directamente a cualquier sección, proceso, contenedor, interfaz o ajuste.
+- **`src/components/OverviewView.tsx`**: Pulir el HUD ejecutivo para que ocupe de manera equilibrada el ancho completo con los 4 medidores angulares y curvas fluidas.
+- **`src/components/EquipmentView.tsx`**: Pestañas modulares de silicio (`cpu`, `ram`, `gpu`, `storage`) con filtros instantáneos.
+- **`src/components/AppsMediaView.tsx`**: Pestañas de cargas de trabajo con buscador rápido integrado (`processes`, `containers`, `services`, `media`, `bots`).
+- **`src/components/NetworkSecurityView.tsx`**: Pestañas de red con buscador de IPs y dispositivos (`live`, `devices`, `map`, `traffic`, `speedtest`, `shield`).
+- **`src/components/MoreView.tsx`**: 7 pestañas limpias con buscador de ajustes y registros (`settings`, `cloud`, `health`, `updates`, `security`, `dex`, `manual`).
+- **`server.py`**: Añadir manejador HTTP completo para `/assets/*` sirviendo tanto `dist/assets` como `static/assets` con `application/javascript` y `text/css`, asegurando que el servidor local nunca devuelva 404 ni pantalla en blanco.
+- **`vite.config.ts`**: Fortalecer `emitStandaloneStaticHtmlPlugin` para empaquetar de forma infalible `static/index.html`.
+
+---
+
+## 5. Verificación Estricta y Entregables
+
+1. **Compilación TypeScript**: `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` sin advertencias ni tipos huérfanos.
+2. **Validación Python**: `python3 -m py_compile server.py i18n_catalog.py desktop_app/recursos_app.py`.
+3. **Build Web y Standalone**: `npm run build` generando `dist/` y `static/index.html` verificados sintácticamente.
+4. **Prueba HTTP de Servidor Local**: Arrancar `python3 server.py` y comprobar que `curl http://localhost:8085/` y `curl http://localhost:8085/assets/...` devuelven HTTP 200 con contenido válido y sin pantalla en blanco.
+5. **Empaquetado Debian Ubuntu**: `bash packaging/build_deb.sh` generando y firmando `recursos-cockpit_14.0.0_amd64.deb`.
+6. **Bitácora**: Actualizar `planes/walkthrough_v14.0.0.md` y `README.md`.

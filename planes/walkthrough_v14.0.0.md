@@ -1,59 +1,63 @@
-# Walkthrough · Rediseño Mayor Integral v14.0.0
+# Walkthrough de Verificación — Rediseño Integral, Submenús Independientes y Blindaje `server.py`
 
-## 1. Resumen de la Intervención
+> Versión canónica: consultar [`../VERSION`](../VERSION) (`14.0.0`).
 
-Se ha completado el rediseño mayor y reorganización arquitectónica del proyecto **Recursos Cockpit** a la versión canónica **`14.0.0`** (MAJOR según `GEMINI.md` regla 6.3), atendiendo la petición:
-> *"rediseña completamente la interfaz reorganiza lo que no creas que este bien posisionado basicamente quiero que cojas todo el proyecto y borres la interfaz actual crees una totalmente nueva reorganizando los submenos en los menus correspondientes"*
+## 1. Resumen Ejecutivo de Cambios
 
-### Principales Transformaciones de Dominio y Ubicación
-1. **Navegación Ergonómica con Barra Lateral Colapsable (`md+`) y Dock Táctil (`< md`)**:
-   - En pantallas de escritorio (`md+`), una barra lateral izquierda colapsable (64px contraída / 224px expandida con persistencia y toggle suave) reemplaza la antigua barra inferior que restaba valiosa altura vertical.
-   - En pantallas móviles y táctiles (`< md`), se preserva un dock inferior con física `MorphPill` elástica para operación con una sola mano.
-   - La cabecera superior se limpia eliminando botones de navegación duplicados y mostrando el contexto del dominio activo con breadcrumb tabular.
+1. **Rediseño Completo de Navegación y Viewport (100 % Ancho Completo)**:
+   - Se eliminó la barra lateral fija de escritorio y se consolidó una **barra superior editorial limpia** (nodo + ruta activa, disparador `Ctrl+K` de buscador rápido, estado de salud, selector de tema e indicador de versión) junto a un **dock flotante obsidiana centrado** (`NavigationSidebar`) con animación `MorphPill` en todos los tamaños de pantalla.
+   - Se incorporó el **buscador rápido global (`GlobalSearchModal`, `Ctrl+K` / `Cmd+K`)** que indexa las 5 áreas principales, todas las páginas independientes de submenús (mostrando su URL semántica como `/red/testdevelocidad`), procesos en vivo (`metrics.system_processes`), dispositivos LAN (`metrics.wifi_clients`) y contenedores Docker (`metrics.docker_activities`).
+   - Se completaron las 7 claves `search.*` en `./i18n/dictionary.csv` a través de los 31 idiomas europeos (33 columnas totales).
 
-2. **`/inicio` — HUD Ejecutivo de Telemetría**:
-   - 4 medidores angulares HUD para lectura en 1 segundo: CPU, Memoria RAM + ZRAM, Almacenamiento Consolidado y Caudal WAN/LAN.
-   - Curvas HiDPI vivas de 5 minutos ampliables mediante la Pantalla de Inspección Táctil hacia `recursos_history.db`.
-   - Banner prioritario de salud y avisos del sistema con clasificación de peligro (`critical`, `high`, `medium`, `low`) y acceso a soluciones asistidas por IA.
-   - Resumen consolidado de cargas de trabajo de software (`apps.containers_running`, `apps.services_active`, `apps.active_transfers`), suprimiendo la lista redundante de dispositivos de red.
+2. **Reorganización Modular por Dominio Natural (Cero Duplicidades)**:
+   - `/equipo/*` (`EquipmentView`): dedicado exclusivamente a silicio y hardware físico (`cpu`, `ram`, `gpu`, `storage`). Se retiró el submenú duplicado de procesos y sus accesos directos redirigen limpiamente a `/programas/procesos`.
+   - `/programas/*` (`AppsMediaView`): centraliza el 100 % de las cargas de trabajo de software en 5 módulos independientes (`procesos` con `ProcessHistoryStackedChart`, `contenedores`, `servicios`, `multimedia`, `bots`).
+   - `/red/*` (`NetworkSecurityView`): reorganizado en `resumen`, `trafico`, `mapa`, `testdevelocidad`, `seguridad` y `dns`.
+   - `/mas/*` (`MoreView`): consolidado en `actualizaciones`, `dispositivos`, `manual` y `dex` (exclusivo de la app nativa Ubuntu).
 
-3. **`/equipo` — Silicio y Hardware Físico**:
-   - Subpestañas delimitadas exclusivamente a silicio: `cpu`, `ram`, `gpu`, `storage`.
-   - Se reubican los procesos y su gráfica apilada de 24 horas a `/programas/processes`, con atajos directos "Ver procesos" desde la CPU.
+3. **Páginas Independientes con URL Propia para Cada Submenú (Norma 3.6 en `GEMINI.md`)**:
+   - Se documentó la nueva norma permanente **3.6 (Rutas Independientes y Enlaces Profundos para Submenús)** en `./GEMINI.md`.
+   - Se implementó resolución bidireccional (`resolveAppRoute`, `normalizeSubTabForView`, `formatCanonicalRoute`) sincronizada con `window.history.pushState`, `popstate` (Atrás/Adelante del navegador) y `document.title`:
 
-4. **`/programas` — Cargas de Trabajo de Software**:
-   - **`processes`**: Gráfico apilado de áreas 24 h (`ProcessHistoryStackedChart`) para CPU, RAM, VRAM y E/S + inspector en vivo con búsqueda instantánea y detalle PID.
-   - **`containers`**: Contenedores Docker con estados en vivo, consumo numérico y acciones de control.
-   - **`services`**: Unidades Systemd esenciales con control seguro de ciclo de vida (`start`, `restart`, `stop`).
-   - **`media`**: Telemetría de descargas qBittorrent y streaming Emby.
-   - **`bots`**: Bot de alertas de Telegram con test de conectividad en tiempo real y registro de actividad en vivo.
+| Dominio | Ruta canónica independiente | Alias aceptados |
+| :--- | :--- | :--- |
+| Inicio | `/` | `/inicio` |
+| Equipo · CPU | `/equipo/cpu` | `/equipo/procesador`, `/cpu` |
+| Equipo · RAM | `/equipo/ram` | `/equipo/memoria`, `/ram` |
+| Equipo · GPU | `/equipo/gpu` | `/equipo/grafica`, `/gpu` |
+| Equipo · Almacenamiento | `/equipo/almacenamiento` | `/equipo/storage`, `/equipo/discos`, `/almacenamiento` |
+| Red · Resumen y LAN | `/red/resumen` | `/red/home`, `/red/live`, `/red/devices` |
+| Red · Tráfico | `/red/trafico` | `/red/traffic`, `/red/historial` |
+| Red · Mapa GeoIP | `/red/mapa` | `/red/map`, `/red/geoip` |
+| Red · Test de velocidad | `/red/testdevelocidad` | `/red/speedtest`, `/red/velocidad`, `/testdevelocidad`, `/speedtest` |
+| Red · Seguridad IPS | `/red/seguridad` | `/red/security`, `/red/shield`, `/red/escudo` |
+| Red · DNS / Pi-hole | `/red/dns` | `/red/duckdns`, `/red/pihole` |
+| Programas · Procesos | `/programas/procesos` | `/programas/processes`, `/procesos` |
+| Programas · Contenedores | `/programas/contenedores` | `/programas/containers`, `/programas/docker` |
+| Programas · Servicios | `/programas/servicios` | `/programas/services`, `/programas/systemd` |
+| Programas · Multimedia | `/programas/multimedia` | `/programas/media`, `/programas/descargas` |
+| Programas · Bots | `/programas/bots` | `/programas/telegram` |
+| Más · Actualizaciones y Sistema | `/mas/actualizaciones` | `/mas/updates`, `/mas/ajustes`, `/mas/health`, `/mas/cloud` |
+| Más · Dispositivos y Confianza | `/mas/dispositivos` | `/mas/devices`, `/mas/security` |
+| Más · Manual | `/mas/manual` | `/manual` |
+| Más · Pantalla USB DeX | `/mas/dex` | `/dex` |
 
-5. **`/red` — Red y Ciberseguridad**:
-   - **`live`**: Interfaces de red físicas con tráfico WAN/LAN segmentado y gráfica de latencia ping persistida.
-   - **`devices`**: Inventario unificado de red local (LAN) con tipo de enlace físico (`Cable LAN`, `5 GHz`, `2.4 GHz`), consumo en tiempo real, Wake-on-LAN (`WoL`) y apagado remoto seguro.
-   - **`map`**: Mapa Leaflet con geolocalización de conexiones externas, clustering interactivo y filtros.
-   - **`traffic`**: Historial 24 h de red, dominios DNS más utilizados (Pi-hole) y análisis asistido por IA.
-   - **`speedtest`**: Test multi-flujo Speedtest.net contrastado con el kernel `/proc/net/dev` e historial SQLite.
-   - **`shield`**: Seguridad consolidada con Fail2ban, sincronización DuckDNS y bloqueos de Pi-hole.
+4. **Corrección Definitiva de Pantalla en Blanco en `python3 server.py`**:
+   - Se añadió `is_valid_web_route()` en `server.py` (con límite de 1–2 segmentos y bloqueo de `/api/*`, `/assets/*` y ficheros no HTML) para que cualquier recarga directa en rutas anidadas como `/red/testdevelocidad` devuelva `200 OK` en lugar de `404`.
+   - Se añadió soporte nativo `/assets/*` en `server.py` con protección anti path-traversal y cabeceras MIME exactas (`.js`, `.mjs`, `.css`, `.svg`, `.png`, `.woff2`, `.json`), resolviendo contra `dist/assets`, `static/assets`, `static`, `dist` y `desktop_app/assets`.
+   - Se endureció `_serve_html_with_bootstrap` usando `rsplit('</head>', 1)` para evitar cualquier sustitución accidental dentro de cadenas JS inlined.
+   - Se mejoró `emitStandaloneStaticHtmlPlugin()` en `vite.config.ts` para purgar hashes antiguos de `static/assets/`, espejar limpiamente el build vigente y situar el `<script type="module">` compilado justo antes de `</body>` (garantizando que `<div id="root"></div>` siempre exista antes de ejecutarse en cualquier navegador o WebView).
 
-6. **`/mas` — Sistema, Nube y Puente Nativo**:
-   - **`settings`**: Preferencias de tema y selector de idioma en 31 lenguas sincronizadas vía OTA.
-   - **`cloud`**: Sincronización en la nube con Firebase Firestore y **Cloud Auth Bridge** para autenticación fiable tanto en dominios locales como en previews iframe.
-   - **`health`**: Registro del sistema (`journalctl`) y diagnóstico IA de fallos preventivo.
-   - **`updates`**: Gestor de actualizaciones para Ubuntu `.deb` y Web OTA.
-   - **`security`**: Bóveda de tokens, HMAC-SHA256 y dispositivos de confianza.
-   - **`dex`**: Conexión de pantalla móvil USB DeX (60 FPS) exclusiva para Ubuntu nativo.
-   - **`manual`**: Manual interactivo completo con simuladores sobre `<canvas>` y explorador REST.
+## 2. Matriz de Verificación Ejecutada
 
----
-
-## 2. Verificación Estricta y Pruebas Ejecutadas
-
-| Prueba | Comando | Resultado |
-|---|---|---|
-| **Integridad del Diccionario** | 33 columnas por fila, 0 duplicados | ✅ `1059 filas`, 0 errores de columnas, 0 duplicados |
-| **Tipado TypeScript** | `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` | ✅ Sin errores ni variables sin uso |
-| **Compilación Python** | `python3 -m py_compile server.py i18n_catalog.py desktop_app/recursos_app.py` | ✅ Sintaxis y tipos conformes |
-| **Build Web de Producción** | `npm run build` | ✅ `dist/index.html` y bundles generados en 2.35s |
-| **Empaquetado Debian Ubuntu** | `bash packaging/build_deb.sh` | ✅ `recursos-cockpit_14.0.0_amd64.deb` generado y firmado con GPG |
-| **Sincronización de Versión** | `./VERSION` | ✅ `14.0.0` unificado sin hardcoding |
+| Comprobación | Resultado | Detalle |
+| :--- | :---: | :--- |
+| `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` | ✅ PASS | 0 errores de tipos ni símbolos sin uso |
+| `python3 -m py_compile server.py i18n_catalog.py desktop_app/recursos_app.py` | ✅ PASS | Sintaxis Python válida en backend y app Ubuntu |
+| Integridad `./i18n/dictionary.csv` | ✅ PASS | 1067 filas × 33 columnas, 0 filas malformadas, 0 claves duplicadas |
+| `npm run build` + `static/index.html` | ✅ PASS | `dist/` y `static/index.html` (`2.73 MB`) + espejo limpio `static/assets/` |
+| `node --check` sobre JS inline en `static/index.html` | ✅ PASS | Código ES module sintácticamente íntegro y montado tras `#root` |
+| Pruebas unitarias de `is_valid_web_route()` (`server.py`) | ✅ PASS | 28 rutas válidas aceptadas (incl. `/red/testdevelocidad`), 5 inválidas rechazadas con 404 |
+| Pruebas HTTP en vivo (`http://127.0.0.1:3000`) | ✅ PASS | `200 OK` en `/`, `/red/testdevelocidad`, `/equipo/almacenamiento`, `/programas/procesos`, `/mas/actualizaciones`, `/api/version` |
+| Empaquetado Debian (`bash packaging/build_deb.sh`) | ✅ PASS | `dist/recursos-cockpit_14.0.0_amd64.deb` generado y firmado con GPG + `SHA256SUMS.txt` |
+| `compile_applet` + `lint_applet` | ✅ PASS | Validación final simultánea sin errores |

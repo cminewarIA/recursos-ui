@@ -6255,11 +6255,37 @@ function emitStandaloneStaticHtmlPlugin(): Plugin {
     closeBundle() {
       const distDir = path.resolve(ROOT_DIR, 'dist');
       const distHtmlPath = path.join(distDir, 'index.html');
-      const staticOutPath = path.resolve(ROOT_DIR, 'static', 'index.html');
+      const staticDir = path.resolve(ROOT_DIR, 'static');
+      const staticOutPath = path.join(staticDir, 'index.html');
       if (!fs.existsSync(distHtmlPath)) return;
+
+      // Mirror dist/assets -> static/assets so server.py always serves chunks even when run standalone
+      const distAssetsDir = path.join(distDir, 'assets');
+      const staticAssetsDir = path.join(staticDir, 'assets');
+      if (fs.existsSync(distAssetsDir)) {
+        try {
+          fs.mkdirSync(staticAssetsDir, { recursive: true });
+          // Remove stale hashed index-* bundles from static/assets before mirroring fresh build
+          for (const existing of fs.readdirSync(staticAssetsDir)) {
+            if (/^index-[A-Za-z0-9_-]+\.(js|css)$/.test(existing)) {
+              fs.unlinkSync(path.join(staticAssetsDir, existing));
+            }
+          }
+          for (const entry of fs.readdirSync(distAssetsDir)) {
+            const srcPath = path.join(distAssetsDir, entry);
+            const dstPath = path.join(staticAssetsDir, entry);
+            if (fs.statSync(srcPath).isFile()) {
+              fs.copyFileSync(srcPath, dstPath);
+            }
+          }
+        } catch {
+          // Best-effort mirror
+        }
+      }
+
       let html = fs.readFileSync(distHtmlPath, 'utf-8');
 
-      // Inline compiled stylesheet tags into <style>
+      // Inline compiled stylesheet tags into <style> inside <head>
       html = html.replace(/<link[^>]+rel=["']stylesheet["'][^>]+href=["']([^"']+)["'][^>]*>/gi, (full, href) => {
         if (/^https?:\/\//i.test(href)) return full;
         const cssFile = path.join(distDir, href.replace(/^\//, ''));
@@ -6270,16 +6296,23 @@ function emitStandaloneStaticHtmlPlugin(): Plugin {
         return full;
       });
 
-      // Inline compiled module script tags into <script type="module">
+      // Extract and inline compiled module script tags right before </body> so #root always exists first
+      const inlinedScripts: string[] = [];
       html = html.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi, (full, src) => {
         if (/^https?:\/\//i.test(src)) return full;
         const jsFile = path.join(distDir, src.replace(/^\//, ''));
         if (fs.existsSync(jsFile)) {
           const js = fs.readFileSync(jsFile, 'utf-8').replace(/<\/script>/gi, '<\\/script>');
-          return `<script type="module">${js}</script>`;
+          inlinedScripts.push(`<script type="module">${js}</script>`);
+          return '';
         }
         return full;
       });
+
+      if (inlinedScripts.length > 0 && html.includes('</body>')) {
+        const lastBodyIdx = html.lastIndexOf('</body>');
+        html = `${html.slice(0, lastBodyIdx)}${inlinedScripts.join('\n')}\n${html.slice(lastBodyIdx)}`;
+      }
 
       fs.mkdirSync(path.dirname(staticOutPath), { recursive: true });
       fs.writeFileSync(staticOutPath, html, 'utf-8');

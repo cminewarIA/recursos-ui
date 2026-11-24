@@ -827,16 +827,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <AlethiaSectionTag pulse tone={overallBusy ? 'danger' : totalErrors > 0 ? 'amber' : 'lime'}>
                 {totalErrors > 0 || overallBusy ? t('overview.hero_alert_tag') : t('overview.hero_verified_tag')}
               </AlethiaSectionTag>
-              <span className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-[#c6f19d]/90">
+              <span className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-[#1e6b38] dark:text-[#c6f19d]/90">
                 {metrics?.system?.hostname || t('overview.default_host')}
               </span>
-              <span className="hidden sm:inline text-[#6e8270]" aria-hidden="true">·</span>
-              <span className="text-xs font-medium text-[#b2c0b3]">
+              <span className="hidden sm:inline text-slate-400 dark:text-[#6e8270]" aria-hidden="true">·</span>
+              <span className="text-xs font-medium text-slate-600 dark:text-[#b2c0b3]">
                 {t('overview.subtitle')}
               </span>
             </div>
 
-            <h1 className="mt-3 font-display text-[clamp(1.3rem,2.3vw+0.6rem,2.15rem)] font-semibold leading-[1.12] tracking-tight text-[#f5f4f2]">
+            <h1 className="mt-3 font-display text-[clamp(1.3rem,2.3vw+0.6rem,2.15rem)] font-semibold leading-[1.12] tracking-tight text-[#0f1f10] dark:text-[#f5f4f2]">
               {overallBusy ? t('overview.high_load_banner') : t('overview.all_normal_banner')}
             </h1>
 
@@ -851,9 +851,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 onClick={() => setDevicesModalMode('devices')}
                 className="alethia-hero-chip inline-flex min-h-[36px] items-center gap-1.5 px-3 py-1 font-mono text-[11px] font-semibold tabular-nums cursor-pointer"
               >
-                <Wifi className="h-3.5 w-3.5 text-[#c6f19d] shrink-0" />
+                <Wifi className="h-3.5 w-3.5 text-[#1e6b38] dark:text-[#c6f19d] shrink-0" />
                 <span>{t('overview.connected_devices_count', { count: onlineWifi.length })}</span>
-                <ChevronRight className="h-3 w-3 text-[#c6f19d]/75 shrink-0" />
+                <ChevronRight className="h-3 w-3 text-[#1e6b38]/75 dark:text-[#c6f19d]/75 shrink-0" />
               </motion.button>
               <motion.button
                 type="button"
@@ -869,37 +869,37 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   })}
                 </span>
                 {metrics?.wifi_summary?.router_wan_available && (
-                  <span className="hidden sm:inline-block rounded bg-[#c6f19d]/20 px-1.5 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.05em] text-[#c6f19d]">
+                  <span className="hidden sm:inline-block rounded bg-[#e5f8d3] px-1.5 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.05em] text-[#144d23] dark:bg-[#c6f19d]/20 dark:text-[#c6f19d]">
                     {t('overview.router_global_badge')}
                   </span>
                 )}
-                <ChevronRight className="h-3 w-3 text-[#c6f19d]/75 shrink-0" />
+                <ChevronRight className="h-3 w-3 text-[#1e6b38]/75 dark:text-[#c6f19d]/75 shrink-0" />
               </motion.button>
             </div>
           </div>
 
           {/* Executive Zeus Vision Radial Pulse Strip + Signature Alethia CTA */}
           <div className="flex flex-wrap items-center gap-3 sm:gap-4 shrink-0">
-            <div className="inline-flex items-center gap-3.5 rounded-2xl border border-[#c6f19d]/16 bg-[#162818]/80 px-3.5 py-2.5 backdrop-blur-sm">
+            <div className="inline-flex items-center gap-3.5 rounded-2xl border border-slate-200/90 bg-[#f5f4f2]/90 px-3.5 py-2.5 backdrop-blur-sm dark:border-[#c6f19d]/16 dark:bg-[#162818]/80">
               <RadialKpiGauge
                 value={cpuPct}
                 size={46}
                 strokeWidth={4.5}
-                invertedDark
+                theme={theme}
                 label={t('overview.exec_cpu')}
               />
               <RadialKpiGauge
                 value={ramPct}
                 size={46}
                 strokeWidth={4.5}
-                invertedDark
+                theme={theme}
                 label={t('overview.exec_ram')}
               />
               <RadialKpiGauge
                 value={storageSummary.localPercent}
                 size={46}
                 strokeWidth={4.5}
-                invertedDark
+                theme={theme}
                 label={t('overview.exec_storage')}
               />
             </div>
@@ -908,9 +908,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <motion.button
                 type="button"
                 onClick={() => setShowErrorsDetail((v) => !v)}
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-amber-400/45 bg-amber-500/18 px-4 py-2 font-mono text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/28 cursor-pointer"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-amber-400/60 bg-amber-100/90 px-4 py-2 font-mono text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200/80 dark:border-amber-400/45 dark:bg-amber-500/18 dark:text-amber-200 dark:hover:bg-amber-500/28 cursor-pointer"
               >
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-300" />
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
                 <span>
                   {totalErrors} {totalErrors === 1 ? t('time.recent_notice') : t('time.recent_notices')}
                 </span>
@@ -919,7 +919,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             ) : (
               <AlethiaActionButton
                 label={t('overview.see_equipment_detail')}
-                variant="dark"
+                variant={isDarkTheme ? 'dark' : 'surface'}
                 onClick={() => onNavigate('equipo')}
               />
             )}
@@ -927,7 +927,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
 
         <AccordionBody open={showErrorsDetail}>
-          <div className="mt-4 border-t border-[#c6f19d]/15 pt-4 text-xs text-[#d6ded6] space-y-3">
+          <div className="mt-4 border-t border-slate-200/80 pt-4 text-xs text-slate-700 dark:border-[#c6f19d]/15 dark:text-[#d6ded6] space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>{t('overview.errors_banner', { count: totalErrors })}</span>
               <div className="flex flex-wrap items-center gap-2">
@@ -936,7 +936,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   data-testid="overview-ai-simplify-faults-btn"
                   disabled={simplifyingOverviewFaults}
                   onClick={() => void handleOverviewSimplifyFaults()}
-                  className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-[#c6f19d]/35 bg-[#c6f19d]/14 px-3 py-1 font-mono text-[11px] font-semibold text-[#c6f19d] transition-colors hover:bg-[#c6f19d]/22 disabled:opacity-50 cursor-pointer"
+                  className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-[#9bd86b] bg-[#e5f8d3] px-3 py-1 font-mono text-[11px] font-semibold text-[#144d23] transition-colors hover:bg-[#d7f3be] disabled:opacity-50 dark:border-[#c6f19d]/35 dark:bg-[#c6f19d]/14 dark:text-[#c6f19d] dark:hover:bg-[#c6f19d]/22 cursor-pointer"
                 >
                   <Sparkles className={`h-3.5 w-3.5 ${simplifyingOverviewFaults ? 'animate-spin' : ''}`} />
                   <span>
@@ -946,7 +946,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onNavigate('mas', 'logs')}
-                  className="font-mono text-[11px] font-semibold text-[#c6f19d] hover:underline cursor-pointer"
+                  className="font-mono text-[11px] font-semibold text-[#1e6b38] hover:underline dark:text-[#c6f19d] cursor-pointer"
                 >
                   {t('overview.open_full_log')}
                 </button>
@@ -975,17 +975,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   return (
                     <div
                       key={item.signature}
-                      className="rounded-xl border border-[#c6f19d]/18 bg-[#162818]/90 p-3 space-y-1.5 text-xs"
+                      className="rounded-xl border border-slate-200/80 bg-[#f5f4f2]/95 p-3 space-y-1.5 text-xs dark:border-[#c6f19d]/18 dark:bg-[#162818]/90"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-1.5">
-                        <span className="font-semibold text-[#f5f4f2]">{item.title}</span>
+                        <span className="font-semibold text-slate-900 dark:text-[#f5f4f2]">{item.title}</span>
                         <span className={`${pillCls} rounded-full px-2 py-0.5 text-[10px] font-bold uppercase`}>
                           {dangerLabel}
                         </span>
                       </div>
-                      <p className="text-[11px] text-[#c5d1c6]">{item.summary}</p>
+                      <p className="text-[11px] text-slate-600 dark:text-[#c5d1c6]">{item.summary}</p>
                       {item.solution && (
-                        <div className="rounded-lg border border-[#c6f19d]/28 bg-[#c6f19d]/10 px-2.5 py-1.5 text-[10.5px] text-[#e6f5d8]">
+                        <div className="rounded-lg border border-[#9bd86b]/70 bg-[#eaf7de] px-2.5 py-1.5 text-[10.5px] text-[#144d23] dark:border-[#c6f19d]/28 dark:bg-[#c6f19d]/10 dark:text-[#e6f5d8]">
                           <span className="font-semibold">{t('more.ai_fault_solution_label')}: </span>
                           <span>{item.solution}</span>
                         </div>

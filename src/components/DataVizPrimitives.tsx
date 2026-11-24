@@ -123,7 +123,7 @@ export const AlethiaSectionTag: React.FC<AlethiaSectionTagProps> = ({
   return (
     <span className={`cockpit-tag-lime ${toneOverride} ${className}`}>
       {pulse ? (
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#0f1f10] cockpit-live-dot" aria-hidden="true" />
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#144d23] dark:bg-[#0f1f10] cockpit-live-dot" aria-hidden="true" />
       ) : null}
       <span>{children}</span>
     </span>

@@ -404,12 +404,12 @@ type ClientSortMode = 'down' | 'up' | 'lan' | 'name';
 function resolveRedSubTab(hint?: string): RedSubTab | undefined {
   if (!hint) return undefined;
   const h = hint.toLowerCase();
-  if (h === 'security' || h === 'seguridad') return 'security';
+  if (h === 'security' || h === 'seguridad' || h === 'shield' || h === 'escudo') return 'security';
   if (h === 'traffic' || h === 'trafico' || h === 'historial' || h === 'history') return 'traffic';
-  if (h === 'dns' || h === 'duckdns') return 'dns';
-  if (h === 'map' || h === 'mapa') return 'map';
-  if (h === 'speedtest' || h === 'velocidad') return 'speedtest';
-  if (h === 'home' || h === 'red') return 'home';
+  if (h === 'dns' || h === 'duckdns' || h === 'pihole') return 'dns';
+  if (h === 'map' || h === 'mapa' || h === 'geoip') return 'map';
+  if (h === 'speedtest' || h === 'testdevelocidad' || h === 'velocidad' || h === 'test') return 'speedtest';
+  if (h === 'home' || h === 'red' || h === 'resumen' || h === 'live' || h === 'devices' || h === 'dispositivos') return 'home';
   return undefined;
 }
 
@@ -427,6 +427,7 @@ interface NetworkSecurityViewProps {
   netHistoryLoading?: boolean;
   netHistoryError?: boolean;
   onRefreshNetHistory24h?: () => void;
+  onSubTabChange?: (sub: string) => void;
 }
 
 interface DuckDnsStatusPayload {
@@ -459,6 +460,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   netHistoryLoading = false,
   netHistoryError = false,
   onRefreshNetHistory24h,
+  onSubTabChange,
 }) => {
   const { t, locale } = useI18n();
   const {
@@ -483,6 +485,11 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const lastSyncedSpeedtestIdRef = useRef<string | null>(null);
 
   const [subTab, setSubTab] = useState<RedSubTab>(() => resolveRedSubTab(initialSubTab) || 'home');
+
+  const handleSelectSubTab = (id: RedSubTab) => {
+    setSubTab(id);
+    onSubTabChange?.(id);
+  };
   const [clientQuery, setClientQuery] = useState('');
   const [clientSort, setClientSort] = useState<ClientSortMode>('down');
   const [showTechNet, setShowTechNet] = useState(false);
@@ -557,6 +564,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const linesLayerRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tileLayerRef = useRef<any>(null);
+  const switchedToOsmRef = useRef(false);
   // Registro incremental para actualizar marcadores sin cerrar popups abiertos durante el refresco en vivo
   const markerRegistryRef = useRef<
     Map<
@@ -1823,10 +1831,10 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         closePopupOnClick: false,
       }).setView([40.4, -3.7], 3);
       const layer = L.tileLayer(primaryTileUrl, { maxZoom: 18 });
-      let switchedToOsm = false;
+      switchedToOsmRef.current = false;
       layer.on('tileerror', () => {
-        if (!switchedToOsm) {
-          switchedToOsm = true;
+        if (!switchedToOsmRef.current) {
+          switchedToOsmRef.current = true;
           const isDarkActive =
             document.documentElement.getAttribute('data-theme') === 'dark' ||
             document.documentElement.classList.contains('dark');
@@ -1864,6 +1872,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         }, 360)
       );
     } else if (tileLayerRef.current) {
+      switchedToOsmRef.current = false;
       mapContainerEl.classList.remove('cockpit-osm-dark-fallback');
       tileLayerRef.current.setUrl(primaryTileUrl);
     }
@@ -2553,7 +2562,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               <motion.button
                 key={tab.id}
                 type="button"
-                onClick={() => setSubTab(tab.id)}
+                onClick={() => handleSelectSubTab(tab.id)}
                 className={`cockpit-subtab-btn relative inline-flex items-center justify-center rounded-xl font-semibold transition-colors ${
                   active
                     ? 'text-sky-700 dark:text-sky-300'

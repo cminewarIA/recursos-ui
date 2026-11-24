@@ -53,9 +53,9 @@ type MoreSubTab = 'updates' | 'devices' | 'manual' | 'dex';
 function resolveMoreSubTab(hint?: string): MoreSubTab | undefined {
   if (!hint) return undefined;
   const h = hint.toLowerCase();
-  if (h === 'updates' || h === 'logs' || h === 'sistema' || h === 'version') return 'updates';
-  if (h === 'devices' || h === 'dispositivos' || h === 'nodos') return 'devices';
-  if (h === 'manual' || h === 'readme' || h === 'ayuda' || h === 'docs') return 'manual';
+  if (['updates', 'actualizaciones', 'logs', 'sistema', 'version', 'settings', 'ajustes', 'cloud', 'nube', 'health', 'salud'].includes(h)) return 'updates';
+  if (['devices', 'dispositivos', 'nodos', 'security', 'seguridad'].includes(h)) return 'devices';
+  if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(h)) return 'manual';
   if (h === 'dex') return 'dex';
   return undefined;
 }
@@ -69,6 +69,7 @@ interface MoreViewProps {
   onRefreshMetrics: () => void;
   onVersionChange?: (ver: VersionInfo) => void;
   onNotify: (msg: string, isError?: boolean) => void;
+  onSubTabChange?: (sub: string) => void;
 }
 
 export const MoreView: React.FC<MoreViewProps> = ({
@@ -80,6 +81,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
   onRefreshMetrics,
   onVersionChange,
   onNotify,
+  onSubTabChange,
 }) => {
   const { locale, supportedLocales, localeNames, otaSource, isSyncingLanguages, setLocale, syncFromGitHub, t } = useI18n();
   const {
@@ -108,6 +110,11 @@ export const MoreView: React.FC<MoreViewProps> = ({
   } = useFirebase();
   const { isUbuntuNative, isNativeApp } = detectNativeEnvironment();
   const [subTab, setSubTab] = useState<MoreSubTab>(() => resolveMoreSubTab(initialSubTab) || 'updates');
+
+  const handleSelectSubTab = (id: MoreSubTab) => {
+    setSubTab(id);
+    onSubTabChange?.(id);
+  };
   const manualIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
   const [langSearch, setLangSearch] = useState('');
@@ -530,7 +537,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
               <motion.button
                 key={tab.id}
                 type="button"
-                onClick={() => setSubTab(tab.id)}
+                onClick={() => handleSelectSubTab(tab.id)}
                 className={`cockpit-subtab-btn relative inline-flex items-center justify-center rounded-xl font-semibold transition-colors ${
                   active
                     ? 'text-sky-700 dark:text-sky-300'

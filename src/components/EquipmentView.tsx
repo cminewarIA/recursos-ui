@@ -5,23 +5,20 @@ import {
   ChevronUp,
   Cpu,
   HardDrive,
-  ListChecks,
   Maximize2,
   MemoryStick,
   Monitor,
-  Search,
 } from 'lucide-react';
 import { AccordionBody, AnimatedMetricValue, MorphPill, ViewStage } from './MotionPrimitives';
 import { ExpandChartSpec } from './OverviewView';
-import { ProcessHistoryStackedChart } from './ProcessHistoryStackedChart';
 import { ResourceProcessesPanel } from './ResourceProcessesPanel';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
-import { MetricsPayload, SystemProcess, ThemeMode } from '../types/telemetry';
-import { formatBytes, formatMbRate, formatPct, formatSpeed, formatTemp } from '../utils/formatters';
+import { MainTabId, MetricsPayload, ThemeMode } from '../types/telemetry';
+import { formatBytes, formatMbRate, formatPct, formatTemp } from '../utils/formatters';
 import { formatDiskFstype, formatDiskLabel, formatDiskTransport, useI18n } from '../i18n';
 
-type EquipmentSubTab = 'cpu' | 'ram' | 'gpu' | 'storage' | 'processes';
+type EquipmentSubTab = 'cpu' | 'ram' | 'gpu' | 'storage';
 
 function resolveEquipmentSubTab(hint?: string): EquipmentSubTab | undefined {
   if (!hint) return undefined;
@@ -29,8 +26,7 @@ function resolveEquipmentSubTab(hint?: string): EquipmentSubTab | undefined {
   if (h === 'cpu' || h === 'procesador') return 'cpu';
   if (h === 'ram' || h === 'memoria') return 'ram';
   if (h === 'gpu' || h === 'grafica') return 'gpu';
-  if (h === 'storage' || h === 'almacenamiento') return 'storage';
-  if (h === 'processes' || h === 'procesos') return 'processes';
+  if (h === 'storage' || h === 'almacenamiento' || h === 'discos') return 'storage';
   return undefined;
 }
 
@@ -40,6 +36,8 @@ interface EquipmentViewProps {
   initialSubTab?: string;
   navTick?: number;
   onExpandChart?: (spec: ExpandChartSpec) => void;
+  onNavigate?: (tab: MainTabId, subTab?: string) => void;
+  onSubTabChange?: (sub: string) => void;
 }
 
 export const EquipmentView: React.FC<EquipmentViewProps> = ({
@@ -48,14 +46,19 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
   initialSubTab,
   navTick,
   onExpandChart,
+  onNavigate,
+  onSubTabChange,
 }) => {
   const { t, locale } = useI18n();
   const [subTab, setSubTab] = useState<EquipmentSubTab>(() => resolveEquipmentSubTab(initialSubTab) || 'cpu');
   const [showTech, setShowTech] = useState(false);
-  const [procQuery, setProcQuery] = useState('');
-  const [procSort, setProcSort] = useState<'cpu' | 'mem' | 'vram' | 'io'>('cpu');
   const [disabledGpuGraphs, setDisabledGpuGraphs] = useState<Record<string, boolean>>({});
   const [coreTooltip, setCoreTooltip] = useState<FloatingTooltipData | null>(null);
+
+  const handleSelectSubTab = (id: EquipmentSubTab) => {
+    setSubTab(id);
+    onSubTabChange?.(id);
+  };
 
   useEffect(() => {
     const mapped = resolveEquipmentSubTab(initialSubTab);
@@ -410,27 +413,11 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     [diskReadHist, diskWriteHist, diskPctHist, t]
   );
 
-  const filteredProcesses = useMemo(() => {
-    const q = procQuery.trim().toLowerCase();
-    const list: SystemProcess[] = [...(metrics?.system_processes ?? [])];
-    const filtered = q
-      ? list.filter((p) => p.name.toLowerCase().includes(q) || String(p.user || '').toLowerCase().includes(q))
-      : list;
-    filtered.sort((a, b) => {
-      if (procSort === 'mem') return Number(b.priv_mb ?? b.mem_mb ?? 0) - Number(a.priv_mb ?? a.mem_mb ?? 0);
-      if (procSort === 'vram') return Number(b.vram_mb || 0) - Number(a.vram_mb || 0);
-      if (procSort === 'io') return Number(b.io_total_bps || 0) - Number(a.io_total_bps || 0);
-      return Number(b.cpu_percent || 0) - Number(a.cpu_percent || 0);
-    });
-    return filtered.slice(0, 60);
-  }, [metrics?.system_processes, procQuery, procSort]);
-
   const subTabs: Array<{ id: EquipmentSubTab; label: string; icon: React.ReactNode }> = [
     { id: 'cpu', label: t('equipment.sort_cpu'), icon: <Cpu className="h-4 w-4" /> },
     { id: 'ram', label: t('hardware.ram.short_title'), icon: <MemoryStick className="h-4 w-4" /> },
     { id: 'gpu', label: t('hardware.gpu.short_title'), icon: <Monitor className="h-4 w-4" /> },
     { id: 'storage', label: t('hardware.storage.title'), icon: <HardDrive className="h-4 w-4" /> },
-    { id: 'processes', label: t('equipment.processes'), icon: <ListChecks className="h-4 w-4" /> },
   ];
 
   return (
@@ -444,7 +431,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
               <motion.button
                 key={tab.id}
                 type="button"
-                onClick={() => setSubTab(tab.id)}
+                onClick={() => handleSelectSubTab(tab.id)}
                 className={`cockpit-subtab-btn relative inline-flex items-center justify-center rounded-xl font-semibold transition-colors ${
                   active
                     ? 'text-sky-700 dark:text-sky-300'
@@ -601,7 +588,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
           <ResourceProcessesPanel
             kind="cpu"
             metrics={metrics}
-            onViewAllProcesses={() => setSubTab('processes')}
+            onViewAllProcesses={() => onNavigate?.('programas', 'processes')}
           />
           <FloatingTooltip data={coreTooltip} />
         </div>
@@ -706,7 +693,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
         <ResourceProcessesPanel
           kind="ram"
           metrics={metrics}
-          onViewAllProcesses={() => setSubTab('processes')}
+          onViewAllProcesses={() => onNavigate?.('programas', 'processes')}
         />
         </div>
       )}
@@ -928,7 +915,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
             <ResourceProcessesPanel
               kind="gpu"
               metrics={metrics}
-              onViewAllProcesses={() => setSubTab('processes')}
+              onViewAllProcesses={() => onNavigate?.('programas', 'processes')}
             />
           </div>
         );
@@ -1084,118 +1071,8 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
           <ResourceProcessesPanel
             kind="storage"
             metrics={metrics}
-            onViewAllProcesses={() => setSubTab('processes')}
+            onViewAllProcesses={() => onNavigate?.('programas', 'processes')}
           />
-        </div>
-      )}
-
-      {/* Subview: Programas en marcha */}
-      {subTab === 'processes' && (
-        <div className="space-y-4">
-          <ProcessHistoryStackedChart theme={theme} />
-
-          <div className="cockpit-bento p-5">
-          <div className="flex flex-col gap-3 pb-4 border-b border-slate-200/70 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-                {t('equipment.processes_now_title')}
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {t('equipment.processes_sub')}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
-              <div className="relative min-w-0 w-full sm:w-auto">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={procQuery}
-                  onChange={(e) => setProcQuery(e.target.value)}
-                  placeholder={t('equipment.processes_search')}
-                  className="cockpit-subtile min-h-[40px] w-full sm:w-52 pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-sky-500 dark:text-white"
-                />
-              </div>
-              <LayoutGroup id="proc-sort">
-                <div className="cockpit-subtile flex flex-wrap items-center gap-1 p-1 max-w-full">
-                  {(['cpu', 'mem', 'vram', 'io'] as const).map((k) => {
-                    const active = procSort === k;
-                    return (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => setProcSort(k)}
-                        className={`relative min-h-[34px] flex-1 sm:flex-initial rounded-lg px-2.5 text-xs font-semibold transition-colors whitespace-nowrap ${
-                          active
-                            ? 'text-sky-700 dark:text-sky-300'
-                            : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-                        }`}
-                      >
-                        {active && <MorphPill layoutId="proc-sort-pill" className="rounded-lg" />}
-                        <span className="relative z-10">
-                          {k === 'cpu'
-                            ? t('equipment.sort_cpu')
-                            : k === 'mem'
-                              ? t('equipment.sort_mem')
-                              : k === 'vram'
-                                ? t('equipment.sort_vram')
-                                : t('hardware.storage.title')}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </LayoutGroup>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-200/70 text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                  <th className="py-2.5 pr-3 font-medium">{t('equipment.col_program')}</th>
-                  <th className="py-2.5 px-3 font-medium">{t('equipment.col_user')}</th>
-                  <th className="py-2.5 px-3 text-right font-medium">{t('equipment.col_cpu')}</th>
-                  <th className="py-2.5 px-3 text-right font-medium">{t('equipment.col_ram')}</th>
-                  <th className="py-2.5 px-3 text-right font-medium">{t('equipment.col_vram')}</th>
-                  <th className="py-2.5 pl-3 text-right font-medium">{t('hardware.storage.title')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
-                {filteredProcesses.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500 dark:text-slate-400">
-                      {t('equipment.processes_none_match', { query: procQuery })}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredProcesses.map((proc) => (
-                    <tr key={`${proc.pid}-${proc.name}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                      <td className="py-2.5 pr-3">
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{proc.name}</p>
-                        <p className="font-mono text-[11px] text-slate-400">{t('equipment.pid_label', { pid: proc.pid })}</p>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">{proc.user || t('equipment.user_system')}</td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-white">
-                        {formatPct(proc.cpu_norm_percent ?? proc.cpu_percent)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
-                        {formatBytes(Number(proc.priv_mb ?? proc.mem_mb ?? 0) * 1024 * 1024)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400">
-                        {proc.vram_mb ? formatBytes(Number(proc.vram_mb) * 1024 * 1024) : '--'}
-                      </td>
-                      <td className="py-2.5 pl-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400">
-                        {proc.io_total_bps
-                          ? formatSpeed(proc.io_total_bps)
-                          : '--'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
         </div>
       )}
       </ViewStage>

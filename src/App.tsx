@@ -1,25 +1,23 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, LayoutGroup, motion, MotionConfig } from 'motion/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import {
   Activity,
-  Cpu,
-  Grid,
-  Home,
   Moon,
-  MoreHorizontal,
+  Search,
   Sun,
-  Wifi,
 } from 'lucide-react';
-import { COCKPIT_EASE, COCKPIT_SPRING, MorphPill, ViewStage } from './components/MotionPrimitives';
+import { COCKPIT_EASE, COCKPIT_SPRING, ViewStage } from './components/MotionPrimitives';
 import { OverviewView, ExpandChartSpec } from './components/OverviewView';
 import { EquipmentView } from './components/EquipmentView';
 import { NetworkSecurityView } from './components/NetworkSecurityView';
 import { AppsMediaView } from './components/AppsMediaView';
 import { MoreView } from './components/MoreView';
 import { ExpandedChartModal } from './components/ExpandedChartModal';
+import { NavigationSidebar } from './components/NavigationSidebar';
+import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { MainTabId, MetricsPayload, TelemetryHistoryResponse, ThemeMode, VersionInfo, WifiClient } from './types/telemetry';
 import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/api';
-import { extractInitialSubTabFromRoute, normalizeExternalRoute } from './utils/formatters';
+import { formatCanonicalRoute, normalizeSubTabForView, resolveAppRoute } from './utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion, isRemoteVersionHigher } from './utils/version';
 import { useI18n } from './i18n';
 import { useFirebase } from './firebase/FirebaseProvider';
@@ -55,18 +53,44 @@ export function App() {
   const [activeTab, setActiveTab] = useState<MainTabId>(() => {
     if (typeof window !== 'undefined') {
       const qView = new URLSearchParams(window.location.search).get('view');
-      return normalizeExternalRoute(qView || window.location.pathname);
+      return resolveAppRoute(qView || window.location.pathname).view;
     }
     return 'inicio';
   });
   const [subTabHint, setSubTabHint] = useState<string | undefined>(() => {
     if (typeof window !== 'undefined') {
       const qView = new URLSearchParams(window.location.search).get('view');
-      return extractInitialSubTabFromRoute(qView || window.location.pathname);
+      return resolveAppRoute(qView || window.location.pathname).subTab;
     }
     return undefined;
   });
   const [navTick, setNavTick] = useState(0);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+
+  // Global Ctrl+K / Cmd+K quick search shortcut
+  useEffect(() => {
+    const handleGlobalKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchModalOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKey);
+    return () => window.removeEventListener('keydown', handleGlobalKey);
+  }, []);
+
+  // Bidirectional browser Back / Forward (popstate) sync for independent submenu pages
+  useEffect(() => {
+    const onPopState = () => {
+      const qView = new URLSearchParams(window.location.search).get('view');
+      const resolved = resolveAppRoute(qView || window.location.pathname);
+      setActiveTab(resolved.view);
+      setSubTabHint(resolved.subTab);
+      setNavTick((tVal) => tVal + 1);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
@@ -199,26 +223,16 @@ export function App() {
   // Native bridge helpers (Ubuntu WebKit2 / Android WebView)
   useEffect(() => {
     window.switchView = (viewName: string) => {
-      const normalized = normalizeExternalRoute(viewName);
-      setActiveTab(normalized);
-      const raw = (viewName || '').toLowerCase();
-      let sub = extractInitialSubTabFromRoute(viewName);
-      if (!sub) {
-        if (raw.includes('dex')) sub = 'dex';
-        else if (raw.includes('version') || raw.includes('sistema')) sub = 'updates';
-        else if (raw.includes('cpu') || raw.includes('procesador')) sub = 'cpu';
-        else if (raw.includes('ram') || raw.includes('memoria')) sub = 'ram';
-        else if (raw.includes('gpu') || raw.includes('grafica')) sub = 'gpu';
-        else if (raw.includes('almacenamiento')) sub = 'storage';
-        else if (raw.includes('procesos')) sub = 'processes';
-        else if (raw.includes('seguridad')) sub = 'security';
-        else if (raw.includes('trafic') || raw.includes('traffic') || raw.includes('historial')) sub = 'traffic';
-        else if (raw.includes('speedtest') || raw.includes('velocidad')) sub = 'speedtest';
-        else if (raw.includes('dns') || raw.includes('duckdns')) sub = 'dns';
-        else if (raw.includes('multimedia') || raw.includes('descargas')) sub = 'media';
+      const resolved = resolveAppRoute(viewName);
+      setActiveTab(resolved.view);
+      setSubTabHint(resolved.subTab);
+      setNavTick((tVal) => tVal + 1);
+      if (typeof window !== 'undefined' && window.history?.replaceState) {
+        const targetPath = formatCanonicalRoute(resolved.view, resolved.subTab);
+        if (window.location.pathname !== targetPath) {
+          window.history.replaceState({ tab: resolved.view, sub: resolved.subTab }, '', targetPath);
+        }
       }
-      setSubTabHint(sub);
-      setNavTick((t) => t + 1);
     };
 
     window.injectNativeSession = (token: string, telemetry?: Record<string, unknown>) => {
@@ -372,17 +386,37 @@ export function App() {
   }, [fetchNetworkHistory24h]);
 
   const navigateTo = useCallback((tab: MainTabId, sub?: string) => {
+    const normalizedSub = normalizeSubTabForView(tab, sub);
     setActiveTab(tab);
-    setSubTabHint(sub);
-    setNavTick((t) => t + 1);
-    if (typeof window !== 'undefined' && window.history?.replaceState) {
-      const targetPath = tab === 'inicio' ? '/' : `/${tab}`;
+    setSubTabHint(normalizedSub);
+    setNavTick((tVal) => tVal + 1);
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      const targetPath = formatCanonicalRoute(tab, normalizedSub);
       if (window.location.pathname !== targetPath) {
-        window.history.replaceState(null, '', targetPath);
+        window.history.pushState({ tab, sub: normalizedSub }, '', targetPath);
       }
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  const handleSubTabChange = useCallback((tab: MainTabId, sub: string) => {
+    const normalizedSub = normalizeSubTabForView(tab, sub);
+    setSubTabHint(normalizedSub);
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      const targetPath = formatCanonicalRoute(tab, normalizedSub);
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ tab, sub: normalizedSub }, '', targetPath);
+      }
+    }
+  }, []);
+
+  // Keep browser document.title synced with the active independent page route
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const routePath = formatCanonicalRoute(activeTab, subTabHint);
+    const baseTitle = t('app.brand');
+    document.title = routePath === '/' ? baseTitle : `${baseTitle} · ${routePath}`;
+  }, [activeTab, subTabHint, t]);
 
   const executePowerAction = useCallback(
     async (action: 'wake' | 'shutdown', client: WifiClient) => {
@@ -478,19 +512,13 @@ export function App() {
     });
   }, [fbUser?.emailVerified, fbAutoSync, metrics, fbSyncPingSnapshot]);
 
-  const navItems: Array<{ id: MainTabId; label: string; icon: React.ReactNode }> = [
-    { id: 'inicio', label: t('nav.inicio'), icon: <Home className="h-5 w-5" /> },
-    { id: 'equipo', label: t('nav.equipo'), icon: <Cpu className="h-5 w-5" /> },
-    { id: 'red', label: t('nav.red'), icon: <Wifi className="h-5 w-5" /> },
-    { id: 'programas', label: t('nav.programas'), icon: <Grid className="h-5 w-5" /> },
-    { id: 'mas', label: t('nav.mas'), icon: <MoreHorizontal className="h-5 w-5" /> },
-  ];
+  const currentRoutePath = formatCanonicalRoute(activeTab, subTabHint);
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] pb-[clamp(4.5rem,11dvh,6.75rem)]">
+      <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] pb-[clamp(5rem,12dvh,7.25rem)]">
         <div id="cockpit-scroll-stage" data-cockpit-jelly-stage="true">
-          {/* Alethia Editorial Top Header with Brand, Desktop Mono Nav & Telemetry Controls */}
+          {/* Clean Editorial Top Header: Brand + Route · Quick Search (Ctrl+K) · Health & Theme */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -498,7 +526,7 @@ export function App() {
             className="cockpit-shell pt-[clamp(0.5rem,1.4dvh,1.1rem)]"
           >
           <header className="cockpit-topbar flex flex-wrap items-center justify-between gap-[clamp(0.5rem,1.5vw,1rem)] px-[clamp(0.75rem,1.6vw,1.25rem)] py-[clamp(0.45rem,0.9dvh,0.7rem)]">
-            {/* Zone 1: Brand with CMineWar emblem */}
+            {/* Zone 1: Brand with CMineWar emblem & current independent route */}
             <motion.button
               type="button"
               onClick={() => navigateTo('inicio')}
@@ -509,10 +537,10 @@ export function App() {
                   src="/recursos-cockpit.png"
                   alt={t('app.brand_alt')}
                   onError={() => setLogoBroken(true)}
-                  className="h-[clamp(2.25rem,min(5vw,7.5dvh),3.5rem)] w-[clamp(2.25rem,min(5vw,7.5dvh),3.5rem)] shrink-0 object-contain drop-shadow-[0_4px_12px_rgba(30,107,56,0.22)] dark:drop-shadow-[0_4px_16px_rgba(198,241,157,0.28)]"
+                  className="h-[clamp(2.25rem,min(5vw,7.5dvh),3.25rem)] w-[clamp(2.25rem,min(5vw,7.5dvh),3.25rem)] shrink-0 object-contain drop-shadow-[0_4px_12px_rgba(30,107,56,0.22)] dark:drop-shadow-[0_4px_16px_rgba(198,241,157,0.28)]"
                 />
               ) : (
-                <div className="flex h-[clamp(2.25rem,min(5vw,7.5dvh),3.5rem)] w-[clamp(2.25rem,min(5vw,7.5dvh),3.5rem)] shrink-0 items-center justify-center rounded-xl bg-[#0f1f10] text-[#c6f19d]">
+                <div className="flex h-[clamp(2.25rem,min(5vw,7.5dvh),3.25rem)] w-[clamp(2.25rem,min(5vw,7.5dvh),3.25rem)] shrink-0 items-center justify-center rounded-xl border border-[#9bd86b] bg-[#e5f8d3] text-[#144d23] dark:border-[#c6f19d]/25 dark:bg-[#0f1f10] dark:text-[#c6f19d]">
                   <Activity className="h-5 w-5" />
                 </div>
               )}
@@ -520,35 +548,38 @@ export function App() {
                 <span className="block truncate font-display text-[clamp(1rem,1.15vw+0.55rem,1.35rem)] font-bold tracking-tight text-slate-900 dark:text-[#f5f4f2]">
                   {t('app.brand')}
                 </span>
-                <span className="mt-0.5 block truncate font-mono text-[clamp(0.625rem,0.45vw+0.42rem,0.72rem)] uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
-                  {metrics?.system?.hostname || t('app.cockpit_fallback')} · {theme === 'dark' ? t('app.theme_dark') : t('app.theme_light')}
+                <span className="mt-0.5 block truncate font-mono text-[clamp(0.625rem,0.45vw+0.42rem,0.72rem)] tracking-[0.04em] text-slate-500 dark:text-slate-400">
+                  {metrics?.system?.hostname || t('app.cockpit_fallback')} · {currentRoutePath}
                 </span>
               </div>
             </motion.button>
 
-            {/* Zone 2: Alethia Desktop Monospace Top Navigation (xl+ only for zero crowding) */}
-            <nav aria-label={t('nav.bottom_aria')} className="hidden xl:flex items-center gap-1">
-              {navItems.map((item) => {
-                const active = activeTab === item.id;
-                return (
-                  <button
-                    key={`top-${item.id}`}
-                    type="button"
-                    onClick={() => navigateTo(item.id)}
-                    className={`relative inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors cursor-pointer ${
-                      active
-                        ? 'bg-[#0f1f10] text-[#c6f19d] dark:bg-[#c6f19d] dark:text-[#0f1f10]'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-[#c6f19d]'
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+            {/* Zone 2: Global Quick Search Trigger (Ctrl+K) */}
+            <button
+              type="button"
+              onClick={() => setSearchModalOpen(true)}
+              aria-label={t('search.quick_search')}
+              className="cockpit-subtile hidden md:flex items-center justify-between gap-4 min-h-[38px] w-[clamp(210px,24vw,340px)] px-3.5 text-xs text-slate-500 transition-colors hover:border-[#1e6b38]/40 hover:text-slate-900 dark:text-slate-400 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#f5f4f2] cursor-pointer"
+            >
+              <span className="inline-flex items-center gap-2 truncate">
+                <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <span className="truncate">{t('search.quick_search')}</span>
+              </span>
+              <kbd className="shrink-0 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
+                Ctrl K
+              </kbd>
+            </button>
 
-            {/* Zone 3: Live Health Pill + Quick Theme + Alethia Version Pill */}
+            {/* Zone 3: Mobile Search + Live Health + Quick Theme + Version */}
             <div className="flex items-center gap-2 shrink-0">
+              <motion.button
+                type="button"
+                aria-label={t('search.quick_search')}
+                onClick={() => setSearchModalOpen(true)}
+                className="cockpit-subtile flex md:hidden min-h-[36px] min-w-[36px] items-center justify-center text-slate-700 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-200 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
+              >
+                <Search className="h-4 w-4" />
+              </motion.button>
               <motion.button
                 type="button"
                 onClick={() => navigateTo(topbarErrors > 0 ? 'mas' : 'inicio', topbarErrors > 0 ? 'logs' : undefined)}
@@ -613,7 +644,9 @@ export function App() {
               >
                 <span
                   className={`h-2 w-2 rounded-[3px] ${
-                    updateAvailable ? 'bg-[#0f1f10] cockpit-live-dot' : 'bg-[#c6f19d] ring-1 ring-[#0f1f10]/20'
+                    updateAvailable
+                      ? 'bg-[#0f1f10] cockpit-live-dot'
+                      : 'bg-[#1e6b38] dark:bg-[#c6f19d] ring-1 ring-[#0f1f10]/15 dark:ring-[#0f1f10]/20'
                   }`}
                 />
                 <span>v{displayVersion}</span>
@@ -665,6 +698,8 @@ export function App() {
                   initialSubTab={subTabHint}
                   navTick={navTick}
                   onExpandChart={setExpandedChart}
+                  onNavigate={navigateTo}
+                  onSubTabChange={(sub) => handleSubTabChange('equipo', sub)}
                 />
               )}
               {activeTab === 'red' && (
@@ -682,15 +717,19 @@ export function App() {
                   netHistoryLoading={netHistoryLoading}
                   netHistoryError={netHistoryError}
                   onRefreshNetHistory24h={() => void fetchNetworkHistory24h(true)}
+                  onSubTabChange={(sub) => handleSubTabChange('red', sub)}
                 />
               )}
               {activeTab === 'programas' && (
                 <AppsMediaView
                   metrics={metrics}
+                  theme={theme}
                   initialSubTab={subTabHint}
                   navTick={navTick}
                   onServiceAction={handleServiceAction}
                   actionPendingTarget={pendingServiceTarget}
+                  onSubTabChange={(sub) => handleSubTabChange('programas', sub)}
+                  onNotify={notify}
                 />
               )}
               {activeTab === 'mas' && (
@@ -703,6 +742,7 @@ export function App() {
                   onRefreshMetrics={() => void fetchMetrics()}
                   onVersionChange={handleVersionChange}
                   onNotify={notify}
+                  onSubTabChange={(sub) => handleSubTabChange('mas', sub)}
                 />
               )}
             </ViewStage>
@@ -710,49 +750,16 @@ export function App() {
         </main>
         </div>
 
-        {/* Alethia Obsidian Floating Dock with Electric Lime Spring Morph Pill */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, delay: 0.08, ease: COCKPIT_EASE }}
-          className="pointer-events-none fixed inset-x-0 bottom-[clamp(0.45rem,1.25dvh,0.9rem)] z-40 flex justify-center px-[clamp(0.5rem,1.5vw,1rem)]"
-        >
-          <LayoutGroup id="dock-nav">
-            <nav
-              aria-label={t('nav.bottom_aria')}
-              className="cockpit-dock pointer-events-auto grid w-full max-w-[min(96vw,clamp(360px,48vw,640px))] grid-cols-5 items-stretch gap-0.5 sm:gap-1 p-[clamp(0.25rem,0.65vw,0.45rem)]"
-            >
-              {navItems.map((item) => {
-                const active = activeTab === item.id;
-                return (
-                  <motion.button
-                    key={item.id}
-                    type="button"
-                    title={item.label}
-                    onClick={() => navigateTo(item.id)}
-                    className={`relative flex min-h-[clamp(38px,6dvh,50px)] min-w-0 w-full flex-col items-center justify-center gap-0.5 rounded-[14px] px-0.5 sm:px-1.5 py-[clamp(0.2rem,0.5dvh,0.35rem)] transition-colors cursor-pointer ${
-                      active
-                        ? 'text-[#0f1f10] font-bold'
-                        : 'text-[#aebaa9] hover:text-[#f5f4f2]'
-                    }`}
-                  >
-                    {active && <MorphPill layoutId="dock-active-pill" className="rounded-[14px]" />}
-                    <motion.span
-                      animate={{ scale: active ? 1.06 : 1, y: active ? -1 : 0 }}
-                      transition={COCKPIT_SPRING}
-                      className="relative z-10 inline-flex shrink-0"
-                    >
-                      {item.icon}
-                    </motion.span>
-                    <span className="relative z-10 w-full max-w-full text-center font-mono text-[clamp(8.5px,0.7vw+4px,10.5px)] font-semibold uppercase tracking-[0.04em] leading-[1.1] truncate">
-                      {item.label}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </nav>
-          </LayoutGroup>
-        </motion.div>
+        {/* Ergonomic Obsidian Floating Dock with Electric Lime Spring Morph Pill */}
+        <NavigationSidebar activeTab={activeTab} onNavigate={navigateTo} />
+
+        {/* Global Quick Search Modal (Ctrl+K) with direct deep-link routes */}
+        <GlobalSearchModal
+          isOpen={searchModalOpen}
+          onClose={() => setSearchModalOpen(false)}
+          onNavigate={navigateTo}
+          metrics={metrics}
+        />
 
         {/* Expanded Chart Modal (Inspección táctil e historial completo SQLite) */}
         <AnimatePresence>
