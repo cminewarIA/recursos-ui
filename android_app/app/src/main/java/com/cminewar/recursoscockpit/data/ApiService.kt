@@ -6,6 +6,8 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
@@ -18,6 +20,7 @@ import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Dispatcher
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -27,7 +30,9 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.security.MessageDigest
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import javax.net.SocketFactory
 import kotlin.math.roundToInt
 
 data class HealthCheckResult(
@@ -51,11 +56,37 @@ class ApiService(
         .readTimeout(4500, TimeUnit.MILLISECONDS)
         .build()
 
-    // Cliente ultrarrápido para escaneo concurrente de puertos y mDNS en LAN
+    // Cliente ultrarrápido de alta concurrencia para escaneo /24 en LAN
+    private val scanDispatcher = Dispatcher().apply {
+        maxRequests = 128
+        maxRequestsPerHost = 16
+    }
+
     private val scanClient = OkHttpClient.Builder()
-        .connectTimeout(350, TimeUnit.MILLISECONDS)
-        .readTimeout(500, TimeUnit.MILLISECONDS)
+        .dispatcher(scanDispatcher)
+        .connectTimeout(700, TimeUnit.MILLISECONDS)
+        .readTimeout(900, TimeUnit.MILLISECONDS)
         .build()
+
+    // Caché de clientes HTTP ligados a la SocketFactory de Wi-Fi/Ethernet para sortear VPN/5G
+    private val boundNormalClients = ConcurrentHashMap<SocketFactory, OkHttpClient>()
+    private val boundScanClients = ConcurrentHashMap<SocketFactory, OkHttpClient>()
+
+    @Volatile
+    private var cachedTelemetryB64: String = ""
+
+    @Volatile
+    private var cachedTelemetryTsMs: Long = 0L
+
+    private fun getHttpClient(isQuickScan: Boolean, socketFactory: SocketFactory?): OkHttpClient {
+        val base = if (isQuickScan) scanClient else client
+        if (socketFactory == null) return base
+        val cache = if (isQuickScan) boundScanClients else boundNormalClients
+        if (cache.size > 8) cache.clear()
+        return cache.getOrPut(socketFactory) {
+            base.newBuilder().socketFactory(socketFactory).build()
+        }
+    }
 
     fun isTelevisionDevice(): Boolean {
         return try {
@@ -68,6 +99,78 @@ class ApiService(
         } catch (_: Exception) {
             false
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun resolveActiveLanIpInfo(): Triple<String, String, String> {
+        // 1. Priorizar red Wi-Fi / Ethernet real vía ConnectivityManager (sin VPN ni celular)
+        try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            if (cm != null) {
+                val candidates = (listOfNotNull(cm.activeNetwork) + cm.allNetworks.toList()).distinct()
+                for (network in candidates) {
+                    val caps = cm.getNetworkCapabilities(network) ?: continue
+                    val isLan = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                        caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                    if (!isLan || caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) || caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                        continue
+                    }
+                    val lp = cm.getLinkProperties(network) ?: continue
+                    val ifName = lp.interfaceName ?: "wlan0"
+                    for (la in lp.linkAddresses) {
+                        val addr = la.address
+                        if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                            val ip = addr.hostAddress ?: continue
+                            if (isPrivateRfc1918Ipv4(ip)) {
+                                var mac = ""
+                                try {
+                                    val hw = NetworkInterface.getByName(ifName)?.hardwareAddress
+                                    if (hw != null && hw.isNotEmpty()) {
+                                        mac = hw.joinToString(":") { String.format("%02X", it) }
+                                    }
+                                } catch (_: Exception) {}
+                                return Triple(ip, ifName, mac)
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 2. Fallback por NetworkInterface excluyendo interfaces celulares, VPN y virtuales
+        var fallbackCandidate: Triple<String, String, String>? = null
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces != null && interfaces.hasMoreElements()) {
+                val iface = interfaces.nextElement()
+                if (!iface.isUp || iface.isLoopback) continue
+                val name = iface.name ?: ""
+                if (isExcludedNonLanInterfaceName(name)) continue
+                val addrs = iface.inetAddresses
+                while (addrs.hasMoreElements()) {
+                    val addr = addrs.nextElement()
+                    if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                        val ip = addr.hostAddress ?: continue
+                        if (!isPrivateRfc1918Ipv4(ip)) continue
+                        var mac = ""
+                        try {
+                            val hw = iface.hardwareAddress
+                            if (hw != null && hw.isNotEmpty()) {
+                                mac = hw.joinToString(":") { String.format("%02X", it) }
+                            }
+                        } catch (_: Exception) {}
+                        val item = Triple(ip, name.ifBlank { "wlan0" }, mac)
+                        if (isPreferredLanInterfaceName(name)) {
+                            return item
+                        }
+                        if (fallbackCandidate == null) {
+                            fallbackCandidate = item
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        return fallbackCandidate ?: Triple("", "", "")
     }
 
     @SuppressLint("HardwareIds")
@@ -173,34 +276,8 @@ class ApiService(
             }
         } catch (_: Exception) {}
 
-        // Red Local (IP, Interfaz, MAC si disponible)
-        var localIp = ""
-        var ifaceName = ""
-        var macAddr = ""
-        try {
-            val interfaces = NetworkInterface.getNetworkInterfaces()
-            while (interfaces != null && interfaces.hasMoreElements()) {
-                val iface = interfaces.nextElement()
-                if (!iface.isUp || iface.isLoopback) continue
-                val addrs = iface.inetAddresses
-                while (addrs.hasMoreElements()) {
-                    val addr = addrs.nextElement()
-                    if (addr is Inet4Address && !addr.isLoopbackAddress) {
-                        val ip = addr.hostAddress ?: continue
-                        localIp = ip
-                        ifaceName = iface.name ?: "wlan0"
-                        try {
-                            val hw = iface.hardwareAddress
-                            if (hw != null && hw.isNotEmpty()) {
-                                macAddr = hw.joinToString(":") { String.format("%02X", it) }
-                            }
-                        } catch (_: Exception) {}
-                        break
-                    }
-                }
-                if (localIp.isNotEmpty()) break
-            }
-        } catch (_: Exception) {}
+        // Red Local Wi-Fi / Ethernet prioritaria
+        val (localIp, ifaceName, macAddr) = resolveActiveLanIpInfo()
 
         // Android ID & Huella Criptográfica Única
         val androidId = try {
@@ -280,9 +357,17 @@ class ApiService(
     }
 
     private fun getEncodedTelemetryHeader(): String {
+        val now = System.currentTimeMillis()
+        val existing = cachedTelemetryB64
+        if (existing.isNotEmpty() && (now - cachedTelemetryTsMs) < 30_000L) {
+            return existing
+        }
         return try {
             val jsonBytes = getDeviceTelemetryJson().toByteArray(Charsets.UTF_8)
-            Base64.encodeToString(jsonBytes, Base64.NO_WRAP)
+            val encoded = Base64.encodeToString(jsonBytes, Base64.NO_WRAP)
+            cachedTelemetryB64 = encoded
+            cachedTelemetryTsMs = now
+            encoded
         } catch (e: Exception) {
             ""
         }
@@ -347,13 +432,15 @@ class ApiService(
         return headers
     }
 
-    private fun applyAuthAndTelemetryHeaders(reqBuilder: Request.Builder) {
+    private fun applyAuthAndTelemetryHeaders(reqBuilder: Request.Builder, includeTelemetry: Boolean = true) {
         val tvFlag = if (isTelevisionDevice()) "; AndroidTV" else ""
         reqBuilder.header("User-Agent", "RecursosCockpit-Android/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE}; ${Build.MANUFACTURER} ${Build.MODEL}$tvFlag; NativeHTML; FullAccess)")
         reqBuilder.header("X-Recursos-Client", "android_native")
-        val telemetryB64 = getEncodedTelemetryHeader()
-        if (telemetryB64.isNotEmpty()) {
-            reqBuilder.header("X-Device-Telemetry", telemetryB64)
+        if (includeTelemetry) {
+            val telemetryB64 = getEncodedTelemetryHeader()
+            if (telemetryB64.isNotEmpty()) {
+                reqBuilder.header("X-Device-Telemetry", telemetryB64)
+            }
         }
         val token = securePreferences.deviceToken.trim()
         if (token.isNotEmpty()) {
@@ -362,13 +449,17 @@ class ApiService(
         }
     }
 
-    suspend fun probeNode(baseUrl: String, isQuickScan: Boolean = false): HealthCheckResult = withContext(Dispatchers.IO) {
+    suspend fun probeNode(
+        baseUrl: String,
+        isQuickScan: Boolean = false,
+        socketFactory: SocketFactory? = null
+    ): HealthCheckResult = withContext(Dispatchers.IO) {
         try {
             val url = "${baseUrl.trimEnd('/')}/api/version"
             val reqBuilder = Request.Builder().url(url)
-            applyAuthAndTelemetryHeaders(reqBuilder)
+            applyAuthAndTelemetryHeaders(reqBuilder, includeTelemetry = !isQuickScan)
 
-            val httpClient = if (isQuickScan) scanClient else client
+            val httpClient = getHttpClient(isQuickScan, socketFactory)
             httpClient.newCall(reqBuilder.build()).execute().use { response ->
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: ""
@@ -388,10 +479,16 @@ class ApiService(
                     val isLocked = body.contains("locked") || body.contains("denegado") || body.isEmpty()
                     HealthCheckResult(isOnline = true, isRevoked = isLocked, isRecursosServer = true)
                 } else {
+                    if (!isQuickScan) {
+                        Log.w("RecursosCockpit", "Sonda $url devolvió HTTP ${response.code}")
+                    }
                     HealthCheckResult(isOnline = false)
                 }
             }
         } catch (e: Exception) {
+            if (!isQuickScan) {
+                Log.w("RecursosCockpit", "Fallo sondeando $baseUrl: ${e.javaClass.simpleName}: ${e.message}")
+            }
             HealthCheckResult(isOnline = false)
         }
     }
@@ -465,4 +562,3 @@ class ApiService(
         }
     }
 }
-

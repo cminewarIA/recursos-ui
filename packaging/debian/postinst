@@ -177,6 +177,24 @@ except Exception:
     pass
 PYEOF
     fi
+
+    # Registrar servicio mDNS/Avahi (_recursos._tcp) para autodescubrimiento LAN instantáneo
+    if [ -d /etc/avahi/services ]; then
+        cat <<'AVAHIEOF' > /etc/avahi/services/recursos-cockpit.service
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">%h</name>
+  <service protocol="ipv4">
+    <type>_recursos._tcp</type>
+    <port>8085</port>
+    <txt-record>path=/</txt-record>
+    <txt-record>app=recursos-cockpit</txt-record>
+  </service>
+</service-group>
+AVAHIEOF
+        chmod 644 /etc/avahi/services/recursos-cockpit.service 2>/dev/null || true
+    fi
 fi
 
 exit 0

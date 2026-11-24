@@ -1,10 +1,15 @@
 package com.cminewar.recursoscockpit
 
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.cminewar.recursoscockpit.data.*
 import com.cminewar.recursoscockpit.i18n.I18nDictionary
@@ -19,6 +24,34 @@ class MainActivity : ComponentActivity() {
     private lateinit var securePreferences: SecurePreferences
     private lateinit var apiService: ApiService
     private lateinit var discoveryManager: DiscoveryManager
+
+    private var onLocalNetworkPermissionGranted: (() -> Unit)? = null
+
+    private val localNetworkPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                Log.i("RecursosCockpit", "Permiso ACCESS_LOCAL_NETWORK concedido; relanzando descubrimiento LAN")
+                onLocalNetworkPermissionGranted?.invoke()
+            } else {
+                Log.w("RecursosCockpit", "Permiso ACCESS_LOCAL_NETWORK denegado en Android 16/17; el tráfico LAN puede quedar bloqueado")
+            }
+        }
+
+    private fun ensureLocalNetworkPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < 36) return
+        val localNetPerm = "android.permission.ACCESS_LOCAL_NETWORK"
+        val permExists = try {
+            packageManager.getPermissionInfo(localNetPerm, 0)
+            true
+        } catch (_: Exception) {
+            false
+        }
+        if (!permExists) return
+        if (ContextCompat.checkSelfPermission(this, localNetPerm) != PackageManager.PERMISSION_GRANTED) {
+            Log.i("RecursosCockpit", "Solicitando permiso en tiempo de ejecución: $localNetPerm")
+            localNetworkPermissionLauncher.launch(localNetPerm)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,7 +112,10 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                fun triggerDiscoveryAndRefresh() {
+                fun triggerDiscoveryAndRefresh(requestPermission: Boolean = false) {
+                    if (requestPermission) {
+                        ensureLocalNetworkPermissionIfNeeded()
+                    }
                     lifecycleScope.launch {
                         connectionMode = ConnectionMode.SCANNING_LAN
                         val endpoint = discoveryManager.resolveActiveNode { msg ->
@@ -89,8 +125,14 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                DisposableEffect(Unit) {
+                    onLocalNetworkPermissionGranted = { triggerDiscoveryAndRefresh(requestPermission = false) }
+                    onDispose { onLocalNetworkPermissionGranted = null }
+                }
+
                 // Autodescubrimiento LAN/WAN completamente automático sin intervención del usuario
                 LaunchedEffect(Unit) {
+                    ensureLocalNetworkPermissionIfNeeded()
                     launch {
                         I18nDictionary.syncRemoteDictionary(applicationContext, null)
                     }
@@ -154,7 +196,7 @@ class MainActivity : ComponentActivity() {
                     },
                     deviceTelemetryProvider = { apiService.getDeviceTelemetryJson() },
                     webViewHeadersProvider = { apiService.buildWebViewAuthHeaders() },
-                    onRefresh = { triggerDiscoveryAndRefresh() }
+                    onRefresh = { triggerDiscoveryAndRefresh(requestPermission = true) }
                 )
             }
         }

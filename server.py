@@ -17445,6 +17445,81 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
+_MDNS_ADVERTISER_LOCK = threading.Lock()
+_MDNS_ADVERTISER_PROC = None
+_MDNS_ZEROCONF_HANDLE = None
+
+def start_mdns_service_advertiser(port=8085):
+    """
+    Publica dinamicamente el servicio HTTP de Recursos Cockpit en mDNS/DNS-SD (_recursos._tcp)
+    para autodescubrimiento instantaneo en LAN desde Ubuntu y Android/TV.
+    Respeta el servicio estatico de Avahi (/etc/avahi/services/recursos-cockpit.service) si ya
+    coincide con el puerto activo para evitar anuncios duplicados.
+    """
+    global _MDNS_ADVERTISER_PROC, _MDNS_ZEROCONF_HANDLE
+    try:
+        port = int(port)
+    except (TypeError, ValueError):
+        port = 8085
+
+    avahi_service_file = "/etc/avahi/services/recursos-cockpit.service"
+    if os.path.isfile(avahi_service_file):
+        try:
+            with open(avahi_service_file, "r", encoding="utf-8", errors="ignore") as f:
+                xml_txt = f.read()
+            if "_recursos._tcp" in xml_txt and f"<port>{port}</port>" in xml_txt:
+                print(f"[mDNS] Servicio _recursos._tcp:{port} activo mediante Avahi ({avahi_service_file})")
+                return True
+        except Exception:
+            pass
+
+    avahi_pub = shutil.which("avahi-publish-service")
+    if avahi_pub:
+        def _run_avahi_pub():
+            global _MDNS_ADVERTISER_PROC
+            svc_name = socket.gethostname() or "recursos-cockpit"
+            try:
+                proc = subprocess.Popen(
+                    [avahi_pub, "-s", svc_name, "_recursos._tcp", str(port), "path=/", "app=recursos-cockpit"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                with _MDNS_ADVERTISER_LOCK:
+                    _MDNS_ADVERTISER_PROC = proc
+                print(f"[mDNS] Publicando _recursos._tcp:{port} con avahi-publish-service ({svc_name})")
+            except Exception as exc:
+                print(f"[mDNS] No se pudo iniciar avahi-publish-service: {exc}")
+
+        threading.Thread(target=_run_avahi_pub, daemon=True, name="MdnsAvahiPublisher").start()
+        return True
+
+    def _run_py_zeroconf():
+        global _MDNS_ZEROCONF_HANDLE
+        try:
+            from zeroconf import ServiceInfo, Zeroconf
+            host_name = socket.gethostname() or "recursos-cockpit"
+            local_ip = SERVER_LOCAL_IP if _is_lan_ipv4(SERVER_LOCAL_IP) else None
+            if not local_ip:
+                return
+            info = ServiceInfo(
+                "_recursos._tcp.local.",
+                f"{host_name}._recursos._tcp.local.",
+                addresses=[socket.inet_aton(local_ip)],
+                port=port,
+                properties={"path": "/", "app": "recursos-cockpit"},
+                server=f"{host_name}.local.",
+            )
+            zc = Zeroconf()
+            zc.register_service(info)
+            with _MDNS_ADVERTISER_LOCK:
+                _MDNS_ZEROCONF_HANDLE = (zc, info)
+            print(f"[mDNS] Publicando _recursos._tcp:{port} con python-zeroconf ({local_ip})")
+        except Exception as exc:
+            print(f"[mDNS] Zeroconf auxiliar no disponible: {exc}")
+
+    threading.Thread(target=_run_py_zeroconf, daemon=True, name="MdnsZeroconfPublisher").start()
+    return False
+
 def run_server(port=None):
     global ACTIVE_SERVER_PORT
     if port is None:
@@ -17468,6 +17543,7 @@ def run_server(port=None):
     threading.Thread(target=telegram_bot_polling_worker, daemon=True, name="TelegramBotPolling").start()
     threading.Thread(target=telegram_bot_monitor_worker, daemon=True, name="TelegramBotMonitor").start()
     schedule_background_dictionary_sync(BASE_DIR, interval_sec=1800.0)
+    start_mdns_service_advertiser(port)
     
     bind_host = os.environ.get("HOST", "0.0.0.0")
     server_address = (bind_host, port)
