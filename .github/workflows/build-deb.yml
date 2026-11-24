@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-packages-release
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -33,7 +37,7 @@ jobs:
       - name: 🌐 Configurar Node.js y Compilar Interfaz Unificada (static/index.html)
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - run: |
           npm install --legacy-peer-deps --no-audit --no-fund
           npm run build
@@ -98,12 +102,10 @@ jobs:
           name: recursos-cockpit-${{ steps.pkg_info.outputs.version }}-binaries
           path: |
             dist/*.deb
-            dist/*.deb.asc
             dist/*.apk
             dist/*.gpg
             dist/*.asc
             dist/SHA256SUMS.txt
-            dist/SHA256SUMS.txt.asc
           if-no-files-found: error
           retention-days: 30
 
@@ -126,12 +128,10 @@ jobs:
           name: Recursos Cockpit v${{ steps.pkg_info.outputs.version }}
           files: |
             dist/*.deb
-            dist/*.deb.asc
             dist/*.apk
             dist/*.gpg
             dist/*.asc
             dist/SHA256SUMS.txt
-            dist/SHA256SUMS.txt.asc
           generate_release_notes: true
           draft: false
           prerelease: false
