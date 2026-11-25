@@ -38,9 +38,6 @@ concurrency:
   group: build-native-clients-release
   cancel-in-progress: false
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   detect-native-changes:
     name: 🔍 Detectar Cambios en Clientes Nativos (Desacoplado de Web/Temas)
@@ -53,7 +50,7 @@ jobs:
       release_tag: ${{ steps.detect.outputs.release_tag }}
     steps:
       - name: 📥 Clonar Repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
@@ -117,7 +114,7 @@ jobs:
 
     steps:
       - name: 📥 Clonar Repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -129,7 +126,7 @@ jobs:
 
       - name: 🌐 Configurar Node.js y Compilar Fallback Web Embutido para Ubuntu
         if: needs.detect-native-changes.outputs.build_ubuntu == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -141,7 +138,7 @@ jobs:
 
       - name: ☕ Configurar Java JDK 17 para Android (Node 24)
         if: needs.detect-native-changes.outputs.build_android == 'true'
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -199,7 +196,7 @@ jobs:
           fi
 
       - name: 📤 Subir Artefactos de Compilación
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: recursos-cockpit-${{ needs.detect-native-changes.outputs.release_tag }}-binaries
           path: |
@@ -224,7 +221,7 @@ jobs:
           git push origin "$TAG_NAME" || true
 
       - name: 🚀 Publicar Clientes Nativos en GitHub Releases
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.detect-native-changes.outputs.release_tag }}
           name: Recursos Cockpit Clientes Nativos (${{ needs.detect-native-changes.outputs.release_tag }})
