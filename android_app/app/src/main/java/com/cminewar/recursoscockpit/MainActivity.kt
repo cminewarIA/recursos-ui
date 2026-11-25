@@ -163,39 +163,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                fun startLocalServerDiscoverer(requestPermission: Boolean = false) {
-                    if (requestPermission) {
-                        ensureLocalNetworkPermissionIfNeeded()
-                    }
-                    lifecycleScope.launch {
-                        showServerDiscoverer = true
-                        isDiscoveringServers = true
-                        discovererError = ""
-                        discoveredServers = emptyList()
-                        connectionMode = ConnectionMode.SCANNING_LAN
-                        val found = discoveryManager.discoverLocalServers(
-                            onProgress = { msg -> scanningMessage = msg },
-                            onNodeFound = { node ->
-                                lifecycleScope.launch(Dispatchers.Main) {
-                                    if (discoveredServers.none { it.url == node.url }) {
-                                        discoveredServers = discoveredServers + node
-                                    }
-                                }
-                            }
-                        )
-                        discoveredServers = found
-                        isDiscoveringServers = false
-                        if (found.isEmpty()) {
-                            connectionMode = ConnectionMode.DISCONNECTED
-                            scanningMessage = I18nDictionary.t(
-                                this@MainActivity,
-                                "native_android.discoverer_empty",
-                                "No se encontraron servidores locales en tu red Wi-Fi. Comprueba que Recursos esté encendido o introduce la IP manualmente."
-                            )
-                        }
-                    }
-                }
-
                 fun pairWithServer(targetUrlOrHost: String) {
                     lifecycleScope.launch {
                         discovererError = ""
@@ -220,6 +187,82 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                fun startLocalServerDiscoverer(
+                    requestPermission: Boolean = false,
+                    autoConnectIfDisconnected: Boolean = false
+                ) {
+                    if (requestPermission) {
+                        ensureLocalNetworkPermissionIfNeeded()
+                    }
+                    lifecycleScope.launch {
+                        showServerDiscoverer = true
+                        isDiscoveringServers = true
+                        discovererError = ""
+                        discoveredServers = emptyList()
+                        connectionMode = ConnectionMode.SCANNING_LAN
+                        var autoConnected = false
+
+                        suspend fun tryAutoConnectNode(candidate: DiscoveredServerNode) {
+                            if (!autoConnectIfDisconnected || activeUrl.isNotBlank() || autoConnected || candidate.isRevoked) return
+                            autoConnected = true
+                            val endpoint = discoveryManager.selectAndPersistNode(candidate.url)
+                            if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN || endpoint.mode == ConnectionMode.REVOKED) {
+                                finalizeConnectedEndpoint(endpoint)
+                            } else {
+                                autoConnected = false
+                            }
+                        }
+
+                        val found = discoveryManager.discoverLocalServers(
+                            onProgress = { msg -> scanningMessage = msg },
+                            onNodeFound = { node ->
+                                lifecycleScope.launch(Dispatchers.Main) {
+                                    if (discoveredServers.none { it.url == node.url }) {
+                                        discoveredServers = discoveredServers + node
+                                    }
+                                    if (autoConnectIfDisconnected && activeUrl.isBlank() && !node.isRevoked && !autoConnected) {
+                                        tryAutoConnectNode(node)
+                                    }
+                                }
+                            }
+                        )
+                        discoveredServers = found
+                        isDiscoveringServers = false
+                        if (autoConnectIfDisconnected && activeUrl.isBlank() && !autoConnected && found.isNotEmpty()) {
+                            val preferred = found.firstOrNull { !it.isRevoked && isPrivateRfc1918Ipv4(it.host) }
+                                ?: found.firstOrNull { !it.isRevoked }
+                                ?: found.first()
+                            tryAutoConnectNode(preferred)
+                            if (activeUrl.isNotBlank()) return@launch
+                        }
+                        if (found.isEmpty()) {
+                            connectionMode = ConnectionMode.DISCONNECTED
+                            scanningMessage = I18nDictionary.t(
+                                this@MainActivity,
+                                "native_android.discoverer_empty",
+                                "No se encontraron servidores locales en tu red Wi-Fi. Comprueba que Recursos esté encendido o introduce la IP manualmente."
+                            )
+                        }
+                    }
+                }
+
+                suspend fun autoConnectLocalNode(): Boolean {
+                    showServerDiscoverer = false
+                    discovererError = ""
+                    connectionMode = ConnectionMode.SCANNING_LAN
+                    val resolved = discoveryManager.resolveActiveNode { msg -> scanningMessage = msg }
+                    return if (
+                        resolved.mode == ConnectionMode.CONNECTED_LAN ||
+                        resolved.mode == ConnectionMode.CONNECTED_WAN ||
+                        resolved.mode == ConnectionMode.REVOKED
+                    ) {
+                        finalizeConnectedEndpoint(resolved)
+                        true
+                    } else {
+                        false
+                    }
+                }
+
                 fun triggerDiscoveryAndRefresh(requestPermission: Boolean = false) {
                     if (requestPermission) {
                         ensureLocalNetworkPermissionIfNeeded()
@@ -229,8 +272,11 @@ class MainActivity : ComponentActivity() {
                         val saved = discoveryManager.trySavedNodeOnly()
                         if (saved != null) {
                             finalizeConnectedEndpoint(saved)
-                        } else {
-                            startLocalServerDiscoverer(requestPermission = false)
+                        } else if (!autoConnectLocalNode()) {
+                            startLocalServerDiscoverer(
+                                requestPermission = false,
+                                autoConnectIfDisconnected = activeUrl.isBlank()
+                            )
                         }
                     }
                 }
@@ -315,17 +361,25 @@ class MainActivity : ComponentActivity() {
                         I18nDictionary.syncRemoteDictionary(applicationContext, null)
                     }
 
-                    // 4. Inicio inteligente: si no está emparejado o falla el nodo guardado, abrir buscador de servidores
+                    // 4. Inicio inteligente: si ya está emparejado usa su nodo; si no o falla, conecta automáticamente con el nodo local detectado
                     val isPaired = securePreferences.savedHost.isNotBlank() && securePreferences.deviceToken.isNotBlank()
                     if (!isPaired) {
-                        startLocalServerDiscoverer(requestPermission = false)
+                        if (!autoConnectLocalNode()) {
+                            startLocalServerDiscoverer(
+                                requestPermission = false,
+                                autoConnectIfDisconnected = true
+                            )
+                        }
                     } else {
                         connectionMode = ConnectionMode.CONNECTING
                         val savedEndpoint = discoveryManager.trySavedNodeOnly()
                         if (savedEndpoint != null) {
                             finalizeConnectedEndpoint(savedEndpoint)
-                        } else {
-                            startLocalServerDiscoverer(requestPermission = false)
+                        } else if (!autoConnectLocalNode()) {
+                            startLocalServerDiscoverer(
+                                requestPermission = false,
+                                autoConnectIfDisconnected = true
+                            )
                         }
                     }
 
@@ -344,7 +398,12 @@ class MainActivity : ComponentActivity() {
                                     finalizeConnectedEndpoint(recovered)
                                 } else {
                                     activeUrl = ""
-                                    startLocalServerDiscoverer(requestPermission = false)
+                                    if (!autoConnectLocalNode()) {
+                                        startLocalServerDiscoverer(
+                                            requestPermission = false,
+                                            autoConnectIfDisconnected = true
+                                        )
+                                    }
                                 }
                             } else {
                                 val vInfo = data.versionInfo
@@ -369,7 +428,12 @@ class MainActivity : ComponentActivity() {
                     discoveredServers = discoveredServers,
                     discovererError = discovererError,
                     onSelectDiscoveredServer = { urlOrHost -> pairWithServer(urlOrHost) },
-                    onRescanLocalServers = { startLocalServerDiscoverer(requestPermission = true) },
+                    onRescanLocalServers = {
+                        startLocalServerDiscoverer(
+                            requestPermission = true,
+                            autoConnectIfDisconnected = activeUrl.isBlank()
+                        )
+                    },
                     onTriggerApkUpdate = { rel -> handleApkUpdateClick(rel) },
                     onThemeChanged = { nextTheme ->
                         if (nextTheme == "dark" || nextTheme == "light") {

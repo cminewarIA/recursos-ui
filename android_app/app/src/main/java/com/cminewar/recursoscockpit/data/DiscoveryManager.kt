@@ -8,6 +8,7 @@ import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -318,7 +319,9 @@ class DiscoveryManager(
             }.awaitAll().filterNotNull()
         }
 
-        val priorityMatch = priorityResults.firstOrNull { !it.second.isRevoked } ?: priorityResults.firstOrNull()
+        val priorityMatch = priorityResults.firstOrNull { (url, res) ->
+            !res.isRevoked && isPrivateRfc1918Ipv4(url.removePrefix("http://").removePrefix("https://").substringBefore("/").substringBefore(":"))
+        } ?: priorityResults.firstOrNull { !it.second.isRevoked } ?: priorityResults.firstOrNull()
         if (priorityMatch != null) {
             val (foundUrl, res) = priorityMatch
             if (res.isRevoked) {
@@ -513,18 +516,9 @@ class DiscoveryManager(
                 if (!serviceInfo.serviceType.contains("_recursos._tcp")) return
                 try {
                     if (Build.VERSION.SDK_INT >= 34) {
-                        val callback = object : NsdManager.ServiceInfoCallback {
-                            override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) {}
-                            override fun onServiceUpdated(resolvedInfo: NsdServiceInfo) {
-                                collectResolvedNsdUrls(resolvedInfo, discoveredUrls)
-                                try {
-                                    nsdManager.unregisterServiceInfoCallback(this)
-                                } catch (_: Exception) {}
-                            }
-                            override fun onServiceLost() {}
-                            override fun onServiceInfoCallbackUnregistered() {}
+                        NsdApi34Helper.resolve(nsdManager, serviceInfo) { resolvedInfo ->
+                            collectResolvedNsdUrls(resolvedInfo, discoveredUrls)
                         }
-                        nsdManager.registerServiceInfoCallback(serviceInfo, { r -> r.run() }, callback)
                     } else {
                         nsdManager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
                             override fun onResolveFailed(si: NsdServiceInfo, errorCode: Int) {}
@@ -579,11 +573,7 @@ class DiscoveryManager(
         val port = if (info.port > 0) info.port else securePreferences.manualPort
         val hosts = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= 34) {
-            for (addr in info.hostAddresses) {
-                if (addr is Inet4Address && !addr.isLoopbackAddress) {
-                    addr.hostAddress?.let { hosts.add(it) }
-                }
-            }
+            hosts.addAll(NsdApi34Helper.extractIpv4Hosts(info))
         }
         val legacyHost = info.host
         if (legacyHost is Inet4Address && !legacyHost.isLoopbackAddress) {
@@ -591,6 +581,35 @@ class DiscoveryManager(
         }
         for (h in hosts.distinct()) {
             out.add("http://$h:$port")
+        }
+    }
+
+    @RequiresApi(34)
+    private object NsdApi34Helper {
+        fun resolve(
+            nsdManager: NsdManager,
+            serviceInfo: NsdServiceInfo,
+            onResolved: (NsdServiceInfo) -> Unit
+        ) {
+            val callback = object : NsdManager.ServiceInfoCallback {
+                override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) {}
+                override fun onServiceUpdated(resolvedInfo: NsdServiceInfo) {
+                    onResolved(resolvedInfo)
+                    try {
+                        nsdManager.unregisterServiceInfoCallback(this)
+                    } catch (_: Exception) {}
+                }
+                override fun onServiceLost() {}
+                override fun onServiceInfoCallbackUnregistered() {}
+            }
+            nsdManager.registerServiceInfoCallback(serviceInfo, { r -> r.run() }, callback)
+        }
+
+        fun extractIpv4Hosts(info: NsdServiceInfo): List<String> {
+            return info.hostAddresses
+                .filterIsInstance<Inet4Address>()
+                .filter { !it.isLoopbackAddress }
+                .mapNotNull { it.hostAddress }
         }
     }
 
