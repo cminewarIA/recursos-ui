@@ -62,7 +62,8 @@ fi
 if [ -d "$PROJECT_ROOT/themes" ]; then
     mkdir -p "$PKG_DIR/usr/lib/$PKG_NAME/themes"
     cp "$PROJECT_ROOT/themes/"*.json "$PKG_DIR/usr/lib/$PKG_NAME/themes/" 2>/dev/null || true
-    chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/themes/"*.json 2>/dev/null || true
+    cp "$PROJECT_ROOT/themes/"*.rcpack.gz "$PKG_DIR/usr/lib/$PKG_NAME/themes/" 2>/dev/null || true
+    chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/themes/"*.json "$PKG_DIR/usr/lib/$PKG_NAME/themes/"*.rcpack.gz 2>/dev/null || true
 fi
 if [ -f "$PROJECT_ROOT/static/index.html" ]; then
     cp "$PROJECT_ROOT/static/index.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"

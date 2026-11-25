@@ -3,6 +3,41 @@ import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
 import { formatRelativeIndexAge } from '../utils/formatters';
 import { TelemetryMetricKey, ThemeMode } from '../types/telemetry';
 import { useI18n } from '../i18n';
+import { useThemeCatalog } from '../themes';
+import { getActiveThemeChartPalette, getActiveThemeModeTokens } from '../themes/types';
+
+function withColorAlpha(color: string, alpha: number): string {
+  const clamped = Math.max(0, Math.min(1, alpha));
+  const c = (color || '').trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(c)) {
+    return `${c}${Math.round(clamped * 255).toString(16).padStart(2, '0')}`;
+  }
+  if (/^#[0-9a-fA-F]{3}$/.test(c)) {
+    const r = parseInt(c[1] + c[1], 16);
+    const g = parseInt(c[2] + c[2], 16);
+    const b = parseInt(c[3] + c[3], 16);
+    return `rgba(${r}, ${g}, ${b}, ${clamped.toFixed(3)})`;
+  }
+  return c || `rgba(30, 107, 56, ${clamped.toFixed(3)})`;
+}
+
+function traceSeriesPath(
+  ctx: CanvasRenderingContext2D,
+  pts: Array<{ x: number; y: number }>,
+  crisp: boolean,
+  startWithMoveTo = true
+): void {
+  if (!crisp) {
+    traceMonotoneSpline(ctx, pts, startWithMoveTo);
+    return;
+  }
+  if (pts.length === 0) return;
+  if (startWithMoveTo) ctx.moveTo(pts[0].x, pts[0].y);
+  else ctx.lineTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    ctx.lineTo(pts[i].x, pts[i].y);
+  }
+}
 
 export interface ChartSeries {
   id: string;
@@ -406,6 +441,32 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
   showPeakBadge = true,
 }) => {
   const { t } = useI18n();
+  const { activeTheme } = useThemeCatalog();
+  const themeChartPalette = useMemo(
+    () => getActiveThemeChartPalette(activeTheme, theme),
+    [activeTheme, theme]
+  );
+  const themeModeTokens = useMemo(
+    () => getActiveThemeModeTokens(activeTheme, theme),
+    [activeTheme, theme]
+  );
+  const isCustomChartTheme = activeTheme.id !== 'alethia-matrix' && Boolean(themeChartPalette);
+
+  const themedSeries = useMemo(() => {
+    if (!isCustomChartTheme || !themeChartPalette) return series;
+    const slots = [
+      themeChartPalette.primary,
+      themeChartPalette.secondary,
+      themeChartPalette.tertiary,
+      themeChartPalette.quaternary,
+    ].filter((c): c is string => Boolean(c));
+    if (slots.length === 0) return series;
+    return series.map((s, idx) => ({
+      ...s,
+      color: slots[idx % slots.length] || s.color,
+    }));
+  }, [series, isCustomChartTheme, themeChartPalette]);
+
   const resolvedEmptyMessage = emptyMessage ?? t('charts.empty_collecting');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -428,14 +489,14 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
 
   const sampleCount = useMemo(() => {
     let maxLen = 0;
-    for (const s of series) {
+    for (const s of themedSeries) {
       if (s.data.length > maxLen) maxLen = s.data.length;
     }
     return maxLen;
-  }, [series]);
+  }, [themedSeries]);
 
-  const hasRightAxis = useMemo(() => series.some((s) => s.axis === 'right'), [series]);
-  const rightAxisSeries = useMemo(() => series.find((s) => s.axis === 'right'), [series]);
+  const hasRightAxis = useMemo(() => themedSeries.some((s) => s.axis === 'right'), [themedSeries]);
+  const rightAxisSeries = useMemo(() => themedSeries.find((s) => s.axis === 'right'), [themedSeries]);
   const resolvedRightUnit = rightAxisSeries?.unit ?? '%';
   const resolvedRightColor = rightAxisSeries?.color;
 
@@ -503,20 +564,24 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
   // Memoización de buckets visuales de datos para curvas densas (preserva exactamente picos y valles)
   const bucketedSeries: BucketedSeriesResult[] = useMemo(() => {
     const maxBuckets = Math.max(48, Math.floor((size.width - 56) / 2.2));
-    return series
+    return themedSeries
       .filter((s) => s.data && s.data.length >= 2)
       .map((s) => {
         const { values, sourceIndices } = buildSeriesBuckets(s.data, maxBuckets);
         return { s, values, sourceIndices };
       });
-  }, [series, size.width]);
+  }, [themedSeries, size.width]);
+
+  const resolvedMonoFont =
+    activeTheme.typography?.monoFont ||
+    '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
 
   // Memoización del diseño de ejes, etiquetas de escala y rejilla temporal
   const axisLayout = useMemo(() => {
     const w = size.width;
     const h = size.height;
     const compact = h < 110;
-    const fontAxis = `${compact ? '600 9.5px' : '600 10px'} "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
+    const fontAxis = `${compact ? '600 9.5px' : '600 10px'} ${resolvedMonoFont}`;
     const gridFracs = compact ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
     const leftLabels = gridFracs.map((f) =>
       formatAxisTick(computedMaxLeft * (1 - f), leftUnit, f === 0)
@@ -627,6 +692,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     dateTimestamps,
     timestamps,
     intervalSec,
+    resolvedMonoFont,
   ]);
 
   useEffect(() => {
@@ -691,11 +757,35 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    const gridColor = theme === 'dark' ? 'rgba(198, 241, 157, 0.11)' : 'rgba(15, 31, 16, 0.09)';
-    const topLineColor = theme === 'dark' ? 'rgba(198, 241, 157, 0.2)' : 'rgba(15, 31, 16, 0.16)';
-    const axisLabelColor = theme === 'dark' ? 'rgba(158, 174, 159, 0.92)' : 'rgba(95, 108, 97, 0.95)';
-    const peakLabelColor = theme === 'dark' ? 'rgba(198, 241, 157, 0.98)' : 'rgba(30, 107, 56, 0.98)';
-    const crosshairColor = theme === 'dark' ? 'rgba(198, 241, 157, 0.55)' : 'rgba(30, 107, 56, 0.45)';
+    const gridColor =
+      themeChartPalette?.grid ||
+      (theme === 'dark' ? 'rgba(198, 241, 157, 0.11)' : 'rgba(15, 31, 16, 0.09)');
+    const topLineColor =
+      isCustomChartTheme && themeChartPalette?.averageLine
+        ? themeChartPalette.averageLine
+        : theme === 'dark'
+          ? 'rgba(198, 241, 157, 0.2)'
+          : 'rgba(15, 31, 16, 0.16)';
+    const axisLabelColor =
+      isCustomChartTheme && themeModeTokens['--text-muted']
+        ? themeModeTokens['--text-muted']
+        : theme === 'dark'
+          ? 'rgba(158, 174, 159, 0.92)'
+          : 'rgba(95, 108, 97, 0.95)';
+    const peakLabelColor =
+      isCustomChartTheme && themeChartPalette?.primary
+        ? themeChartPalette.primary
+        : theme === 'dark'
+          ? 'rgba(198, 241, 157, 0.98)'
+          : 'rgba(30, 107, 56, 0.98)';
+    const crosshairColor =
+      isCustomChartTheme && themeChartPalette?.averageLine
+        ? themeChartPalette.averageLine
+        : theme === 'dark'
+          ? 'rgba(198, 241, 157, 0.55)'
+          : 'rgba(30, 107, 56, 0.45)';
+    const crispLines = themeChartPalette?.lineStyle === 'crisp';
+    const neonGlow = Boolean(themeChartPalette?.glow || themeChartPalette?.lineStyle === 'neon');
 
     // Horizontal grid lines + Left/Right Y-axis scale labels
     ctx.font = fontAxis;
@@ -770,11 +860,11 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
       const fillAlpha = s.fillAlpha ?? (s.dashed ? 0 : 0.16);
       if (fillAlpha > 0) {
         const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
-        grad.addColorStop(0, `${s.color}${Math.round(fillAlpha * 255).toString(16).padStart(2, '0')}`);
-        grad.addColorStop(1, `${s.color}00`);
+        grad.addColorStop(0, withColorAlpha(s.color, fillAlpha));
+        grad.addColorStop(1, withColorAlpha(s.color, 0));
         ctx.beginPath();
         ctx.moveTo(pts[0].x, padT + plotH);
-        traceMonotoneSpline(ctx, pts, false);
+        traceSeriesPath(ctx, pts, crispLines, false);
         ctx.lineTo(pts[pts.length - 1].x, padT + plotH);
         ctx.closePath();
         ctx.fillStyle = grad;
@@ -782,20 +872,25 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
       }
     }
 
-    // 2. Stroke smooth monotone spline lines (exact knot alignment, zero overshoot)
+    // 2. Stroke smooth monotone spline or crisp HUD trace (exact knot alignment, zero overshoot)
     for (const { s, pts } of computedSeriesGeometry) {
       ctx.save();
       ctx.beginPath();
-      traceMonotoneSpline(ctx, pts, true);
+      traceSeriesPath(ctx, pts, crispLines, true);
       ctx.strokeStyle = s.color;
-      ctx.lineWidth = s.dashed ? 1.6 : 2.2;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
+      ctx.lineWidth = s.dashed ? 1.6 : neonGlow ? 2.35 : 2.2;
+      ctx.lineJoin = crispLines ? 'miter' : 'round';
+      ctx.lineCap = crispLines ? 'square' : 'round';
       if (s.dashed) ctx.setLineDash([5, 4]);
+      if (neonGlow) {
+        ctx.shadowColor = s.color;
+        ctx.shadowBlur = s.dashed ? 4 : 9;
+      }
       ctx.stroke();
 
-      // Luminous traveling wave overlay clipped onto the EXACT full spline
+      // Luminous traveling wave overlay clipped onto the EXACT full path
       if (!s.dashed && pts.length >= 6 && revealFrac >= 1) {
+        ctx.shadowBlur = 0;
         const sweepFrac = animPhaseRef.current % 1;
         const winStartX = padL + Math.max(0, sweepFrac - 0.14) * plotW;
         const winEndX = padL + Math.min(1, sweepFrac + 0.04) * plotW;
@@ -806,7 +901,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
           glowGrad.addColorStop(0.55, highlightColor);
           glowGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
           ctx.beginPath();
-          traceMonotoneSpline(ctx, pts, true);
+          traceSeriesPath(ctx, pts, crispLines, true);
           ctx.strokeStyle = glowGrad;
           ctx.lineWidth = 2.2;
           ctx.stroke();
@@ -815,7 +910,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
       ctx.restore();
     }
 
-    const dotBgFill = theme === 'dark' ? '#111f13' : '#ffffff';
+    const dotBgFill = themeModeTokens['--bg-surface-solid'] || (theme === 'dark' ? '#111f13' : '#ffffff');
 
     // 2.5 Zeus Vision + Alethia: Dashed mean reference line (primary) & true global peak callout pill (all left-axis solid series)
     const solidLeftGeoms = computedSeriesGeometry.filter((g) => g.s.axis !== 'right' && !g.s.dashed && g.pts.length >= 2);
@@ -861,7 +956,9 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
         ctx.beginPath();
         ctx.moveTo(padL, avgY);
         ctx.lineTo(padL + plotW, avgY);
-        ctx.strokeStyle = theme === 'dark' ? 'rgba(198, 241, 157, 0.36)' : 'rgba(30, 107, 56, 0.30)';
+        ctx.strokeStyle =
+          themeChartPalette?.averageLine ||
+          (theme === 'dark' ? 'rgba(198, 241, 157, 0.36)' : 'rgba(30, 107, 56, 0.30)');
         ctx.lineWidth = 1.15;
         ctx.setLineDash([4, 4]);
         ctx.stroke();
@@ -883,9 +980,19 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
         const peakY = padT + plotH - peakRatio * plotH;
         const pUnit = globalPeakSeries.unit ?? leftUnit;
         const peakText = formatAxisTick(globalPeakVal, pUnit, true);
+        const peakPillBg = isCustomChartTheme
+          ? themeModeTokens['--alethia-lime'] || themeChartPalette?.primary || '#c6f19d'
+          : theme === 'dark'
+            ? '#c6f19d'
+            : '#0f1f10';
+        const peakPillInk = isCustomChartTheme
+          ? themeModeTokens['--alethia-lime-ink'] || '#0b0e14'
+          : theme === 'dark'
+            ? '#0f1f10'
+            : '#c6f19d';
 
         ctx.save();
-        ctx.font = '700 9.5px "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.font = `700 9.5px ${resolvedMonoFont}`;
         const textW = ctx.measureText(peakText).width;
         const pillW = Math.ceil(textW) + 12;
         const pillH = 16;
@@ -899,14 +1006,15 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
         // Peak point ring
         ctx.beginPath();
         ctx.arc(peakX, peakY, 3, 0, Math.PI * 2);
-        ctx.fillStyle = theme === 'dark' ? '#c6f19d' : '#0f1f10';
+        ctx.fillStyle = peakPillBg;
         ctx.fill();
         ctx.lineWidth = 1.5;
         ctx.strokeStyle = dotBgFill;
         ctx.stroke();
 
-        // Rounded Alethia pill badge
-        const r = 4;
+        // Rounded or HUD-sharp peak badge
+        const surfaceShape = activeTheme.layout?.surfaceShape;
+        const r = surfaceShape === 'sharp' || surfaceShape === 'beveled' ? 1.5 : 4;
         ctx.beginPath();
         ctx.moveTo(clampedX + r, clampedY);
         ctx.lineTo(clampedX + pillW - r, clampedY);
@@ -919,10 +1027,10 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
         ctx.quadraticCurveTo(clampedX, clampedY, clampedX + r, clampedY);
         ctx.closePath();
 
-        ctx.fillStyle = theme === 'dark' ? '#c6f19d' : '#0f1f10';
+        ctx.fillStyle = peakPillBg;
         ctx.fill();
 
-        ctx.fillStyle = theme === 'dark' ? '#0f1f10' : '#c6f19d';
+        ctx.fillStyle = peakPillInk;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(peakText, clampedX + pillW / 2, clampedY + pillH / 2 + 0.5);
@@ -939,7 +1047,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
       ctx.save();
       ctx.beginPath();
       ctx.arc(tip.x, tip.y, 4.2 + pulseWave * 4.8, 0, Math.PI * 2);
-      ctx.fillStyle = `${s.color}${Math.round((0.32 - pulseWave * 0.24) * 255).toString(16).padStart(2, '0')}`;
+      ctx.fillStyle = withColorAlpha(s.color, 0.32 - pulseWave * 0.24);
       ctx.fill();
 
       ctx.beginPath();
@@ -1004,7 +1112,26 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
         ctx.fill();
       }
     }
-  }, [axisLayout, computedSeriesGeometry, computedMaxLeft, getXForGlobalIndex, leftUnit, hasRightAxis, resolvedRightColor, sampleCount, theme, hoverIdx, showAverageLine, showPeakBadge]);
+  }, [
+    axisLayout,
+    computedSeriesGeometry,
+    computedMaxLeft,
+    getXForGlobalIndex,
+    leftUnit,
+    hasRightAxis,
+    resolvedRightColor,
+    sampleCount,
+    theme,
+    hoverIdx,
+    showAverageLine,
+    showPeakBadge,
+    activeTheme.id,
+    activeTheme.layout?.surfaceShape,
+    isCustomChartTheme,
+    themeChartPalette,
+    themeModeTokens,
+    resolvedMonoFont,
+  ]);
 
   drawChartRef.current = drawChart;
 
@@ -1096,7 +1223,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
       }
     }
     const subtitle = computedSubtitle;
-    const entries = series
+    const entries = themedSeries
       .map((s) => {
         const localIdx = hoverIdx - (sampleCount - s.data.length);
         if (localIdx < 0 || localIdx >= s.data.length) return null;
@@ -1123,7 +1250,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
       subtitle,
       entries,
     };
-  }, [hoverIdx, pointerPos, sampleCount, timestamps, dateTimestamps, validEpochRange, intervalSec, series, formatLabel, formatValue, leftUnit, t]);
+  }, [hoverIdx, pointerPos, sampleCount, timestamps, dateTimestamps, validEpochRange, intervalSec, themedSeries, formatLabel, formatValue, leftUnit, t]);
 
   const handlePanMove = useCallback(
     (clientX: number) => {

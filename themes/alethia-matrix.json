@@ -1,8 +1,9 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "alethia-matrix",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Recursos Cockpit",
+  "colorModePolicy": "dual",
   "name": {
     "es": "Alethia Matrix",
     "en": "Alethia Matrix",
@@ -12,28 +13,71 @@
     "pt": "Alethia Matrix"
   },
   "description": {
-    "es": "Estética botánica con lluvia de terminal alimentada por métricas reales del servidor y paneles translúcidos en modo claro y oscuro.",
-    "en": "Botanical editorial aesthetic with live server telemetry terminal rain and translucent panels in light and dark modes.",
-    "fr": "Esthétique botanique avec pluie de terminal alimentée par la télémétrie réelle du serveur et panneaux translucides en mode clair et sombre.",
-    "de": "Botanische Ästhetik mit Live-Server-Telemetrie-Terminalregen und transluzenten Panels im hellen und dunklen Modus.",
-    "it": "Estetica botanica con pioggia da terminale alimentata dalla telemetria reale del server e pannelli traslucidi in modalità chiara e scura.",
-    "pt": "Estética botânica com chuva de terminal alimentada pela telemetria real do servidor e painéis translúcidos no modo claro e escuro."
+    "es": "Estética botánica con lluvia de terminal alimentada por métricas reales y paneles claros de mayor transparencia para apreciar el fondo animado con gran luminosidad.",
+    "en": "Botanical aesthetic with live telemetry rain and enhanced light-mode panel translucency so the animated background shines through clearly.",
+    "fr": "Esthétique botanique avec pluie de télémétrie en direct et panneaux translucides éclaircis en mode clair.",
+    "de": "Botanische Ästhetik mit Live-Telemetrie-Regen und erhöhter Panel-Transparenz im hellen Modus.",
+    "it": "Estetica botanica con pioggia di telemetria live e pannelli chiari più trasparenti per valorizzare lo sfondo animato.",
+    "pt": "Estética botânica com chuva de telemetria real e painéis claros mais translúcidos para realçar o fundo animado."
   },
-  "tags": ["matrix", "telemetry", "botanical", "translucent"],
+  "tags": [
+    "matrix",
+    "telemetry",
+    "botanical",
+    "translucent"
+  ],
+  "layout": {
+    "navPosition": "bottom-dock",
+    "surfaceShape": "rounded",
+    "headerStyle": "editorial"
+  },
+  "typography": {
+    "displayFont": "'Geist', 'Inter', system-ui, sans-serif",
+    "bodyFont": "'Geist', 'Inter', system-ui, sans-serif",
+    "monoFont": "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
+  },
+  "backdrop": {
+    "assetId": "",
+    "scrimLight": "rgba(234, 244, 230, 0.0)",
+    "scrimDark": "rgba(6, 16, 7, 0.0)",
+    "blurPx": 0
+  },
+  "chartPalette": {
+    "light": {
+      "primary": "#1e6b38",
+      "secondary": "#0e7490",
+      "tertiary": "#d97706",
+      "quaternary": "#6366f1",
+      "grid": "rgba(15, 31, 16, 0.09)",
+      "averageLine": "rgba(30, 107, 56, 0.34)",
+      "glow": false,
+      "lineStyle": "smooth"
+    },
+    "dark": {
+      "primary": "#c6f19d",
+      "secondary": "#5eead4",
+      "tertiary": "#fbbf24",
+      "quaternary": "#a5b4fc",
+      "grid": "rgba(198, 241, 157, 0.11)",
+      "averageLine": "rgba(198, 241, 157, 0.36)",
+      "glow": false,
+      "lineStyle": "smooth"
+    }
+  },
   "backgroundEffect": {
     "type": "matrix-telemetry",
     "fps": 28,
     "columnSpacingPx": 22,
     "fontSizePx": 13,
     "light": {
-      "baseFill": "#eaf2e6",
-      "fadeAlpha": 0.14,
-      "trailColor": "rgba(24, 114, 58, 0.36)",
-      "midColor": "rgba(22, 98, 49, 0.58)",
-      "headColor": "rgba(14, 70, 34, 0.88)",
-      "glowColor": "rgba(30, 107, 56, 0.22)",
-      "speedMultiplier": 0.92,
-      "opacity": 0.88
+      "baseFill": "#edf6e9",
+      "fadeAlpha": 0.12,
+      "trailColor": "rgba(26, 146, 70, 0.48)",
+      "midColor": "rgba(18, 122, 56, 0.74)",
+      "headColor": "rgba(10, 78, 36, 0.96)",
+      "glowColor": "rgba(34, 156, 78, 0.30)",
+      "speedMultiplier": 0.94,
+      "opacity": 0.96
     },
     "dark": {
       "baseFill": "#061007",
@@ -48,33 +92,34 @@
   },
   "tokens": {
     "light": {
-      "--bg-canvas": "#eaf2e6",
-      "--bg-surface": "rgba(255, 255, 255, 0.78)",
+      "--bg-canvas": "#edf6e9",
+      "--bg-surface": "rgba(255, 255, 255, 0.50)",
       "--bg-surface-solid": "#ffffff",
-      "--bg-subtle": "rgba(240, 246, 237, 0.70)",
-      "--bg-hover": "rgba(224, 238, 217, 0.82)",
-      "--surface-topbar": "rgba(255, 255, 255, 0.76)",
-      "--surface-bento": "rgba(255, 255, 255, 0.78)",
-      "--surface-subtile": "rgba(240, 246, 237, 0.70)",
-      "--surface-segmented": "rgba(255, 255, 255, 0.76)",
-      "--surface-dock": "rgba(255, 255, 255, 0.80)",
-      "--surface-hero-bg": "rgba(249, 253, 247, 0.74)",
-      "--surface-hero-grad-a": "rgba(198, 241, 157, 0.28)",
-      "--surface-hero-grad-b": "rgba(30, 107, 56, 0.08)",
+      "--bg-subtle": "rgba(244, 251, 241, 0.44)",
+      "--bg-hover": "rgba(224, 242, 218, 0.62)",
+      "--surface-topbar": "rgba(255, 255, 255, 0.52)",
+      "--surface-bento": "rgba(255, 255, 255, 0.50)",
+      "--surface-subtile": "rgba(244, 251, 241, 0.44)",
+      "--surface-segmented": "rgba(255, 255, 255, 0.50)",
+      "--surface-dock": "rgba(255, 255, 255, 0.58)",
+      "--surface-hero-bg": "rgba(249, 254, 246, 0.46)",
+      "--surface-hero-grad-a": "rgba(198, 241, 157, 0.24)",
+      "--surface-hero-grad-b": "rgba(30, 107, 56, 0.07)",
       "--surface-hero-dot": "rgba(30, 107, 56, 0.08)",
-      "--surface-blur": "14px",
-      "--border-hairline": "rgba(20, 66, 34, 0.14)",
-      "--border-strong": "rgba(20, 66, 34, 0.26)",
-      "--text-primary": "#0b1a0c",
-      "--text-secondary": "#2c3f2f",
-      "--text-muted": "#4b5e4e",
+      "--surface-blur": "9px",
+      "--border-hairline": "rgba(20, 82, 42, 0.18)",
+      "--border-strong": "rgba(20, 82, 42, 0.32)",
+      "--text-primary": "#081709",
+      "--text-secondary": "#1d3521",
+      "--text-muted": "#39523d",
       "--accent": "#1e6b38",
       "--accent-blue": "#1e6b38",
       "--accent-sky": "#0e7490",
       "--ok": "#15803d",
       "--warn": "#b45309",
       "--danger": "#b91c1c",
-      "--violet": "#4f46e5"
+      "--violet": "#4f46e5",
+      "--panel-radius": "18px"
     },
     "dark": {
       "--bg-canvas": "#061007",
@@ -103,7 +148,8 @@
       "--ok": "#86efac",
       "--warn": "#fbbf24",
       "--danger": "#fb7185",
-      "--violet": "#a5b4fc"
+      "--violet": "#a5b4fc",
+      "--panel-radius": "18px"
     }
   }
 }

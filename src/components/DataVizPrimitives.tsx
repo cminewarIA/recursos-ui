@@ -2,6 +2,8 @@ import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import { ThemeMode } from '../types/telemetry';
 import { useI18n } from '../i18n';
+import { useThemeCatalog } from '../themes';
+import { getActiveThemeChartPalette } from '../themes/types';
 
 interface RadialKpiGaugeProps {
   value: number;
@@ -29,11 +31,14 @@ export const RadialKpiGauge: React.FC<RadialKpiGaugeProps> = ({
   invertedDark = false,
   showPercentSign = true,
 }) => {
+  const { activeTheme } = useThemeCatalog();
   const pct = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - pct / 100);
   const darkSurface = invertedDark || theme === 'dark';
+  const chartPal = getActiveThemeChartPalette(activeTheme, darkSurface ? 'dark' : 'light');
+  const isCustomTheme = activeTheme.id !== 'alethia-matrix';
 
   const resolvedStroke =
     color ??
@@ -45,11 +50,18 @@ export const RadialKpiGauge: React.FC<RadialKpiGaugeProps> = ({
         ? darkSurface
           ? '#fbbf24'
           : '#d97706'
-        : darkSurface
-          ? '#c6f19d'
-          : '#1e6b38');
+        : isCustomTheme && chartPal?.primary
+          ? chartPal.primary
+          : darkSurface
+            ? '#c6f19d'
+            : '#1e6b38');
 
-  const trackColor = darkSurface ? 'rgba(198, 241, 157, 0.14)' : 'rgba(15, 31, 16, 0.09)';
+  const trackColor =
+    isCustomTheme && chartPal?.grid
+      ? chartPal.grid
+      : darkSurface
+        ? 'rgba(198, 241, 157, 0.14)'
+        : 'rgba(15, 31, 16, 0.09)';
 
   return (
     <div className="inline-flex flex-col items-center justify-center shrink-0">
@@ -220,7 +232,7 @@ export const ChartNarrativeFooter: React.FC<ChartNarrativeFooterProps> = ({
       </span>
       <span className="inline-flex items-center gap-1 min-w-0">
         <span className="uppercase tracking-[0.06em] opacity-75">{t('charts.stat_peak')}</span>
-        <strong className="font-semibold text-[#1e6b38] dark:text-[#c6f19d]">{fmt(stats.peak)}</strong>
+        <strong className="font-semibold text-[var(--accent)]">{fmt(stats.peak)}</strong>
       </span>
       <span className="inline-flex items-center gap-1 min-w-0">
         <span className="uppercase tracking-[0.06em] opacity-75">{t('charts.stat_now')}</span>

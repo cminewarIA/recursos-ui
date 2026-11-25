@@ -131,7 +131,7 @@ export const ProcessCpuSparkline: React.FC<ProcessCpuSparklineProps> = React.mem
         ? 'text-rose-600 dark:text-rose-400'
         : currentPct >= 25 || peak >= 35
           ? 'text-amber-600 dark:text-amber-400'
-          : 'text-[#1e6b38] dark:text-[#c6f19d]';
+          : 'text-[var(--accent)]';
 
     const summaryTitle = `${t('charts.stat_now')}: ${formatPct(currentPct)} · ${t('charts.stat_peak')}: ${formatPct(peak)}`;
 

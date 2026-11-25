@@ -1,11 +1,19 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "pack_version": "2.0.0",
+  "pack_file": "themes-pack.rcpack.gz",
+  "pack_sha256": "1eaf5889f31e218a87bc4da891e2123920623300593d1edf4365c619e6c751ee",
   "default_theme": "alethia-matrix",
   "themes": [
     {
       "id": "alethia-matrix",
-      "file": "alethia-matrix.json",
-      "version": "1.0.0",
+      "version": "1.1.0",
+      "colorModePolicy": "dual",
+      "layout": {
+        "navPosition": "bottom-dock",
+        "surfaceShape": "rounded",
+        "headerStyle": "editorial"
+      },
       "name": {
         "es": "Alethia Matrix",
         "en": "Alethia Matrix",
@@ -15,29 +23,301 @@
         "pt": "Alethia Matrix"
       },
       "description": {
-        "es": "Estética botánica con lluvia de terminal alimentada por métricas reales del servidor y paneles translúcidos en modo claro y oscuro.",
-        "en": "Botanical editorial aesthetic with live server telemetry terminal rain and translucent panels in light and dark modes.",
-        "fr": "Esthétique botanique avec pluie de terminal alimentée par la télémétrie réelle du serveur et panneaux translucides en mode clair et sombre.",
-        "de": "Botanische Ästhetik mit Live-Server-Telemetrie-Terminalregen und transluzenten Panels im hellen und dunklen Modus.",
-        "it": "Estetica botanica con pioggia da terminale alimentata dalla telemetria reale del server e pannelli traslucidi in modalità chiara e scura.",
-        "pt": "Estética botânica com chuva de terminal alimentada pela telemetria real do servidor e painéis translúcidos no modo claro e escuro."
+        "es": "Estética botánica con lluvia de terminal alimentada por métricas reales y paneles claros de mayor transparencia para apreciar el fondo animado con gran luminosidad.",
+        "en": "Botanical aesthetic with live telemetry rain and enhanced light-mode panel translucency so the animated background shines through clearly.",
+        "fr": "Esthétique botanique avec pluie de télémétrie en direct et panneaux translucides éclaircis en mode clair.",
+        "de": "Botanische Ästhetik mit Live-Telemetrie-Regen und erhöhter Panel-Transparenz im hellen Modus.",
+        "it": "Estetica botanica con pioggia di telemetria live e pannelli chiari più trasparenti per valorizzare lo sfondo animato.",
+        "pt": "Estética botânica com chuva de telemetria real e painéis claros mais translúcidos para realçar o fundo animado."
       },
-      "tags": ["matrix", "telemetry", "botanical", "translucent"],
+      "tags": [
+        "matrix",
+        "telemetry",
+        "botanical",
+        "translucent"
+      ],
       "has_animation": true,
-      "preview": {
-        "light": {
-          "canvas": "#eaf2e6",
-          "surface": "rgba(255, 255, 255, 0.78)",
-          "accent": "#1e6b38",
-          "rain": "#1c7a3e"
-        },
-        "dark": {
-          "canvas": "#061007",
-          "surface": "rgba(12, 24, 14, 0.76)",
-          "accent": "#c6f19d",
-          "rain": "#74e888"
-        }
-      }
+      "file": "alethia-matrix.json"
+    },
+    {
+      "id": "navidad-escarcha",
+      "version": "1.0.0",
+      "colorModePolicy": "dual",
+      "layout": {
+        "navPosition": "bottom-dock",
+        "surfaceShape": "frosted",
+        "headerStyle": "editorial"
+      },
+      "name": {
+        "es": "Navidad · Escarcha Invernal",
+        "en": "Christmas · Winter Frost",
+        "fr": "Noël · Givre Hivernal",
+        "de": "Weihnachten · Winterfrost",
+        "it": "Natale · Brina Invernale",
+        "pt": "Natal · Geada de Inverno"
+      },
+      "description": {
+        "es": "Estética navideña e invernal con paneles de hielo escarchado, nieve cayendo en profundidad sobre aurora alpina y gráficas en rojo acebo, pino boreal y dorado.",
+        "en": "Complete winter Christmas transformation with crystalline frosted-ice panels, multi-depth falling snow, alpine aurora backdrop, and festive holly-pine-gold charts.",
+        "fr": "Transformation hivernale et festive avec panneaux givrés, neige animée en profondeur et graphiques aux tons houx, sapin et or.",
+        "de": "Winterliche Weihnachtsgestaltung mit vereisten Frost-Panels, fallendem Schnee in mehreren Ebenen und festlichen Diagrammfarben.",
+        "it": "Estetica natalizia invernale con pannelli effetto ghiaccio/brina, neve animata sullo sfondo e grafici in rosso agrifoglio, pino e oro.",
+        "pt": "Estética natalina de inverno com painéis de gelo fosco, neve caindo em camadas e gráficos em vermelho azevinho, pinheiro e dourado."
+      },
+      "tags": [
+        "christmas",
+        "winter",
+        "frost",
+        "snow",
+        "dual"
+      ],
+      "has_animation": true,
+      "file": ""
+    },
+    {
+      "id": "cyberpunk-2077",
+      "version": "1.0.0",
+      "colorModePolicy": "locked-dark",
+      "layout": {
+        "navPosition": "left-hud",
+        "surfaceShape": "beveled",
+        "headerStyle": "hud-tactical"
+      },
+      "name": {
+        "es": "Cyberpunk 2077 · Night City HUD",
+        "en": "Cyberpunk 2077 · Night City HUD",
+        "fr": "Cyberpunk 2077 · Night City HUD",
+        "de": "Cyberpunk 2077 · Night City HUD",
+        "it": "Cyberpunk 2077 · Night City HUD",
+        "pt": "Cyberpunk 2077 · Night City HUD"
+      },
+      "description": {
+        "es": "Interfaz HUD Netrunner completa: navegación vertical fija a la izquierda, paneles biselados con cortes diagonales, amarillo cibernético #FCEE09, cian #00F0FF y gráficas neón.",
+        "en": "Full Night City Netrunner HUD: fixed left tactical sidebar, beveled angled panels, cyber yellow #FCEE09, netrunner cyan #00F0FF, crimson trim, and neon telemetry charts.",
+        "fr": "HUD Netrunner complet avec barre latérale gauche tactique, panneaux biseautés jaune cyber et cyan néon.",
+        "de": "Komplettes Night-City-HUD mit fester linker Seitenleiste, abgeschrägten Panels und Neon-Telemetriediagrammen.",
+        "it": "Interfaccia HUD Netrunner con menu verticale sinistro, pannelli smussati giallo cyber e grafici al neon.",
+        "pt": "HUD Netrunner completo com menu lateral esquerdo fixo, painéis chanfrados amarelo cyber e gráficos neon."
+      },
+      "tags": [
+        "cyberpunk",
+        "hud",
+        "neon",
+        "left-hud",
+        "beveled"
+      ],
+      "has_animation": true,
+      "file": ""
+    },
+    {
+      "id": "gta-iii",
+      "version": "1.0.0",
+      "colorModePolicy": "locked-dark",
+      "layout": {
+        "navPosition": "top-bar",
+        "surfaceShape": "sharp",
+        "headerStyle": "classic-compact"
+      },
+      "name": {
+        "es": "GTA III · Liberty City 2001",
+        "en": "GTA III · Liberty City 2001",
+        "fr": "GTA III · Liberty City 2001",
+        "de": "GTA III · Liberty City 2001",
+        "it": "GTA III · Liberty City 2001",
+        "pt": "GTA III · Liberty City 2001"
+      },
+      "description": {
+        "es": "Atmósfera noir lluviosa de Liberty City 2001: barra de navegación superior compacta, paneles rectos gris-asfalto, verde dólar clásico #4ADE80, azul policía y lluvia urbana.",
+        "en": "2001 Liberty City rainy noir HUD: compact top navigation bar, sharp asphalt-dark panels, classic HUD dollar green #4ADE80, police blue, and subtle urban rain.",
+        "fr": "Atmosphère noir pluvieuse de Liberty City 2001 avec barre supérieure compacte, vert dollar classique et pluie urbaine.",
+        "de": "Düstere Liberty-City-2001-Atmosphäre mit kompakter oberer Navigationsleiste, klassischem HUD-Grün und Stadtregen.",
+        "it": "Atmosfera noir piovosa di Liberty City 2001 con barra superiore compatta, verde dollaro classico e pioggia urbana.",
+        "pt": "Atmosfera noir chuvosa de Liberty City 2001 com barra superior compacta, verde dólar clássico e chuva urbana."
+      },
+      "tags": [
+        "gta",
+        "gta-iii",
+        "noir",
+        "top-bar",
+        "rain"
+      ],
+      "has_animation": true,
+      "file": ""
+    },
+    {
+      "id": "gta-vice-city",
+      "version": "1.0.0",
+      "colorModePolicy": "locked-dark",
+      "layout": {
+        "navPosition": "right-rail",
+        "surfaceShape": "rounded",
+        "headerStyle": "editorial"
+      },
+      "name": {
+        "es": "GTA: Vice City · Neon 1986",
+        "en": "GTA: Vice City · Neon 1986",
+        "fr": "GTA: Vice City · Néon 1986",
+        "de": "GTA: Vice City · Neon 1986",
+        "it": "GTA: Vice City · Neon 1986",
+        "pt": "GTA: Vice City · Neon 1986"
+      },
+      "description": {
+        "es": "Atardecer ochentero de Ocean Beach: raíl vertical de navegación a la derecha, paneles violeta medianoche con filo rosa neón #FF4FD8, turquesa #00E5FF y gráficas synthwave.",
+        "en": "1986 Ocean Beach sunset HUD: vertical right-side neon rail menu, midnight-violet glass panels trimmed in hot pink #FF4FD8 and electric cyan #00E5FF.",
+        "fr": "Ambiance Miami 1986 avec rail vertical droit néon, panneaux violet nuit, rose vif #FF4FD8 et cyan électrique.",
+        "de": "1986er-Sonnenuntergangs-HUD mit vertikaler rechter Neon-Leiste, Mitternachtsviolett, Pink #FF4FD8 und Cyan.",
+        "it": "Tramonto anni '80 a Vice City con barra verticale destra al neon, viola mezzanotte, rosa #FF4FD8 e turchese.",
+        "pt": "Pôr do sol anos 80 de Vice City com menu vertical à direita em neon rosa #FF4FD8 e turquesa #00E5FF."
+      },
+      "tags": [
+        "gta",
+        "vice-city",
+        "80s",
+        "neon",
+        "right-rail"
+      ],
+      "has_animation": false,
+      "file": ""
+    },
+    {
+      "id": "gta-san-andreas",
+      "version": "1.0.0",
+      "colorModePolicy": "locked-dark",
+      "layout": {
+        "navPosition": "left-sidebar",
+        "surfaceShape": "sharp",
+        "headerStyle": "classic-compact"
+      },
+      "name": {
+        "es": "GTA: San Andreas · Los Santos 1992",
+        "en": "GTA: San Andreas · Los Santos 1992",
+        "fr": "GTA: San Andreas · Los Santos 1992",
+        "de": "GTA: San Andreas · Los Santos 1992",
+        "it": "GTA: San Andreas · Los Santos 1992",
+        "pt": "GTA: San Andreas · Los Santos 1992"
+      },
+      "description": {
+        "es": "Estética clásica de Los Santos 1992: menú lateral izquierdo estilo pausa en lista de alto contraste, paneles carbón rectos con borde nítido, verde Grove #22C55E y dorado cálido.",
+        "en": "1992 Los Santos classic pause UI: crisp left-side vertical pause menu, high-contrast charcoal sharp panels, Grove Street green #22C55E, and warm West Coast amber.",
+        "fr": "Menu pause classique à gauche de Los Santos 1992, panneaux anthracite nets, vert Grove #22C55E et doré.",
+        "de": "Klassisches linkes Pausenmenü im Los-Santos-1992-Stil mit kontrastreichen Panels, Grove-Grün und Gold.",
+        "it": "Menu pausa sinistro classico di Los Santos 1992 con pannelli neri ad alto contrasto, verde Grove e oro.",
+        "pt": "Menu lateral esquerdo clássico de Los Santos 1992 com painéis escuros retos, verde Grove #22C55E e dourado."
+      },
+      "tags": [
+        "gta",
+        "san-andreas",
+        "classic",
+        "left-sidebar",
+        "sharp"
+      ],
+      "has_animation": false,
+      "file": ""
+    },
+    {
+      "id": "gta-iv",
+      "version": "1.0.0",
+      "colorModePolicy": "locked-dark",
+      "layout": {
+        "navPosition": "top-bar",
+        "surfaceShape": "sharp",
+        "headerStyle": "minimal"
+      },
+      "name": {
+        "es": "GTA IV · Liberty City 2008",
+        "en": "GTA IV · Liberty City 2008",
+        "fr": "GTA IV · Liberty City 2008",
+        "de": "GTA IV · Liberty City 2008",
+        "it": "GTA IV · Liberty City 2008",
+        "pt": "GTA IV · Liberty City 2008"
+      },
+      "description": {
+        "es": "Diseño sobrio y cinematográfico de GTA IV: pestañas horizontales minimalistas en cabecera, paneles pizarra ahumados, acero blanco, ámbar taxi y llovizna metropolitana.",
+        "en": "Gritty 2008 Liberty City cinematic UI: minimalist horizontal top bar, smoked slate panels, crisp steel white, yellow-cab amber accents, and overcast drizzle.",
+        "fr": "Interface sobre GTA IV avec onglets supérieurs minimalistes, ardoise fumée, blanc acier et ambre taxi.",
+        "de": "Schlichtes GTA-IV-Design mit minimalistischer oberer Leiste, Rauchgrau-Panels und Taxi-Bernstein.",
+        "it": "Stile cinematografico GTA IV con barra superiore minimalista, pannelli ardesia fumé e accenti ambra.",
+        "pt": "Estilo sóbrio cinematográfico de GTA IV com barra superior minimalista, painéis ardósia e âmbar táxi."
+      },
+      "tags": [
+        "gta",
+        "gta-iv",
+        "gritty",
+        "top-bar",
+        "minimal"
+      ],
+      "has_animation": true,
+      "file": ""
+    },
+    {
+      "id": "gta-v",
+      "version": "1.0.0",
+      "colorModePolicy": "locked-dark",
+      "layout": {
+        "navPosition": "top-tabs",
+        "surfaceShape": "sharp",
+        "headerStyle": "minimal"
+      },
+      "name": {
+        "es": "GTA V · Los Santos Tactical",
+        "en": "GTA V · Los Santos Tactical",
+        "fr": "GTA V · Los Santos Tactical",
+        "de": "GTA V · Los Santos Tactical",
+        "it": "GTA V · Los Santos Tactical",
+        "pt": "GTA V · Los Santos Tactical"
+      },
+      "description": {
+        "es": "Menú de pausa táctico de GTA V: franja superior ancha con indicador azul cielo #38BDF8, paneles oscuros rectos de cristal limpio y tríada azul/verde/naranja en gráficas.",
+        "en": "GTA V modern pause UI: full-width top tactical tab strip with sky-blue #38BDF8 active rule, crisp dark glass panels, and Los Santos blue-green-orange chart triad.",
+        "fr": "Menu pause tactique GTA V avec bandeau supérieur large bleu ciel #38BDF8 et triade bleu/vert/orange.",
+        "de": "Taktisches GTA-V-Pausenmenü mit breiter oberer Tab-Leiste, Himmelblau #38BDF8 und Los-Santos-Farbtrias.",
+        "it": "Menu pausa tattico GTA V con fascia superiore blu cielo #38BDF8 e triade blu/verde/arancione nei grafici.",
+        "pt": "Menu tático de GTA V com faixa superior larga azul celeste #38BDF8 e tríade azul/verde/laranja."
+      },
+      "tags": [
+        "gta",
+        "gta-v",
+        "tactical",
+        "top-tabs",
+        "sharp"
+      ],
+      "has_animation": false,
+      "file": ""
+    },
+    {
+      "id": "gta-vi",
+      "version": "1.0.0",
+      "colorModePolicy": "locked-dark",
+      "layout": {
+        "navPosition": "corner-dock",
+        "surfaceShape": "rounded",
+        "headerStyle": "editorial"
+      },
+      "name": {
+        "es": "GTA VI · Leonida Vice",
+        "en": "GTA VI · Leonida Vice",
+        "fr": "GTA VI · Leonida Vice",
+        "de": "GTA VI · Leonida Vice",
+        "it": "GTA VI · Leonida Vice",
+        "pt": "GTA VI · Leonida Vice"
+      },
+      "description": {
+        "es": "Atardecer contemporáneo de Leonida: dock táctico anclado en la esquina inferior izquierda, paneles de cristal moderno y paleta coral-magenta #FF4D8D, turquesa #22D3EE y ultravioleta.",
+        "en": "Modern Leonida sunset interface: compact bottom-left corner dock, contemporary frosted dark glass panels, and coral-magenta #FF4D8D, turquoise #22D3EE, and ultraviolet charts.",
+        "fr": "Interface Leonida contemporaine avec dock en coin inférieur gauche, verre sombre moderne, corail #FF4D8D et turquoise.",
+        "de": "Moderne Leonida-Oberfläche mit kompaktem Eck-Dock unten links, Korall-Magenta #FF4D8D und Türkis.",
+        "it": "Interfaccia Leonida contemporanea con dock nell'angolo inferiore sinistro, corallo-magenta #FF4D8D e turchese.",
+        "pt": "Interface contemporânea de Leonida com dock compacto no canto inferior esquerdo, coral #FF4D8D e turquesa."
+      },
+      "tags": [
+        "gta",
+        "gta-vi",
+        "leonida",
+        "corner-dock",
+        "modern"
+      ],
+      "has_animation": false,
+      "file": ""
     }
   ]
 }

@@ -5605,6 +5605,24 @@ function realOsTelemetryMiddleware(): Plugin {
 
         if (
           !isViteModuleImport &&
+          (url === '/api/themes/pack' || url === '/themes/themes-pack.rcpack.gz')
+        ) {
+          const packPath = path.resolve(ROOT_DIR, 'themes/themes-pack.rcpack.gz');
+          if (fs.existsSync(packPath)) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/gzip');
+            res.setHeader('Content-Disposition', 'inline; filename="themes-pack.rcpack.gz"');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.end(fs.readFileSync(packPath));
+            return;
+          }
+          res.statusCode = 404;
+          res.end('Theme pack not found');
+          return;
+        }
+
+        if (
+          !isViteModuleImport &&
           (url === '/api/themes' ||
             url === '/api/themes/sync' ||
             url.startsWith('/api/themes/') ||
@@ -5624,7 +5642,7 @@ function realOsTelemetryMiddleware(): Plugin {
             'import json, sys',
             `sys.path.insert(0, ${JSON.stringify(ROOT_DIR)})`,
             'import themes_catalog as tc',
-            isSync ? `sync_res = tc.sync_themes_from_github(${JSON.stringify(ROOT_DIR)}, force=True, timeout=5.0)` : 'sync_res = None',
+            isSync ? `sync_res = tc.sync_themes_from_github(${JSON.stringify(ROOT_DIR)}, force=True, timeout=6.0)` : 'sync_res = None',
             requestedItem && requestedItem !== 'themes.json'
               ? `out = tc.get_single_theme_payload(${JSON.stringify(requestedItem)}, ${JSON.stringify(ROOT_DIR)})`
               : `out = tc.get_themes_catalog_payload(${JSON.stringify(ROOT_DIR)})`,
@@ -5656,9 +5674,12 @@ function realOsTelemetryMiddleware(): Plugin {
             res.end(
               JSON.stringify({
                 ok: true,
-                schema_version: 1,
+                schema_version: 2,
+                pack_version: '2.0.0',
+                pack_file: 'themes-pack.rcpack.gz',
                 default_theme: 'alethia-matrix',
                 source: 'local',
+                assets: {},
                 themes: fallbackTheme ? [fallbackTheme] : [],
               })
             );

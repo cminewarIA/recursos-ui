@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """
-Catálogo centralizado de temas visuales independientes con sincronización OTA desde GitHub
-para Recursos Cockpit.
-Espejo arquitectónico de i18n_catalog.py: permite añadir o editar temas en ./themes/
-sin recompilar ni actualizar la aplicación.
+Catálogo centralizado de temas visuales espaciales (Schema v2) con paquete único
+comprimido (themes-pack.rcpack.gz) y sincronización OTA desde GitHub para Recursos Cockpit.
+
+Permite añadir, rediseñar o empaquetar temas (layouts, tipografías, gráficas, efectos e
+ilustraciones WebP/JPEG embebidas) en un único archivo descargable desde GitHub sin
+recompilar ni actualizar la aplicación principal.
 """
 
+import gzip
+import hashlib
+import io
 import json
 import os
 import re
@@ -13,12 +18,26 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 GITHUB_THEMES_BASE_URL = os.environ.get(
     "RECURSOS_THEMES_GITHUB_URL",
     "https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/themes",
 ).rstrip("/")
+
+PACK_FILENAME = "themes-pack.rcpack.gz"
+MAX_COMPRESSED_PACK_BYTES = 8 * 1024 * 1024     # 8 MB máximo comprimido
+MAX_DECOMPRESSED_PACK_BYTES = 16 * 1024 * 1024  # 16 MB máximo descomprimido (anti gzip-bomb)
+MAX_SINGLE_ASSET_CHARS = 1_200_000              # ~900 KB imagen base64 por fondo
+MAX_PACK_ASSETS = 32
+
+_ALLOWED_GITHUB_HOSTS = frozenset({
+    "raw.githubusercontent.com",
+    "github.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+})
 
 _THEMES_LOCK = threading.Lock()
 _THEMES_OTA_SYNC_LOCK = threading.Lock()
@@ -28,6 +47,9 @@ _THEMES_OTA_LAST_TRY = 0.0
 _SAFE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 _SAFE_FILE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,79}\.json$")
 _UNSAFE_CSS_VALUE_RE = re.compile(r"[;{}<>`\\]|url\s*\(|expression\s*\(|@import|javascript:", re.IGNORECASE)
+_SAFE_FONT_STACK_RE = re.compile(r"^[A-Za-z0-9\s,'\"_-]{1,120}$")
+_SAFE_GOOGLE_FONTS_QUERY_RE = re.compile(r"^[A-Za-z0-9+:;.,@&=-]{1,260}$")
+_SAFE_RASTER_DATA_URI_RE = re.compile(r"^data:image/(?:webp|jpeg|png);base64,[A-Za-z0-9+/=]+$")
 
 _ALLOWED_CSS_TOKENS = frozenset({
     "--bg-canvas",
@@ -47,6 +69,7 @@ _ALLOWED_CSS_TOKENS = frozenset({
     "--surface-blur",
     "--border-hairline",
     "--border-strong",
+    "--frost-highlight",
     "--text-primary",
     "--text-secondary",
     "--text-muted",
@@ -62,11 +85,44 @@ _ALLOWED_CSS_TOKENS = frozenset({
     "--warn",
     "--danger",
     "--violet",
+    "--hud-accent-2",
+    "--hud-accent-3",
+    "--panel-radius",
+    "--font-display",
+    "--font-sans",
+    "--font-mono",
     "--ui-shadow",
     "--ui-shadow-strong",
 })
 
-_ALLOWED_EFFECT_TYPES = frozenset({"matrix-telemetry", "none"})
+_ALLOWED_EFFECT_TYPES = frozenset({"matrix-telemetry", "snowfall", "cyber-grid", "urban-rain", "none"})
+_ALLOWED_COLOR_MODE_POLICIES = frozenset({"dual", "locked-dark", "locked-light"})
+_ALLOWED_NAV_POSITIONS = frozenset({
+    "bottom-dock",
+    "left-sidebar",
+    "left-hud",
+    "right-rail",
+    "top-bar",
+    "top-tabs",
+    "corner-dock",
+})
+_ALLOWED_SURFACE_SHAPES = frozenset({"rounded", "frosted", "beveled", "sharp"})
+_ALLOWED_HEADER_STYLES = frozenset({"editorial", "hud-tactical", "classic-compact", "minimal"})
+_ALLOWED_CHART_LINE_STYLES = frozenset({"smooth", "crisp", "neon"})
+
+
+def is_allowed_github_url(url_str):
+    """Restringe descargas OTA únicamente a orígenes HTTPS oficiales de GitHub."""
+    if not isinstance(url_str, str):
+        return False
+    try:
+        parsed = urllib.parse.urlparse(url_str.strip())
+        return (
+            parsed.scheme == "https"
+            and (parsed.hostname or "").lower() in _ALLOWED_GITHUB_HOSTS
+        )
+    except Exception:
+        return False
 
 
 def resolve_themes_base_dir(hint_path=None):
@@ -87,7 +143,9 @@ def resolve_themes_base_dir(hint_path=None):
         "/usr/share/recursos-cockpit",
     ])
     for root in candidates:
-        if os.path.isfile(os.path.join(root, "themes", "themes.json")):
+        if os.path.isfile(os.path.join(root, "themes", PACK_FILENAME)) or os.path.isfile(
+            os.path.join(root, "themes", "themes.json")
+        ):
             return root
     return here
 
@@ -143,12 +201,12 @@ def _sanitize_token_map(raw_map):
 
 def _sanitize_localized_text(raw_val, fallback=""):
     if isinstance(raw_val, str):
-        return {"es": raw_val.strip()[:240], "en": raw_val.strip()[:240]}
+        return {"es": raw_val.strip()[:280], "en": raw_val.strip()[:280]}
     if isinstance(raw_val, dict):
         out = {}
         for k, v in raw_val.items():
             if isinstance(k, str) and isinstance(v, str) and len(k.strip()) <= 16:
-                val = v.strip()[:320]
+                val = v.strip()[:360]
                 if val:
                     out[k.strip().lower()] = val
         if out:
@@ -178,20 +236,113 @@ def _sanitize_background_effect(raw_eff):
     if eff_type not in _ALLOWED_EFFECT_TYPES:
         eff_type = "none"
     out = {"type": eff_type}
-    if eff_type == "matrix-telemetry":
+    if eff_type != "none":
         fps = raw_eff.get("fps", 28)
-        col_px = raw_eff.get("columnSpacingPx", 22)
-        font_px = raw_eff.get("fontSizePx", 13)
         out["fps"] = max(12, min(60, int(fps) if isinstance(fps, (int, float)) else 28))
-        out["columnSpacingPx"] = max(14, min(48, int(col_px) if isinstance(col_px, (int, float)) else 22))
-        out["fontSizePx"] = max(10, min(20, int(font_px) if isinstance(font_px, (int, float)) else 13))
+        if eff_type == "matrix-telemetry":
+            col_px = raw_eff.get("columnSpacingPx", 22)
+            font_px = raw_eff.get("fontSizePx", 13)
+            out["columnSpacingPx"] = max(14, min(48, int(col_px) if isinstance(col_px, (int, float)) else 22))
+            out["fontSizePx"] = max(10, min(20, int(font_px) if isinstance(font_px, (int, float)) else 13))
         out["light"] = _sanitize_effect_palette(raw_eff.get("light"))
         out["dark"] = _sanitize_effect_palette(raw_eff.get("dark"))
     return out
 
 
-def sanitize_theme_definition(raw_theme, source="local", fallback_id=None):
-    """Valida y sanea estrictamente una definición JSON de tema independiente."""
+def _sanitize_layout(raw_layout):
+    if not isinstance(raw_layout, dict):
+        return {
+            "navPosition": "bottom-dock",
+            "surfaceShape": "rounded",
+            "headerStyle": "editorial",
+        }
+    nav = str(raw_layout.get("navPosition") or "bottom-dock").strip().lower()
+    shape = str(raw_layout.get("surfaceShape") or "rounded").strip().lower()
+    header = str(raw_layout.get("headerStyle") or "editorial").strip().lower()
+    return {
+        "navPosition": nav if nav in _ALLOWED_NAV_POSITIONS else "bottom-dock",
+        "surfaceShape": shape if shape in _ALLOWED_SURFACE_SHAPES else "rounded",
+        "headerStyle": header if header in _ALLOWED_HEADER_STYLES else "editorial",
+    }
+
+
+def _sanitize_typography(raw_typo):
+    if not isinstance(raw_typo, dict):
+        return {}
+    out = {}
+    for key in ("displayFont", "bodyFont", "monoFont"):
+        val = raw_typo.get(key)
+        if isinstance(val, str) and _SAFE_FONT_STACK_RE.match(val.strip()) and not _UNSAFE_CSS_VALUE_RE.search(val):
+            out[key] = val.strip()
+    gf = raw_typo.get("googleFontsFamily")
+    if isinstance(gf, str) and _SAFE_GOOGLE_FONTS_QUERY_RE.match(gf.strip()):
+        out["googleFontsFamily"] = gf.strip()
+    return out
+
+
+def _sanitize_backdrop(raw_bg, valid_asset_ids=None):
+    if not isinstance(raw_bg, dict):
+        return {}
+    out = {}
+    asset_id = str(raw_bg.get("assetId") or "").strip().lower()
+    if asset_id and is_valid_theme_id(asset_id):
+        if valid_asset_ids is None or asset_id in valid_asset_ids:
+            out["assetId"] = asset_id
+    for key in ("scrimLight", "scrimDark"):
+        if _is_safe_css_val(raw_bg.get(key)):
+            out[key] = str(raw_bg.get(key)).strip()
+    blur = raw_bg.get("blurPx")
+    if isinstance(blur, (int, float)):
+        out["blurPx"] = max(0, min(24, int(blur)))
+    return out
+
+
+def _sanitize_chart_mode_palette(raw_pal):
+    if not isinstance(raw_pal, dict):
+        return {}
+    out = {}
+    for key in ("primary", "secondary", "tertiary", "quaternary", "grid", "averageLine"):
+        if _is_safe_css_val(raw_pal.get(key)):
+            out[key] = str(raw_pal.get(key)).strip()
+    if isinstance(raw_pal.get("glow"), bool):
+        out["glow"] = raw_pal["glow"]
+    ls = str(raw_pal.get("lineStyle") or "").strip().lower()
+    if ls in _ALLOWED_CHART_LINE_STYLES:
+        out["lineStyle"] = ls
+    return out
+
+
+def _sanitize_chart_palette(raw_cp):
+    if not isinstance(raw_cp, dict):
+        return None
+    light = _sanitize_chart_mode_palette(raw_cp.get("light"))
+    dark = _sanitize_chart_mode_palette(raw_cp.get("dark"))
+    if not light and not dark:
+        return None
+    return {"light": light or dark, "dark": dark or light}
+
+
+def sanitize_assets_map(raw_assets):
+    """Sanea mapa de recursos gráficos embebidos: únicamente raster webp/jpeg/png en base64 (cero SVG/scripts)."""
+    if not isinstance(raw_assets, dict):
+        return {}
+    clean = {}
+    for k, v in raw_assets.items():
+        if len(clean) >= MAX_PACK_ASSETS:
+            break
+        aid = str(k or "").strip().lower()
+        if not is_valid_theme_id(aid):
+            continue
+        if not isinstance(v, str) or len(v) > MAX_SINGLE_ASSET_CHARS:
+            continue
+        val = v.strip()
+        if _SAFE_RASTER_DATA_URI_RE.match(val):
+            clean[aid] = val
+    return clean
+
+
+def sanitize_theme_definition(raw_theme, source="local", fallback_id=None, valid_asset_ids=None):
+    """Valida y sanea estrictamente una definición JSON de tema independiente (Schema v1 y v2)."""
     if not isinstance(raw_theme, dict):
         return None
     theme_id = str(raw_theme.get("id") or fallback_id or "").strip().lower()
@@ -205,14 +356,26 @@ def sanitize_theme_definition(raw_theme, source="local", fallback_id=None):
     dark_tokens = _sanitize_token_map(tokens_raw.get("dark"))
     if not light_tokens and not dark_tokens:
         return None
+    if not light_tokens:
+        light_tokens = dict(dark_tokens)
+    if not dark_tokens:
+        dark_tokens = dict(light_tokens)
 
     bg_effect = _sanitize_background_effect(raw_theme.get("backgroundEffect"))
+    layout = _sanitize_layout(raw_theme.get("layout"))
+    typography = _sanitize_typography(raw_theme.get("typography"))
+    backdrop = _sanitize_backdrop(raw_theme.get("backdrop"), valid_asset_ids=valid_asset_ids)
+    chart_palette = _sanitize_chart_palette(raw_theme.get("chartPalette"))
+
+    policy_raw = str(raw_theme.get("colorModePolicy") or "dual").strip().lower()
+    color_mode_policy = policy_raw if policy_raw in _ALLOWED_COLOR_MODE_POLICIES else "dual"
+
     raw_tags = raw_theme.get("tags") if isinstance(raw_theme.get("tags"), list) else []
     tags = [str(t).strip().lower()[:24] for t in raw_tags if isinstance(t, str) and t.strip()][:8]
 
     preview_light = {
         "canvas": light_tokens.get("--bg-canvas", "#eef4eb"),
-        "surface": light_tokens.get("--surface-bento", light_tokens.get("--bg-surface", "rgba(255,255,255,0.78)")),
+        "surface": light_tokens.get("--surface-bento", light_tokens.get("--bg-surface", "rgba(255,255,255,0.52)")),
         "accent": light_tokens.get("--accent", "#1e6b38"),
         "rain": (bg_effect.get("light") or {}).get("headColor", light_tokens.get("--accent", "#1e6b38")),
     }
@@ -223,16 +386,20 @@ def sanitize_theme_definition(raw_theme, source="local", fallback_id=None):
         "rain": (bg_effect.get("dark") or {}).get("headColor", dark_tokens.get("--accent", "#c6f19d")),
     }
 
-    return {
-        "schema_version": 1,
+    result = {
+        "schema_version": 2,
         "id": theme_id,
         "version": str(raw_theme.get("version") or "1.0.0").strip()[:24],
         "author": str(raw_theme.get("author") or "Recursos Cockpit").strip()[:64],
         "source": source,
+        "colorModePolicy": color_mode_policy,
         "name": _sanitize_localized_text(raw_theme.get("name"), fallback=theme_id),
         "description": _sanitize_localized_text(raw_theme.get("description"), fallback=""),
         "tags": tags,
         "has_animation": bg_effect.get("type") != "none",
+        "layout": layout,
+        "typography": typography,
+        "backdrop": backdrop,
         "preview": {"light": preview_light, "dark": preview_dark},
         "backgroundEffect": bg_effect,
         "tokens": {
@@ -240,6 +407,9 @@ def sanitize_theme_definition(raw_theme, source="local", fallback_id=None):
             "dark": dark_tokens,
         },
     }
+    if chart_palette:
+        result["chartPalette"] = chart_palette
+    return result
 
 
 def _read_json_file(path):
@@ -259,29 +429,95 @@ def _write_json_atomic(path, data):
     os.replace(tmp, path)
 
 
-def _fetch_remote_json(url, etag=None, timeout=5.0):
-    headers = {
-        "User-Agent": "Recursos-Cockpit-Themes-OTA/1.0",
-        "Accept": "application/json",
-    }
-    if etag:
-        headers["If-None-Match"] = etag
-    req = urllib.request.Request(url, headers=headers)
+def _write_bytes_atomic(path, raw_bytes):
+    tmp = f"{path}.tmp"
+    with open(tmp, "wb") as fp:
+        fp.write(raw_bytes)
+    os.replace(tmp, path)
+
+
+def safe_decompress_pack_bytes(gz_bytes):
+    """Descomprime un paquete .rcpack.gz con protección estricta contra bombas gzip."""
+    if not isinstance(gz_bytes, (bytes, bytearray)):
+        return None
+    if len(gz_bytes) == 0 or len(gz_bytes) > MAX_COMPRESSED_PACK_BYTES:
+        return None
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read(2 * 1024 * 1024)
-            new_etag = resp.headers.get("ETag") or ""
-            return 200, json.loads(raw.decode("utf-8")), new_etag
-    except urllib.error.HTTPError as he:
-        if he.code == 304:
-            return 304, None, etag or ""
-        return he.code, None, ""
+        with gzip.GzipFile(fileobj=io.BytesIO(gz_bytes), mode="rb") as gz:
+            chunks = []
+            total = 0
+            while True:
+                chunk = gz.read(65536)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_DECOMPRESSED_PACK_BYTES:
+                    return None
+                chunks.append(chunk)
+            raw_json = b"".join(chunks)
+        parsed = json.loads(raw_json.decode("utf-8"))
+        if not isinstance(parsed, dict):
+            return None
+        return parsed
     except Exception:
-        return 0, None, ""
+        return None
 
 
-def _load_directory_catalog(themes_dir, source="local"):
-    """Lee un manifiesto themes.json y sus archivos de tema independientes en un directorio dado."""
+def _parse_pack_dict(raw_pack, source="local"):
+    """Valida y sanea un paquete único de temas completo (assets + themes + metadatos)."""
+    if not isinstance(raw_pack, dict):
+        return None
+    assets = sanitize_assets_map(raw_pack.get("assets"))
+    valid_asset_ids = set(assets.keys())
+    raw_themes = raw_pack.get("themes")
+    if not isinstance(raw_themes, list) or not raw_themes:
+        return None
+
+    themes = {}
+    ordered_ids = []
+    for item in raw_themes:
+        sanitized = sanitize_theme_definition(item, source=source, valid_asset_ids=valid_asset_ids)
+        if sanitized:
+            tid = sanitized["id"]
+            if tid not in themes:
+                ordered_ids.append(tid)
+            themes[tid] = sanitized
+
+    if not themes:
+        return None
+
+    cand_def = str(raw_pack.get("default_theme") or "alethia-matrix").strip().lower()
+    default_theme = cand_def if cand_def in themes else ordered_ids[0]
+    return {
+        "pack_version": str(raw_pack.get("pack_version") or "2.0.0").strip()[:24],
+        "pack_sha256": str(raw_pack.get("pack_sha256") or "").strip()[:64],
+        "generated_at": int(raw_pack.get("generated_at") or 0) if isinstance(raw_pack.get("generated_at"), (int, float)) else None,
+        "default_theme": default_theme,
+        "ordered_ids": ordered_ids,
+        "assets": assets,
+        "themes": themes,
+    }
+
+
+def _load_pack_from_file(pack_path, source="local"):
+    try:
+        if not os.path.isfile(pack_path):
+            return None
+        size = os.path.getsize(pack_path)
+        if size <= 0 or size > MAX_COMPRESSED_PACK_BYTES:
+            return None
+        with open(pack_path, "rb") as fp:
+            gz_bytes = fp.read(MAX_COMPRESSED_PACK_BYTES + 1)
+        parsed = safe_decompress_pack_bytes(gz_bytes)
+        if not parsed:
+            return None
+        return _parse_pack_dict(parsed, source=source)
+    except Exception:
+        return None
+
+
+def _load_legacy_directory_catalog(themes_dir, source="local"):
+    """Fallback de compatibilidad para archivos JSON individuales sueltos."""
     manifest = _read_json_file(os.path.join(themes_dir, "themes.json"))
     default_theme = "alethia-matrix"
     themes = {}
@@ -295,7 +531,7 @@ def _load_directory_catalog(themes_dir, source="local"):
             if not isinstance(entry, dict):
                 continue
             tid = str(entry.get("id") or "").strip().lower()
-            tfile = str(entry.get("file") or f"{tid}.json").strip()
+            tfile = str(entry.get("file") or "").strip()
             if not is_valid_theme_id(tid) or not _SAFE_FILE_RE.match(tfile):
                 continue
             raw_theme = _read_json_file(os.path.join(themes_dir, tfile))
@@ -303,7 +539,6 @@ def _load_directory_catalog(themes_dir, source="local"):
             if sanitized:
                 themes[tid] = sanitized
 
-    # Descubrimiento automático adicional de cualquier archivo *.json válido en el directorio
     if os.path.isdir(themes_dir):
         try:
             for fname in sorted(os.listdir(themes_dir)):
@@ -321,10 +556,39 @@ def _load_directory_catalog(themes_dir, source="local"):
     return default_theme, themes
 
 
-def sync_themes_from_github(base_dir=None, force=False, timeout=5.0):
+def _fetch_remote_bytes(url, etag=None, timeout=8.0, max_bytes=MAX_COMPRESSED_PACK_BYTES):
+    if not is_allowed_github_url(url):
+        return 403, None, ""
+    headers = {
+        "User-Agent": "Recursos-Cockpit-Themes-OTA/2.0",
+        "Accept": "application/octet-stream, application/gzip, application/json",
+    }
+    if etag:
+        headers["If-None-Match"] = etag
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            final_url = resp.geturl()
+            if not is_allowed_github_url(final_url):
+                return 403, None, ""
+            raw = resp.read(max_bytes + 1)
+            if len(raw) > max_bytes:
+                return 413, None, ""
+            new_etag = resp.headers.get("ETag") or ""
+            return 200, raw, new_etag
+    except urllib.error.HTTPError as he:
+        if he.code == 304:
+            return 304, None, etag or ""
+        return he.code, None, ""
+    except Exception:
+        return 0, None, ""
+
+
+def sync_themes_from_github(base_dir=None, force=False, timeout=8.0):
     """
-    Descarga desde GitHub el manifiesto themes/themes.json y cada archivo de tema independiente
-    al directorio de caché OTA local (fuera de Git), sin requerir actualizar la app.
+    Descarga de forma atómica el paquete único `themes-pack.rcpack.gz` desde GitHub
+    al caché OTA local del usuario, validando origen HTTPS, tamaño, descompresión
+    segura y saneamiento estricto sin tocar código ni versiones de la aplicación.
     """
     global _THEMES_OTA_LAST_TRY
     now = time.time()
@@ -336,10 +600,15 @@ def sync_themes_from_github(base_dir=None, force=False, timeout=5.0):
         cache_dir = _get_ota_themes_cache_dir()
         meta_path = os.path.join(cache_dir, "themes_ota.meta.json")
         meta = _read_json_file(meta_path) or {}
-        prev_etag = None if force else meta.get("etag")
+        prev_etag = None if force else meta.get("pack_etag")
 
-        manifest_url = f"{GITHUB_THEMES_BASE_URL}/themes.json"
-        status, remote_manifest, new_etag = _fetch_remote_json(manifest_url, etag=prev_etag, timeout=timeout)
+        pack_url = f"{GITHUB_THEMES_BASE_URL}/{PACK_FILENAME}"
+        status, gz_bytes, new_etag = _fetch_remote_bytes(
+            pack_url,
+            etag=prev_etag,
+            timeout=timeout,
+            max_bytes=MAX_COMPRESSED_PACK_BYTES,
+        )
         if status == 304:
             meta["checked_at"] = int(time.time())
             try:
@@ -348,66 +617,38 @@ def sync_themes_from_github(base_dir=None, force=False, timeout=5.0):
                 pass
             return {"ok": True, "not_modified": True, "source": "github"}
 
-        if status != 200 or not isinstance(remote_manifest, dict):
-            return {"ok": False, "status": status, "source": "local"}
+        if status == 200 and gz_bytes:
+            parsed_raw = safe_decompress_pack_bytes(gz_bytes)
+            sanitized_pack = _parse_pack_dict(parsed_raw, source="github") if parsed_raw else None
+            if not sanitized_pack:
+                return {"ok": False, "status": 422, "source": "local"}
+            try:
+                _write_bytes_atomic(os.path.join(cache_dir, PACK_FILENAME), gz_bytes)
+                _write_json_atomic(
+                    meta_path,
+                    {
+                        "pack_etag": new_etag,
+                        "pack_version": sanitized_pack["pack_version"],
+                        "pack_sha256": sanitized_pack["pack_sha256"] or hashlib.sha256(gz_bytes).hexdigest(),
+                        "synced_at": int(time.time()),
+                        "checked_at": int(time.time()),
+                        "themes_count": len(sanitized_pack["themes"]),
+                        "assets_count": len(sanitized_pack["assets"]),
+                        "source_url": pack_url,
+                    },
+                )
+            except Exception:
+                return {"ok": False, "status": 500, "source": "local"}
+            return {
+                "ok": True,
+                "source": "github",
+                "pack_version": sanitized_pack["pack_version"],
+                "synced_count": len(sanitized_pack["themes"]),
+                "theme_ids": sanitized_pack["ordered_ids"],
+                "synced_at": int(time.time()),
+            }
 
-        entries = remote_manifest.get("themes")
-        if not isinstance(entries, list) or not entries:
-            return {"ok": False, "status": 422, "source": "local"}
-
-        downloaded = []
-        valid_entries = []
-        for entry in entries:
-            if not isinstance(entry, dict):
-                continue
-            tid = str(entry.get("id") or "").strip().lower()
-            tfile = str(entry.get("file") or f"{tid}.json").strip()
-            if not is_valid_theme_id(tid) or not _SAFE_FILE_RE.match(tfile):
-                continue
-            theme_url = f"{GITHUB_THEMES_BASE_URL}/{tfile}"
-            t_status, raw_theme, _ = _fetch_remote_json(theme_url, etag=None, timeout=timeout)
-            if t_status == 200 and isinstance(raw_theme, dict):
-                sanitized = sanitize_theme_definition(raw_theme, source="github", fallback_id=tid)
-                if sanitized:
-                    try:
-                        _write_json_atomic(os.path.join(cache_dir, tfile), raw_theme)
-                        downloaded.append(tid)
-                        valid_entries.append(entry)
-                    except Exception:
-                        pass
-
-        if not downloaded:
-            return {"ok": False, "status": 502, "source": "local"}
-
-        try:
-            _write_json_atomic(
-                os.path.join(cache_dir, "themes.json"),
-                {
-                    "schema_version": 1,
-                    "default_theme": str(remote_manifest.get("default_theme") or "alethia-matrix").strip().lower(),
-                    "themes": valid_entries,
-                },
-            )
-            _write_json_atomic(
-                meta_path,
-                {
-                    "etag": new_etag,
-                    "synced_at": int(time.time()),
-                    "checked_at": int(time.time()),
-                    "themes_count": len(downloaded),
-                    "source_url": GITHUB_THEMES_BASE_URL,
-                },
-            )
-        except Exception:
-            return {"ok": False, "status": 500, "source": "local"}
-
-        return {
-            "ok": True,
-            "source": "github",
-            "synced_count": len(downloaded),
-            "theme_ids": downloaded,
-            "synced_at": int(time.time()),
-        }
+        return {"ok": False, "status": status, "source": "local"}
 
 
 def start_background_themes_ota_sync(base_dir=None):
@@ -420,47 +661,88 @@ def start_background_themes_ota_sync(base_dir=None):
 
     def _worker():
         try:
-            sync_themes_from_github(base_dir=base_dir, force=False, timeout=5.0)
+            sync_themes_from_github(base_dir=base_dir, force=False, timeout=6.0)
         except Exception:
             pass
 
     threading.Thread(target=_worker, daemon=True, name="themes-ota-sync").start()
 
 
+def get_theme_pack_bytes(base_dir=None):
+    """Devuelve los bytes del paquete único .rcpack.gz activo (OTA si válido, o local)."""
+    root = resolve_themes_base_dir(base_dir)
+    cache_pack = os.path.join(_get_ota_themes_cache_dir(), PACK_FILENAME)
+    local_pack = os.path.join(root, "themes", PACK_FILENAME)
+    for candidate in (cache_pack, local_pack):
+        try:
+            if os.path.isfile(candidate) and 0 < os.path.getsize(candidate) <= MAX_COMPRESSED_PACK_BYTES:
+                with open(candidate, "rb") as fp:
+                    return fp.read()
+        except Exception:
+            continue
+    return None
+
+
 def get_themes_catalog_payload(base_dir=None):
     """
-    Devuelve el catálogo unificado de temas (empaquetados locales + temas OTA descargados de GitHub).
+    Devuelve el catálogo unificado Schema v2 (temas + assets WebP embebidos + metadatos del paquete).
     """
     root = resolve_themes_base_dir(base_dir)
     local_dir = os.path.join(root, "themes")
     cache_dir = _get_ota_themes_cache_dir()
 
-    local_default, local_themes = _load_directory_catalog(local_dir, source="local")
-    ota_default, ota_themes = _load_directory_catalog(cache_dir, source="github")
+    local_pack = _load_pack_from_file(os.path.join(local_dir, PACK_FILENAME), source="local")
+    ota_pack = _load_pack_from_file(os.path.join(cache_dir, PACK_FILENAME), source="github")
     meta = _read_json_file(os.path.join(cache_dir, "themes_ota.meta.json")) or {}
 
-    merged = dict(local_themes)
-    for tid, tdef in ota_themes.items():
-        merged[tid] = tdef
+    merged_themes = {}
+    merged_assets = {}
+    ordered_ids = []
 
-    default_theme = ota_default if ota_themes and ota_default in merged else (
-        local_default if local_default in merged else (next(iter(merged.keys()), "alethia-matrix"))
+    if local_pack:
+        merged_assets.update(local_pack["assets"])
+        for tid in local_pack["ordered_ids"]:
+            merged_themes[tid] = local_pack["themes"][tid]
+            ordered_ids.append(tid)
+    else:
+        _, legacy_local = _load_legacy_directory_catalog(local_dir, source="local")
+        for tid, tdef in legacy_local.items():
+            merged_themes[tid] = tdef
+            if tid not in ordered_ids:
+                ordered_ids.append(tid)
+
+    if ota_pack:
+        merged_assets.update(ota_pack["assets"])
+        for tid in ota_pack["ordered_ids"]:
+            merged_themes[tid] = ota_pack["themes"][tid]
+            if tid not in ordered_ids:
+                ordered_ids.append(tid)
+
+    active_pack = ota_pack or local_pack
+    default_theme = (
+        active_pack["default_theme"]
+        if active_pack and active_pack["default_theme"] in merged_themes
+        else ("alethia-matrix" if "alethia-matrix" in merged_themes else (ordered_ids[0] if ordered_ids else "alethia-matrix"))
     )
 
     ordered = []
-    if default_theme in merged:
-        ordered.append(merged[default_theme])
-    for tid in sorted(merged.keys()):
-        if tid != default_theme:
-            ordered.append(merged[tid])
+    if default_theme in merged_themes:
+        ordered.append(merged_themes[default_theme])
+    for tid in ordered_ids:
+        if tid != default_theme and tid in merged_themes:
+            ordered.append(merged_themes[tid])
 
     return {
         "ok": True,
-        "schema_version": 1,
+        "schema_version": 2,
+        "pack_version": (active_pack or {}).get("pack_version", "2.0.0"),
+        "pack_file": PACK_FILENAME,
+        "pack_sha256": (active_pack or {}).get("pack_sha256", ""),
         "default_theme": default_theme,
-        "source": "github" if ota_themes else "local",
+        "source": "github" if ota_pack else "local",
         "synced_at": meta.get("synced_at") or None,
         "github_base_url": GITHUB_THEMES_BASE_URL,
+        "assets": merged_assets,
         "themes": ordered,
     }
 

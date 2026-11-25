@@ -46,6 +46,26 @@ import { formatBytes, getDisplayVersionString } from '../utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion } from '../utils/version';
 import { useI18n } from '../i18n';
 import { resolveThemeLocalizedText, useThemeCatalog } from '../themes';
+import { ThemeNavPosition } from '../themes/types';
+
+function getThemeLayoutLabelKey(pos?: ThemeNavPosition): string {
+  switch (pos) {
+    case 'left-hud':
+      return 'themes.layout_left_hud';
+    case 'left-sidebar':
+      return 'themes.layout_left_sidebar';
+    case 'right-rail':
+      return 'themes.layout_right_rail';
+    case 'top-bar':
+      return 'themes.layout_top_bar';
+    case 'top-tabs':
+      return 'themes.layout_top_tabs';
+    case 'corner-dock':
+      return 'themes.layout_corner_dock';
+    default:
+      return 'themes.layout_bottom_dock';
+  }
+}
 
 type MoreSubTab = 'updates' | 'themes' | 'console' | 'devices' | 'manual' | 'dex';
 
@@ -91,6 +111,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
     selectTheme,
     otaSource: themesOtaSource,
     syncedAt: themesSyncedAt,
+    packVersion: themesPackVersion,
+    packFile: themesPackFile,
+    isModeLocked,
+    getThemeBackdropUrl,
     isSyncingThemes,
     syncThemesFromGitHub,
   } = useThemeCatalog();
@@ -1454,7 +1478,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
         </div>
       )}
 
-      {/* 1b. Catálogo de Temas independientes con sincronización OTA desde GitHub */}
+      {/* 1b. Catálogo de Temas independientes con paquete único OTA desde GitHub */}
       {subTab === 'themes' && (
         <div className="space-y-4">
           <section className="cockpit-bento p-5">
@@ -1462,11 +1486,14 @@ export const MoreView: React.FC<MoreViewProps> = ({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="inline-flex items-center gap-2 font-display text-base font-semibold text-slate-900 dark:text-white">
-                    <Palette className="h-4 w-4 text-[#1e6b38] dark:text-[#c6f19d]" />
+                    <Palette className="h-4 w-4 text-[var(--accent)]" />
                     <span>{t('themes.title')}</span>
                   </h2>
                   <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold">
                     {t('themes.count_badge', { count: themeCatalog.length })}
+                  </span>
+                  <span className="cockpit-subtile rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold text-slate-700 dark:text-slate-200">
+                    {t('themes.pack_badge', { ver: themesPackVersion || '2.0.0' })}
                   </span>
                   <span className="cockpit-pill-emerald rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold">
                     {themesOtaSource === 'github' ? t('themes.ota_github') : t('themes.ota_local')}
@@ -1479,23 +1506,39 @@ export const MoreView: React.FC<MoreViewProps> = ({
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <LayoutGroup id="themes-tab-mode-switcher">
-                  <div className="cockpit-subtile inline-flex items-center gap-1 p-1">
+                  <div
+                    className={`cockpit-subtile inline-flex items-center gap-1 p-1 ${
+                      isModeLocked ? 'opacity-65' : ''
+                    }`}
+                    title={isModeLocked ? t('themes.locked_atmosphere_hint') : undefined}
+                  >
                     {(['light', 'dark'] as const).map((modeOpt) => {
                       const active = theme === modeOpt;
                       return (
                         <button
                           key={modeOpt}
                           type="button"
+                          disabled={isModeLocked}
                           onClick={() => onChangeTheme(modeOpt)}
                           className={`relative inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                            isModeLocked
+                              ? 'cursor-not-allowed'
+                              : 'cursor-pointer'
+                          } ${
                             active
-                              ? 'text-sky-700 dark:text-sky-300'
+                              ? 'text-[var(--accent)]'
                               : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                           }`}
                         >
                           {active && <MorphPill layoutId="themes-tab-mode-pill" className="rounded-lg" />}
                           <span className="relative z-10 inline-flex items-center gap-1.5">
-                            {modeOpt === 'light' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+                            {isModeLocked && active ? (
+                              <Lock className="h-3 w-3 opacity-80" />
+                            ) : modeOpt === 'light' ? (
+                              <Sun className="h-3.5 w-3.5" />
+                            ) : (
+                              <Moon className="h-3.5 w-3.5" />
+                            )}
                             <span>{modeOpt === 'light' ? t('more.theme_light') : t('more.theme_dark')}</span>
                           </span>
                         </button>
@@ -1524,14 +1567,28 @@ export const MoreView: React.FC<MoreViewProps> = ({
               </div>
             </div>
 
+            {isModeLocked && (
+              <div className="mt-3 cockpit-subtile flex items-center gap-2 px-3 py-2 text-[11px] text-slate-600 dark:text-slate-300">
+                <Lock className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+                <span>{t('themes.locked_atmosphere_hint')}</span>
+              </div>
+            )}
+
             <div className="mt-4 cockpit-auto-grid-cards">
               {themeCatalog.map((item) => {
                 const isActive = item.id === activeThemeId;
                 const itemName = resolveThemeLocalizedText(item.name, locale, item.id);
                 const itemDesc = resolveThemeLocalizedText(item.description, locale, '');
+                const backdropUrl = getThemeBackdropUrl(item);
+                const navPos: ThemeNavPosition = item.layout?.navPosition || 'bottom-dock';
+                const layoutLabel = t(getThemeLayoutLabelKey(navPos));
+                const isLockedAtmosphere = item.colorModePolicy === 'locked-dark' || item.colorModePolicy === 'locked-light';
+                const effectType = item.backgroundEffect?.type || 'none';
+                const isAnimated = effectType !== 'none';
+
                 const lightPrev = item.preview?.light || {
                   canvas: item.tokens.light['--bg-canvas'] || '#eaf2e6',
-                  surface: item.tokens.light['--surface-bento'] || 'rgba(255,255,255,0.78)',
+                  surface: item.tokens.light['--surface-bento'] || 'rgba(255,255,255,0.50)',
                   accent: item.tokens.light['--accent'] || '#1e6b38',
                   rain: item.backgroundEffect?.light?.headColor || '#1e6b38',
                 };
@@ -1541,72 +1598,263 @@ export const MoreView: React.FC<MoreViewProps> = ({
                   accent: item.tokens.dark['--accent'] || '#c6f19d',
                   rain: item.backgroundEffect?.dark?.headColor || '#c6f19d',
                 };
-                const isAnimated = item.backgroundEffect?.type === 'matrix-telemetry';
+                const chartDarkPrimary = item.chartPalette?.dark?.primary || darkPrev.accent;
+                const chartDarkSecondary = item.chartPalette?.dark?.secondary || item.tokens.dark['--hud-accent-2'] || darkPrev.accent;
+
+                const renderMiniNavWireframe = (accentColor: string) => {
+                  if (navPos === 'left-hud' || navPos === 'left-sidebar') {
+                    return (
+                      <div
+                        aria-hidden="true"
+                        className="absolute left-1.5 top-2 bottom-2 z-20 flex w-2.5 flex-col justify-center gap-1 rounded-sm p-0.5"
+                        style={{ backgroundColor: 'rgba(6, 10, 14, 0.72)', border: `1px solid ${accentColor}88` }}
+                      >
+                        <span className="h-2 w-full rounded-[1px]" style={{ backgroundColor: accentColor }} />
+                        <span className="h-1.5 w-full rounded-[1px] bg-white/40" />
+                        <span className="h-1.5 w-full rounded-[1px] bg-white/40" />
+                        <span className="h-1.5 w-full rounded-[1px] bg-white/40" />
+                      </div>
+                    );
+                  }
+                  if (navPos === 'right-rail') {
+                    return (
+                      <div
+                        aria-hidden="true"
+                        className="absolute right-1.5 top-2 bottom-2 z-20 flex w-2.5 flex-col justify-center gap-1 rounded-full p-0.5"
+                        style={{ backgroundColor: 'rgba(14, 6, 26, 0.76)', border: `1px solid ${accentColor}99` }}
+                      >
+                        <span className="h-2 w-full rounded-full" style={{ backgroundColor: accentColor }} />
+                        <span className="h-1.5 w-full rounded-full bg-white/40" />
+                        <span className="h-1.5 w-full rounded-full bg-white/40" />
+                      </div>
+                    );
+                  }
+                  if (navPos === 'top-bar' || navPos === 'top-tabs') {
+                    return (
+                      <div
+                        aria-hidden="true"
+                        className="absolute left-2 right-2 top-1.5 z-20 flex h-2.5 items-center gap-1 px-1"
+                        style={{ backgroundColor: 'rgba(8, 10, 14, 0.78)', borderBottom: `1px solid ${accentColor}` }}
+                      >
+                        <span className="h-1 w-4" style={{ backgroundColor: accentColor }} />
+                        <span className="h-1 w-3 bg-white/45" />
+                        <span className="h-1 w-3 bg-white/45" />
+                        <span className="h-1 w-3 bg-white/45" />
+                      </div>
+                    );
+                  }
+                  if (navPos === 'corner-dock') {
+                    return (
+                      <div
+                        aria-hidden="true"
+                        className="absolute right-2 bottom-1.5 z-20 flex h-2.5 items-center gap-1 rounded-full px-1.5"
+                        style={{ backgroundColor: 'rgba(12, 8, 22, 0.80)', border: `1px solid ${accentColor}` }}
+                      >
+                        <span className="h-1 w-3 rounded-full" style={{ backgroundColor: accentColor }} />
+                        <span className="h-1 w-1.5 rounded-full bg-white/45" />
+                        <span className="h-1 w-1.5 rounded-full bg-white/45" />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      aria-hidden="true"
+                      className="absolute left-1/2 bottom-1.5 z-20 flex h-2.5 -translate-x-1/2 items-center gap-1 rounded-full px-2"
+                      style={{ backgroundColor: 'rgba(10, 18, 12, 0.74)', border: `1px solid ${accentColor}88` }}
+                    >
+                      <span className="h-1 w-3 rounded-full" style={{ backgroundColor: accentColor }} />
+                      <span className="h-1 w-1.5 rounded-full bg-white/45" />
+                      <span className="h-1 w-1.5 rounded-full bg-white/45" />
+                    </div>
+                  );
+                };
 
                 return (
                   <motion.div
                     key={item.id}
                     layout
                     className={`cockpit-subtile flex flex-col justify-between gap-4 p-4 transition-all ${
-                      isActive ? 'ring-2 ring-[#1e6b38]/60 dark:ring-[#c6f19d]/65' : ''
+                      isActive ? 'ring-2 ring-[var(--accent)]' : ''
                     }`}
                   >
                     <div className="space-y-3">
-                      {/* Dual Light / Dark Translucent Preview Canvas */}
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { key: 'light', label: t('themes.preview_light'), p: lightPrev, ink: '#0b1a0c' },
-                          { key: 'dark', label: t('themes.preview_dark'), p: darkPrev, ink: '#f4f7f2' },
-                        ].map((sw) => (
+                      {/* Visual Preview Canvas: Cinematic Artwork for Game Themes / Dual Light+Dark for Dual Themes */}
+                      {isLockedAtmosphere && backdropUrl ? (
+                        <div
+                          className="relative h-28 overflow-hidden rounded-xl border border-black/15 dark:border-white/15"
+                          style={{ backgroundColor: darkPrev.canvas }}
+                        >
+                          <img
+                            src={backdropUrl}
+                            alt=""
+                            aria-hidden="true"
+                            loading="lazy"
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
                           <div
-                            key={sw.key}
-                            className="relative h-24 overflow-hidden rounded-xl border border-black/10 dark:border-white/10 p-2"
-                            style={{ backgroundColor: sw.p.canvas }}
+                            aria-hidden="true"
+                            className="absolute inset-0"
+                            style={{ backgroundColor: item.backdrop?.scrimDark || 'rgba(8, 10, 14, 0.42)' }}
+                          />
+                          {renderMiniNavWireframe(darkPrev.accent)}
+
+                          {/* Translucent HUD sample widget */}
+                          <div
+                            className={`relative z-10 flex h-full flex-col justify-between p-2.5 ${
+                              navPos === 'left-hud' || navPos === 'left-sidebar'
+                                ? 'pl-6'
+                                : navPos === 'right-rail'
+                                  ? 'pr-6'
+                                  : navPos === 'top-bar' || navPos === 'top-tabs'
+                                    ? 'pt-5'
+                                    : ''
+                            }`}
                           >
-                            {isAnimated && (
-                              <div
-                                aria-hidden="true"
-                                className="pointer-events-none absolute inset-0 flex justify-around px-1.5 font-mono text-[8px] font-bold leading-tight opacity-75 select-none"
-                                style={{ color: sw.p.rain || sw.p.accent }}
-                              >
-                                <span className="flex flex-col">
-                                  <span>C</span><span>P</span><span>U</span><span>4</span><span>2</span><span>%</span>
-                                </span>
-                                <span className="flex flex-col pt-2">
-                                  <span>5</span><span>1</span><span>°</span><span>C</span><span>R</span><span>A</span>
-                                </span>
-                                <span className="flex flex-col">
-                                  <span>W</span><span>A</span><span>N</span><span>↓</span><span>8</span><span>M</span>
-                                </span>
-                                <span className="flex flex-col pt-1">
-                                  <span>I</span><span>O</span><span>1</span><span>2</span><span>M</span><span>S</span>
-                                </span>
-                              </div>
-                            )}
                             <div
-                              className="relative z-10 flex h-full flex-col justify-between rounded-lg border border-black/10 dark:border-white/15 p-2 backdrop-blur-md"
-                              style={{ backgroundColor: sw.p.surface, color: sw.ink }}
+                              className="flex flex-1 flex-col justify-between rounded-lg border p-2 backdrop-blur-md"
+                              style={{
+                                backgroundColor: darkPrev.surface,
+                                borderColor: `${darkPrev.accent}55`,
+                                color: item.tokens.dark['--text-primary'] || '#f4f7f2',
+                              }}
                             >
                               <div className="flex items-center justify-between gap-1">
-                                <span className="font-mono text-[9px] font-semibold uppercase tracking-wider opacity-80">
-                                  {sw.label}
+                                <span
+                                  className="font-mono text-[9px] font-bold uppercase tracking-wider truncate"
+                                  style={{ color: darkPrev.accent }}
+                                >
+                                  {layoutLabel}
                                 </span>
-                                <span
-                                  className="h-2.5 w-2.5 rounded-full"
-                                  style={{ backgroundColor: sw.p.accent }}
-                                />
+                                <span className="flex items-center gap-1 shrink-0">
+                                  <span
+                                    className="h-2 w-2 rounded-full"
+                                    style={{ backgroundColor: chartDarkPrimary }}
+                                  />
+                                  <span
+                                    className="h-2 w-2 rounded-full"
+                                    style={{ backgroundColor: chartDarkSecondary }}
+                                  />
+                                </span>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className="h-1.5 flex-1 rounded-full opacity-80"
-                                  style={{ backgroundColor: sw.p.accent }}
+
+                              {/* Mini themed chart sparkline */}
+                              <svg viewBox="0 0 120 26" className="h-6 w-full overflow-visible" aria-hidden="true">
+                                <polyline
+                                  fill="none"
+                                  stroke={chartDarkSecondary}
+                                  strokeWidth="1.4"
+                                  strokeDasharray="3 2"
+                                  opacity="0.7"
+                                  points="0,20 20,17 42,19 66,12 88,15 120,9"
                                 />
-                                <span className="h-1.5 w-5 rounded-full bg-current opacity-25" />
-                              </div>
+                                <polyline
+                                  fill="none"
+                                  stroke={chartDarkPrimary}
+                                  strokeWidth="2"
+                                  points="0,22 18,16 38,18 60,7 84,12 104,5 120,8"
+                                />
+                              </svg>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            {
+                              key: 'light',
+                              label: t('themes.preview_light'),
+                              p: lightPrev,
+                              ink: item.tokens.light['--text-primary'] || '#0b1a0c',
+                              scrim: item.backdrop?.scrimLight,
+                            },
+                            {
+                              key: 'dark',
+                              label: t('themes.preview_dark'),
+                              p: darkPrev,
+                              ink: item.tokens.dark['--text-primary'] || '#f4f7f2',
+                              scrim: item.backdrop?.scrimDark,
+                            },
+                          ].map((sw) => (
+                            <div
+                              key={sw.key}
+                              className="relative h-28 overflow-hidden rounded-xl border border-black/10 dark:border-white/10 p-2"
+                              style={{ backgroundColor: sw.p.canvas }}
+                            >
+                              {backdropUrl && (
+                                <>
+                                  <img
+                                    src={backdropUrl}
+                                    alt=""
+                                    aria-hidden="true"
+                                    loading="lazy"
+                                    className="absolute inset-0 h-full w-full object-cover"
+                                  />
+                                  {sw.scrim && (
+                                    <div
+                                      aria-hidden="true"
+                                      className="absolute inset-0"
+                                      style={{ backgroundColor: sw.scrim }}
+                                    />
+                                  )}
+                                </>
+                              )}
+                              {effectType === 'matrix-telemetry' && (
+                                <div
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute inset-0 flex justify-around px-1.5 font-mono text-[8px] font-bold leading-tight opacity-85 select-none"
+                                  style={{ color: sw.p.rain || sw.p.accent }}
+                                >
+                                  <span className="flex flex-col">
+                                    <span>C</span><span>P</span><span>U</span><span>4</span><span>2</span><span>%</span>
+                                  </span>
+                                  <span className="flex flex-col pt-2">
+                                    <span>5</span><span>1</span><span>°</span><span>C</span><span>R</span><span>A</span>
+                                  </span>
+                                  <span className="flex flex-col">
+                                    <span>W</span><span>A</span><span>N</span><span>↓</span><span>8</span><span>M</span>
+                                  </span>
+                                  <span className="flex flex-col pt-1">
+                                    <span>I</span><span>O</span><span>1</span><span>2</span><span>M</span><span>S</span>
+                                  </span>
+                                </div>
+                              )}
+                              {effectType === 'snowfall' && (
+                                <div
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute inset-0 select-none"
+                                  style={{
+                                    backgroundImage:
+                                      'radial-gradient(circle, rgba(255,255,255,0.92) 1.5px, transparent 2px), radial-gradient(circle, rgba(224,242,254,0.8) 1px, transparent 1.5px)',
+                                    backgroundSize: '26px 26px, 18px 18px',
+                                    backgroundPosition: '4px 6px, 12px 14px',
+                                  }}
+                                />
+                              )}
+                              <div
+                                className="relative z-10 flex h-full flex-col justify-between rounded-lg border border-black/10 dark:border-white/20 p-2 backdrop-blur-md"
+                                style={{ backgroundColor: sw.p.surface, color: sw.ink }}
+                              >
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="font-mono text-[9px] font-semibold uppercase tracking-wider opacity-85">
+                                    {sw.label}
+                                  </span>
+                                  <span
+                                    className="h-2.5 w-2.5 rounded-full"
+                                    style={{ backgroundColor: sw.p.accent }}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className="h-1.5 flex-1 rounded-full opacity-85"
+                                    style={{ backgroundColor: sw.p.accent }}
+                                  />
+                                  <span className="h-1.5 w-5 rounded-full bg-current opacity-25" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       <div>
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1618,8 +1866,13 @@ export const MoreView: React.FC<MoreViewProps> = ({
                               v{item.version || '1.0.0'}
                             </span>
                             <span className="cockpit-pill-cyan rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold">
-                              {isAnimated ? t('themes.animated_badge') : t('themes.static_badge')}
+                              {isLockedAtmosphere ? t('themes.mode_native_badge') : t('themes.mode_dual_badge')}
                             </span>
+                            {isAnimated && (
+                              <span className="cockpit-pill-emerald rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold">
+                                {t('themes.animated_badge')}
+                              </span>
+                            )}
                           </div>
                         </div>
                         {itemDesc && (
@@ -1631,11 +1884,11 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/80">
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        {item.id}.json
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                        {layoutLabel} · {themesPackFile || 'themes-pack.rcpack.gz'}
                       </span>
                       {isActive ? (
-                        <span className="cockpit-pill-lime inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold">
+                        <span className="cockpit-pill-lime inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold shrink-0">
                           <Check className="h-3.5 w-3.5" />
                           <span>{t('themes.active_badge')}</span>
                         </span>
@@ -1646,7 +1899,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                             selectTheme(item.id);
                             onNotify(t('themes.applied_toast', { name: itemName }));
                           }}
-                          className="cockpit-btn-accent inline-flex min-h-[34px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors cursor-pointer"
+                          className="cockpit-btn-accent inline-flex min-h-[34px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors cursor-pointer shrink-0"
                         >
                           <span>{t('themes.apply_btn')}</span>
                         </button>

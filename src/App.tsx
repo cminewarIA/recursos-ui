@@ -33,7 +33,13 @@ interface ToastState {
 
 export function App() {
   const { t } = useI18n();
-  const { mode: theme, setMode: applyTheme, activeTheme } = useThemeCatalog();
+  const {
+    mode: theme,
+    setMode: applyTheme,
+    isModeLocked,
+    activeTheme,
+    activeBackdropUrl,
+  } = useThemeCatalog();
 
   const [activeTab, setActiveTab] = useState<MainTabId>(() => {
     if (typeof window !== 'undefined') {
@@ -439,10 +445,12 @@ export function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative min-h-dvh text-[var(--text-primary)] pb-[clamp(5rem,12dvh,7.25rem)]">
+      <div className="cockpit-stage-wrap relative min-h-dvh text-[var(--text-primary)] pb-[clamp(5rem,12dvh,7.25rem)] transition-[padding] duration-200">
         <MatrixTelemetryBackdrop
           metrics={metrics}
           effect={activeTheme.backgroundEffect}
+          backdropUrl={activeBackdropUrl}
+          backdropConfig={activeTheme.backdrop}
           mode={theme}
         />
         <div id="cockpit-scroll-stage" data-cockpit-jelly-stage="true" className="relative z-10">
@@ -535,9 +543,29 @@ export function App() {
 
               <motion.button
                 type="button"
-                aria-label={theme === 'dark' ? t('app.toggle_to_light') : t('app.toggle_to_dark')}
-                onClick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-700 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-200 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
+                disabled={isModeLocked}
+                title={
+                  isModeLocked
+                    ? t('themes.locked_atmosphere_hint')
+                    : theme === 'dark'
+                      ? t('app.toggle_to_light')
+                      : t('app.toggle_to_dark')
+                }
+                aria-label={
+                  isModeLocked
+                    ? t('themes.locked_atmosphere_hint')
+                    : theme === 'dark'
+                      ? t('app.toggle_to_light')
+                      : t('app.toggle_to_dark')
+                }
+                onClick={() => {
+                  if (!isModeLocked) applyTheme(theme === 'dark' ? 'light' : 'dark');
+                }}
+                className={`cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-700 transition-colors dark:text-slate-200 ${
+                  isModeLocked
+                    ? 'opacity-45 cursor-not-allowed'
+                    : 'hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer'
+                }`}
               >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
@@ -548,7 +576,11 @@ export function App() {
                     transition={{ duration: 0.2 }}
                     className="inline-flex"
                   >
-                    {theme === 'dark' ? <Sun className="h-4 w-4 text-[#c6f19d]" /> : <Moon className="h-4 w-4 text-[#0f1f10]" />}
+                    {theme === 'dark' ? (
+                      <Sun className="h-4 w-4 text-[var(--accent)]" />
+                    ) : (
+                      <Moon className="h-4 w-4 text-[var(--text-primary)]" />
+                    )}
                   </motion.span>
                 </AnimatePresence>
               </motion.button>
@@ -581,6 +613,8 @@ export function App() {
               </motion.button>
             </div>
           </header>
+          {/* Top-bar / Top-tabs desktop navigation (GTA III, GTA IV, GTA V) */}
+          <NavigationSidebar activeTab={activeTab} onNavigate={navigateTo} placement="top-inline" />
         </motion.div>
 
         {/* Main Content Container */}

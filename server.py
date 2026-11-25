@@ -77,15 +77,19 @@ except ImportError:
 try:
     from themes_catalog import (
         get_single_theme_payload,
+        get_theme_pack_bytes,
         get_themes_catalog_payload,
         start_background_themes_ota_sync,
         sync_themes_from_github,
     )
 except ImportError:
     def get_themes_catalog_payload(base_dir=None):
-        return {"ok": True, "schema_version": 1, "default_theme": "alethia-matrix", "source": "local", "themes": []}
+        return {"ok": True, "schema_version": 2, "default_theme": "alethia-matrix", "source": "local", "assets": {}, "themes": []}
 
     def get_single_theme_payload(theme_id, base_dir=None):
+        return None
+
+    def get_theme_pack_bytes(base_dir=None):
         return None
 
     def sync_themes_from_github(base_dir=None, force=False, timeout=5.0):
@@ -16435,6 +16439,23 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(themes_bytes)))
             self.end_headers()
             self.wfile.write(themes_bytes)
+            return
+
+        elif clean_path in ("/api/themes/pack", "/themes/themes-pack.rcpack.gz"):
+            pack_bytes = get_theme_pack_bytes(BASE_DIR)
+            if not pack_bytes:
+                self.send_response(404)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/gzip')
+            self.send_header('Content-Disposition', 'inline; filename="themes-pack.rcpack.gz"')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(pack_bytes)))
+            self.end_headers()
+            self.wfile.write(pack_bytes)
             return
 
         elif clean_path.startswith("/api/themes/") or clean_path.startswith("/themes/"):
