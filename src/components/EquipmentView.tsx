@@ -52,6 +52,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
   const { t, locale } = useI18n();
   const [subTab, setSubTab] = useState<EquipmentSubTab>(() => resolveEquipmentSubTab(initialSubTab) || 'cpu');
   const [showTech, setShowTech] = useState(false);
+  const [disabledCpuGraphs, setDisabledCpuGraphs] = useState<Record<string, boolean>>({});
   const [disabledGpuGraphs, setDisabledGpuGraphs] = useState<Record<string, boolean>>({});
   const [coreTooltip, setCoreTooltip] = useState<FloatingTooltipData | null>(null);
 
@@ -71,14 +72,337 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
 
   const isDarkTheme = theme === 'dark';
   const primaryBotanical = isDarkTheme ? '#c6f19d' : '#1e6b38';
+  const thermalOrange = isDarkTheme ? '#fb923c' : '#ea580c';
   const secondaryTeal = isDarkTheme ? '#5eead4' : '#0e7490';
   const tertiaryIndigo = isDarkTheme ? '#a5b4fc' : '#4f46e5';
+  const warningAmber = isDarkTheme ? '#fbbf24' : '#d97706';
 
   const cpuCores = useMemo(() => metrics?.cpu?.per_core_percent ?? [], [metrics?.cpu?.per_core_percent]);
-  const cpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'cpu', metricKey: 'cpu', label: t('equipment.sort_cpu'), data: hist?.cpu ?? [], color: primaryBotanical, unit: '%' }],
-    [hist?.cpu, primaryBotanical, t]
+  const hasCpuTemp = useMemo(
+    () =>
+      (metrics?.cpu?.temp_c !== null && metrics?.cpu?.temp_c !== undefined) ||
+      (hist?.cpu_temp ?? []).some((v) => Number.isFinite(v) && v > 0),
+    [metrics?.cpu?.temp_c, hist?.cpu_temp]
   );
+
+  const cpuSeries: ChartSeries[] = useMemo(() => {
+    const list: ChartSeries[] = [
+      { id: 'cpu', metricKey: 'cpu', label: t('equipment.sort_cpu'), data: hist?.cpu ?? [], color: primaryBotanical, unit: '%', axis: 'left' },
+    ];
+    if (hasCpuTemp) {
+      const tempArr =
+        hist?.cpu_temp && hist.cpu_temp.length >= 2
+          ? hist.cpu_temp
+          : metrics?.cpu?.temp_c !== null && metrics?.cpu?.temp_c !== undefined
+            ? (hist?.cpu ?? [metrics.cpu.temp_c, metrics.cpu.temp_c]).map(() => Number(metrics.cpu?.temp_c ?? 0))
+            : [];
+      list.push({
+        id: 'cpu_temp',
+        metricKey: 'cpu_temp',
+        label: t('hardware.cpu.series_temp'),
+        data: tempArr,
+        color: thermalOrange,
+        unit: '°C',
+        decimals: 1,
+        axis: 'right',
+        dashed: true,
+        fillAlpha: 0,
+      });
+    }
+    return list;
+  }, [hist?.cpu, hist?.cpu_temp, metrics?.cpu?.temp_c, hasCpuTemp, primaryBotanical, thermalOrange, t]);
+
+  // Sub-gráficas dinámicas de CPU adaptadas al patrón de GPU, con historial completo en SQLite
+  const cpuSubgraphs = useMemo(() => {
+    const cpu = metrics?.cpu;
+    const caps = cpu?.capabilities ?? {};
+
+    // Recortar a últimos 5 min para vista en vivo coherente con Inicio y GPU
+    let sliceStart = 0;
+    if (epochTs.length >= 2) {
+      const latestEpoch = Number(epochTs[epochTs.length - 1] || 0);
+      if (Number.isFinite(latestEpoch) && latestEpoch > 0) {
+        const cutoff = latestEpoch - 300;
+        const idx = epochTs.findIndex((tsVal) => Number(tsVal) >= cutoff);
+        sliceStart = idx >= 0 ? Math.min(idx, Math.max(0, epochTs.length - 2)) : Math.max(0, epochTs.length - 2);
+      }
+    }
+    const cTimestamps = timestamps.slice(sliceStart);
+    const cEpochTs = epochTs.slice(sliceStart);
+    const sliceOrFallback = (arr?: number[], fallbackVal?: number | null): number[] => {
+      if (arr && arr.length >= 2) return arr.slice(sliceStart);
+      if (fallbackVal !== null && fallbackVal !== undefined && Number.isFinite(Number(fallbackVal))) {
+        return [Number(fallbackVal), Number(fallbackVal)];
+      }
+      return [];
+    };
+
+    const hasTemp = Boolean(caps.temp ?? hasCpuTemp);
+    const hasPower = Boolean(caps.power ?? (cpu?.power_watts !== null && cpu?.power_watts !== undefined));
+    const hasPowerTemp = hasTemp || hasPower;
+    const hasFreq = Boolean(
+      caps.freq ?? ((cpu?.freq_mhz ?? 0) > 0 || (hist?.cpu_freq ?? []).some((v) => v > 0))
+    );
+
+    const cards: Array<{
+      id: 'usage_temp' | 'power_temp' | 'freq' | 'times' | 'load';
+      title: string;
+      subtitle: string;
+      headline: string;
+      available: boolean;
+      leftUnit: string;
+      maxLeft?: number;
+      maxRight?: number;
+      timestamps: string[];
+      epochTs: number[];
+      series: ChartSeries[];
+    }> = [];
+
+    // 1. Uso y Temperatura del Procesador
+    const usageTempSeries: ChartSeries[] = [
+      {
+        id: 'cpu_usage',
+        metricKey: 'cpu',
+        label: t('hardware.cpu.series_usage'),
+        data: sliceOrFallback(hist?.cpu, cpu?.usage_percent ?? 0),
+        color: primaryBotanical,
+        unit: '%',
+        decimals: 1,
+        axis: 'left',
+      },
+    ];
+    if (hasTemp) {
+      usageTempSeries.push({
+        id: 'cpu_temp_overlay',
+        metricKey: 'cpu_temp',
+        label: t('hardware.cpu.series_temp'),
+        data: sliceOrFallback(hist?.cpu_temp, cpu?.temp_c ?? 0),
+        color: thermalOrange,
+        unit: '°C',
+        decimals: 1,
+        axis: 'right',
+        dashed: true,
+        fillAlpha: 0,
+      });
+    }
+    cards.push({
+      id: 'usage_temp',
+      title: t('hardware.cpu.graph_usage_temp_title'),
+      subtitle: hasTemp
+        ? t('hardware.cpu.graph_usage_temp_sub', {
+            usage: formatPct(cpu?.usage_percent ?? 0),
+            temp: formatTemp(cpu?.temp_c),
+            cores: cpu?.logical_cores ?? cpuCores.length,
+          })
+        : t('hardware.cpu.graph_usage_only_sub', {
+            usage: formatPct(cpu?.usage_percent ?? 0),
+            cores: cpu?.logical_cores ?? cpuCores.length,
+          }),
+      headline: hasTemp
+        ? `${formatPct(cpu?.usage_percent ?? 0)} · ${formatTemp(cpu?.temp_c)}`
+        : formatPct(cpu?.usage_percent ?? 0),
+      available: true,
+      leftUnit: '%',
+      maxLeft: 100,
+      maxRight: hasTemp ? 100 : undefined,
+      timestamps: cTimestamps,
+      epochTs: cEpochTs,
+      series: usageTempSeries,
+    });
+
+    // 2. Temperatura y Consumo Eléctrico (RAPL)
+    const powerTempSeries: ChartSeries[] = [];
+    if (hasPower) {
+      powerTempSeries.push({
+        id: 'cpu_power',
+        metricKey: 'cpu_power',
+        label: t('hardware.cpu.series_power'),
+        data: sliceOrFallback(hist?.cpu_power, cpu?.power_watts ?? 0),
+        color: '#ea580c',
+        unit: 'W',
+        decimals: 1,
+        axis: 'left',
+      });
+    }
+    if (hasTemp) {
+      powerTempSeries.push({
+        id: 'cpu_temp',
+        metricKey: 'cpu_temp',
+        label: t('hardware.cpu.series_temp'),
+        data: sliceOrFallback(hist?.cpu_temp, cpu?.temp_c ?? 0),
+        color: hasPower ? '#ef4444' : thermalOrange,
+        unit: '°C',
+        decimals: 1,
+        axis: hasPower ? 'right' : 'left',
+        dashed: hasPower,
+        fillAlpha: hasPower ? 0 : 0.16,
+      });
+    }
+    cards.push({
+      id: 'power_temp',
+      title: hasPower ? t('hardware.cpu.graph_power_temp_title') : t('hardware.cpu.graph_thermal_title'),
+      subtitle: hasPower
+        ? t('hardware.cpu.graph_power_temp_sub', {
+            power: `${cpu?.power_watts} W`,
+            temp: formatTemp(cpu?.temp_c),
+          })
+        : t('hardware.cpu.graph_thermal_sub', {
+            temp: formatTemp(cpu?.temp_c),
+            sensors: cpu?.temp_sensors?.length ?? (hasTemp ? 1 : 0),
+          }),
+      headline: hasPower ? `${cpu?.power_watts} W` : formatTemp(cpu?.temp_c),
+      available: hasPowerTemp && powerTempSeries.length > 0,
+      leftUnit: hasPower ? 'W' : '°C',
+      maxLeft: hasPower ? undefined : 100,
+      maxRight: hasPower && hasTemp ? 100 : undefined,
+      timestamps: cTimestamps,
+      epochTs: cEpochTs,
+      series: powerTempSeries,
+    });
+
+    // 3. Frecuencia de Reloj
+    const freqCur = Math.round(Number(cpu?.freq_mhz ?? 0));
+    const freqMax = Math.round(Number(cpu?.freq_max_mhz ?? 0));
+    cards.push({
+      id: 'freq',
+      title: t('hardware.cpu.graph_freq_title'),
+      subtitle: t('hardware.cpu.graph_freq_sub', {
+        cur: freqCur > 0 ? `${freqCur} MHz` : '--',
+        max: freqMax > 0 ? `${freqMax} MHz` : '--',
+        gov: cpu?.governor || '--',
+      }),
+      headline: freqCur > 0 ? `${freqCur} MHz` : '--',
+      available: hasFreq,
+      leftUnit: 'MHz',
+      timestamps: cTimestamps,
+      epochTs: cEpochTs,
+      series: hasFreq
+        ? [
+            {
+              id: 'cpu_freq',
+              metricKey: 'cpu_freq',
+              label: t('hardware.cpu.series_freq'),
+              data: sliceOrFallback(hist?.cpu_freq, cpu?.freq_mhz ?? 0),
+              color: secondaryTeal,
+              unit: 'MHz',
+              decimals: 0,
+            },
+          ]
+        : [],
+    });
+
+    // 4. Desglose de Ejecución (Usuario / Sistema / Espera E/S)
+    cards.push({
+      id: 'times',
+      title: t('hardware.cpu.graph_times_title'),
+      subtitle: t('hardware.cpu.graph_times_sub', {
+        user: formatPct(cpu?.user_percent ?? 0),
+        sys: formatPct(cpu?.system_percent ?? 0),
+        io: formatPct(cpu?.iowait_percent ?? 0),
+      }),
+      headline: `${formatPct(cpu?.user_percent ?? 0)} / ${formatPct(cpu?.system_percent ?? 0)}`,
+      available: true,
+      leftUnit: '%',
+      maxLeft: 100,
+      timestamps: cTimestamps,
+      epochTs: cEpochTs,
+      series: [
+        {
+          id: 'cpu_user',
+          metricKey: 'cpu_user',
+          label: t('hardware.cpu.series_user'),
+          data: sliceOrFallback(hist?.cpu_user, cpu?.user_percent ?? 0),
+          color: primaryBotanical,
+          unit: '%',
+          decimals: 1,
+        },
+        {
+          id: 'cpu_system',
+          metricKey: 'cpu_system',
+          label: t('hardware.cpu.series_system'),
+          data: sliceOrFallback(hist?.cpu_system, cpu?.system_percent ?? 0),
+          color: tertiaryIndigo,
+          unit: '%',
+          decimals: 1,
+          fillAlpha: 0.08,
+        },
+        {
+          id: 'cpu_iowait',
+          metricKey: 'cpu_iowait',
+          label: t('hardware.cpu.series_iowait'),
+          data: sliceOrFallback(hist?.cpu_iowait, cpu?.iowait_percent ?? 0),
+          color: warningAmber,
+          unit: '%',
+          decimals: 1,
+          fillAlpha: 0,
+          dashed: true,
+        },
+      ],
+    });
+
+    // 5. Cola de Carga del Sistema (Load 1m / 5m)
+    cards.push({
+      id: 'load',
+      title: t('hardware.cpu.graph_load_title'),
+      subtitle: t('hardware.cpu.graph_load_sub', {
+        l1: (cpu?.load_1m ?? 0).toFixed(2),
+        l5: (cpu?.load_5m ?? 0).toFixed(2),
+        l15: (cpu?.load_15m ?? 0).toFixed(2),
+        cores: cpu?.logical_cores ?? cpuCores.length,
+      }),
+      headline: (cpu?.load_1m ?? 0).toFixed(2),
+      available: true,
+      leftUnit: '',
+      timestamps: cTimestamps,
+      epochTs: cEpochTs,
+      series: [
+        {
+          id: 'cpu_load_1m',
+          metricKey: 'cpu_load_1m',
+          label: t('hardware.cpu.series_load_1m'),
+          data: sliceOrFallback(hist?.cpu_load_1m, cpu?.load_1m ?? 0),
+          color: secondaryTeal,
+          unit: '',
+          decimals: 2,
+        },
+        {
+          id: 'cpu_load_5m',
+          metricKey: 'cpu_load_5m',
+          label: t('hardware.cpu.series_load_5m'),
+          data: sliceOrFallback(hist?.cpu_load_5m, cpu?.load_5m ?? 0),
+          color: tertiaryIndigo,
+          unit: '',
+          decimals: 2,
+          fillAlpha: 0,
+          dashed: true,
+        },
+      ],
+    });
+
+    return cards;
+  }, [
+    metrics?.cpu,
+    hist?.cpu,
+    hist?.cpu_temp,
+    hist?.cpu_power,
+    hist?.cpu_freq,
+    hist?.cpu_user,
+    hist?.cpu_system,
+    hist?.cpu_iowait,
+    hist?.cpu_load_1m,
+    hist?.cpu_load_5m,
+    hasCpuTemp,
+    cpuCores.length,
+    timestamps,
+    epochTs,
+    primaryBotanical,
+    thermalOrange,
+    secondaryTeal,
+    tertiaryIndigo,
+    warningAmber,
+    t,
+  ]);
+
   const ramSeries: ChartSeries[] = useMemo(
     () => [
       { id: 'ram', metricKey: 'ram', label: t('hardware.ram.active_series'), data: hist?.ram ?? [], color: secondaryTeal, unit: '%' },
@@ -182,8 +506,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     if (caps.vram ?? Number(gpu?.vram_total_mb || 0) > 0) {
       vramSeriesList.push({
         id: 'gpu_vram_pct',
+        metricKey: 'gpu_vram_pct',
         label: t('hardware.gpu.series_vram_pct'),
-        data: pickNumeric(gHist.map((b) => b.vram_pct), [Number(gpu?.vram_percent ?? 0), Number(gpu?.vram_percent ?? 0)]),
+        data: pickNumeric(gHist.map((b) => b.vram_pct), hist?.gpu_vram_pct ?? [Number(gpu?.vram_percent ?? 0), Number(gpu?.vram_percent ?? 0)]),
         color: '#1e6b38',
         unit: '%',
         decimals: 1,
@@ -192,8 +517,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     if (hasMemCtrl) {
       vramSeriesList.push({
         id: 'gpu_mem_ctrl',
+        metricKey: 'gpu_mem_ctrl',
         label: t('hardware.gpu.series_mem_ctrl'),
-        data: pickNumeric(gHist.map((b) => b.mem_util), [Number(gpu?.mem_util_percent ?? 0), Number(gpu?.mem_util_percent ?? 0)]),
+        data: pickNumeric(gHist.map((b) => b.mem_util), hist?.gpu_mem_ctrl ?? [Number(gpu?.mem_util_percent ?? 0), Number(gpu?.mem_util_percent ?? 0)]),
         color: '#06b6d4',
         unit: '%',
         decimals: 1,
@@ -228,8 +554,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     if (hasEncoder) {
       videoSeriesList.push({
         id: 'gpu_enc',
+        metricKey: 'gpu_enc',
         label: t('hardware.gpu.series_encoder'),
-        data: pickNumeric(gHist.map((b) => b.enc), [Number(gpu?.encoder_util_percent ?? 0), Number(gpu?.encoder_util_percent ?? 0)]),
+        data: pickNumeric(gHist.map((b) => b.enc), hist?.gpu_enc ?? [Number(gpu?.encoder_util_percent ?? 0), Number(gpu?.encoder_util_percent ?? 0)]),
         color: '#10b981',
         unit: '%',
         decimals: 1,
@@ -238,8 +565,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     if (hasDecoder) {
       videoSeriesList.push({
         id: 'gpu_dec',
+        metricKey: 'gpu_dec',
         label: t('hardware.gpu.series_decoder'),
-        data: pickNumeric(gHist.map((b) => b.dec), [Number(gpu?.decoder_util_percent ?? 0), Number(gpu?.decoder_util_percent ?? 0)]),
+        data: pickNumeric(gHist.map((b) => b.dec), hist?.gpu_dec ?? [Number(gpu?.decoder_util_percent ?? 0), Number(gpu?.decoder_util_percent ?? 0)]),
         color: '#f59e0b',
         unit: '%',
         decimals: 1,
@@ -271,8 +599,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     if (hasPower) {
       powerTempSeries.push({
         id: 'gpu_power',
+        metricKey: 'gpu_power',
         label: t('hardware.gpu.series_power'),
-        data: pickNumeric(gHist.map((b) => b.power), [Number(gpu?.power_watts ?? 0), Number(gpu?.power_watts ?? 0)]),
+        data: pickNumeric(gHist.map((b) => b.power), hist?.gpu_power ?? [Number(gpu?.power_watts ?? 0), Number(gpu?.power_watts ?? 0)]),
         color: '#ea580c',
         unit: 'W',
         decimals: 1,
@@ -282,8 +611,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     if (hasTemp) {
       powerTempSeries.push({
         id: 'gpu_temp',
+        metricKey: 'gpu_temp',
         label: t('hardware.gpu.series_temp'),
-        data: pickNumeric(gHist.map((b) => b.temp), [Number(gpu?.temp_c ?? 0), Number(gpu?.temp_c ?? 0)]),
+        data: pickNumeric(gHist.map((b) => b.temp), hist?.gpu_temp ?? [Number(gpu?.temp_c ?? 0), Number(gpu?.temp_c ?? 0)]),
         color: '#ef4444',
         unit: '°C',
         decimals: 0,
@@ -317,8 +647,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     if (gpu?.clock_graphics_mhz !== null && gpu?.clock_graphics_mhz !== undefined) {
       clockSeries.push({
         id: 'gpu_clk_gfx',
+        metricKey: 'gpu_clk_gfx',
         label: t('hardware.gpu.series_clock_gfx'),
-        data: pickNumeric(gHist.map((b) => b.clock_gfx), [Number(gpu.clock_graphics_mhz), Number(gpu.clock_graphics_mhz)]),
+        data: pickNumeric(gHist.map((b) => b.clock_gfx), hist?.gpu_clk_gfx ?? [Number(gpu.clock_graphics_mhz), Number(gpu.clock_graphics_mhz)]),
         color: '#1e6b38',
         unit: 'MHz',
         decimals: 0,
@@ -327,8 +658,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     if (gpu?.clock_mem_mhz !== null && gpu?.clock_mem_mhz !== undefined) {
       clockSeries.push({
         id: 'gpu_clk_mem',
+        metricKey: 'gpu_clk_mem',
         label: t('hardware.gpu.series_clock_mem'),
-        data: pickNumeric(gHist.map((b) => b.clock_mem), [Number(gpu.clock_mem_mhz), Number(gpu.clock_mem_mhz)]),
+        data: pickNumeric(gHist.map((b) => b.clock_mem), hist?.gpu_clk_mem ?? [Number(gpu.clock_mem_mhz), Number(gpu.clock_mem_mhz)]),
         color: '#a855f7',
         unit: 'MHz',
         decimals: 0,
@@ -373,16 +705,18 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
         ? [
             {
               id: 'gpu_pcie_rx',
+              metricKey: 'gpu_pcie_rx',
               label: t('hardware.gpu.series_pcie_rx'),
-              data: pickNumeric(gHist.map((b) => b.pcie_rx), [pcieRxMb, pcieRxMb]),
+              data: pickNumeric(gHist.map((b) => b.pcie_rx), hist?.gpu_pcie_rx ?? [pcieRxMb, pcieRxMb]),
               color: '#1e6b38',
               unit: 'MB/s',
               decimals: 2,
             },
             {
               id: 'gpu_pcie_tx',
+              metricKey: 'gpu_pcie_tx',
               label: t('hardware.gpu.series_pcie_tx'),
-              data: pickNumeric(gHist.map((b) => b.pcie_tx), [pcieTxMb, pcieTxMb]),
+              data: pickNumeric(gHist.map((b) => b.pcie_tx), hist?.gpu_pcie_tx ?? [pcieTxMb, pcieTxMb]),
               color: '#10b981',
               unit: 'MB/s',
               decimals: 2,
@@ -393,7 +727,24 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     });
 
     return cards;
-  }, [metrics?.gpu, hist?.gpu, timestamps, epochTs, locale, t]);
+  }, [
+    metrics?.gpu,
+    hist?.gpu,
+    hist?.gpu_vram_pct,
+    hist?.gpu_mem_ctrl,
+    hist?.gpu_enc,
+    hist?.gpu_dec,
+    hist?.gpu_power,
+    hist?.gpu_temp,
+    hist?.gpu_clk_gfx,
+    hist?.gpu_clk_mem,
+    hist?.gpu_pcie_rx,
+    hist?.gpu_pcie_tx,
+    timestamps,
+    epochTs,
+    locale,
+    t,
+  ]);
 
   const disks = useMemo(() => metrics?.disks ?? [], [metrics?.disks]);
   const diskReadHist = hist?.disk_r ?? [];
@@ -451,148 +802,328 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
 
       <ViewStage tabKey={subTab}>
         {/* Subview: CPU */}
-        {subTab === 'cpu' && (
-          <div className="space-y-4">
-            <div className="cockpit-bento p-5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <div>
-                  <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-                    {t('equipment.cpu_perf')}
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {metrics?.cpu?.model || t('equipment.cpu_main_fallback')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <AnimatedMetricValue
-                    value={Number(metrics?.cpu?.usage_percent ?? 0)}
-                    decimals={1}
-                    suffix=" %"
-                    className="font-mono text-2xl font-bold text-slate-900 dark:text-white"
-                  />
-                  <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
-                    {formatTemp(metrics?.cpu?.temp_c)}
-                  </span>
-                {onExpandChart && (
-                  <button
-                    type="button"
-                    aria-label={t('hardware.cpu.inspect_aria')}
-                    onClick={() =>
-                      onExpandChart({
-                        title: t('hardware.cpu.chart_full_title'),
-                        subtitle: metrics?.cpu?.model || t('equipment.cpu_main_fallback'),
-                        series: cpuSeries,
-                        timestamps,
-                        epochTs,
-                        leftUnit: '%',
-                        maxLeft: 100,
-                        chartKind: 'cpu',
-                      })
-                    }
-                    className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="mt-4">
-              <TelemetryChart
-                series={cpuSeries}
-                timestamps={timestamps}
-                epochTs={epochTs}
-                heightClassName="cockpit-chart-tall"
-                maxLeft={100}
-                leftUnit="%"
-                theme={theme}
-                onExpandClick={
-                  onExpandChart
-                    ? () =>
-                        onExpandChart({
-                          title: t('hardware.cpu.chart_full_title'),
-                          subtitle: metrics?.cpu?.model || t('equipment.cpu_main_fallback'),
-                          series: cpuSeries,
-                          timestamps,
-                          epochTs,
-                          leftUnit: '%',
-                          maxLeft: 100,
-                          chartKind: 'cpu',
-                        })
-                    : undefined
-                }
-              />
-            </div>
-
-            {cpuCores.length > 0 && (
-              <div className="mt-6">
-                <p className="mb-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  {t('hardware.cpu.threads_load', { cores: cpuCores.length })}
-                </p>
-                <div className="cockpit-cores-grid">
-                  {cpuCores.map((val, idx) => (
-                    <div
-                      key={idx}
-                      onPointerMove={(e) =>
-                        setCoreTooltip({
-                          visible: true,
-                          clientX: e.clientX,
-                          clientY: e.clientY,
-                          title: t('hardware.cpu.core_n', { n: idx + 1 }),
-                          entries: [
-                            {
-                              label: t('hardware.cpu.usage_current'),
-                              value: formatPct(val),
-                              color: val >= 85 ? '#dc2626' : val >= 60 ? '#d97706' : primaryBotanical,
-                            },
-                          ],
-                        })
-                      }
-                      onPointerLeave={() => setCoreTooltip(null)}
-                      className="cockpit-subtile p-2 text-center transition-colors hover:border-sky-400 dark:hover:border-sky-500"
-                    >
-                      <div className="h-10 w-full flex items-end justify-center">
-                        <div
-                          className="w-full rounded-md transition-all duration-150"
-                          style={{
-                            height: `${Math.max(8, Math.min(100, val))}%`,
-                            backgroundColor: val >= 85 ? '#dc2626' : val >= 60 ? '#d97706' : primaryBotanical,
-                          }}
-                        />
-                      </div>
-                      <span className="mt-1 block font-mono text-[10px] font-semibold tabular-nums text-slate-700 dark:text-slate-300">
-                        {Math.round(val)}%
+        {subTab === 'cpu' && (() => {
+          const availableCpuCount = cpuSubgraphs.filter((g) => g.available).length;
+          const activeCpuGraphs = cpuSubgraphs.filter((g) => g.available && !disabledCpuGraphs[g.id]);
+          const toggleCpuGraph = (id: string) => {
+            setDisabledCpuGraphs((prev) => ({ ...prev, [id]: !prev[id] }));
+          };
+          const cpuSensors = metrics?.cpu?.temp_sensors ?? [];
+          return (
+            <div className="space-y-4">
+              {/* Cabecera de resumen de sensores y barra dinámica de sub-gráficas (paridad con GPU) */}
+              <div className="cockpit-bento p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
+                      {t('equipment.cpu_perf')}
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {metrics?.cpu?.model || t('equipment.cpu_main_fallback')}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AnimatedMetricValue
+                      value={Number(metrics?.cpu?.usage_percent ?? 0)}
+                      decimals={1}
+                      suffix=" %"
+                      className="font-mono text-2xl font-bold text-slate-900 dark:text-white"
+                    />
+                    <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
+                      {formatTemp(metrics?.cpu?.temp_c)}
+                    </span>
+                    {metrics?.cpu?.governor && (
+                      <span className="cockpit-subtile rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                        {metrics.cpu.governor}
                       </span>
-                    </div>
-                  ))}
+                    )}
+                    {onExpandChart && (
+                      <button
+                        type="button"
+                        aria-label={t('hardware.cpu.inspect_aria')}
+                        onClick={() =>
+                          onExpandChart({
+                            title: t('hardware.cpu.chart_full_title'),
+                            subtitle: metrics?.cpu?.model || t('equipment.cpu_main_fallback'),
+                            series: cpuSeries,
+                            timestamps,
+                            epochTs,
+                            leftUnit: '%',
+                            maxLeft: 100,
+                            maxRight: hasCpuTemp ? 100 : undefined,
+                            chartKind: 'cpu',
+                          })
+                        }
+                        className="cockpit-subtile flex min-h-[40px] min-w-[40px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-[#c6f19d]"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tira de resumen de sensores CPU */}
+                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200/70 pt-4 text-xs dark:border-slate-800 sm:grid-cols-4">
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">{t('hardware.cpu.base_freq')}</span>
+                    <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
+                      {metrics?.cpu?.freq_mhz ? `${Math.round(metrics.cpu.freq_mhz)} MHz` : '--'}
+                      {metrics?.cpu?.freq_max_mhz ? (
+                        <span className="ml-1 text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                          / {Math.round(metrics.cpu.freq_max_mhz)}
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">{t('hardware.cpu.temp_label')}</span>
+                    <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
+                      {formatTemp(metrics?.cpu?.temp_c)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">{t('hardware.cpu.load_label')}</span>
+                    <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
+                      {(metrics?.cpu?.load_1m ?? 0).toFixed(2)} / {(metrics?.cpu?.load_5m ?? 0).toFixed(2)} / {(metrics?.cpu?.load_15m ?? 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {metrics?.cpu?.power_watts !== null && metrics?.cpu?.power_watts !== undefined
+                        ? t('hardware.cpu.power_draw')
+                        : t('hardware.cpu.logical_cores')}
+                    </span>
+                    <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
+                      {metrics?.cpu?.power_watts !== null && metrics?.cpu?.power_watts !== undefined
+                        ? `${metrics.cpu.power_watts} W`
+                        : `${metrics?.cpu?.physical_cores || '--'} / ${metrics?.cpu?.logical_cores || cpuCores.length || '--'}`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Barra dinámica de sub-gráficas activadas/desactivadas según sensores CPU */}
+                <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-800">
+                  <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      {t('hardware.cpu.sensors_bar_label')}
+                    </span>
+                    <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                      {t('hardware.cpu.sensors_active_count', {
+                        active: activeCpuGraphs.length,
+                        total: availableCpuCount,
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {cpuSubgraphs.map((g) => {
+                      const isEnabled = g.available && !disabledCpuGraphs[g.id];
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          disabled={!g.available}
+                          onClick={() => g.available && toggleCpuGraph(g.id)}
+                          title={!g.available ? t('hardware.cpu.sensor_unavailable') : g.subtitle}
+                          className={`inline-flex min-h-[36px] items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                            !g.available
+                              ? 'cockpit-subtile cursor-not-allowed opacity-45 text-slate-400 dark:text-slate-500'
+                              : isEnabled
+                                ? 'cockpit-pill-cyan ring-1 ring-[#1e6b38]/40 dark:ring-[#c6f19d]/40'
+                                : 'cockpit-subtile text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              !g.available
+                                ? 'bg-slate-400/50'
+                                : isEnabled
+                                  ? 'bg-[#1e6b38] dark:bg-[#c6f19d] cockpit-live-dot'
+                                  : 'bg-slate-400'
+                            }`}
+                          />
+                          <span>{g.title}</span>
+                          {!g.available && (
+                            <span className="font-normal text-[10px] opacity-80">
+                              ({t('hardware.cpu.sensor_unavailable')})
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            )}
 
-            <button
-              type="button"
-              onClick={() => setShowTech((s) => !s)}
-              className="mt-5 inline-flex min-h-[40px] items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-            >
-              {showTech ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              <span>{t('equipment.technical_details')}</span>
-            </button>
-            <AccordionBody open={showTech}>
-              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-200/70 pt-3 text-xs font-mono tabular-nums text-slate-600 dark:border-slate-800 dark:text-slate-300 sm:grid-cols-4">
-                <div>{t('equipment.tech_arch_row', { arch: metrics?.cpu?.architecture || '--' })}</div>
-                <div>{t('hardware.cpu.physical_cores', { count: metrics?.cpu?.physical_cores || '--' })}</div>
-                <div>{t('equipment.freq_row', { freq: metrics?.cpu?.freq_mhz ? `${Math.round(metrics.cpu.freq_mhz)} MHz` : '--' })}</div>
-                <div>{t('equipment.load_1m_5m', { l1: metrics?.cpu?.load_1m ?? 0, l5: metrics?.cpu?.load_5m ?? 0 })}</div>
+              {/* Rejilla paralela automática con las sub-gráficas activas de CPU */}
+              {activeCpuGraphs.length === 0 ? (
+                <div className="cockpit-bento p-8 text-center text-xs text-slate-500 dark:text-slate-400">
+                  {t('hardware.cpu.no_active_graphs')}
+                </div>
+              ) : (
+                <div className="cockpit-auto-grid">
+                  {activeCpuGraphs.map((g) => {
+                    const buildExpandSpec = (): ExpandChartSpec => ({
+                      title: g.title,
+                      subtitle: `${metrics?.cpu?.model || t('equipment.cpu_main_fallback')} · ${g.subtitle}`,
+                      series: g.series,
+                      timestamps: g.timestamps,
+                      epochTs: g.epochTs,
+                      leftUnit: g.leftUnit,
+                      maxLeft: g.maxLeft,
+                      maxRight: g.maxRight,
+                      chartKind: 'cpu',
+                    });
+                    return (
+                      <div key={g.id} className="cockpit-bento flex min-w-0 flex-col justify-between p-5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white truncate">
+                              {g.title}
+                            </h3>
+                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 truncate" title={g.subtitle}>
+                              {g.subtitle}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-xs font-bold tabular-nums">
+                              {g.headline}
+                            </span>
+                            {onExpandChart && (
+                              <button
+                                type="button"
+                                aria-label={t('hardware.cpu.inspect_aria')}
+                                onClick={() => onExpandChart(buildExpandSpec())}
+                                className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-[#c6f19d]"
+                              >
+                                <Maximize2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <TelemetryChart
+                            series={g.series}
+                            timestamps={g.timestamps}
+                            epochTs={g.epochTs}
+                            heightClassName="cockpit-chart-medium"
+                            maxLeft={g.maxLeft}
+                            maxRight={g.maxRight}
+                            leftUnit={g.leftUnit}
+                            theme={theme}
+                            onExpandClick={onExpandChart ? () => onExpandChart(buildExpandSpec()) : undefined}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Carga por núcleo + sensores térmicos detectados + detalles técnicos */}
+              <div className="cockpit-bento p-5">
+                {cpuCores.length > 0 && (
+                  <div>
+                    <p className="mb-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      {t('hardware.cpu.threads_load', { cores: cpuCores.length })}
+                    </p>
+                    <div className="cockpit-cores-grid">
+                      {cpuCores.map((val, idx) => (
+                        <div
+                          key={idx}
+                          onPointerMove={(e) =>
+                            setCoreTooltip({
+                              visible: true,
+                              clientX: e.clientX,
+                              clientY: e.clientY,
+                              title: t('hardware.cpu.core_n', { n: idx + 1 }),
+                              entries: [
+                                {
+                                  label: t('hardware.cpu.usage_current'),
+                                  value: formatPct(val),
+                                  color: val >= 85 ? '#dc2626' : val >= 60 ? '#d97706' : primaryBotanical,
+                                },
+                              ],
+                            })
+                          }
+                          onPointerLeave={() => setCoreTooltip(null)}
+                          className="cockpit-subtile p-2 text-center transition-colors hover:border-[#1e6b38]/50 dark:hover:border-[#c6f19d]/50"
+                        >
+                          <div className="h-10 w-full flex items-end justify-center">
+                            <div
+                              className="w-full rounded-md transition-all duration-150"
+                              style={{
+                                height: `${Math.max(8, Math.min(100, val))}%`,
+                                backgroundColor: val >= 85 ? '#dc2626' : val >= 60 ? '#d97706' : primaryBotanical,
+                              }}
+                            />
+                          </div>
+                          <span className="mt-1 block font-mono text-[10px] font-semibold tabular-nums text-slate-700 dark:text-slate-300">
+                            {Math.round(val)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {cpuSensors.length > 1 && (
+                  <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-800">
+                    <p className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      {t('hardware.cpu.thermal_sensors_title')}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {cpuSensors.map((s, idx) => (
+                        <div
+                          key={`${s.label}-${idx}`}
+                          className="cockpit-subtile flex items-center justify-between gap-2 px-3 py-2 text-xs"
+                        >
+                          <span className="truncate text-slate-600 dark:text-slate-300" title={s.label}>
+                            {s.label}
+                          </span>
+                          <span
+                            className={`shrink-0 font-mono font-semibold tabular-nums ${
+                              s.temp_c >= 85
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : s.temp_c >= 70
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-slate-900 dark:text-white'
+                            }`}
+                          >
+                            {formatTemp(s.temp_c)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowTech((s) => !s)}
+                  className="mt-4 inline-flex min-h-[40px] items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                >
+                  {showTech ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  <span>{t('equipment.technical_details')}</span>
+                </button>
+                <AccordionBody open={showTech}>
+                  <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-200/70 pt-3 text-xs font-mono tabular-nums text-slate-600 dark:border-slate-800 dark:text-slate-300 sm:grid-cols-4">
+                    <div>{t('equipment.tech_arch_row', { arch: metrics?.cpu?.architecture || '--' })}</div>
+                    <div>{t('hardware.cpu.physical_cores', { count: metrics?.cpu?.physical_cores || '--' })}</div>
+                    <div>{t('equipment.freq_row', { freq: metrics?.cpu?.freq_mhz ? `${Math.round(metrics.cpu.freq_mhz)} MHz` : '--' })}</div>
+                    <div>{t('equipment.load_1m_5m', { l1: metrics?.cpu?.load_1m ?? 0, l5: metrics?.cpu?.load_5m ?? 0 })}</div>
+                  </div>
+                </AccordionBody>
               </div>
-            </AccordionBody>
-          </div>
-          <ResourceProcessesPanel
-            kind="cpu"
-            metrics={metrics}
-            onViewAllProcesses={() => onNavigate?.('programas', 'processes')}
-          />
-          <FloatingTooltip data={coreTooltip} />
-        </div>
-      )}
+
+              <ResourceProcessesPanel
+                kind="cpu"
+                metrics={metrics}
+                onViewAllProcesses={() => onNavigate?.('programas', 'processes')}
+              />
+              <FloatingTooltip data={coreTooltip} />
+            </div>
+          );
+        })()}
 
       {/* Subview: RAM */}
       {subTab === 'ram' && (

@@ -435,7 +435,9 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
   }, [series]);
 
   const hasRightAxis = useMemo(() => series.some((s) => s.axis === 'right'), [series]);
-  const resolvedRightUnit = useMemo(() => series.find((s) => s.axis === 'right')?.unit ?? '%', [series]);
+  const rightAxisSeries = useMemo(() => series.find((s) => s.axis === 'right'), [series]);
+  const resolvedRightUnit = rightAxisSeries?.unit ?? '%';
+  const resolvedRightColor = rightAxisSeries?.color;
 
   const validEpochRange = useMemo(() => {
     if (!epochTs || epochTs.length < 2) return null;
@@ -483,6 +485,21 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     return peak > 0.0001 ? peak : 0.1;
   }, [series, maxLeft, leftUnit]);
 
+  const computedMaxRight = useMemo(() => {
+    let peak = 0;
+    for (const s of series) {
+      if (s.axis !== 'right') continue;
+      for (const v of s.data) {
+        if (Number.isFinite(v) && v > peak) peak = v;
+      }
+    }
+    if (typeof maxRight === 'number' && maxRight > 0) {
+      return peak > maxRight ? Math.ceil(peak / 5) * 5 : maxRight;
+    }
+    if (resolvedRightUnit === '°C') return Math.max(100, Math.ceil(peak / 5) * 5);
+    return Math.max(100, Math.ceil(peak));
+  }, [series, maxRight, resolvedRightUnit]);
+
   // Memoización de buckets visuales de datos para curvas densas (preserva exactamente picos y valles)
   const bucketedSeries: BucketedSeriesResult[] = useMemo(() => {
     const maxBuckets = Math.max(48, Math.floor((size.width - 56) / 2.2));
@@ -511,7 +528,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     }
 
     const maxRightLabelW = hasRightAxis
-      ? measureAxisTextWidth(`${Math.round(maxRight)}${resolvedRightUnit}`, fontAxis)
+      ? measureAxisTextWidth(`${Math.round(computedMaxRight)}${resolvedRightUnit}`, fontAxis)
       : 0;
     const padL = Math.max(leftUnit === '%' ? 34 : 48, Math.ceil(maxLeftLabelW) + 10);
     const padR = hasRightAxis ? Math.max(36, Math.ceil(maxRightLabelW) + 12) : 12;
@@ -523,7 +540,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     const gridLines = gridFracs.map((frac, i) => {
       const gy = Math.round(padT + plotH * frac) + 0.5;
       const yText = frac === 0 ? Math.max(7, gy + 1) : frac === 1 ? Math.min(padT + plotH - 1, gy) : gy;
-      const rightVal = hasRightAxis ? `${Math.round(maxRight * (1 - frac))}${resolvedRightUnit}` : '';
+      const rightVal = hasRightAxis ? `${Math.round(computedMaxRight * (1 - frac))}${resolvedRightUnit}` : '';
       return {
         frac,
         gy,
@@ -603,7 +620,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     computedMaxLeft,
     leftUnit,
     hasRightAxis,
-    maxRight,
+    computedMaxRight,
     resolvedRightUnit,
     validEpochRange,
     sampleCount,
@@ -643,7 +660,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
     const { padT, plotH } = axisLayout;
     return bucketedSeries.map(({ s, values, sourceIndices }) => {
       const rawLen = s.data.length;
-      const maxScale = s.axis === 'right' ? maxRight : computedMaxLeft;
+      const maxScale = s.axis === 'right' ? computedMaxRight : computedMaxLeft;
       const denomScale = Math.max(0.0001, maxScale);
       const pts = values.map((val, bi) => {
         const origIdx = sourceIndices.length > 0 ? sourceIndices[bi] : bi;
@@ -656,7 +673,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
       });
       return { s, pts, sourceIndices };
     });
-  }, [bucketedSeries, axisLayout, sampleCount, maxRight, computedMaxLeft, getXForGlobalIndex]);
+  }, [bucketedSeries, axisLayout, sampleCount, computedMaxRight, computedMaxLeft, getXForGlobalIndex]);
 
   const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
@@ -700,7 +717,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
 
       if (hasRightAxis) {
         ctx.textAlign = 'left';
-        ctx.fillStyle = axisLabelColor;
+        ctx.fillStyle = line.frac === 0 && resolvedRightColor ? resolvedRightColor : axisLabelColor;
         ctx.fillText(line.rightLabel, padL + plotW + 6, line.yText);
       }
     }
@@ -987,7 +1004,7 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
         ctx.fill();
       }
     }
-  }, [axisLayout, computedSeriesGeometry, computedMaxLeft, getXForGlobalIndex, leftUnit, hasRightAxis, sampleCount, theme, hoverIdx, showAverageLine, showPeakBadge]);
+  }, [axisLayout, computedSeriesGeometry, computedMaxLeft, getXForGlobalIndex, leftUnit, hasRightAxis, resolvedRightColor, sampleCount, theme, hoverIdx, showAverageLine, showPeakBadge]);
 
   drawChartRef.current = drawChart;
 

@@ -486,7 +486,25 @@ HISTORY = {
     "timestamps": [],
     "epoch_ts": [],
     "cpu": [],
+    "cpu_temp": [],
+    "cpu_freq": [],
+    "cpu_power": [],
+    "cpu_load_1m": [],
+    "cpu_load_5m": [],
+    "cpu_user": [],
+    "cpu_system": [],
+    "cpu_iowait": [],
     "gpu": [],
+    "gpu_vram_pct": [],
+    "gpu_mem_ctrl": [],
+    "gpu_enc": [],
+    "gpu_dec": [],
+    "gpu_power": [],
+    "gpu_temp": [],
+    "gpu_clk_gfx": [],
+    "gpu_clk_mem": [],
+    "gpu_pcie_rx": [],
+    "gpu_pcie_tx": [],
     "ram": [],
     "ram_total": [],
     "net_rx": [],
@@ -499,6 +517,27 @@ HISTORY = {
     "disk_w": [],
     "disk_pct": []
 }
+
+_EXTENDED_TELEMETRY_COLS = (
+    "cpu_temp",
+    "cpu_freq",
+    "cpu_power",
+    "cpu_load_1m",
+    "cpu_load_5m",
+    "cpu_user",
+    "cpu_system",
+    "cpu_iowait",
+    "gpu_vram_pct",
+    "gpu_mem_ctrl",
+    "gpu_enc",
+    "gpu_dec",
+    "gpu_power",
+    "gpu_temp",
+    "gpu_clk_gfx",
+    "gpu_clk_mem",
+    "gpu_pcie_rx",
+    "gpu_pcie_tx",
+)
 
 def _sync_history_dict_from_buckets():
     HISTORY["timestamps"] = [b["time_str"] for b in _HISTORY_BUCKETS_20M]
@@ -516,6 +555,8 @@ def _sync_history_dict_from_buckets():
     HISTORY["disk_r"] = [b["disk_r"] for b in _HISTORY_BUCKETS_20M]
     HISTORY["disk_w"] = [b["disk_w"] for b in _HISTORY_BUCKETS_20M]
     HISTORY["disk_pct"] = [b["disk_pct"] for b in _HISTORY_BUCKETS_20M]
+    for col in _EXTENDED_TELEMETRY_COLS:
+        HISTORY[col] = [b.get(col, 0.0) for b in _HISTORY_BUCKETS_20M]
 
 def _push_history_bucket(
     sample_ts,
@@ -533,6 +574,7 @@ def _push_history_bucket(
     net_wan_tx_val=None,
     net_lan_rx_val=None,
     net_lan_tx_val=None,
+    extra=None,
     sync=True,
 ):
     ts_num = float(sample_ts)
@@ -553,9 +595,14 @@ def _push_history_bucket(
     dw_v = round(float(disk_w_val or 0.0), 2)
     dp_v = round(float(disk_pct_val or 0.0), 1)
     t_str = str(time_str or "")
+    ext = extra if isinstance(extra, dict) else {}
+    ext_vals = {
+        col: round(float(ext.get(col) or 0.0), 2)
+        for col in _EXTENDED_TELEMETRY_COLS
+    }
 
     if not _HISTORY_BUCKETS_20M or _HISTORY_BUCKETS_20M[-1]["b_ts"] < b_ts:
-        _HISTORY_BUCKETS_20M.append({
+        entry = {
             "b_ts": b_ts,
             "ts": round(ts_num, 2),
             "time_str": t_str,
@@ -572,7 +619,9 @@ def _push_history_bucket(
             "disk_r": dr_v,
             "disk_w": dw_v,
             "disk_pct": dp_v,
-        })
+        }
+        entry.update(ext_vals)
+        _HISTORY_BUCKETS_20M.append(entry)
     elif _HISTORY_BUCKETS_20M[-1]["b_ts"] == b_ts:
         last_b = _HISTORY_BUCKETS_20M[-1]
         last_b["ts"] = round(ts_num, 2)
@@ -591,6 +640,13 @@ def _push_history_bucket(
         last_b["disk_r"] = max(last_b["disk_r"], dr_v)
         last_b["disk_w"] = max(last_b["disk_w"], dw_v)
         last_b["disk_pct"] = max(last_b["disk_pct"], dp_v)
+        for col in _EXTENDED_TELEMETRY_COLS:
+            nv = ext_vals[col]
+            pv = last_b.get(col, 0.0)
+            if col in ("cpu_freq", "gpu_clk_gfx", "gpu_clk_mem"):
+                last_b[col] = nv if nv > 0 else pv
+            else:
+                last_b[col] = max(pv, nv)
 
     while _HISTORY_BUCKETS_20M and _HISTORY_BUCKETS_20M[0]["b_ts"] < cutoff_b_ts:
         _HISTORY_BUCKETS_20M.pop(0)
@@ -2667,7 +2723,25 @@ def init_geoip_history_db():
                     ts REAL PRIMARY KEY,
                     time_str TEXT NOT NULL,
                     cpu REAL DEFAULT 0,
+                    cpu_temp REAL DEFAULT 0,
+                    cpu_freq REAL DEFAULT 0,
+                    cpu_power REAL DEFAULT 0,
+                    cpu_load_1m REAL DEFAULT 0,
+                    cpu_load_5m REAL DEFAULT 0,
+                    cpu_user REAL DEFAULT 0,
+                    cpu_system REAL DEFAULT 0,
+                    cpu_iowait REAL DEFAULT 0,
                     gpu REAL DEFAULT 0,
+                    gpu_vram_pct REAL DEFAULT 0,
+                    gpu_mem_ctrl REAL DEFAULT 0,
+                    gpu_enc REAL DEFAULT 0,
+                    gpu_dec REAL DEFAULT 0,
+                    gpu_power REAL DEFAULT 0,
+                    gpu_temp REAL DEFAULT 0,
+                    gpu_clk_gfx REAL DEFAULT 0,
+                    gpu_clk_mem REAL DEFAULT 0,
+                    gpu_pcie_rx REAL DEFAULT 0,
+                    gpu_pcie_tx REAL DEFAULT 0,
                     ram REAL DEFAULT 0,
                     ram_total REAL DEFAULT 0,
                     net_rx REAL DEFAULT 0,
@@ -2684,7 +2758,7 @@ def init_geoip_history_db():
             existing_cols = {
                 row[1] for row in conn.execute("PRAGMA table_info(telemetry_history)").fetchall()
             }
-            for col_name in ("net_wan_rx", "net_wan_tx", "net_lan_rx", "net_lan_tx"):
+            for col_name in ("net_wan_rx", "net_wan_tx", "net_lan_rx", "net_lan_tx", *_EXTENDED_TELEMETRY_COLS):
                 if col_name not in existing_cols:
                     conn.execute(f"ALTER TABLE telemetry_history ADD COLUMN {col_name} REAL DEFAULT 0;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_history_ts ON telemetry_history(ts DESC);")
@@ -2787,10 +2861,11 @@ def preload_telemetry_history_from_sqlite():
             cutoff_ts = time.time() - HISTORY_WINDOW_SECONDS
             conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
             conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
+            ext_select = ", ".join(_EXTENDED_TELEMETRY_COLS)
+            rows = conn.execute(f"""
                 SELECT ts, time_str, cpu, gpu, ram, ram_total, net_rx, net_tx,
                        net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
-                       disk_r, disk_w, disk_pct
+                       disk_r, disk_w, disk_pct, {ext_select}
                 FROM telemetry_history
                 WHERE ts >= ?
                 ORDER BY ts ASC
@@ -2809,6 +2884,7 @@ def preload_telemetry_history_from_sqlite():
                     wan_rx = nrx
                 if wan_tx == 0.0 and lan_tx == 0.0 and ntx > 0.0:
                     wan_tx = ntx
+                ext_map = {col: float(r[col] or 0.0) for col in _EXTENDED_TELEMETRY_COLS}
                 _push_history_bucket(
                     r["ts"] or 0.0,
                     r["time_str"] or "",
@@ -2825,6 +2901,7 @@ def preload_telemetry_history_from_sqlite():
                     net_wan_tx_val=wan_tx,
                     net_lan_rx_val=lan_rx,
                     net_lan_tx_val=lan_tx,
+                    extra=ext_map,
                     sync=False,
                 )
             _sync_history_dict_from_buckets()
@@ -2853,6 +2930,7 @@ def record_telemetry_sample_to_sqlite(
     net_wan_tx_val=None,
     net_lan_rx_val=None,
     net_lan_tx_val=None,
+    extra=None,
     force_flush=False,
 ):
     """Encola y persiste periódicamente en recursos_history.db cada muestra de consumo del sistema."""
@@ -2865,6 +2943,8 @@ def record_telemetry_sample_to_sqlite(
     nwan_tx_v = round(float(ntx_v if net_wan_tx_val is None else (net_wan_tx_val or 0.0)), 2)
     nlan_rx_v = round(float(0.0 if net_lan_rx_val is None else (net_lan_rx_val or 0.0)), 2)
     nlan_tx_v = round(float(0.0 if net_lan_tx_val is None else (net_lan_tx_val or 0.0)), 2)
+    ext = extra if isinstance(extra, dict) else {}
+    ext_tuple = tuple(round(float(ext.get(col) or 0.0), 2) for col in _EXTENDED_TELEMETRY_COLS)
     sample = (
         round(float(now_ts), 3),
         str(time_str or ""),
@@ -2881,6 +2961,7 @@ def record_telemetry_sample_to_sqlite(
         round(float(disk_r_val or 0.0), 2),
         round(float(disk_w_val or 0.0), 2),
         round(float(disk_pct_val or 0.0), 1),
+        *ext_tuple,
     )
     _TELEMETRY_SQLITE_BUFFER.append(sample)
     if not force_flush and len(_TELEMETRY_SQLITE_BUFFER) < 4 and (now_ts - _LAST_TELEMETRY_FLUSH_TS) < 6.0:
@@ -2888,16 +2969,19 @@ def record_telemetry_sample_to_sqlite(
     batch = list(_TELEMETRY_SQLITE_BUFFER)
     _TELEMETRY_SQLITE_BUFFER.clear()
     _LAST_TELEMETRY_FLUSH_TS = now_ts
+    ext_cols_sql = ", ".join(_EXTENDED_TELEMETRY_COLS)
+    placeholders = ", ".join(["?"] * (15 + len(_EXTENDED_TELEMETRY_COLS)))
+    ext_updates_sql = ",\n                    ".join(f"{col}=excluded.{col}" for col in _EXTENDED_TELEMETRY_COLS)
     with GEOIP_HISTORY_DB_LOCK:
         conn = None
         try:
             conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=10.0)
-            conn.executemany("""
+            conn.executemany(f"""
                 INSERT INTO telemetry_history (
                     ts, time_str, cpu, gpu, ram, ram_total,
                     net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
-                    disk_r, disk_w, disk_pct
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    disk_r, disk_w, disk_pct, {ext_cols_sql}
+                ) VALUES ({placeholders})
                 ON CONFLICT(ts) DO UPDATE SET
                     time_str=excluded.time_str,
                     cpu=excluded.cpu,
@@ -2912,7 +2996,8 @@ def record_telemetry_sample_to_sqlite(
                     net_lan_tx=excluded.net_lan_tx,
                     disk_r=excluded.disk_r,
                     disk_w=excluded.disk_w,
-                    disk_pct=excluded.disk_pct
+                    disk_pct=excluded.disk_pct,
+                    {ext_updates_sql}
             """, batch)
             if now_ts - _LAST_TELEMETRY_PRUNE_TS >= 60.0:
                 cutoff_7d = now_ts - (7 * 86400.0)
@@ -2951,6 +3036,7 @@ def _format_telemetry_rows_payload(rows):
     disk_r = []
     disk_w = []
     disk_pct = []
+    ext_lists = {col: [] for col in _EXTENDED_TELEMETRY_COLS}
     for r in rows:
         ts_val = float(r["ts"] or 0.0)
         t_str = str(r["time_str"] or "")
@@ -2984,7 +3070,10 @@ def _format_telemetry_rows_payload(rows):
         disk_r.append(round(float(r["disk_r"] or 0.0), 2))
         disk_w.append(round(float(r["disk_w"] or 0.0), 2))
         disk_pct.append(round(float(r["disk_pct"] or 0.0), 1))
-    return {
+        for col in _EXTENDED_TELEMETRY_COLS:
+            val = float((r[col] if col in keys else 0.0) or 0.0)
+            ext_lists[col].append(round(val, 2))
+    out = {
         "timestamps": timestamps,
         "date_timestamps": date_timestamps,
         "epoch_ts": epoch_ts,
@@ -3002,6 +3091,8 @@ def _format_telemetry_rows_payload(rows):
         "disk_w": disk_w,
         "disk_pct": disk_pct,
     }
+    out.update(ext_lists)
+    return out
 
 def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_sec=None, limit=180):
     """Consulta el historial persistente de consumo desde recursos_history.db con soporte de retroceso y submuestreo."""
@@ -3035,6 +3126,12 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
     is_all_window = str(window_sec or "").strip().lower() == "all"
 
     empty_series = _format_telemetry_rows_payload([])
+    ext_cols_sql = ", ".join(_EXTENDED_TELEMETRY_COLS)
+    ext_agg_sql = ", ".join(
+        f"MAX({c}) AS {c}" if c in ("cpu_temp", "gpu_temp", "gpu_vram_pct", "gpu_mem_ctrl", "gpu_enc", "gpu_dec", "gpu_pcie_rx", "gpu_pcie_tx")
+        else f"AVG({c}) AS {c}"
+        for c in _EXTENDED_TELEMETRY_COLS
+    )
     with GEOIP_HISTORY_DB_LOCK:
         conn = None
         try:
@@ -3078,32 +3175,33 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
                 range_cnt = int(range_cnt_row["c"] or 0) if range_cnt_row else 0
                 if range_cnt > limit_val * 3 and end_ref > start_ref:
                     bucket_sec = max(1.0, (end_ref - start_ref) / float(limit_val))
-                    raw_rows = cur.execute("""
+                    raw_rows = cur.execute(f"""
                         SELECT MAX(ts) AS ts, MAX(time_str) AS time_str,
                                AVG(cpu) AS cpu, AVG(gpu) AS gpu, AVG(ram) AS ram, MAX(ram_total) AS ram_total,
                                MAX(net_rx) AS net_rx, MAX(net_tx) AS net_tx,
                                MAX(net_wan_rx) AS net_wan_rx, MAX(net_wan_tx) AS net_wan_tx,
                                MAX(net_lan_rx) AS net_lan_rx, MAX(net_lan_tx) AS net_lan_tx,
-                               MAX(disk_r) AS disk_r, MAX(disk_w) AS disk_w, MAX(disk_pct) AS disk_pct
+                               MAX(disk_r) AS disk_r, MAX(disk_w) AS disk_w, MAX(disk_pct) AS disk_pct,
+                               {ext_agg_sql}
                         FROM telemetry_history
                         WHERE ts >= ? AND ts <= ?
                         GROUP BY CAST((ts - ?) / ? AS INTEGER)
                         ORDER BY ts ASC
                     """, (start_ref, end_ref, start_ref, bucket_sec)).fetchall()
                 else:
-                    raw_rows = cur.execute("""
+                    raw_rows = cur.execute(f"""
                         SELECT ts, time_str, cpu, gpu, ram, ram_total,
                                net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
-                               disk_r, disk_w, disk_pct
+                               disk_r, disk_w, disk_pct, {ext_cols_sql}
                         FROM telemetry_history
                         WHERE ts >= ? AND ts <= ?
                         ORDER BY ts ASC
                     """, (start_ref, end_ref)).fetchall()
             elif a_ts is not None and b_ts is None:
-                raw_rows = cur.execute("""
+                raw_rows = cur.execute(f"""
                     SELECT ts, time_str, cpu, gpu, ram, ram_total,
                            net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
-                           disk_r, disk_w, disk_pct
+                           disk_r, disk_w, disk_pct, {ext_cols_sql}
                     FROM telemetry_history
                     WHERE ts >= ?
                     ORDER BY ts ASC
@@ -3120,7 +3218,7 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
                 desc_rows = cur.execute(f"""
                     SELECT ts, time_str, cpu, gpu, ram, ram_total,
                            net_rx, net_tx, net_wan_rx, net_wan_tx, net_lan_rx, net_lan_tx,
-                           disk_r, disk_w, disk_pct
+                           disk_r, disk_w, disk_pct, {ext_cols_sql}
                     FROM telemetry_history
                     {where_sql}
                     ORDER BY ts DESC
@@ -9874,6 +9972,181 @@ def get_locked_page_html(client_ip):
 # ==============================================================================
 # Hardware, OS & Metrics Collectors
 # ==============================================================================
+_CPU_RAPL_LOCK = threading.Lock()
+_CPU_RAPL_PREV = {"ts": 0.0, "energy_uj": None, "watts": None}
+
+
+def _read_cpu_temp_and_sensors():
+    """Detecta dinámicamente la temperatura principal del procesador y sensores térmicos en Linux."""
+    cpu_temp = None
+    sensors = []
+    preferred_drivers = ("coretemp", "k10temp", "zenpower", "cpu_thermal", "soc_thermal", "x86_pkg_temp")
+    fallback_drivers = ("acpitz", "package", "dell_smm", "thinkpad", "asus")
+
+    def _scan_hwmon(target_drivers):
+        found_primary = None
+        found_list = []
+        hwmon_root = "/sys/class/hwmon"
+        if not os.path.isdir(hwmon_root):
+            return found_primary, found_list
+        try:
+            for hw in sorted(os.listdir(hwmon_root)):
+                hw_dir = os.path.join(hwmon_root, hw)
+                name_f = os.path.join(hw_dir, "name")
+                if not os.path.exists(name_f):
+                    continue
+                try:
+                    with open(name_f, "r", encoding="utf-8", errors="ignore") as nf:
+                        hw_name = nf.read().strip().lower()
+                except Exception:
+                    continue
+                if not any(k in hw_name for k in target_drivers):
+                    continue
+                try:
+                    entries = sorted(os.listdir(hw_dir))
+                except Exception:
+                    continue
+                for fname in entries:
+                    if not (fname.startswith("temp") and fname.endswith("_input")):
+                        continue
+                    t_path = os.path.join(hw_dir, fname)
+                    if not os.path.exists(t_path):
+                        continue
+                    try:
+                        with open(t_path, "r", encoding="utf-8", errors="ignore") as tf:
+                            raw_val = int(tf.read().strip())
+                        temp_c = round(raw_val / 1000.0, 1)
+                        if not (-20.0 <= temp_c <= 150.0):
+                            continue
+                    except Exception:
+                        continue
+                    prefix = fname[:-6]
+                    lbl_path = os.path.join(hw_dir, f"{prefix}_label")
+                    lbl = hw_name
+                    if os.path.exists(lbl_path):
+                        try:
+                            with open(lbl_path, "r", encoding="utf-8", errors="ignore") as lf:
+                                lbl = lf.read().strip() or hw_name
+                        except Exception:
+                            pass
+                    found_list.append({"label": lbl, "temp_c": temp_c})
+                    low_lbl = lbl.lower()
+                    if found_primary is None or any(p in low_lbl for p in ("package", "tctl", "tdie", "cpu")):
+                        found_primary = temp_c
+                if found_primary is not None:
+                    break
+        except Exception:
+            pass
+        return found_primary, found_list
+
+    cpu_temp, sensors = _scan_hwmon(preferred_drivers)
+    if cpu_temp is None:
+        cpu_temp, sensors = _scan_hwmon(fallback_drivers)
+
+    if cpu_temp is None and os.path.isdir("/sys/class/thermal"):
+        try:
+            for z in sorted(os.listdir("/sys/class/thermal")):
+                if not z.startswith("thermal_zone"):
+                    continue
+                z_dir = os.path.join("/sys/class/thermal", z)
+                type_f = os.path.join(z_dir, "type")
+                temp_f = os.path.join(z_dir, "temp")
+                if not (os.path.exists(type_f) and os.path.exists(temp_f)):
+                    continue
+                try:
+                    with open(type_f, "r", encoding="utf-8", errors="ignore") as tf:
+                        z_type = tf.read().strip()
+                    with open(temp_f, "r", encoding="utf-8", errors="ignore") as vf:
+                        temp_c = round(int(vf.read().strip()) / 1000.0, 1)
+                    if not (-20.0 <= temp_c <= 150.0):
+                        continue
+                    low_t = z_type.lower()
+                    if any(k in low_t for k in ("x86_pkg", "cpu", "soc", "tcpu", "acpitz", "core")):
+                        sensors.append({"label": z_type, "temp_c": temp_c})
+                        if cpu_temp is None or "pkg" in low_t or "cpu" in low_t:
+                            cpu_temp = temp_c
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+    if cpu_temp is None and hasattr(psutil, "sensors_temperatures"):
+        try:
+            st = psutil.sensors_temperatures() or {}
+            for key in ("coretemp", "k10temp", "zenpower", "cpu_thermal", "acpitz"):
+                if key in st and st[key]:
+                    for item in st[key]:
+                        if item.current is not None and -20.0 <= item.current <= 150.0:
+                            val = round(float(item.current), 1)
+                            sensors.append({"label": item.label or key, "temp_c": val})
+                            if cpu_temp is None:
+                                cpu_temp = val
+                    if cpu_temp is not None:
+                        break
+        except Exception:
+            pass
+
+    return cpu_temp, sensors[:8]
+
+
+def _read_cpu_rapl_watts():
+    """Lee el consumo eléctrico real del paquete CPU vía RAPL (/sys/class/powercap) si está disponible y legible."""
+    rapl_root = "/sys/class/powercap"
+    if not os.path.isdir(rapl_root):
+        return None
+    energy_path = None
+    max_range_path = None
+    try:
+        candidates = []
+        for entry in sorted(os.listdir(rapl_root)):
+            if not entry.startswith("intel-rapl:") or entry.count(":") != 1:
+                continue
+            d_path = os.path.join(rapl_root, entry)
+            e_file = os.path.join(d_path, "energy_uj")
+            if os.path.exists(e_file) and os.access(e_file, os.R_OK):
+                name_f = os.path.join(d_path, "name")
+                dom_name = ""
+                if os.path.exists(name_f):
+                    try:
+                        with open(name_f, "r", encoding="utf-8", errors="ignore") as nf:
+                            dom_name = nf.read().strip().lower()
+                    except Exception:
+                        pass
+                candidates.append((0 if "package" in dom_name else 1, e_file, os.path.join(d_path, "max_energy_range_uj")))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda x: x[0])
+        _, energy_path, max_range_path = candidates[0]
+        with open(energy_path, "r", encoding="utf-8", errors="ignore") as ef:
+            curr_uj = int(ef.read().strip())
+        max_uj = 0
+        if os.path.exists(max_range_path) and os.access(max_range_path, os.R_OK):
+            try:
+                with open(max_range_path, "r", encoding="utf-8", errors="ignore") as mf:
+                    max_uj = int(mf.read().strip())
+            except Exception:
+                max_uj = 0
+        now_t = time.time()
+        with _CPU_RAPL_LOCK:
+            prev_t = _CPU_RAPL_PREV["ts"]
+            prev_uj = _CPU_RAPL_PREV["energy_uj"]
+            watts = _CPU_RAPL_PREV["watts"]
+            if prev_uj is not None and (now_t - prev_t) >= 0.4:
+                diff_uj = curr_uj - prev_uj
+                if diff_uj < 0 and max_uj > 0:
+                    diff_uj += max_uj
+                if diff_uj >= 0:
+                    w = (diff_uj / 1_000_000.0) / (now_t - prev_t)
+                    if 0.0 <= w <= 600.0:
+                        watts = round(w, 1)
+                        _CPU_RAPL_PREV["watts"] = watts
+            _CPU_RAPL_PREV["ts"] = now_t
+            _CPU_RAPL_PREV["energy_uj"] = curr_uj
+            return watts
+    except Exception:
+        return None
+
+
 def get_cpu_info():
     try:
         per_cpu = psutil.cpu_percent(interval=None, percpu=True)
@@ -9882,7 +10155,7 @@ def get_cpu_info():
         freq_current = round(freq.current, 1) if freq and freq.current else 0.0
         freq_max = round(freq.max, 1) if freq and freq.max else 0.0
         freq_min = round(freq.min, 1) if freq and freq.min else 0.0
-        if freq_current <= 0:
+        if freq_current <= 0 and os.path.exists("/proc/cpuinfo"):
             try:
                 with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as f:
                     freqs = []
@@ -9893,23 +10166,46 @@ def get_cpu_info():
                         freq_current = round(sum(freqs) / len(freqs), 1)
             except Exception:
                 pass
-        cpu_temp = None
+        governor = None
+        gov_path = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+        if os.path.exists(gov_path):
+            try:
+                with open(gov_path, "r", encoding="utf-8", errors="ignore") as gf:
+                    governor = gf.read().strip() or None
+            except Exception:
+                pass
+        if freq_max <= 0:
+            max_f_path = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+            if os.path.exists(max_f_path):
+                try:
+                    with open(max_f_path, "r", encoding="utf-8", errors="ignore") as mf:
+                        freq_max = round(int(mf.read().strip()) / 1000.0, 1)
+                except Exception:
+                    pass
+        if freq_min <= 0:
+            min_f_path = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq"
+            if os.path.exists(min_f_path):
+                try:
+                    with open(min_f_path, "r", encoding="utf-8", errors="ignore") as mf:
+                        freq_min = round(int(mf.read().strip()) / 1000.0, 1)
+                except Exception:
+                    pass
+
+        cpu_temp, temp_sensors = _read_cpu_temp_and_sensors()
+        power_watts = _read_cpu_rapl_watts()
+        user_pct = 0.0
+        system_pct = 0.0
+        iowait_pct = 0.0
+        idle_pct = 100.0
         try:
-            if os.path.isdir("/sys/class/hwmon"):
-                for hw in os.listdir("/sys/class/hwmon"):
-                    hw_dir = os.path.join("/sys/class/hwmon", hw)
-                    name_f = os.path.join(hw_dir, "name")
-                    if os.path.exists(name_f):
-                        with open(name_f, "r") as nf:
-                            hw_name = nf.read().strip().lower()
-                            if any(k in hw_name for k in ("coretemp", "k10temp", "zenpower", "cpu_thermal", "acpitz", "package")):
-                                t1 = os.path.join(hw_dir, "temp1_input")
-                                if os.path.exists(t1):
-                                    with open(t1, "r") as tf:
-                                        cpu_temp = round(int(tf.read().strip()) / 1000.0, 1)
-                                break
+            ct = psutil.cpu_times_percent(interval=None)
+            user_pct = round(float(getattr(ct, "user", 0.0) or 0.0) + float(getattr(ct, "nice", 0.0) or 0.0), 1)
+            system_pct = round(float(getattr(ct, "system", 0.0) or 0.0) + float(getattr(ct, "irq", 0.0) or 0.0) + float(getattr(ct, "softirq", 0.0) or 0.0), 1)
+            iowait_pct = round(float(getattr(ct, "iowait", 0.0) or 0.0), 1)
+            idle_pct = round(float(getattr(ct, "idle", 0.0) or 0.0), 1)
         except Exception:
             pass
+
         load1, load5, load15 = os.getloadavg()
         return {
             "model": CPU_MODEL,
@@ -9923,10 +10219,26 @@ def get_cpu_info():
             "freq_mhz": freq_current,
             "freq_max_mhz": freq_max,
             "freq_min_mhz": freq_min,
+            "governor": governor,
             "temp_c": cpu_temp,
+            "temp_sensors": temp_sensors,
+            "power_watts": power_watts,
+            "user_percent": user_pct,
+            "system_percent": system_pct,
+            "iowait_percent": iowait_pct,
+            "idle_percent": idle_pct,
             "load_1m": round(load1, 2),
             "load_5m": round(load5, 2),
-            "load_15m": round(load15, 2)
+            "load_15m": round(load15, 2),
+            "capabilities": {
+                "usage": True,
+                "temp": cpu_temp is not None,
+                "freq": freq_current > 0,
+                "power": power_watts is not None,
+                "times": True,
+                "load": True,
+                "cores": len(per_cpu) > 0,
+            },
         }
     except Exception as e:
         return {"error": str(e), "model": CPU_MODEL, "architecture": CPU_ARCH, "usage_percent": 0.0, "per_core_percent": [], "temp_c": None}
@@ -14071,6 +14383,28 @@ def background_collector():
             disk_r_sample = round(read_bytes_sec / (1024 * 1024), 2)
             disk_w_sample = round(write_bytes_sec / (1024 * 1024), 2)
 
+            gpu_avail = bool(gpu_info.get("available"))
+            extra_telemetry = {
+                "cpu_temp": round(float(cpu_info.get("temp_c") or 0.0), 1),
+                "cpu_freq": round(float(cpu_info.get("freq_mhz") or 0.0), 1),
+                "cpu_power": round(float(cpu_info.get("power_watts") or 0.0), 1),
+                "cpu_load_1m": round(float(cpu_info.get("load_1m") or 0.0), 2),
+                "cpu_load_5m": round(float(cpu_info.get("load_5m") or 0.0), 2),
+                "cpu_user": round(float(cpu_info.get("user_percent") or 0.0), 1),
+                "cpu_system": round(float(cpu_info.get("system_percent") or 0.0), 1),
+                "cpu_iowait": round(float(cpu_info.get("iowait_percent") or 0.0), 1),
+                "gpu_vram_pct": round(float(gpu_info.get("vram_percent") or 0.0), 1) if gpu_avail else 0.0,
+                "gpu_mem_ctrl": round(float(gpu_info.get("mem_util_percent") or 0.0), 1) if gpu_avail else 0.0,
+                "gpu_enc": round(float(gpu_info.get("encoder_util_percent") or 0.0), 1) if gpu_avail else 0.0,
+                "gpu_dec": round(float(gpu_info.get("decoder_util_percent") or 0.0), 1) if gpu_avail else 0.0,
+                "gpu_power": round(float(gpu_info.get("power_watts") or 0.0), 1) if gpu_avail else 0.0,
+                "gpu_temp": round(float(gpu_info.get("temp_c") or 0.0), 1) if gpu_avail else 0.0,
+                "gpu_clk_gfx": round(float(gpu_info.get("clock_graphics_mhz") or 0.0), 1) if gpu_avail else 0.0,
+                "gpu_clk_mem": round(float(gpu_info.get("clock_mem_mhz") or 0.0), 1) if gpu_avail else 0.0,
+                "gpu_pcie_rx": round(float(gpu_info.get("pcie_rx_kbps") or 0.0) / 1024.0, 2) if gpu_avail else 0.0,
+                "gpu_pcie_tx": round(float(gpu_info.get("pcie_tx_kbps") or 0.0) / 1024.0, 2) if gpu_avail else 0.0,
+            }
+
             _push_history_bucket(
                 now,
                 t_str_sample,
@@ -14087,6 +14421,7 @@ def background_collector():
                 net_wan_tx_val=net_wan_tx_sample,
                 net_lan_rx_val=net_lan_rx_sample,
                 net_lan_tx_val=net_lan_tx_sample,
+                extra=extra_telemetry,
                 sync=True,
             )
 
@@ -14106,6 +14441,7 @@ def background_collector():
                 net_wan_tx_val=net_wan_tx_sample,
                 net_lan_rx_val=net_lan_rx_sample,
                 net_lan_tx_val=net_lan_tx_sample,
+                extra=extra_telemetry,
             )
             
             with DOCKER_LOCK:

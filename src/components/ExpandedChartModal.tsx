@@ -369,7 +369,12 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   }, []);
 
   const useLocal20mGpu = Boolean(
-    preset === '1200' && cursorEndTs === null && hasGpuSubHist && liveGpuHist && liveGpuHist.length >= 2
+    preset === '1200' &&
+      cursorEndTs === null &&
+      hasGpuSubHist &&
+      liveGpuHist &&
+      liveGpuHist.length > 10 &&
+      !hasMetricKeys
   );
   const useLocal20mStorage = Boolean(
     preset === '1200' &&
@@ -453,7 +458,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       };
     }
 
-    if ((isLiveHead && hasGpuSubHist && liveGpuHist) || (!isLiveHead && useLocal20mGpu && liveGpuHist)) {
+    if ((isLiveHead && hasGpuSubHist && liveGpuHist && liveGpuHist.length >= 2) || (!isLiveHead && useLocal20mGpu && liveGpuHist)) {
       const epochsAll = liveGpuHist.map((b) => Math.round(b.t / 1000));
       const startIdx = liveSliceWindow.filterByEpoch(epochsAll, spanSec);
       const sliced = liveGpuHist.slice(startIdx);
@@ -465,7 +470,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       };
     }
 
-    if (isLiveHead && liveMetrics?.history && (spec.chartKind !== 'net' || !spec.nicName) && spec.chartKind !== 'router' && spec.chartKind !== 'ping' && !spec.gpuSubmetric) {
+    if (isLiveHead && liveMetrics?.history && (spec.chartKind !== 'net' || !spec.nicName) && spec.chartKind !== 'router' && spec.chartKind !== 'ping' && !(hasGpuSubHist && liveGpuHist && liveGpuHist.length >= 2)) {
       const liveHist = liveMetrics.history;
       const epochsAll = liveHist.epoch_ts ?? [];
       const startIdx = liveSliceWindow.filterByEpoch(epochsAll, LIVE_WINDOW_SECONDS);

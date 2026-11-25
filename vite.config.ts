@@ -229,7 +229,25 @@ interface TelemetryHistoryRow {
   ts: number;
   time_str: string;
   cpu: number;
+  cpu_temp?: number;
+  cpu_freq?: number;
+  cpu_power?: number;
+  cpu_load_1m?: number;
+  cpu_load_5m?: number;
+  cpu_user?: number;
+  cpu_system?: number;
+  cpu_iowait?: number;
   gpu: number;
+  gpu_vram_pct?: number;
+  gpu_mem_ctrl?: number;
+  gpu_enc?: number;
+  gpu_dec?: number;
+  gpu_power?: number;
+  gpu_temp?: number;
+  gpu_clk_gfx?: number;
+  gpu_clk_mem?: number;
+  gpu_pcie_rx?: number;
+  gpu_pcie_tx?: number;
   ram: number;
   ram_total: number;
   net_rx: number;
@@ -280,23 +298,8 @@ loadTelemetryHistoryDev();
 const DEV_HISTORY_WINDOW_SEC = 1200; // 20 minutos
 const DEV_HISTORY_BUCKET_SEC = 5;    // cubetas de 5s pico-preservantes (hasta 240 puntos)
 
-interface HistoryBucketDev {
+interface HistoryBucketDev extends TelemetryHistoryRow {
   b_ts: number;
-  ts: number;
-  time_str: string;
-  cpu: number;
-  gpu: number;
-  ram: number;
-  ram_total: number;
-  net_rx: number;
-  net_tx: number;
-  net_wan_rx?: number;
-  net_wan_tx?: number;
-  net_lan_rx?: number;
-  net_lan_tx?: number;
-  disk_r: number;
-  disk_w: number;
-  disk_pct: number;
 }
 
 const historyBuckets20m: HistoryBucketDev[] = [];
@@ -304,7 +307,25 @@ const historyBuffer: Record<string, (number | string)[]> = {
   timestamps: [],
   epoch_ts: [],
   cpu: [],
+  cpu_temp: [],
+  cpu_freq: [],
+  cpu_power: [],
+  cpu_load_1m: [],
+  cpu_load_5m: [],
+  cpu_user: [],
+  cpu_system: [],
+  cpu_iowait: [],
   gpu: [],
+  gpu_vram_pct: [],
+  gpu_mem_ctrl: [],
+  gpu_enc: [],
+  gpu_dec: [],
+  gpu_power: [],
+  gpu_temp: [],
+  gpu_clk_gfx: [],
+  gpu_clk_mem: [],
+  gpu_pcie_rx: [],
+  gpu_pcie_tx: [],
   ram: [],
   ram_total: [],
   net_rx: [],
@@ -322,7 +343,25 @@ function syncHistoryBufferDev() {
   historyBuffer.timestamps = historyBuckets20m.map((b) => b.time_str);
   historyBuffer.epoch_ts = historyBuckets20m.map((b) => b.ts);
   historyBuffer.cpu = historyBuckets20m.map((b) => b.cpu);
+  historyBuffer.cpu_temp = historyBuckets20m.map((b) => b.cpu_temp ?? 0);
+  historyBuffer.cpu_freq = historyBuckets20m.map((b) => b.cpu_freq ?? 0);
+  historyBuffer.cpu_power = historyBuckets20m.map((b) => b.cpu_power ?? 0);
+  historyBuffer.cpu_load_1m = historyBuckets20m.map((b) => b.cpu_load_1m ?? 0);
+  historyBuffer.cpu_load_5m = historyBuckets20m.map((b) => b.cpu_load_5m ?? 0);
+  historyBuffer.cpu_user = historyBuckets20m.map((b) => b.cpu_user ?? 0);
+  historyBuffer.cpu_system = historyBuckets20m.map((b) => b.cpu_system ?? 0);
+  historyBuffer.cpu_iowait = historyBuckets20m.map((b) => b.cpu_iowait ?? 0);
   historyBuffer.gpu = historyBuckets20m.map((b) => b.gpu);
+  historyBuffer.gpu_vram_pct = historyBuckets20m.map((b) => b.gpu_vram_pct ?? 0);
+  historyBuffer.gpu_mem_ctrl = historyBuckets20m.map((b) => b.gpu_mem_ctrl ?? 0);
+  historyBuffer.gpu_enc = historyBuckets20m.map((b) => b.gpu_enc ?? 0);
+  historyBuffer.gpu_dec = historyBuckets20m.map((b) => b.gpu_dec ?? 0);
+  historyBuffer.gpu_power = historyBuckets20m.map((b) => b.gpu_power ?? 0);
+  historyBuffer.gpu_temp = historyBuckets20m.map((b) => b.gpu_temp ?? 0);
+  historyBuffer.gpu_clk_gfx = historyBuckets20m.map((b) => b.gpu_clk_gfx ?? 0);
+  historyBuffer.gpu_clk_mem = historyBuckets20m.map((b) => b.gpu_clk_mem ?? 0);
+  historyBuffer.gpu_pcie_rx = historyBuckets20m.map((b) => b.gpu_pcie_rx ?? 0);
+  historyBuffer.gpu_pcie_tx = historyBuckets20m.map((b) => b.gpu_pcie_tx ?? 0);
   historyBuffer.ram = historyBuckets20m.map((b) => b.ram);
   historyBuffer.ram_total = historyBuckets20m.map((b) => b.ram_total);
   historyBuffer.net_rx = historyBuckets20m.map((b) => b.net_rx);
@@ -346,7 +385,25 @@ function pushHistoryBucketDev(row: TelemetryHistoryRow, sync = true) {
     last.ts = row.ts;
     if (row.time_str) last.time_str = row.time_str;
     last.cpu = Math.max(last.cpu, row.cpu);
+    last.cpu_temp = Math.max(last.cpu_temp ?? 0, row.cpu_temp ?? 0);
+    last.cpu_freq = (row.cpu_freq ?? 0) > 0 ? row.cpu_freq : (last.cpu_freq ?? 0);
+    last.cpu_power = Math.max(last.cpu_power ?? 0, row.cpu_power ?? 0);
+    last.cpu_load_1m = Math.max(last.cpu_load_1m ?? 0, row.cpu_load_1m ?? 0);
+    last.cpu_load_5m = Math.max(last.cpu_load_5m ?? 0, row.cpu_load_5m ?? 0);
+    last.cpu_user = Math.max(last.cpu_user ?? 0, row.cpu_user ?? 0);
+    last.cpu_system = Math.max(last.cpu_system ?? 0, row.cpu_system ?? 0);
+    last.cpu_iowait = Math.max(last.cpu_iowait ?? 0, row.cpu_iowait ?? 0);
     last.gpu = Math.max(last.gpu, row.gpu);
+    last.gpu_vram_pct = Math.max(last.gpu_vram_pct ?? 0, row.gpu_vram_pct ?? 0);
+    last.gpu_mem_ctrl = Math.max(last.gpu_mem_ctrl ?? 0, row.gpu_mem_ctrl ?? 0);
+    last.gpu_enc = Math.max(last.gpu_enc ?? 0, row.gpu_enc ?? 0);
+    last.gpu_dec = Math.max(last.gpu_dec ?? 0, row.gpu_dec ?? 0);
+    last.gpu_power = Math.max(last.gpu_power ?? 0, row.gpu_power ?? 0);
+    last.gpu_temp = Math.max(last.gpu_temp ?? 0, row.gpu_temp ?? 0);
+    last.gpu_clk_gfx = (row.gpu_clk_gfx ?? 0) > 0 ? row.gpu_clk_gfx : (last.gpu_clk_gfx ?? 0);
+    last.gpu_clk_mem = (row.gpu_clk_mem ?? 0) > 0 ? row.gpu_clk_mem : (last.gpu_clk_mem ?? 0);
+    last.gpu_pcie_rx = Math.max(last.gpu_pcie_rx ?? 0, row.gpu_pcie_rx ?? 0);
+    last.gpu_pcie_tx = Math.max(last.gpu_pcie_tx ?? 0, row.gpu_pcie_tx ?? 0);
     last.ram = Math.max(last.ram, row.ram);
     last.ram_total = Math.max(last.ram_total, row.ram_total);
     last.net_rx = Math.max(last.net_rx, row.net_rx);
@@ -561,28 +618,127 @@ function getStaticCpuSpecs() {
   return cachedStaticCpu;
 }
 
-function sampleRealCpuUsage(): { overall: number; perCore: number[]; model: string; arch: string; vendor: string; cacheSize: string; freqMhz: number } {
+let prevProcStatTotals: { user: number; system: number; iowait: number; idle: number; total: number } | null = null;
+
+function readRealCpuTempDev(): { tempC: number | null; sensors: Array<{ label: string; temp_c: number }> } {
+  let tempC: number | null = null;
+  const sensors: Array<{ label: string; temp_c: number }> = [];
+  const preferred = ['coretemp', 'k10temp', 'zenpower', 'cpu_thermal', 'soc_thermal', 'x86_pkg_temp'];
+  const fallback = ['acpitz', 'package', 'dell_smm', 'thinkpad'];
+
+  const scanHwmon = (drivers: string[]) => {
+    const root = '/sys/class/hwmon';
+    if (!fs.existsSync(root)) return;
+    try {
+      for (const hw of fs.readdirSync(root).sort()) {
+        const hwDir = path.join(root, hw);
+        const namePath = path.join(hwDir, 'name');
+        if (!fs.existsSync(namePath)) continue;
+        const hwName = fs.readFileSync(namePath, 'utf-8').trim().toLowerCase();
+        if (!drivers.some((d) => hwName.includes(d))) continue;
+        for (const f of fs.readdirSync(hwDir).sort()) {
+          if (!f.startsWith('temp') || !f.endsWith('_input')) continue;
+          try {
+            const raw = parseInt(fs.readFileSync(path.join(hwDir, f), 'utf-8').trim(), 10);
+            const val = Math.round((raw / 1000) * 10) / 10;
+            if (!Number.isFinite(val) || val < -20 || val > 150) continue;
+            const lblPath = path.join(hwDir, `${f.slice(0, -6)}_label`);
+            const lbl = fs.existsSync(lblPath) ? fs.readFileSync(lblPath, 'utf-8').trim() || hwName : hwName;
+            sensors.push({ label: lbl, temp_c: val });
+            if (tempC === null || /package|tctl|tdie|cpu/i.test(lbl)) tempC = val;
+          } catch {
+            // Skip unreadable sensor
+          }
+        }
+        if (tempC !== null) break;
+      }
+    } catch {
+      // Ignore hwmon errors
+    }
+  };
+
+  scanHwmon(preferred);
+  if (tempC === null) scanHwmon(fallback);
+
+  if (tempC === null && fs.existsSync('/sys/class/thermal')) {
+    try {
+      for (const z of fs.readdirSync('/sys/class/thermal').sort()) {
+        if (!z.startsWith('thermal_zone')) continue;
+        const tPath = path.join('/sys/class/thermal', z, 'type');
+        const vPath = path.join('/sys/class/thermal', z, 'temp');
+        if (!fs.existsSync(tPath) || !fs.existsSync(vPath)) continue;
+        const zType = fs.readFileSync(tPath, 'utf-8').trim();
+        const raw = parseInt(fs.readFileSync(vPath, 'utf-8').trim(), 10);
+        const val = Math.round((raw / 1000) * 10) / 10;
+        if (!Number.isFinite(val) || val < -20 || val > 150) continue;
+        if (/x86_pkg|cpu|soc|tcpu|acpitz|core/i.test(zType)) {
+          sensors.push({ label: zType, temp_c: val });
+          if (tempC === null || /pkg|cpu/i.test(zType)) tempC = val;
+        }
+      }
+    } catch {
+      // Ignore thermal errors
+    }
+  }
+
+  return { tempC, sensors: sensors.slice(0, 8) };
+}
+
+function sampleRealCpuUsage(): {
+  overall: number;
+  perCore: number[];
+  model: string;
+  arch: string;
+  vendor: string;
+  cacheSize: string;
+  freqMhz: number;
+  freqMaxMhz: number;
+  freqMinMhz: number;
+  governor: string | null;
+  tempC: number | null;
+  tempSensors: Array<{ label: string; temp_c: number }>;
+  userPct: number;
+  systemPct: number;
+  iowaitPct: number;
+  idlePct: number;
+} {
   const cpus = os.cpus() || [];
   const { model, arch, vendor, cacheSize } = getStaticCpuSpecs();
   let freqMhz = cpus[0]?.speed || 0;
+  let freqMaxMhz = 0;
+  let freqMinMhz = 0;
+  let governor: string | null = null;
 
   try {
-    const cpuinfo = fs.readFileSync('/proc/cpuinfo', 'utf-8');
-    const freqs: number[] = [];
-    for (const line of cpuinfo.split('\n')) {
-      if (line.startsWith('cpu MHz')) {
-        const idx = line.indexOf(':');
-        if (idx !== -1) {
-          const f = parseFloat(line.slice(idx + 1).trim());
-          if (!isNaN(f) && f > 0) freqs.push(f);
+    if (fs.existsSync('/proc/cpuinfo')) {
+      const cpuinfo = fs.readFileSync('/proc/cpuinfo', 'utf-8');
+      const freqs: number[] = [];
+      for (const line of cpuinfo.split('\n')) {
+        if (line.startsWith('cpu MHz')) {
+          const idx = line.indexOf(':');
+          if (idx !== -1) {
+            const f = parseFloat(line.slice(idx + 1).trim());
+            if (!isNaN(f) && f > 0) freqs.push(f);
+          }
         }
       }
-    }
-    if (freqs.length > 0) {
-      freqMhz = Math.round((freqs.reduce((a, b) => a + b, 0) / freqs.length) * 10) / 10;
+      if (freqs.length > 0) {
+        freqMhz = Math.round((freqs.reduce((a, b) => a + b, 0) / freqs.length) * 10) / 10;
+      }
     }
   } catch {
     // Fallback to os.cpus()
+  }
+
+  try {
+    const govPath = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor';
+    if (fs.existsSync(govPath)) governor = fs.readFileSync(govPath, 'utf-8').trim() || null;
+    const maxPath = '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq';
+    if (fs.existsSync(maxPath)) freqMaxMhz = Math.round((parseInt(fs.readFileSync(maxPath, 'utf-8').trim(), 10) / 1000) * 10) / 10;
+    const minPath = '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq';
+    if (fs.existsSync(minPath)) freqMinMhz = Math.round((parseInt(fs.readFileSync(minPath, 'utf-8').trim(), 10) / 1000) * 10) / 10;
+  } catch {
+    // Optional cpufreq files
   }
 
   const currentTimes = cpus.map((c) => {
@@ -604,7 +760,53 @@ function sampleRealCpuUsage(): { overall: number; perCore: number[]; model: stri
     ? Math.round((perCore.reduce((a, b) => a + b, 0) / perCore.length) * 10) / 10
     : 0;
 
-  return { overall, perCore, model, arch, vendor, cacheSize, freqMhz };
+  let userPct = 0;
+  let systemPct = 0;
+  let iowaitPct = 0;
+  let idlePct = Math.max(0, Math.round((100 - overall) * 10) / 10);
+  try {
+    if (fs.existsSync('/proc/stat')) {
+      const firstLine = fs.readFileSync('/proc/stat', 'utf-8').split('\n')[0] || '';
+      const parts = firstLine.trim().split(/\s+/).slice(1).map((x) => parseInt(x, 10) || 0);
+      if (parts.length >= 5) {
+        const user = (parts[0] || 0) + (parts[1] || 0);
+        const system = (parts[2] || 0) + (parts[5] || 0) + (parts[6] || 0);
+        const idle = parts[3] || 0;
+        const iowait = parts[4] || 0;
+        const total = parts.reduce((acc, v) => acc + v, 0);
+        if (prevProcStatTotals && total > prevProcStatTotals.total) {
+          const dt = total - prevProcStatTotals.total;
+          userPct = Math.round(((user - prevProcStatTotals.user) / dt) * 1000) / 10;
+          systemPct = Math.round(((system - prevProcStatTotals.system) / dt) * 1000) / 10;
+          iowaitPct = Math.round(((iowait - prevProcStatTotals.iowait) / dt) * 1000) / 10;
+          idlePct = Math.round(((idle - prevProcStatTotals.idle) / dt) * 1000) / 10;
+        }
+        prevProcStatTotals = { user, system, iowait, idle, total };
+      }
+    }
+  } catch {
+    // Optional /proc/stat
+  }
+
+  const { tempC, sensors: tempSensors } = readRealCpuTempDev();
+  return {
+    overall,
+    perCore,
+    model,
+    arch,
+    vendor,
+    cacheSize,
+    freqMhz,
+    freqMaxMhz,
+    freqMinMhz,
+    governor,
+    tempC,
+    tempSensors,
+    userPct,
+    systemPct,
+    iowaitPct,
+    idlePct,
+  };
 }
 
 function sampleRealMemory() {
@@ -4122,7 +4324,25 @@ function realOsTelemetryMiddleware(): Plugin {
             date_timestamps: sampled.map((s) => fmtDt(s.ts)),
             epoch_ts: sampled.map((s) => Math.round(s.ts * 1000) / 1000),
             cpu: sampled.map((s) => s.cpu),
+            cpu_temp: sampled.map((s) => s.cpu_temp ?? 0),
+            cpu_freq: sampled.map((s) => s.cpu_freq ?? 0),
+            cpu_power: sampled.map((s) => s.cpu_power ?? 0),
+            cpu_load_1m: sampled.map((s) => s.cpu_load_1m ?? 0),
+            cpu_load_5m: sampled.map((s) => s.cpu_load_5m ?? 0),
+            cpu_user: sampled.map((s) => s.cpu_user ?? 0),
+            cpu_system: sampled.map((s) => s.cpu_system ?? 0),
+            cpu_iowait: sampled.map((s) => s.cpu_iowait ?? 0),
             gpu: sampled.map((s) => s.gpu),
+            gpu_vram_pct: sampled.map((s) => s.gpu_vram_pct ?? 0),
+            gpu_mem_ctrl: sampled.map((s) => s.gpu_mem_ctrl ?? 0),
+            gpu_enc: sampled.map((s) => s.gpu_enc ?? 0),
+            gpu_dec: sampled.map((s) => s.gpu_dec ?? 0),
+            gpu_power: sampled.map((s) => s.gpu_power ?? 0),
+            gpu_temp: sampled.map((s) => s.gpu_temp ?? 0),
+            gpu_clk_gfx: sampled.map((s) => s.gpu_clk_gfx ?? 0),
+            gpu_clk_mem: sampled.map((s) => s.gpu_clk_mem ?? 0),
+            gpu_pcie_rx: sampled.map((s) => s.gpu_pcie_rx ?? 0),
+            gpu_pcie_tx: sampled.map((s) => s.gpu_pcie_tx ?? 0),
             ram: sampled.map((s) => s.ram),
             ram_total: sampled.map((s) => s.ram_total),
             net_rx: sampled.map((s) => s.net_rx),
@@ -4532,7 +4752,25 @@ function realOsTelemetryMiddleware(): Plugin {
             ts: nowEpochSec,
             time_str: timeStr,
             cpu: Math.round(cpu.overall * 100) / 100,
+            cpu_temp: cpu.tempC ?? 0,
+            cpu_freq: Math.round(cpu.freqMhz * 10) / 10,
+            cpu_power: 0,
+            cpu_load_1m: Math.round(l1 * 100) / 100,
+            cpu_load_5m: Math.round(l5 * 100) / 100,
+            cpu_user: cpu.userPct,
+            cpu_system: cpu.systemPct,
+            cpu_iowait: cpu.iowaitPct,
             gpu: 0,
+            gpu_vram_pct: 0,
+            gpu_mem_ctrl: 0,
+            gpu_enc: 0,
+            gpu_dec: 0,
+            gpu_power: 0,
+            gpu_temp: 0,
+            gpu_clk_gfx: 0,
+            gpu_clk_mem: 0,
+            gpu_pcie_rx: 0,
+            gpu_pcie_tx: 0,
             ram: Math.round(ram.percent * 100) / 100,
             ram_total: Math.round(ram.percent * 100) / 100,
             net_rx: Math.round((net.rx_bytes_sec / (1024 * 1024)) * 100) / 100,
@@ -4613,10 +4851,28 @@ function realOsTelemetryMiddleware(): Plugin {
               usage_percent: cpu.overall,
               per_core_percent: cpu.perCore,
               freq_mhz: cpu.freqMhz,
-              temp_c: null,
+              freq_max_mhz: cpu.freqMaxMhz,
+              freq_min_mhz: cpu.freqMinMhz,
+              governor: cpu.governor,
+              temp_c: cpu.tempC,
+              temp_sensors: cpu.tempSensors,
+              power_watts: null,
+              user_percent: cpu.userPct,
+              system_percent: cpu.systemPct,
+              iowait_percent: cpu.iowaitPct,
+              idle_percent: cpu.idlePct,
               load_1m: Math.round(l1 * 100) / 100,
               load_5m: Math.round(l5 * 100) / 100,
               load_15m: Math.round(l15 * 100) / 100,
+              capabilities: {
+                usage: true,
+                temp: cpu.tempC !== null,
+                freq: cpu.freqMhz > 0,
+                power: false,
+                times: true,
+                load: true,
+                cores: cpu.perCore.length > 0,
+              },
             },
             ram,
             gpu: {

@@ -16,6 +16,21 @@ export interface SystemInfo {
   time_str?: string;
 }
 
+export interface CpuTempSensor {
+  label: string;
+  temp_c: number;
+}
+
+export interface CpuCapabilities {
+  usage?: boolean;
+  temp?: boolean;
+  freq?: boolean;
+  power?: boolean;
+  times?: boolean;
+  load?: boolean;
+  cores?: boolean;
+}
+
 export interface CpuInfo {
   model?: string;
   architecture?: string;
@@ -28,10 +43,18 @@ export interface CpuInfo {
   freq_mhz?: number;
   freq_max_mhz?: number;
   freq_min_mhz?: number;
+  governor?: string | null;
   temp_c?: number | null;
+  temp_sensors?: CpuTempSensor[];
+  power_watts?: number | null;
+  user_percent?: number;
+  system_percent?: number;
+  iowait_percent?: number;
+  idle_percent?: number;
   load_1m?: number;
   load_5m?: number;
   load_15m?: number;
+  capabilities?: CpuCapabilities;
   error?: string;
 }
 
@@ -823,7 +846,25 @@ export interface SecurityData {
 
 export type TelemetryMetricKey =
   | 'cpu'
+  | 'cpu_temp'
+  | 'cpu_freq'
+  | 'cpu_power'
+  | 'cpu_load_1m'
+  | 'cpu_load_5m'
+  | 'cpu_user'
+  | 'cpu_system'
+  | 'cpu_iowait'
   | 'gpu'
+  | 'gpu_vram_pct'
+  | 'gpu_mem_ctrl'
+  | 'gpu_enc'
+  | 'gpu_dec'
+  | 'gpu_power'
+  | 'gpu_temp'
+  | 'gpu_clk_gfx'
+  | 'gpu_clk_mem'
+  | 'gpu_pcie_rx'
+  | 'gpu_pcie_tx'
   | 'ram'
   | 'ram_total'
   | 'net_rx'
@@ -841,7 +882,25 @@ export interface HistorySeries {
   date_timestamps?: string[];
   epoch_ts?: number[];
   cpu?: number[];
+  cpu_temp?: number[];
+  cpu_freq?: number[];
+  cpu_power?: number[];
+  cpu_load_1m?: number[];
+  cpu_load_5m?: number[];
+  cpu_user?: number[];
+  cpu_system?: number[];
+  cpu_iowait?: number[];
   gpu?: number[];
+  gpu_vram_pct?: number[];
+  gpu_mem_ctrl?: number[];
+  gpu_enc?: number[];
+  gpu_dec?: number[];
+  gpu_power?: number[];
+  gpu_temp?: number[];
+  gpu_clk_gfx?: number[];
+  gpu_clk_mem?: number[];
+  gpu_pcie_rx?: number[];
+  gpu_pcie_tx?: number[];
   ram?: number[];
   ram_total?: number[];
   net_rx?: number[];

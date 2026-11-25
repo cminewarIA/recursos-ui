@@ -102,7 +102,14 @@ conn.execute("""
 conn.execute("""
     CREATE TABLE IF NOT EXISTS telemetry_history (
         ts REAL PRIMARY KEY, time_str TEXT NOT NULL,
-        cpu REAL DEFAULT 0, gpu REAL DEFAULT 0, ram REAL DEFAULT 0, ram_total REAL DEFAULT 0,
+        cpu REAL DEFAULT 0, cpu_temp REAL DEFAULT 0, cpu_freq REAL DEFAULT 0,
+        cpu_power REAL DEFAULT 0, cpu_load_1m REAL DEFAULT 0, cpu_load_5m REAL DEFAULT 0,
+        cpu_user REAL DEFAULT 0, cpu_system REAL DEFAULT 0, cpu_iowait REAL DEFAULT 0,
+        gpu REAL DEFAULT 0, gpu_vram_pct REAL DEFAULT 0, gpu_mem_ctrl REAL DEFAULT 0,
+        gpu_enc REAL DEFAULT 0, gpu_dec REAL DEFAULT 0, gpu_power REAL DEFAULT 0,
+        gpu_temp REAL DEFAULT 0, gpu_clk_gfx REAL DEFAULT 0, gpu_clk_mem REAL DEFAULT 0,
+        gpu_pcie_rx REAL DEFAULT 0, gpu_pcie_tx REAL DEFAULT 0,
+        ram REAL DEFAULT 0, ram_total REAL DEFAULT 0,
         net_rx REAL DEFAULT 0, net_tx REAL DEFAULT 0,
         net_wan_rx REAL DEFAULT 0, net_wan_tx REAL DEFAULT 0,
         net_lan_rx REAL DEFAULT 0, net_lan_tx REAL DEFAULT 0,

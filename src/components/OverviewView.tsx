@@ -602,6 +602,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     timestamps,
     epochTs,
     cpuHist,
+    cpuTempHist,
     ramHist,
     gpuHist,
     netWanRxHist,
@@ -612,6 +613,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     const rawTs = hist?.timestamps ?? [];
     const rawEpoch = hist?.epoch_ts ?? [];
     const rawCpu = hist?.cpu ?? [];
+    const rawCpuTemp = hist?.cpu_temp ?? [];
     const rawRam = hist?.ram ?? [];
     const rawGpu = hist?.gpu ?? [];
     const rawNetRx = hist?.net_rx ?? [];
@@ -640,6 +642,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         timestamps: rawTs,
         epochTs: rawEpoch,
         cpuHist: rawCpu,
+        cpuTempHist: rawCpuTemp,
         ramHist: rawRam,
         gpuHist: rawGpu,
         netWanRxHist: rawWanRx,
@@ -665,6 +668,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       timestamps: rawTs.slice(startIdx),
       epochTs: rawEpoch.slice(startIdx),
       cpuHist: rawCpu.slice(startIdx),
+      cpuTempHist: rawCpuTemp.slice(startIdx),
       ramHist: rawRam.slice(startIdx),
       gpuHist: rawGpu.slice(startIdx),
       netWanRxHist: rawWanRx.slice(startIdx),
@@ -697,6 +701,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const isDarkTheme = theme === 'dark';
   const cpuChartColor = isDarkTheme ? '#c6f19d' : '#1e6b38';
+  const cpuTempChartColor = isDarkTheme ? '#fb923c' : '#ea580c';
   const ramChartColor = isDarkTheme ? '#5eead4' : '#0e7490';
   const gpuChartColor = isDarkTheme ? '#a5b4fc' : '#4f46e5';
   const wanRxChartColor = isDarkTheme ? '#c6f19d' : '#1e6b38';
@@ -704,10 +709,37 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const lanRxChartColor = isDarkTheme ? '#93c5fd' : '#4f46e5';
   const lanTxChartColor = isDarkTheme ? '#fbbf24' : '#b45309';
 
-  const cpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'cpu', metricKey: 'cpu', label: t('hardware.cpu.title'), data: cpuHist, color: cpuChartColor, unit: '%' }],
-    [cpuHist, cpuChartColor, t]
+  const hasCpuTemp = useMemo(
+    () => (cpuTemp !== null && Number.isFinite(cpuTemp)) || cpuTempHist.some((v) => Number.isFinite(v) && v > 0),
+    [cpuTemp, cpuTempHist]
   );
+
+  const cpuSeries: ChartSeries[] = useMemo(() => {
+    const list: ChartSeries[] = [
+      { id: 'cpu', metricKey: 'cpu', label: t('hardware.cpu.title'), data: cpuHist, color: cpuChartColor, unit: '%', axis: 'left' },
+    ];
+    if (hasCpuTemp) {
+      const tempData =
+        cpuTempHist.length >= 2
+          ? cpuTempHist
+          : cpuTemp !== null
+            ? cpuHist.map(() => cpuTemp)
+            : [];
+      list.push({
+        id: 'cpu_temp',
+        metricKey: 'cpu_temp',
+        label: t('hardware.cpu.series_temp'),
+        data: tempData,
+        color: cpuTempChartColor,
+        unit: '°C',
+        decimals: 1,
+        axis: 'right',
+        dashed: true,
+        fillAlpha: 0,
+      });
+    }
+    return list;
+  }, [cpuHist, cpuTempHist, cpuTemp, hasCpuTemp, cpuChartColor, cpuTempChartColor, t]);
   const ramSeries: ChartSeries[] = useMemo(
     () => [{ id: 'ram', metricKey: 'ram', label: t('hardware.ram.title'), data: ramHist, color: ramChartColor, unit: '%' }],
     [ramHist, ramChartColor, t]
@@ -1060,6 +1092,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       epochTs,
                       leftUnit: '%',
                       maxLeft: 100,
+                      maxRight: hasCpuTemp ? 100 : undefined,
                       chartKind: 'cpu',
                     })
                   }
@@ -1088,6 +1121,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               epochTs={epochTs}
               heightClassName="cockpit-chart-compact"
               maxLeft={100}
+              maxRight={hasCpuTemp ? 100 : undefined}
               leftUnit="%"
               theme={theme}
               onExpandClick={() =>
@@ -1099,6 +1133,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   epochTs,
                   leftUnit: '%',
                   maxLeft: 100,
+                  maxRight: hasCpuTemp ? 100 : undefined,
                   chartKind: 'cpu',
                 })
               }
