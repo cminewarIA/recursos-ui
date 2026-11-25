@@ -26,8 +26,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import java.io.FileOutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -77,6 +79,29 @@ class ApiService(
 
     @Volatile
     private var cachedTelemetryTsMs: Long = 0L
+
+    fun invalidateTelemetryCache() {
+        cachedTelemetryB64 = ""
+        cachedTelemetryTsMs = 0L
+    }
+
+    private val allowedGithubHosts = setOf(
+        "github.com",
+        "api.github.com",
+        "raw.githubusercontent.com",
+        "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com"
+    )
+
+    fun isAllowedGithubUrl(url: String): Boolean {
+        return try {
+            val uri = URI(url.trim())
+            uri.scheme.equals("https", ignoreCase = true) &&
+                (uri.host?.lowercase(Locale.ROOT) in allowedGithubHosts)
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     private fun getHttpClient(isQuickScan: Boolean, socketFactory: SocketFactory?): OkHttpClient {
         val base = if (isQuickScan) scanClient else client
@@ -309,6 +334,9 @@ class ApiService(
             fullAccess = true,
             dexCapable = false,
             appVersion = BuildConfig.VERSION_NAME,
+            clientVersion = BuildConfig.VERSION_NAME,
+            rootAccess = RootManager.hasRootAccess,
+            rootMethod = RootManager.rootMethod,
             hardwareId = hardwareId,
             name = if (deviceCodename.isNotBlank()) "$displayModel ($deviceCodename)" else displayModel,
             hostname = cleanHost,
@@ -559,6 +587,171 @@ class ApiService(
         } catch (e: Exception) {
             Log.e("RecursosCockpit", "Error consultando /api/metrics en $baseUrl: ${e.message}")
             Pair(null, false)
+        }
+    }
+
+    suspend fun checkGithubAndroidRelease(): GithubAndroidReleaseInfo? = withContext(Dispatchers.IO) {
+        val repo = "cminewarIA/recursos-ui"
+        val ua = "RecursosCockpit-Android/${BuildConfig.VERSION_NAME}"
+        var remoteVer = ""
+        var apkUrl = ""
+        var assetName = ""
+        var sizeBytes = 0L
+        var releaseUrl = "https://github.com/$repo/releases"
+
+        // 1. Leer ANDROID_VERSION independiente desde main
+        val rawVerUrl = "https://raw.githubusercontent.com/$repo/main/ANDROID_VERSION"
+        if (isAllowedGithubUrl(rawVerUrl)) {
+            try {
+                val req = Request.Builder().url(rawVerUrl).header("User-Agent", ua).build()
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val txt = (resp.body?.string() ?: "").trim().removePrefix("v").removePrefix("V")
+                        if (Regex("""^\d+\.\d+\.\d+$""").matches(txt)) {
+                            remoteVer = txt
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 2. Consultar GitHub Releases buscando el artefacto .apk más reciente
+        val relApiUrl = "https://api.github.com/repos/$repo/releases?per_page=8"
+        if (isAllowedGithubUrl(relApiUrl)) {
+            try {
+                val req = Request.Builder()
+                    .url(relApiUrl)
+                    .header("User-Agent", ua)
+                    .header("Accept", "application/vnd.github+json")
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string() ?: "[]"
+                        val arr = org.json.JSONArray(body)
+                        for (i in 0 until arr.length()) {
+                            val rel = arr.optJSONObject(i) ?: continue
+                            if (rel.optBoolean("draft", false)) continue
+                            val htmlUrl = rel.optString("html_url", "").trim()
+                            if (htmlUrl.isNotEmpty() && isAllowedGithubUrl(htmlUrl)) {
+                                releaseUrl = htmlUrl
+                            }
+                            val assets = rel.optJSONArray("assets") ?: continue
+                            for (j in 0 until assets.length()) {
+                                val a = assets.optJSONObject(j) ?: continue
+                                val name = a.optString("name", "").trim()
+                                val dlUrl = a.optString("browser_download_url", "").trim()
+                                if (!name.lowercase(Locale.ROOT).endsWith(".apk")) continue
+                                if (!isAllowedGithubUrl(dlUrl)) continue
+                                val mVer = Regex("""(\d+\.\d+\.\d+)""").find(name)?.groupValues?.getOrNull(1)
+                                if (apkUrl.isEmpty() || (name.contains("_") && !assetName.contains("_"))) {
+                                    apkUrl = dlUrl
+                                    assetName = name
+                                    sizeBytes = a.optLong("size", 0L)
+                                    if (!mVer.isNullOrBlank()) {
+                                        remoteVer = mVer
+                                    }
+                                }
+                            }
+                            if (apkUrl.isNotEmpty()) break
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("RecursosCockpit", "No se pudo consultar releases Android en GitHub: ${e.message}")
+            }
+        }
+
+        if (remoteVer.isBlank()) return@withContext null
+        val finalApkUrl = apkUrl.ifBlank {
+            "https://github.com/$repo/releases/latest/download/recursos-cockpit.apk"
+        }
+        val finalAssetName = assetName.ifBlank { "recursos-cockpit_$remoteVer.apk" }
+        val updateAvailable = isRemoteVersionNewer(remoteVer, BuildConfig.VERSION_NAME)
+        GithubAndroidReleaseInfo(
+            latestVersion = remoteVer,
+            apkUrl = finalApkUrl,
+            assetName = finalAssetName,
+            sizeBytes = sizeBytes,
+            releaseUrl = releaseUrl,
+            updateAvailable = updateAvailable
+        )
+    }
+
+    suspend fun downloadApkToCache(
+        apkUrl: String,
+        assetName: String,
+        onProgress: (Int) -> Unit = {}
+    ): File? = withContext(Dispatchers.IO) {
+        if (!isAllowedGithubUrl(apkUrl)) return@withContext null
+        val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
+        val safeName = assetName
+            .substringAfterLast('/')
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .let { if (it.lowercase(Locale.ROOT).endsWith(".apk")) it else "$it.apk" }
+        val outFile = File(updatesDir, safeName)
+        val tmpFile = File(updatesDir, "$safeName.part")
+        try {
+            val dlClient = OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .build()
+            val req = Request.Builder()
+                .url(apkUrl)
+                .header("User-Agent", "RecursosCockpit-Android/${BuildConfig.VERSION_NAME}")
+                .build()
+            dlClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext null
+                val finalHost = resp.request.url.host.lowercase(Locale.ROOT)
+                if (!resp.request.url.isHttps || finalHost !in allowedGithubHosts) {
+                    return@withContext null
+                }
+                val body = resp.body ?: return@withContext null
+                val totalLen = body.contentLength()
+                var downloaded = 0L
+                val buf = ByteArray(16384)
+                val magic = ByteArray(4)
+                var magicLen = 0
+                FileOutputStream(tmpFile).use { fos ->
+                    body.byteStream().use { ins ->
+                        while (true) {
+                            val read = ins.read(buf)
+                            if (read <= 0) break
+                            if (magicLen < 4) {
+                                val take = minOf(4 - magicLen, read)
+                                System.arraycopy(buf, 0, magic, magicLen, take)
+                                magicLen += take
+                            }
+                            fos.write(buf, 0, read)
+                            downloaded += read
+                            if (totalLen > 0L) {
+                                onProgress(((downloaded * 100L) / totalLen).toInt().coerceIn(0, 100))
+                            }
+                        }
+                    }
+                }
+                // Verificar cabecera mágica ZIP/APK (PK\x03\x04)
+                val isZip = magicLen == 4 &&
+                    magic[0] == 0x50.toByte() &&
+                    magic[1] == 0x4B.toByte() &&
+                    magic[2] == 0x03.toByte() &&
+                    magic[3] == 0x04.toByte()
+                if (!isZip || downloaded < 50_000L) {
+                    tmpFile.delete()
+                    return@withContext null
+                }
+                if (outFile.exists()) outFile.delete()
+                if (!tmpFile.renameTo(outFile)) {
+                    tmpFile.copyTo(outFile, overwrite = true)
+                    tmpFile.delete()
+                }
+                onProgress(100)
+                outFile
+            }
+        } catch (e: Exception) {
+            Log.e("RecursosCockpit", "Error descargando APK en caché: ${e.message}")
+            tmpFile.delete()
+            null
         }
     }
 }

@@ -124,6 +124,7 @@ const CANONICAL_SUBTAB_SLUG: Record<AppViewId, Record<string, string>> = {
   mas: {
     updates: 'actualizaciones',
     themes: 'temas',
+    console: 'consola',
     devices: 'dispositivos',
     manual: 'manual',
     dex: 'dex',
@@ -159,6 +160,7 @@ export function normalizeSubTabForView(view: AppViewId, hint?: string): string |
   }
   if (view === 'mas') {
     if (['themes', 'temas', 'apariencia', 'appearance', 'matrix'].includes(h)) return 'themes';
+    if (['console', 'consola', 'terminal', 'shell', 'stdout'].includes(h)) return 'console';
     if (['devices', 'dispositivos', 'nodos', 'security', 'seguridad'].includes(h)) return 'devices';
     if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(h)) return 'manual';
     if (['dex'].includes(h)) return 'dex';
@@ -208,6 +210,7 @@ export function resolveAppRoute(pathStr: string): AppRouteInfo {
   if (['multimedia', 'media', 'descargas', 'downloads', 'emby', 'torrents'].includes(p0)) return { view: 'programas', subTab: 'media' };
   if (['bots', 'bot', 'telegram'].includes(p0)) return { view: 'programas', subTab: 'bots' };
   if (['temas', 'themes', 'apariencia', 'appearance'].includes(p0)) return { view: 'mas', subTab: 'themes' };
+  if (['consola', 'console', 'terminal'].includes(p0)) return { view: 'mas', subTab: 'console' };
   if (['actualizaciones', 'updates', 'version', 'ajustes', 'settings', 'cloud', 'nube', 'health', 'salud', 'logs'].includes(p0)) return { view: 'mas', subTab: 'updates' };
   if (['dispositivos', 'devices', 'nodos'].includes(p0)) return { view: 'mas', subTab: 'devices' };
   if (['dex'].includes(p0)) return { view: 'mas', subTab: 'dex' };

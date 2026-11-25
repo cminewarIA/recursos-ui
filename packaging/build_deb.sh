@@ -9,14 +9,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 PKG_NAME="recursos-cockpit"
-VERSION="$(cat "$PROJECT_ROOT/VERSION" | tr -d '[:space:]')"
+VERSION="$(cat "$PROJECT_ROOT/UBUNTU_VERSION" | tr -d '[:space:]')"
+SERVER_VERSION="$(cat "$PROJECT_ROOT/VERSION" | tr -d '[:space:]')"
 ARCH="amd64"
 BUILD_DIR="$PROJECT_ROOT/build_deb"
 OUTPUT_DIR="$PROJECT_ROOT/dist"
 PKG_DIR="$BUILD_DIR/${PKG_NAME}_${VERSION}_${ARCH}"
 
 echo "============================================================"
-echo "📦 Construyendo paquete Debian: ${PKG_NAME}_${VERSION}_${ARCH}.deb"
+echo "📦 Construyendo paquete Debian (Ubuntu client): ${PKG_NAME}_${VERSION}_${ARCH}.deb (Web/Server: v${SERVER_VERSION})"
 echo "============================================================"
 
 # Limpiar compilaciones previas y paquetes obsoletos
@@ -76,6 +77,14 @@ fi
 cp "$PROJECT_ROOT/static/"*.png "$PROJECT_ROOT/static/favicon.ico" "$PKG_DIR/usr/lib/$PKG_NAME/static/" 2>/dev/null || true
 cp "$PROJECT_ROOT/desktop_app/assets/"* "$PKG_DIR/usr/lib/$PKG_NAME/assets/"
 cp "$PROJECT_ROOT/VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/VERSION"
+if [ -f "$PROJECT_ROOT/UBUNTU_VERSION" ]; then
+    cp "$PROJECT_ROOT/UBUNTU_VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/UBUNTU_VERSION"
+    chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/UBUNTU_VERSION"
+fi
+if [ -f "$PROJECT_ROOT/ANDROID_VERSION" ]; then
+    cp "$PROJECT_ROOT/ANDROID_VERSION" "$PKG_DIR/usr/lib/$PKG_NAME/ANDROID_VERSION"
+    chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/ANDROID_VERSION"
+fi
 if [ -f "$PROJECT_ROOT/package.json" ]; then
     cp "$PROJECT_ROOT/package.json" "$PKG_DIR/usr/lib/$PKG_NAME/package.json"
     sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$PKG_DIR/usr/lib/$PKG_NAME/package.json"

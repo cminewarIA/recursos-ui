@@ -68,6 +68,184 @@ class DiscoveryManager(
     private val securePreferences: SecurePreferences
 ) {
 
+    suspend fun trySavedNodeOnly(): ResolvedEndpoint? = withContext(Dispatchers.IO) {
+        val defaultPort = securePreferences.manualPort
+        val savedHost = securePreferences.savedHost.trim()
+        val lanContexts = discoverLocalLanContexts()
+        val primarySocketFactory = lanContexts.firstOrNull { it.socketFactory != null }?.socketFactory
+
+        if (savedHost.isNotEmpty()) {
+            val candidateUrl = if (savedHost.startsWith("http://") || savedHost.startsWith("https://")) {
+                savedHost.trimEnd('/')
+            } else {
+                "http://$savedHost:$defaultPort"
+            }
+            var res = apiService.probeNode(candidateUrl, isQuickScan = false)
+            if (!res.isOnline && primarySocketFactory != null) {
+                res = apiService.probeNode(candidateUrl, isQuickScan = false, socketFactory = primarySocketFactory)
+            }
+            if (res.isRevoked) {
+                securePreferences.isCertRevoked = true
+                return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.REVOKED)
+            }
+            if (res.isOnline && res.isRecursosServer) {
+                securePreferences.isCertRevoked = false
+                return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.CONNECTED_LAN)
+            }
+        }
+
+        val wanDomain = securePreferences.wanDomain.trim().trimEnd('/')
+        if (apiService.isValidWanDomain(wanDomain)) {
+            val wanCandidate = if (wanDomain.startsWith("http://") || wanDomain.startsWith("https://")) wanDomain else "https://$wanDomain"
+            val wanRes = apiService.probeNode(wanCandidate, isQuickScan = false)
+            if (wanRes.isRevoked) {
+                securePreferences.isCertRevoked = true
+                return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.REVOKED)
+            }
+            if (wanRes.isOnline && wanRes.isRecursosServer) {
+                securePreferences.isCertRevoked = false
+                return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.CONNECTED_WAN)
+            }
+        }
+        null
+    }
+
+    suspend fun selectAndPersistNode(rawHostOrUrl: String): ResolvedEndpoint = withContext(Dispatchers.IO) {
+        val trimmed = rawHostOrUrl.trim().trimEnd('/')
+        if (trimmed.isEmpty()) return@withContext ResolvedEndpoint("", ConnectionMode.ERROR)
+        val defaultPort = securePreferences.manualPort
+        val candidateUrl = when {
+            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+            trimmed.contains(":") -> "http://$trimmed"
+            else -> "http://$trimmed:$defaultPort"
+        }
+        val lanContexts = discoverLocalLanContexts()
+        val primarySocketFactory = lanContexts.firstOrNull { it.socketFactory != null }?.socketFactory
+        var res = apiService.probeNode(candidateUrl, isQuickScan = false)
+        if (!res.isOnline && primarySocketFactory != null) {
+            res = apiService.probeNode(candidateUrl, isQuickScan = false, socketFactory = primarySocketFactory)
+        }
+        if (res.isRevoked) {
+            securePreferences.isCertRevoked = true
+            persistDiscoveredHostAndPort(candidateUrl)
+            return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.REVOKED)
+        }
+        if (res.isOnline && res.isRecursosServer) {
+            persistDiscoveredHostAndPort(candidateUrl)
+            val mode = if (candidateUrl.startsWith("https://")) ConnectionMode.CONNECTED_WAN else ConnectionMode.CONNECTED_LAN
+            return@withContext ResolvedEndpoint(candidateUrl, mode)
+        }
+        ResolvedEndpoint(candidateUrl, ConnectionMode.ERROR)
+    }
+
+    suspend fun discoverLocalServers(
+        onProgress: ((String) -> Unit)? = null,
+        onNodeFound: ((DiscoveredServerNode) -> Unit)? = null
+    ): List<DiscoveredServerNode> = withContext(Dispatchers.IO) {
+        val defaultPort = securePreferences.manualPort
+        val lanContexts = discoverLocalLanContexts()
+        val primarySocketFactory = lanContexts.firstOrNull { it.socketFactory != null }?.socketFactory
+        val foundMap = linkedMapOf<String, DiscoveredServerNode>()
+
+        fun registerFound(url: String, res: HealthCheckResult) {
+            val clean = url.removePrefix("http://").removePrefix("https://").substringBefore("/")
+            val host = clean.substringBefore(":")
+            val port = clean.substringAfter(":", "").toIntOrNull() ?: defaultPort
+            val node = DiscoveredServerNode(
+                url = url,
+                host = host,
+                port = port,
+                serverVersion = res.serverVersion,
+                isRevoked = res.isRevoked
+            )
+            val isNew = synchronized(foundMap) {
+                if (foundMap.containsKey(url)) false else {
+                    foundMap[url] = node
+                    true
+                }
+            }
+            if (isNew) {
+                onNodeFound?.invoke(node)
+            }
+        }
+
+        onProgress?.invoke(
+            I18nDictionary.t(apiService.appContext, "native_android.searching_wifi", "Buscando instalaciones locales en la red Wi-Fi...")
+        )
+
+        val nsdCandidates = discoverViaNsd(timeoutMs = 1600L)
+        val priorityUrls = linkedSetOf<Pair<String, SocketFactory?>>()
+        val savedHost = securePreferences.savedHost.trim()
+        if (savedHost.isNotEmpty()) {
+            priorityUrls.add("http://$savedHost:$defaultPort" to primarySocketFactory)
+        }
+        for (u in nsdCandidates) {
+            priorityUrls.add(u to primarySocketFactory)
+            if (primarySocketFactory != null) priorityUrls.add(u to null)
+        }
+        for (ctx in lanContexts) {
+            val hosts = listOfNotNull(
+                "${ctx.subnetBase}.2",
+                ctx.gatewayIp,
+                "${ctx.subnetBase}.1",
+                "${ctx.subnetBase}.10",
+                "${ctx.subnetBase}.100",
+                "${ctx.subnetBase}.254"
+            ).filter { it != ctx.ownIp }.distinct()
+            for (h in hosts) {
+                val u = "http://$h:$defaultPort"
+                if (ctx.socketFactory != null) priorityUrls.add(u to ctx.socketFactory)
+                priorityUrls.add(u to null)
+            }
+        }
+        priorityUrls.add("http://recursos.local:$defaultPort" to primarySocketFactory)
+        priorityUrls.add("http://servidor.local:$defaultPort" to primarySocketFactory)
+
+        coroutineScope {
+            priorityUrls.map { (url, sf) ->
+                async {
+                    val r = apiService.probeNode(url, isQuickScan = true, socketFactory = sf)
+                    if (r.isOnline && r.isRecursosServer) {
+                        registerFound(url, r)
+                    }
+                }
+            }.awaitAll()
+        }
+
+        for (ctx in lanContexts) {
+            val alreadyTestedHosts = setOfNotNull(
+                ctx.ownIp,
+                ctx.gatewayIp,
+                "${ctx.subnetBase}.1",
+                "${ctx.subnetBase}.2",
+                "${ctx.subnetBase}.10",
+                "${ctx.subnetBase}.100",
+                "${ctx.subnetBase}.254"
+            )
+            val allIps = (1..254)
+                .map { "${ctx.subnetBase}.$it" }
+                .filter { it !in alreadyTestedHosts }
+            val activeSocketFactories = listOfNotNull(ctx.socketFactory, null).distinct()
+            for (chunk in allIps.chunked(32)) {
+                coroutineScope {
+                    chunk.flatMap { ip ->
+                        val url = "http://$ip:$defaultPort"
+                        activeSocketFactories.map { sf ->
+                            async {
+                                val r = apiService.probeNode(url, isQuickScan = true, socketFactory = sf)
+                                if (r.isOnline && r.isRecursosServer) {
+                                    registerFound(url, r)
+                                }
+                            }
+                        }
+                    }.awaitAll()
+                }
+            }
+        }
+
+        synchronized(foundMap) { foundMap.values.toList() }
+    }
+
     suspend fun resolveActiveNode(onScanningProgress: ((String) -> Unit)? = null): ResolvedEndpoint = withContext(Dispatchers.IO) {
         val startMs = System.currentTimeMillis()
         val defaultPort = securePreferences.manualPort

@@ -143,31 +143,123 @@ def i18n_t(key, params=None, fallback=None, locale=None):
     return _catalog_t(key, locale=locale, params=kw, fallback=fallback, base_dir=base_dir)
 
 
-def get_app_version():
-    """Lee la versión canónica desde el único punto de verdad (./VERSION) vía i18n_catalog."""
-    ver = _catalog_get_version(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
-    if ver and ver != "0.0.0":
-        return ver
+_ALLOWED_GITHUB_HOSTS = frozenset({
+    "github.com",
+    "api.github.com",
+    "raw.githubusercontent.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+})
+
+
+def is_allowed_github_url(url):
+    try:
+        parsed = urllib.parse.urlparse(str(url or "").strip())
+        return parsed.scheme == "https" and (parsed.hostname or "").lower() in _ALLOWED_GITHUB_HOSTS
+    except Exception:
+        return False
+
+
+def _read_version_file(filename, fallback="1.1.1"):
     for path in (
-        os.path.join(SCRIPT_DIR, "..", "VERSION"),
-        os.path.join(SCRIPT_DIR, "VERSION"),
-        "/usr/share/recursos-cockpit/VERSION",
-        "/usr/lib/recursos-cockpit/VERSION",
-        "./VERSION",
+        os.path.join(SCRIPT_DIR, "..", filename),
+        os.path.join(SCRIPT_DIR, filename),
+        f"/usr/lib/recursos-cockpit/{filename}",
+        f"/usr/share/recursos-cockpit/{filename}",
+        f"./{filename}",
     ):
         if os.path.isfile(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:
-                    v = f.read().strip()
+                    v = f.read().strip().lstrip("vV")
                     if v:
                         return v
             except Exception:
                 pass
-    return "0.0.0"
+    return fallback
+
+
+def get_app_version():
+    """Lee la versión independiente del cliente nativo Ubuntu desde UBUNTU_VERSION (desacoplada de ./VERSION)."""
+    return _read_version_file("UBUNTU_VERSION", fallback="1.1.1")
+
+
+def get_android_client_version():
+    """Lee la versión independiente del cliente Android desde ANDROID_VERSION."""
+    return _read_version_file("ANDROID_VERSION", fallback="1.1.1")
+
+
+def get_server_bundled_version():
+    """Lee la versión del servidor/web empaquetado desde ./VERSION."""
+    ver = _catalog_get_version(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
+    if ver and ver != "0.0.0":
+        return ver
+    return _read_version_file("VERSION", fallback="0.0.0")
 
 
 def get_display_version(raw_ver=None):
     return str(raw_ver or get_app_version()).strip()
+
+
+_UBUNTU_ROOT_CACHE = {"checked": False, "root_access": False, "root_method": "none"}
+_UBUNTU_ROOT_LOCK = threading.Lock()
+
+
+def detect_ubuntu_root_status(force=False):
+    """Comprueba acceso root en segundo plano sin mostrar ningún selector ni opción al usuario."""
+    with _UBUNTU_ROOT_LOCK:
+        if _UBUNTU_ROOT_CACHE["checked"] and not force:
+            return {
+                "root_access": bool(_UBUNTU_ROOT_CACHE["root_access"]),
+                "root_method": str(_UBUNTU_ROOT_CACHE["root_method"]),
+            }
+    has_root = False
+    method = "none"
+    try:
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            has_root = True
+            method = "uid0"
+        else:
+            p = subprocess.run(
+                ["sudo", "-n", "true"],
+                capture_output=True,
+                text=True,
+                timeout=1.5,
+            )
+            if p.returncode == 0:
+                has_root = True
+                method = "sudo"
+    except Exception:
+        has_root = False
+        method = "none"
+    with _UBUNTU_ROOT_LOCK:
+        _UBUNTU_ROOT_CACHE["checked"] = True
+        _UBUNTU_ROOT_CACHE["root_access"] = has_root
+        _UBUNTU_ROOT_CACHE["root_method"] = method
+    return {"root_access": has_root, "root_method": method}
+
+
+def resolve_user_downloads_dir():
+    """Resuelve dinámicamente la carpeta de Descargas del usuario (xdg-user-dir DOWNLOAD / ~/Downloads)."""
+    try:
+        p = subprocess.run(["xdg-user-dir", "DOWNLOAD"], capture_output=True, text=True, timeout=2.0)
+        cand = (p.stdout or "").strip()
+        if p.returncode == 0 and cand and os.path.isabs(cand):
+            os.makedirs(cand, exist_ok=True)
+            return cand
+    except Exception:
+        pass
+    home = os.path.expanduser("~")
+    for sub in ("Descargas", "Downloads"):
+        cand = os.path.join(home, sub)
+        if os.path.isdir(cand):
+            return cand
+    fallback = os.path.join(home, "Downloads")
+    try:
+        os.makedirs(fallback, exist_ok=True)
+    except Exception:
+        pass
+    return fallback
 
 
 def parse_semver_tuple(ver_str):
@@ -512,6 +604,7 @@ def collect_native_device_telemetry():
         display_title_parts.append(f"{manufacturer} {board_name}".strip())
     display_model = " ".join(display_title_parts).strip() or f"Ubuntu Workstation ({hostname})"
 
+    root_status = detect_ubuntu_root_status()
     return {
         "client_type": "ubuntu_native",
         "client_label": "App Nativa Ubuntu (.deb)",
@@ -519,6 +612,9 @@ def collect_native_device_telemetry():
         "full_access": True,
         "dex_capable": True,
         "app_version": ver,
+        "client_version": ver,
+        "root_access": bool(root_status.get("root_access", False)),
+        "root_method": str(root_status.get("root_method") or "none"),
         "hardware_id": hardware_id,
         "name": f"{display_model} · {hostname}",
         "hostname": hostname,
@@ -1526,8 +1622,220 @@ class ServerConnectionManager:
             "error": err_msg,
         }
 
+    def fetch_github_native_releases(self, force_refresh=False):
+        """Obtiene dinámicamente desde GitHub las últimas compilaciones nativas (.deb Ubuntu y .apk Android)."""
+        now_ts = time.time()
+        cached = getattr(self, "_native_releases_cache", None)
+        if not force_refresh and isinstance(cached, dict) and (now_ts - float(cached.get("ts") or 0.0) < 60.0):
+            return dict(cached["data"])
+
+        local_ubuntu = get_app_version()
+        installed_deb = self.get_installed_deb_version()
+        if installed_deb and parse_semver_tuple(installed_deb) >= parse_semver_tuple(local_ubuntu):
+            local_ubuntu = installed_deb
+        local_android = get_android_client_version()
+        server_ver = get_server_bundled_version()
+
+        remote_ubuntu = local_ubuntu
+        remote_android = local_android
+        github_reachable = False
+        tag_name = ""
+        release_name = ""
+        release_url = "https://github.com/cminewarIA/recursos-ui/releases"
+        published_at = ""
+        sha256_url = ""
+        deb_asset = None
+        apk_asset = None
+
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"RecursosCockpit-Ubuntu/{local_ubuntu}",
+        }
+
+        for fname, key in (("UBUNTU_VERSION", "ubuntu"), ("ANDROID_VERSION", "android")):
+            raw_u = f"https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/{fname}"
+            if not is_allowed_github_url(raw_u):
+                continue
+            try:
+                req = urllib.request.Request(raw_u, headers=headers)
+                with urllib.request.urlopen(req, timeout=4.0) as resp:
+                    val = resp.read().decode("utf-8").strip().lstrip("vV")
+                    if re.match(r"^\d+\.\d+\.\d+$", val):
+                        github_reachable = True
+                        if key == "ubuntu":
+                            remote_ubuntu = val
+                        else:
+                            remote_android = val
+            except Exception:
+                pass
+
+        releases_list = []
+        try:
+            rel_api = "https://api.github.com/repos/cminewarIA/recursos-ui/releases?per_page=8"
+            if is_allowed_github_url(rel_api):
+                req = urllib.request.Request(rel_api, headers=headers)
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                    parsed = json.loads(resp.read().decode("utf-8"))
+                    if isinstance(parsed, list):
+                        releases_list = [r for r in parsed if isinstance(r, dict) and not r.get("draft")]
+                        github_reachable = True
+        except Exception:
+            pass
+
+        for rel in releases_list:
+            r_tag = str(rel.get("tag_name") or "").strip()
+            r_name = str(rel.get("name") or r_tag).strip()
+            r_html = str(rel.get("html_url") or "").strip()
+            r_pub = str(rel.get("published_at") or "").strip()
+            if not tag_name and r_tag:
+                tag_name = r_tag
+                release_name = r_name
+                if is_allowed_github_url(r_html):
+                    release_url = r_html
+                published_at = r_pub
+
+            for a in rel.get("assets", []) or []:
+                if not isinstance(a, dict):
+                    continue
+                a_name = str(a.get("name") or "").strip()
+                a_url = str(a.get("browser_download_url") or "").strip()
+                if not a_name or not is_allowed_github_url(a_url):
+                    continue
+                a_size = int(a.get("size") or 0)
+                a_pub = str(a.get("updated_at") or r_pub or "").strip()
+                low = a_name.lower()
+                m_ver = re.search(r"(\d+\.\d+\.\d+)", a_name)
+                if low == "sha256sums.txt" and not sha256_url:
+                    sha256_url = a_url
+                elif low.endswith(".deb"):
+                    cand = {
+                        "version": m_ver.group(1) if m_ver else remote_ubuntu,
+                        "asset_name": a_name,
+                        "download_url": a_url,
+                        "size_bytes": a_size,
+                        "published_at": a_pub,
+                        "tag_name": r_tag,
+                    }
+                    if deb_asset is None or ("_" in a_name and "_" not in deb_asset["asset_name"]):
+                        deb_asset = cand
+                elif low.endswith(".apk"):
+                    cand = {
+                        "version": m_ver.group(1) if m_ver else remote_android,
+                        "asset_name": a_name,
+                        "download_url": a_url,
+                        "size_bytes": a_size,
+                        "published_at": a_pub,
+                        "tag_name": r_tag,
+                    }
+                    if apk_asset is None or ("_" in a_name and "_" not in apk_asset["asset_name"]):
+                        apk_asset = cand
+            if deb_asset and apk_asset:
+                break
+
+        deb_ver = (deb_asset or {}).get("version") or remote_ubuntu
+        apk_ver = (apk_asset or {}).get("version") or remote_android
+        payload = {
+            "ok": True,
+            "is_ubuntu_native": True,
+            "downloads_dir": resolve_user_downloads_dir(),
+            "repo": "cminewarIA/recursos-ui",
+            "repo_url": "https://github.com/cminewarIA/recursos-ui",
+            "server_version": server_ver,
+            "local_ubuntu_version": local_ubuntu,
+            "local_android_version": local_android,
+            "github_reachable": github_reachable,
+            "tag_name": tag_name,
+            "release_name": release_name or (f"Release {tag_name}" if tag_name else ""),
+            "release_url": release_url,
+            "published_at": published_at,
+            "sha256_url": sha256_url,
+            "deb": {
+                "version": deb_ver,
+                "local_version": local_ubuntu,
+                "asset_name": (deb_asset or {}).get("asset_name") or f"recursos-cockpit_{deb_ver}_amd64.deb",
+                "download_url": (deb_asset or {}).get("download_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb",
+                "size_bytes": int((deb_asset or {}).get("size_bytes") or 0),
+                "published_at": (deb_asset or {}).get("published_at") or published_at,
+                "tag_name": (deb_asset or {}).get("tag_name") or tag_name,
+                "available": bool(deb_asset),
+                "update_available": parse_semver_tuple(deb_ver) > parse_semver_tuple(local_ubuntu),
+            },
+            "apk": {
+                "version": apk_ver,
+                "local_version": local_android,
+                "asset_name": (apk_asset or {}).get("asset_name") or f"recursos-cockpit_{apk_ver}.apk",
+                "download_url": (apk_asset or {}).get("download_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk",
+                "size_bytes": int((apk_asset or {}).get("size_bytes") or 0),
+                "published_at": (apk_asset or {}).get("published_at") or published_at,
+                "tag_name": (apk_asset or {}).get("tag_name") or tag_name,
+                "available": bool(apk_asset),
+                "update_available": parse_semver_tuple(apk_ver) > parse_semver_tuple(local_android),
+            },
+            "checked_at": time.strftime("%H:%M:%S"),
+        }
+        self._native_releases_cache = {"ts": now_ts, "data": dict(payload)}
+        return payload
+
+    def download_apk_to_downloads(self, releases_info=None):
+        """Descarga la última APK desde GitHub y la guarda de forma segura en la carpeta Descargas del usuario."""
+        rel = releases_info if isinstance(releases_info, dict) else self.fetch_github_native_releases(force_refresh=True)
+        apk_meta = rel.get("apk") if isinstance(rel.get("apk"), dict) else {}
+        apk_url = str(apk_meta.get("download_url") or "").strip()
+        if not is_allowed_github_url(apk_url):
+            return False, "URL de descarga APK no permitida por la política HTTPS de GitHub.", ""
+
+        raw_name = os.path.basename(str(apk_meta.get("asset_name") or "recursos-cockpit.apk"))
+        safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", raw_name)
+        if not safe_name.lower().endswith(".apk"):
+            safe_name = f"{safe_name}.apk"
+
+        downloads_dir = resolve_user_downloads_dir()
+        dest_path = os.path.abspath(os.path.join(downloads_dir, safe_name))
+        if not dest_path.startswith(os.path.abspath(downloads_dir) + os.sep):
+            return False, "Ruta de destino inválida fuera de Descargas.", ""
+
+        try:
+            req = urllib.request.Request(
+                apk_url,
+                headers={"User-Agent": f"RecursosCockpit-Ubuntu/{get_app_version()}"},
+            )
+            with urllib.request.urlopen(req, timeout=45.0) as resp:
+                apk_bytes = resp.read()
+            if len(apk_bytes) < 50000 or not apk_bytes.startswith(b"PK\x03\x04"):
+                return False, "El archivo descargado desde GitHub no es un paquete APK válido.", ""
+
+            sha_url = str(rel.get("sha256_url") or "").strip()
+            if sha_url and is_allowed_github_url(sha_url):
+                try:
+                    req_sha = urllib.request.Request(
+                        sha_url,
+                        headers={"User-Agent": f"RecursosCockpit-Ubuntu/{get_app_version()}"},
+                    )
+                    with urllib.request.urlopen(req_sha, timeout=10.0) as rsha:
+                        sums_txt = rsha.read().decode("utf-8", errors="ignore")
+                    expected = ""
+                    for line in sums_txt.splitlines():
+                        parts = line.strip().split()
+                        if len(parts) >= 2 and (parts[1].lstrip("*") == safe_name or parts[1].endswith(".apk")):
+                            expected = parts[0].lower()
+                            break
+                    if expected:
+                        actual = hashlib.sha256(apk_bytes).hexdigest().lower()
+                        if actual != expected:
+                            return False, "Error de verificación SHA-256 al descargar la APK desde GitHub.", ""
+                except Exception:
+                    pass
+
+            tmp_path = f"{dest_path}.part"
+            with open(tmp_path, "wb") as fh:
+                fh.write(apk_bytes)
+            os.replace(tmp_path, dest_path)
+            return True, f"APK guardada correctamente en {dest_path}", dest_path
+        except Exception as exc:
+            return False, f"No se pudo descargar la APK desde GitHub: {exc}", ""
+
     def check_github_app_update(self, target_url=None, probe_server=True, server_payload=None, refresh_server=False):
-        """Consulta App Ubuntu, Servidor web local y GitHub Releases/VERSION comparando las tres versiones."""
+        """Consulta App Ubuntu (UBUNTU_VERSION), Servidor web local (VERSION) y GitHub Releases de forma desacoplada."""
         local_ver = get_app_version()
         installed_deb = self.get_installed_deb_version()
         if installed_deb and parse_semver_tuple(installed_deb) >= parse_semver_tuple(local_ver):
@@ -1535,120 +1843,16 @@ class ServerConnectionManager:
         else:
             app_ver = local_ver
 
-        now_ts = time.time()
-        gh_release_ver = str(self._cached_release_meta.get("release_ver") or "")
-        deb_url = str(self._cached_release_meta.get("deb_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb")
-        deb_asset_name = str(self._cached_release_meta.get("deb_asset_name") or "recursos-cockpit.deb")
-        sha_url = str(self._cached_release_meta.get("sha_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/SHA256SUMS.txt")
-        release_url = str(self._cached_release_meta.get("release_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest")
-        err_msg = ""
+        rel_meta = self.fetch_github_native_releases(force_refresh=bool(refresh_server))
+        deb_meta = rel_meta.get("deb") if isinstance(rel_meta.get("deb"), dict) else {}
+        deb_release_ver = str(deb_meta.get("version") or local_ver).strip().lstrip("vV")
+        deb_url = str(deb_meta.get("download_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb")
+        deb_asset_name = str(deb_meta.get("asset_name") or "recursos-cockpit.deb")
+        sha_url = str(rel_meta.get("sha256_url") or "")
+        release_url = str(rel_meta.get("release_url") or "https://github.com/cminewarIA/recursos-ui/releases")
+        err_msg = "" if rel_meta.get("github_reachable") else "Sin conexión con GitHub"
 
-        raw_gh_ver = ""
-        try:
-            req_ver = urllib.request.Request(
-                "https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/VERSION",
-                headers={"User-Agent": f"RecursosCockpit-Ubuntu/{app_ver}"},
-            )
-            with urllib.request.urlopen(req_ver, timeout=3.5) as resp:
-                raw_gh_ver = resp.read().decode("utf-8").strip().lstrip("vV")
-        except Exception as e2:
-            err_msg = str(e2)
-
-        need_release_meta = bool(
-            refresh_server
-            or not gh_release_ver
-            or (now_ts - self._last_release_check_ts >= 300.0)
-            or (raw_gh_ver and parse_semver_tuple(raw_gh_ver) > parse_semver_tuple(gh_release_ver))
-        )
-
-        if need_release_meta:
-            rel_fetched = False
-            try:
-                req = urllib.request.Request(
-                    "https://api.github.com/repos/cminewarIA/recursos-ui/releases/latest",
-                    headers={
-                        "Accept": "application/vnd.github+json",
-                        "User-Agent": f"RecursosCockpit-Ubuntu/{app_ver}",
-                    },
-                )
-                with urllib.request.urlopen(req, timeout=4.0) as resp:
-                    rel = json.loads(resp.read().decode("utf-8"))
-                    tag = str(rel.get("tag_name") or "").strip()
-                    gh_release_ver = tag.lstrip("vV")
-                    release_url = str(rel.get("html_url") or release_url)
-                    for asset in rel.get("assets", []) or []:
-                        name = str(asset.get("name") or "")
-                        dl = str(asset.get("browser_download_url") or "")
-                        if not dl:
-                            continue
-                        if name.endswith(".deb") and "amd64" in name:
-                            deb_url = dl
-                            deb_asset_name = name
-                        elif name == "recursos-cockpit.deb" and not deb_asset_name.endswith("_amd64.deb"):
-                            deb_url = dl
-                            deb_asset_name = name
-                        elif name == "SHA256SUMS.txt":
-                            sha_url = dl
-                    rel_fetched = True
-                    err_msg = ""
-            except Exception as e:
-                if not err_msg:
-                    err_msg = str(e)
-                # Fallback sin límite de API: seguir redirección de releases/latest
-                try:
-                    req_red = urllib.request.Request(
-                        "https://github.com/cminewarIA/recursos-ui/releases/latest",
-                        headers={"User-Agent": f"RecursosCockpit-Ubuntu/{app_ver}"},
-                        method="HEAD",
-                    )
-                    with urllib.request.urlopen(req_red, timeout=4.0) as rred:
-                        final_u = str(rred.geturl() or "")
-                        m_tag = re.search(r"/releases/tag/v?([0-9]+\.[0-9]+\.[0-9]+)", final_u)
-                        if m_tag:
-                            gh_release_ver = m_tag.group(1)
-                            release_url = final_u
-                            deb_asset_name = f"recursos-cockpit_{gh_release_ver}_amd64.deb"
-                            deb_url = f"https://github.com/cminewarIA/recursos-ui/releases/download/v{gh_release_ver}/{deb_asset_name}"
-                            sha_url = f"https://github.com/cminewarIA/recursos-ui/releases/download/v{gh_release_ver}/SHA256SUMS.txt"
-                            rel_fetched = True
-                            err_msg = ""
-                except Exception:
-                    pass
-
-            if rel_fetched:
-                self._last_release_check_ts = now_ts
-                self._cached_release_meta = {
-                    "release_ver": gh_release_ver,
-                    "deb_url": deb_url,
-                    "deb_asset_name": deb_asset_name,
-                    "sha_url": sha_url,
-                    "release_url": release_url,
-                }
-
-        # Si main/VERSION es más reciente que releases/latest, verificar si el .deb de ese tag ya existe
-        if raw_gh_ver and (not gh_release_ver or parse_semver_tuple(raw_gh_ver) > parse_semver_tuple(gh_release_ver)):
-            cand_asset = f"recursos-cockpit_{raw_gh_ver}_amd64.deb"
-            cand_url = f"https://github.com/cminewarIA/recursos-ui/releases/download/v{raw_gh_ver}/{cand_asset}"
-            try:
-                req_head = urllib.request.Request(
-                    cand_url,
-                    headers={"User-Agent": f"RecursosCockpit-Ubuntu/{app_ver}"},
-                    method="HEAD",
-                )
-                with urllib.request.urlopen(req_head, timeout=3.0) as rhead:
-                    if 200 <= getattr(rhead, "status", 200) < 400:
-                        gh_release_ver = raw_gh_ver
-                        deb_asset_name = cand_asset
-                        deb_url = cand_url
-                        sha_url = f"https://github.com/cminewarIA/recursos-ui/releases/download/v{raw_gh_ver}/SHA256SUMS.txt"
-                        release_url = f"https://github.com/cminewarIA/recursos-ui/releases/tag/v{raw_gh_ver}"
-            except Exception:
-                pass
-
-        gh_ver = raw_gh_ver or gh_release_ver
-        deb_release_ver = gh_release_ver or raw_gh_ver
-        if gh_ver:
-            err_msg = ""
+        gh_ver = deb_release_ver
 
         srv_ver = ""
         srv_reachable = False
@@ -1675,10 +1879,6 @@ class ServerConnectionManager:
                     or srv_payload.get("version")
                     or ""
                 ).strip().lstrip("vV")
-                if not gh_ver and srv_payload.get("remote_version"):
-                    gh_ver = str(srv_payload.get("remote_version") or "").strip().lstrip("vV")
-                    if not deb_release_ver:
-                        deb_release_ver = gh_ver
 
         info = self._compute_version_comparison(
             app_ver=app_ver,
@@ -1694,27 +1894,35 @@ class ServerConnectionManager:
             err_msg=err_msg,
             deb_release_ver=deb_release_ver,
         )
+        info["native_releases"] = rel_meta
         self.github_update_info = info
         return info
 
     def _install_deb_from_github(self, info, relaunch_on_deb=True, interactive=True):
-        """Descarga, verifica SHA-256 e instala el paquete .deb oficial desde GitHub Releases."""
-        deb_url = info.get("deb_download_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb"
-        tmp_deb = "/tmp/recursos-cockpit-github-update.deb"
+        """Descarga, verifica SHA-256 e instala el paquete .deb oficial desde GitHub Releases sin interpolación shell."""
+        deb_url = str(
+            info.get("deb_download_url")
+            or (info.get("deb") or {}).get("download_url")
+            or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb"
+        ).strip()
+        if not is_allowed_github_url(deb_url):
+            return False, "URL de descarga DEB no permitida por la política HTTPS de GitHub.", ""
+
+        tmp_deb = os.path.join("/tmp", f"recursos-cockpit-github-update-{os.getpid()}.deb")
         try:
             req = urllib.request.Request(
                 deb_url,
                 headers={"User-Agent": f"RecursosCockpit-Updater/{get_app_version()}"},
             )
-            with urllib.request.urlopen(req, timeout=30.0) as resp:
+            with urllib.request.urlopen(req, timeout=40.0) as resp:
                 deb_bytes = resp.read()
             if len(deb_bytes) < 10240 or not deb_bytes.startswith(b"!<arch>\n"):
                 return False, "El archivo descargado desde GitHub no es un paquete .deb válido.", ""
             with open(tmp_deb, "wb") as f:
                 f.write(deb_bytes)
 
-            sha_url = info.get("sha256_url")
-            if sha_url:
+            sha_url = str(info.get("sha256_url") or "").strip()
+            if sha_url and is_allowed_github_url(sha_url):
                 try:
                     req_sha = urllib.request.Request(
                         sha_url,
@@ -1723,7 +1931,7 @@ class ServerConnectionManager:
                     with urllib.request.urlopen(req_sha, timeout=10.0) as rsha:
                         sums_txt = rsha.read().decode("utf-8", errors="ignore")
                     expected = ""
-                    target_name = info.get("deb_asset_name") or "recursos-cockpit.deb"
+                    target_name = info.get("deb_asset_name") or (info.get("deb") or {}).get("asset_name") or "recursos-cockpit.deb"
                     for line in sums_txt.splitlines():
                         parts = line.strip().split()
                         if len(parts) >= 2 and (parts[1].lstrip("*") == target_name or parts[1].endswith(".deb")):
@@ -1740,38 +1948,38 @@ class ServerConnectionManager:
             if check_p.returncode != 0:
                 return False, i18n_t("native_ubuntu.deb_corrupt"), ""
 
-            is_root = (os.geteuid() == 0) if hasattr(os, "geteuid") else False
-            helper_script = "/tmp/recursos-cockpit-apply-update.sh"
-            with open(helper_script, "w", encoding="utf-8") as hf:
-                hf.write(
-                    "#!/usr/bin/env bash\n"
-                    "set -e\n"
-                    "apt-get install --reinstall -y --allow-downgrades "
-                    f"'{tmp_deb}' || dpkg -i --force-overwrite '{tmp_deb}'\n"
-                    f"rm -f '{tmp_deb}'\n"
-                )
-            os.chmod(helper_script, 0o755)
-            if is_root:
-                cmd = ["bash", helper_script]
+            root_info = detect_ubuntu_root_status()
+            dpkg_argv = ["dpkg", "-i", "--force-overwrite", tmp_deb]
+            if root_info.get("root_method") == "uid0":
+                cmd = dpkg_argv
+            elif root_info.get("root_method") == "sudo":
+                cmd = ["sudo", "-n"] + dpkg_argv
             elif interactive:
-                runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
-                cmd = [runner, "bash", helper_script]
+                has_pkexec = subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0
+                cmd = (["pkexec"] if has_pkexec else ["sudo"]) + dpkg_argv
             else:
-                cmd = ["sudo", "-n", "bash", helper_script]
+                cmd = ["sudo", "-n"] + dpkg_argv
+
             inst = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             try:
-                os.remove(helper_script)
+                if os.path.exists(tmp_deb):
+                    os.remove(tmp_deb)
             except Exception:
                 pass
             if inst.returncode == 0:
                 self._auto_perm_cooldown_until = 0.0
-                new_ver = self.get_installed_deb_version() or info.get("deb_release_version") or info.get("github_version") or get_app_version()
+                new_ver = self.get_installed_deb_version() or info.get("deb_release_version") or (info.get("deb") or {}).get("version") or get_app_version()
                 return True, i18n_t("native_ubuntu.deb_updated_part", {"ver": get_display_version(new_ver)}), new_ver
             err_detail = (inst.stderr or inst.stdout or "").strip()
             if not interactive:
                 self._auto_perm_cooldown_until = time.time() + 900.0
             return False, i18n_t("native_ubuntu.deb_install_fail", {"err": err_detail[:180] or "permisos requeridos"}), ""
         except Exception as e:
+            try:
+                if os.path.exists(tmp_deb):
+                    os.remove(tmp_deb)
+            except Exception:
+                pass
             return False, i18n_t("native_ubuntu.download_error", {"error": e}), ""
 
     def perform_unified_update(self, gh_info=None, target_url=None, relaunch_on_deb=True, interactive=True, force_download=False):
@@ -2749,6 +2957,11 @@ class LocalHtmlBridgeServer:
                     self._send_json(parent.conn_mgr.refresh_device_telemetry())
                     return
 
+                if clean_path == "/api/native/github-releases":
+                    force_ref = ("refresh=1" in self.path or "refresh=true" in self.path)
+                    self._send_json(parent.conn_mgr.fetch_github_native_releases(force_refresh=force_ref))
+                    return
+
                 # 1. Control local de hardware DeX USB exclusivo de Ubuntu
                 if clean_path == "/api/dex/status":
                     deps = parent.dex.check_dependencies()
@@ -3110,6 +3323,33 @@ class LocalHtmlBridgeServer:
                             except Exception:
                                 pass
                     self._send_json({"ok": True, "theme": parent.conn_mgr.ui_theme})
+                    return
+
+                if clean_path == "/api/native/download-deb":
+                    rel_info = parent.conn_mgr.fetch_github_native_releases(force_refresh=True)
+                    ok_deb, msg_deb, new_ver = parent.conn_mgr._install_deb_from_github(
+                        rel_info,
+                        relaunch_on_deb=False,
+                        interactive=True,
+                    )
+                    self._send_json({
+                        "ok": ok_deb,
+                        "message": msg_deb,
+                        "installed_version": new_ver or get_app_version(),
+                        "releases": rel_info,
+                    })
+                    return
+
+                if clean_path == "/api/native/download-apk":
+                    rel_info = parent.conn_mgr.fetch_github_native_releases(force_refresh=True)
+                    ok_apk, msg_apk, saved_path = parent.conn_mgr.download_apk_to_downloads(rel_info)
+                    self._send_json({
+                        "ok": ok_apk,
+                        "message": msg_apk,
+                        "saved_path": saved_path,
+                        "downloads_dir": resolve_user_downloads_dir(),
+                        "releases": rel_info,
+                    })
                     return
 
                 if clean_path == "/api/themes/sync":
@@ -3749,6 +3989,13 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         c2_text.pack_start(c2_t, False, False, 0)
         c2_text.pack_start(self.lbl_node_info, False, False, 0)
         c2_text.pack_start(self.lbl_github_info, False, False, 0)
+        self.lbl_github_releases = Gtk.Label(
+            label=f"GitHub · Ubuntu .deb v{get_app_version()} · Android .apk v{get_android_client_version()}",
+            xalign=0,
+        )
+        self.lbl_github_releases.set_line_wrap(True)
+        self.lbl_github_releases.get_style_context().add_class("launcher-subtitle")
+        c2_text.pack_start(self.lbl_github_releases, False, False, 0)
 
         c2_btns = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         c2_btns.set_valign(Gtk.Align.CENTER)
@@ -3764,6 +4011,17 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         c2_top.pack_start(c2_text, True, True, 0)
         c2_top.pack_end(c2_btns, False, False, 0)
         card2.pack_start(c2_top, False, False, 0)
+
+        c2_dl_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.btn_dl_deb = Gtk.Button(label=i18n_t("native_ubuntu.download_install_deb", fallback="Descargar e instalar .deb (GitHub)"))
+        self.btn_dl_deb.get_style_context().add_class("btn-primary")
+        self.btn_dl_deb.connect("clicked", self._on_download_deb_clicked)
+        self.btn_dl_apk = Gtk.Button(label=i18n_t("native_ubuntu.download_apk_downloads", fallback="Descargar .apk en Descargas"))
+        self.btn_dl_apk.get_style_context().add_class("btn-nav")
+        self.btn_dl_apk.connect("clicked", self._on_download_apk_clicked)
+        c2_dl_row.pack_start(self.btn_dl_deb, False, False, 0)
+        c2_dl_row.pack_start(self.btn_dl_apk, False, False, 0)
+        card2.pack_start(c2_dl_row, False, False, 0)
         center_box.pack_start(card2, False, False, 0)
 
         # Opción 3: Configuraciones (Muestra y guarda la conexión detectada desde Opción 1)
@@ -3946,6 +4204,64 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
                 self.lbl_github_info.set_text(i18n_t("native_ubuntu.unified_update_avail"))
                 self.btn_opt2_update.set_label(i18n_t("native_ubuntu.check_and_update"))
                 ctx.add_class("btn-nav")
+
+        if hasattr(self, "lbl_github_releases"):
+            rel_meta = (gh or {}).get("native_releases") if isinstance(gh, dict) else None
+            if isinstance(rel_meta, dict):
+                deb_m = rel_meta.get("deb") or {}
+                apk_m = rel_meta.get("apk") or {}
+                deb_mb = f" ({deb_m.get('size_bytes', 0) / (1024 * 1024):.1f} MB)" if deb_m.get("size_bytes") else ""
+                apk_mb = f" ({apk_m.get('size_bytes', 0) / (1024 * 1024):.1f} MB)" if apk_m.get("size_bytes") else ""
+                tag_str = f" · {rel_meta.get('tag_name')}" if rel_meta.get("tag_name") else ""
+                self.lbl_github_releases.set_text(
+                    f"GitHub{tag_str} · Ubuntu .deb v{deb_m.get('version', get_app_version())}{deb_mb} · Android .apk v{apk_m.get('version', get_android_client_version())}{apk_mb}"
+                )
+        return False
+
+    def _on_download_deb_clicked(self, _widget):
+        if hasattr(self, "btn_dl_deb"):
+            self.btn_dl_deb.set_sensitive(False)
+            self.btn_dl_deb.set_label("Descargando e instalando .deb...")
+        if hasattr(self, "lbl_home_status"):
+            self.lbl_home_status.set_text("Descargando la última compilación .deb desde GitHub...")
+
+        def worker():
+            rel_info = self.conn_mgr.fetch_github_native_releases(force_refresh=True)
+            ok, msg, _new_ver = self.conn_mgr._install_deb_from_github(rel_info, relaunch_on_deb=False, interactive=True)
+            GLib.idle_add(self._on_download_deb_finished, ok, msg, rel_info)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_download_deb_finished(self, ok, msg, rel_info):
+        if hasattr(self, "btn_dl_deb"):
+            self.btn_dl_deb.set_sensitive(True)
+            self.btn_dl_deb.set_label(i18n_t("native_ubuntu.download_install_deb", fallback="Descargar e instalar .deb (GitHub)"))
+        if hasattr(self, "lbl_home_status"):
+            self.lbl_home_status.set_text(msg)
+        if ok and os.environ.get("DISPLAY"):
+            GLib.timeout_add(450, self._reexec_after_update)
+        return False
+
+    def _on_download_apk_clicked(self, _widget):
+        if hasattr(self, "btn_dl_apk"):
+            self.btn_dl_apk.set_sensitive(False)
+            self.btn_dl_apk.set_label("Descargando .apk...")
+        if hasattr(self, "lbl_home_status"):
+            self.lbl_home_status.set_text("Descargando la última compilación .apk desde GitHub en Descargas...")
+
+        def worker():
+            rel_info = self.conn_mgr.fetch_github_native_releases(force_refresh=True)
+            ok, msg, saved_path = self.conn_mgr.download_apk_to_downloads(rel_info)
+            GLib.idle_add(self._on_download_apk_finished, ok, msg, saved_path)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_download_apk_finished(self, ok, msg, _saved_path):
+        if hasattr(self, "btn_dl_apk"):
+            self.btn_dl_apk.set_sensitive(True)
+            self.btn_dl_apk.set_label(i18n_t("native_ubuntu.download_apk_downloads", fallback="Descargar .apk en Descargas"))
+        if hasattr(self, "lbl_home_status"):
+            self.lbl_home_status.set_text(msg)
         return False
 
     def _on_update_from_github_clicked(self, _widget):

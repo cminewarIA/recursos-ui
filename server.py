@@ -4,6 +4,7 @@ import os
 import pwd
 import re
 import subprocess
+import sys
 import threading
 import time
 import xml.etree.ElementTree as ET
@@ -2874,6 +2875,18 @@ def init_geoip_history_db():
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_dev_series_lookup ON device_series_history(entity_kind, entity_id, ts DESC);")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS service_console_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    time_str TEXT NOT NULL,
+                    level TEXT NOT NULL DEFAULT 'INFO',
+                    source TEXT NOT NULL DEFAULT 'server',
+                    command TEXT DEFAULT '',
+                    message TEXT NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_service_console_logs_ts ON service_console_logs(ts DESC);")
             conn.commit()
             _TELEMETRY_HISTORY_INITIALIZED = True
         except Exception as e:
@@ -2884,6 +2897,469 @@ def init_geoip_history_db():
                     conn.close()
                 except Exception:
                     pass
+
+
+SERVICE_CONSOLE_RETENTION_SECONDS = 86400  # 24 horas máximo en recursos_history.db
+_SERVICE_CONSOLE_LOCK = threading.Lock()
+_SERVICE_CONSOLE_LAST_PRUNE_TS = 0.0
+_SERVICE_CONSOLE_WRITE_COUNT = 0
+_SERVICE_CONSOLE_IN_PROGRESS = threading.local()
+_SERVICE_CONSOLE_TEE_INSTALLED = False
+
+_CONSOLE_SECRET_PATTERNS = (
+    (re.compile(r'(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;\]"\']+'), r'\1[REDACTED]'),
+    (re.compile(r'(?i)(bearer\s+)[A-Za-z0-9._\-~+/=]{12,}'), r'\1[REDACTED]'),
+    (re.compile(r'(?i)((?:x-device-token|x-session-token|device_token|session_token|access_token|refresh_token|api[_-]?key|password|passwd|secret|signature|hmac|cookie)\s*[:=]\s*)[^\s&,;\]"\']+'), r'\1[REDACTED]'),
+    (re.compile(r'(?i)([?&](?:token|sig|signature|key|api_key|password|secret)=)[^&\s"\']+'), r'\1[REDACTED]'),
+)
+
+
+def redact_service_console_secrets(text):
+    """Enmascara tokens, cabeceras Bearer, contraseñas y firmas antes de persistir o mostrar logs."""
+    out = str(text or "")
+    for rx, repl in _CONSOLE_SECRET_PATTERNS:
+        out = rx.sub(repl, out)
+    return out
+
+
+def _infer_console_level(message, default_level="INFO"):
+    low = str(message or "").lower()
+    if any(k in low for k in ("traceback", "error", "exception", "critical", "fatal", "[-]", "failed")):
+        return "ERROR"
+    if any(k in low for k in ("warn", "warning", "[!]", "timeout", "denegado", "403", "500")):
+        return "WARN"
+    if any(k in low for k in ("[ota]", "github", "themes_catalog", "i18n", "dictionary.csv", "sync")):
+        return "OTA"
+    if any(k in low for k in ("exec", "cmd:", "subprocess", "systemctl", "docker ", "dpkg", "git ")):
+        return "CMD"
+    return default_level
+
+
+def record_service_console_log(message, level="INFO", source="server", command=""):
+    """Persiste un evento de ejecución del servicio en recursos_history.db con retención estricta de 24h."""
+    global _SERVICE_CONSOLE_LAST_PRUNE_TS, _SERVICE_CONSOLE_WRITE_COUNT
+    if getattr(_SERVICE_CONSOLE_IN_PROGRESS, "active", False):
+        return
+    clean_msg = redact_service_console_secrets(str(message or "").replace("\r", "").strip())
+    if not clean_msg:
+        return
+    clean_msg = clean_msg[:1800]
+    clean_cmd = redact_service_console_secrets(str(command or "").strip())[:400]
+    clean_level = str(level or "INFO").upper()[:12]
+    if clean_level not in ("INFO", "CMD", "HTTP", "OTA", "WARN", "ERROR"):
+        clean_level = "INFO"
+    clean_src = re.sub(r"[^a-zA-Z0-9._-]", "", str(source or "server"))[:32] or "server"
+
+    now_ts = time.time()
+    time_str = datetime.fromtimestamp(now_ts).strftime("%Y-%m-%d %H:%M:%S")
+    cutoff_ts = now_ts - SERVICE_CONSOLE_RETENTION_SECONDS
+
+    _SERVICE_CONSOLE_IN_PROGRESS.active = True
+    try:
+        init_geoip_history_db()
+        with _SERVICE_CONSOLE_LOCK:
+            conn = None
+            try:
+                conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=5.0)
+                conn.execute(
+                    "INSERT INTO service_console_logs (ts, time_str, level, source, command, message) VALUES (?, ?, ?, ?, ?, ?)",
+                    (now_ts, time_str, clean_level, clean_src, clean_cmd, clean_msg),
+                )
+                _SERVICE_CONSOLE_WRITE_COUNT += 1
+                if (_SERVICE_CONSOLE_WRITE_COUNT % 40 == 0) or (now_ts - _SERVICE_CONSOLE_LAST_PRUNE_TS >= 60.0):
+                    conn.execute("DELETE FROM service_console_logs WHERE ts < ?", (cutoff_ts,))
+                    _SERVICE_CONSOLE_LAST_PRUNE_TS = now_ts
+                conn.commit()
+            except Exception:
+                pass
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+    finally:
+        _SERVICE_CONSOLE_IN_PROGRESS.active = False
+
+
+def prune_service_console_logs(now_ts=None):
+    """Elimina cualquier registro de consola con más de 24 horas de antigüedad."""
+    ts_ref = float(now_ts if now_ts is not None else time.time())
+    cutoff_ts = ts_ref - SERVICE_CONSOLE_RETENTION_SECONDS
+    init_geoip_history_db()
+    with _SERVICE_CONSOLE_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=5.0)
+            cur = conn.execute("DELETE FROM service_console_logs WHERE ts < ?", (cutoff_ts,))
+            deleted = cur.rowcount if cur.rowcount is not None else 0
+            conn.commit()
+            return deleted
+        except Exception:
+            return 0
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+
+def query_service_console_logs(after_id=0, window="24h", level="", q="", limit=350):
+    """Consulta los logs de consola en modo solo lectura aplicando la ventana máxima de 24h."""
+    init_geoip_history_db()
+    now_ts = time.time()
+    max_cutoff_ts = now_ts - SERVICE_CONSOLE_RETENTION_SECONDS
+    win_map = {
+        "live": 1800,
+        "1h": 3600,
+        "6h": 21600,
+        "24h": SERVICE_CONSOLE_RETENTION_SECONDS,
+    }
+    win_key = str(window or "24h").strip().lower()
+    win_sec = min(SERVICE_CONSOLE_RETENTION_SECONDS, win_map.get(win_key, SERVICE_CONSOLE_RETENTION_SECONDS))
+    cutoff_ts = max(max_cutoff_ts, now_ts - win_sec)
+
+    try:
+        after_int = max(0, int(after_id or 0))
+    except (TypeError, ValueError):
+        after_int = 0
+    try:
+        limit_int = max(20, min(600, int(limit or 350)))
+    except (TypeError, ValueError):
+        limit_int = 350
+
+    level_up = str(level or "").strip().upper()
+    search_q = str(q or "").strip()
+
+    with _SERVICE_CONSOLE_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=5.0)
+            conn.row_factory = sqlite3.Row
+            conn.execute("DELETE FROM service_console_logs WHERE ts < ?", (max_cutoff_ts,))
+            conn.commit()
+
+            where_clauses = ["ts >= ?"]
+            params = [cutoff_ts]
+            if after_int > 0:
+                where_clauses.append("id > ?")
+                params.append(after_int)
+            if level_up and level_up != "ALL":
+                where_clauses.append("level = ?")
+                params.append(level_up)
+            if search_q:
+                where_clauses.append("(message LIKE ? OR source LIKE ? OR command LIKE ?)")
+                like_val = f"%{search_q}%"
+                params.extend([like_val, like_val, like_val])
+
+            where_sql = " AND ".join(where_clauses)
+            if after_int > 0:
+                rows = conn.execute(
+                    f"SELECT id, ts, time_str, level, source, command, message FROM service_console_logs WHERE {where_sql} ORDER BY id ASC LIMIT ?",
+                    params + [limit_int],
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    f"SELECT id, ts, time_str, level, source, command, message FROM service_console_logs WHERE {where_sql} ORDER BY id DESC LIMIT ?",
+                    params + [limit_int],
+                ).fetchall()
+                rows = list(reversed(rows))
+
+            total_row = conn.execute(
+                "SELECT COUNT(*) AS cnt, COALESCE(MAX(id), 0) AS max_id FROM service_console_logs WHERE ts >= ?",
+                (max_cutoff_ts,),
+            ).fetchone()
+            total_24h = int(total_row["cnt"] or 0) if total_row else 0
+            max_id = int(total_row["max_id"] or 0) if total_row else 0
+
+            entries = [
+                {
+                    "id": int(r["id"]),
+                    "ts": float(r["ts"]),
+                    "time_str": str(r["time_str"] or ""),
+                    "level": str(r["level"] or "INFO"),
+                    "source": str(r["source"] or "server"),
+                    "command": str(r["command"] or ""),
+                    "message": str(r["message"] or ""),
+                }
+                for r in rows
+            ]
+            return {
+                "ok": True,
+                "read_only": True,
+                "retention_hours": 24,
+                "window": win_key if win_key in win_map else "24h",
+                "last_id": max(max_id, entries[-1]["id"] if entries else after_int),
+                "total_24h": total_24h,
+                "entries": entries,
+            }
+        except Exception as exc:
+            return {
+                "ok": False,
+                "read_only": True,
+                "retention_hours": 24,
+                "window": win_key,
+                "last_id": after_int,
+                "total_24h": 0,
+                "entries": [],
+                "error": str(exc),
+            }
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+
+class _ServiceConsoleStreamTee:
+    """Captura stdout/stderr del servicio en tiempo real sin alterar la salida original."""
+
+    def __init__(self, orig_stream, source_name="stdout", default_level="INFO"):
+        self._orig = orig_stream
+        self._source = source_name
+        self._default_level = default_level
+        self._buf = ""
+
+    def write(self, data):
+        try:
+            written = self._orig.write(data)
+        except Exception:
+            written = len(data) if data else 0
+        try:
+            if not data:
+                return written
+            self._buf += str(data)
+            while "\n" in self._buf:
+                line, self._buf = self._buf.split("\n", 1)
+                clean = line.strip()
+                if clean:
+                    lvl = "ERROR" if self._source == "stderr" else _infer_console_level(clean, self._default_level)
+                    record_service_console_log(clean, level=lvl, source=self._source)
+        except Exception:
+            pass
+        return written
+
+    def flush(self):
+        try:
+            self._orig.flush()
+        except Exception:
+            pass
+
+    def __getattr__(self, name):
+        return getattr(self._orig, name)
+
+
+def install_service_console_tee():
+    """Activa la captura pasiva de stdout/stderr hacia recursos_history.db."""
+    global _SERVICE_CONSOLE_TEE_INSTALLED
+    if _SERVICE_CONSOLE_TEE_INSTALLED:
+        return
+    _SERVICE_CONSOLE_TEE_INSTALLED = True
+    try:
+        sys.stdout = _ServiceConsoleStreamTee(sys.stdout, source_name="stdout", default_level="INFO")
+        sys.stderr = _ServiceConsoleStreamTee(sys.stderr, source_name="stderr", default_level="ERROR")
+    except Exception:
+        pass
+
+
+_ALLOWED_GITHUB_RELEASE_HOSTS = frozenset({
+    "github.com",
+    "api.github.com",
+    "raw.githubusercontent.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+})
+_NATIVE_RELEASES_CACHE = {"ts": 0.0, "data": None}
+_NATIVE_RELEASES_LOCK = threading.Lock()
+
+
+def is_allowed_github_release_url(url):
+    try:
+        parsed = urllib.parse.urlparse(str(url or "").strip())
+        return parsed.scheme == "https" and (parsed.hostname or "").lower() in _ALLOWED_GITHUB_RELEASE_HOSTS
+    except Exception:
+        return False
+
+
+def read_native_client_version(filename):
+    path = os.path.join(BASE_DIR, filename)
+    try:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as fh:
+                val = fh.read().strip().lstrip("vV")
+                if val:
+                    return val
+    except Exception:
+        pass
+    return "1.1.1"
+
+
+def _parse_semver_tuple(ver_str):
+    nums = [int(p) for p in re.findall(r"\d+", str(ver_str or ""))[:3]]
+    while len(nums) < 3:
+        nums.append(0)
+    return tuple(nums)
+
+
+def _extract_asset_version(asset_name, fallback_ver=""):
+    m = re.search(r"(\d+\.\d+\.\d+)", str(asset_name or ""))
+    return m.group(1) if m else str(fallback_ver or "")
+
+
+def get_github_native_releases_info(force_refresh=False):
+    """Consulta dinámicamente la última compilación en GitHub para clientes nativos Ubuntu (.deb) y Android (.apk)."""
+    now_ts = time.time()
+    with _NATIVE_RELEASES_LOCK:
+        if not force_refresh and _NATIVE_RELEASES_CACHE["data"] and (now_ts - _NATIVE_RELEASES_CACHE["ts"] < 60.0):
+            return dict(_NATIVE_RELEASES_CACHE["data"])
+
+    local_ubuntu_ver = read_native_client_version("UBUNTU_VERSION")
+    local_android_ver = read_native_client_version("ANDROID_VERSION")
+    server_ver = get_canonical_version(BASE_DIR)
+
+    remote_ubuntu_ver = local_ubuntu_ver
+    remote_android_ver = local_android_ver
+    github_reachable = False
+    tag_name = ""
+    release_name = ""
+    release_url = f"https://github.com/{GITHUB_REPO}/releases"
+    published_at = ""
+    sha256_url = ""
+    deb_asset = None
+    apk_asset = None
+    headers = {
+        "User-Agent": f"RecursosCockpit/{server_ver} (+https://github.com/{GITHUB_REPO})",
+        "Accept": "application/vnd.github+json",
+    }
+
+    for fname, key in (("UBUNTU_VERSION", "ubuntu"), ("ANDROID_VERSION", "android")):
+        try:
+            raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{fname}"
+            if is_allowed_github_release_url(raw_url):
+                r = requests.get(raw_url, headers=headers, timeout=4.0)
+                if r.status_code == 200:
+                    val = r.text.strip().lstrip("vV")
+                    if re.match(r"^\d+\.\d+\.\d+$", val):
+                        github_reachable = True
+                        if key == "ubuntu":
+                            remote_ubuntu_ver = val
+                        else:
+                            remote_android_ver = val
+        except Exception:
+            pass
+
+    releases_list = []
+    try:
+        rel_api = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=8"
+        if is_allowed_github_release_url(rel_api):
+            r = requests.get(rel_api, headers=headers, timeout=5.0)
+            if r.status_code == 200:
+                parsed = r.json()
+                if isinstance(parsed, list):
+                    releases_list = [x for x in parsed if isinstance(x, dict) and not x.get("draft")]
+                    github_reachable = True
+    except Exception:
+        pass
+
+    for rel in releases_list:
+        r_tag = str(rel.get("tag_name") or "").strip()
+        r_name = str(rel.get("name") or r_tag).strip()
+        r_html = str(rel.get("html_url") or "").strip()
+        r_pub = str(rel.get("published_at") or "").strip()
+        if not tag_name and r_tag:
+            tag_name = r_tag
+            release_name = r_name
+            if is_allowed_github_release_url(r_html):
+                release_url = r_html
+            published_at = r_pub
+
+        assets = rel.get("assets") if isinstance(rel.get("assets"), list) else []
+        for a in assets:
+            if not isinstance(a, dict):
+                continue
+            a_name = str(a.get("name") or "").strip()
+            a_url = str(a.get("browser_download_url") or "").strip()
+            if not a_name or not is_allowed_github_release_url(a_url):
+                continue
+            a_size = int(a.get("size") or 0)
+            a_pub = str(a.get("updated_at") or r_pub or "").strip()
+            low_name = a_name.lower()
+            if low_name == "sha256sums.txt" and not sha256_url:
+                sha256_url = a_url
+            elif low_name.endswith(".deb"):
+                cand = {
+                    "version": _extract_asset_version(a_name, remote_ubuntu_ver),
+                    "asset_name": a_name,
+                    "download_url": a_url,
+                    "size_bytes": a_size,
+                    "published_at": a_pub,
+                    "tag_name": r_tag,
+                }
+                if deb_asset is None or ("_" in a_name and "_" not in deb_asset["asset_name"]):
+                    deb_asset = cand
+            elif low_name.endswith(".apk"):
+                cand = {
+                    "version": _extract_asset_version(a_name, remote_android_ver),
+                    "asset_name": a_name,
+                    "download_url": a_url,
+                    "size_bytes": a_size,
+                    "published_at": a_pub,
+                    "tag_name": r_tag,
+                }
+                if apk_asset is None or ("_" in a_name and "_" not in apk_asset["asset_name"]):
+                    apk_asset = cand
+        if deb_asset and apk_asset:
+            break
+
+    deb_ver = (deb_asset or {}).get("version") or remote_ubuntu_ver
+    apk_ver = (apk_asset or {}).get("version") or remote_android_ver
+
+    deb_info = {
+        "version": deb_ver,
+        "local_version": local_ubuntu_ver,
+        "asset_name": (deb_asset or {}).get("asset_name") or f"recursos-cockpit_{deb_ver}_amd64.deb",
+        "download_url": (deb_asset or {}).get("download_url") or f"https://github.com/{GITHUB_REPO}/releases/latest/download/recursos-cockpit.deb",
+        "size_bytes": int((deb_asset or {}).get("size_bytes") or 0),
+        "published_at": (deb_asset or {}).get("published_at") or published_at,
+        "tag_name": (deb_asset or {}).get("tag_name") or tag_name,
+        "available": bool(deb_asset),
+        "update_available": _parse_semver_tuple(deb_ver) > _parse_semver_tuple(local_ubuntu_ver),
+    }
+    apk_info = {
+        "version": apk_ver,
+        "local_version": local_android_ver,
+        "asset_name": (apk_asset or {}).get("asset_name") or f"recursos-cockpit_{apk_ver}.apk",
+        "download_url": (apk_asset or {}).get("download_url") or f"https://github.com/{GITHUB_REPO}/releases/latest/download/recursos-cockpit.apk",
+        "size_bytes": int((apk_asset or {}).get("size_bytes") or 0),
+        "published_at": (apk_asset or {}).get("published_at") or published_at,
+        "tag_name": (apk_asset or {}).get("tag_name") or tag_name,
+        "available": bool(apk_asset),
+        "update_available": _parse_semver_tuple(apk_ver) > _parse_semver_tuple(local_android_ver),
+    }
+
+    payload = {
+        "ok": True,
+        "repo": GITHUB_REPO,
+        "repo_url": f"https://github.com/{GITHUB_REPO}",
+        "server_version": server_ver,
+        "local_ubuntu_version": local_ubuntu_ver,
+        "local_android_version": local_android_ver,
+        "github_reachable": github_reachable,
+        "tag_name": tag_name,
+        "release_name": release_name or (f"Release {tag_name}" if tag_name else ""),
+        "release_url": release_url,
+        "published_at": published_at,
+        "sha256_url": sha256_url,
+        "deb": deb_info,
+        "apk": apk_info,
+        "checked_at": datetime.now().strftime("%H:%M:%S"),
+    }
+    with _NATIVE_RELEASES_LOCK:
+        _NATIVE_RELEASES_CACHE["ts"] = now_ts
+        _NATIVE_RELEASES_CACHE["data"] = dict(payload)
+    return payload
 
 def preload_telemetry_history_from_sqlite():
     """Precarga las últimas muestras de consumo (últimos 20 minutos) desde recursos_history.db."""
@@ -9675,13 +10151,14 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     protected_hw_keys = {
         "hardware_id", "manufacturer", "model", "board", "chassis_type",
         "os_distro", "kernel", "cpu_model", "cpu_cores_physical",
-        "ram_total_gb", "storage_total_gb", "storage_free_gb", "mac_address", "interface_name"
+        "ram_total_gb", "storage_total_gb", "storage_free_gb", "mac_address", "interface_name",
+        "root_access", "root_method", "client_version"
     }
     merged_tel = dict(prev_tel)
     for k, v in tel.items():
         if v is None or v == "":
             continue
-        if prev_is_native and not incoming_is_native and k in protected_hw_keys and merged_tel.get(k):
+        if prev_is_native and not incoming_is_native and k in protected_hw_keys and (k in merged_tel and merged_tel.get(k) not in (None, "")):
             continue
         merged_tel[k] = v
 
@@ -15056,6 +15533,9 @@ VALID_WEB_PREFIXES = (
     "/system",
     "/temas",
     "/themes",
+    "/consola",
+    "/console",
+    "/terminal",
     "/version",
     "/actualizaciones",
     "/updates",
@@ -16001,6 +16481,55 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        # 1b-native. COMPILACIONES NATIVAS EN GITHUB (.deb UBUNTU & .apk ANDROID)
+        elif clean_path == "/api/native/github-releases":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            force_ref = ("refresh=1" in self.path or "refresh=true" in self.path)
+            rel_data = get_github_native_releases_info(force_refresh=force_ref)
+            resp = json.dumps(rel_data, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 1b-console. CONSOLA DE SERVICIO EN SOLO LECTURA (RETENCIÓN MÁX. 24H)
+        elif clean_path == "/api/system/console-logs":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            after_id = (qs.get("after_id") or ["0"])[0]
+            window = (qs.get("window") or ["24h"])[0]
+            level = (qs.get("level") or [""])[0]
+            q_str = (qs.get("q") or [""])[0]
+            limit = (qs.get("limit") or ["350"])[0]
+            console_data = query_service_console_logs(
+                after_id=after_id,
+                window=window,
+                level=level,
+                q=q_str,
+                limit=limit,
+            )
+            resp = json.dumps(console_data, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # 1c. REGISTRO UNIFICADO DE FALLOS Y ERRORES DEL SISTEMA (APPS, SERVICIOS, KERNEL)
         elif clean_path == "/api/system/logs":
             if not auth["is_trusted"]:
@@ -16200,6 +16729,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                         "verified_in_lan": v.get("verified_in_lan", True),
                         "trusted": v.get("trusted", True),
                         "is_current": is_cur_dev,
+                        "root_access": bool(tel.get("root_access", False)),
+                        "root_method": str(tel.get("root_method") or ""),
                         "device_telemetry": tel
                     })
                 dev_list.sort(key=lambda x: (not x.get("is_current", False), not x.get("full_access", False), x.get("last_seen", "")), reverse=False)
@@ -18364,6 +18895,15 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
     def log_message(self, format, *args):
+        try:
+            msg = (format % args) if args else str(format)
+            if "/api/system/console-logs" in msg or "/api/metrics" in msg:
+                return
+            client_ip = self.client_address[0] if getattr(self, "client_address", None) else "-"
+            lvl = "ERROR" if (" 500 " in msg or " 502 " in msg) else ("WARN" if (" 403 " in msg or " 404 " in msg) else "HTTP")
+            record_service_console_log(f"{client_ip} {msg}", level=lvl, source="http")
+        except Exception:
+            pass
         return
 
 _MDNS_ADVERTISER_LOCK = threading.Lock()
@@ -18450,7 +18990,13 @@ def run_server(port=None):
         except (TypeError, ValueError):
             port = 8085
     ACTIVE_SERVER_PORT = port
+    install_service_console_tee()
     preload_telemetry_history_from_sqlite()
+    record_service_console_log(
+        f"Servicio Recursos Cockpit v{get_canonical_version(BASE_DIR)} inicializando en puerto {port} (retención consola: 24h)",
+        level="INFO",
+        source="lifecycle",
+    )
     preload_ping_history_from_sqlite()
     threading.Thread(target=fetch_gpu_worker, daemon=True).start()
     threading.Thread(target=fetch_disks_worker, daemon=True).start()

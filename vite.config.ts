@@ -536,6 +536,278 @@ function readAppVersion(): string {
   }
 }
 
+function readNativeClientVersion(filename: 'UBUNTU_VERSION' | 'ANDROID_VERSION'): string {
+  try {
+    const val = fs.readFileSync(path.resolve(ROOT_DIR, filename), 'utf-8').trim().replace(/^[vV]/, '');
+    if (val) return val;
+  } catch {
+    // Fallback
+  }
+  return '1.1.1';
+}
+
+interface DevConsoleLogEntry {
+  id: number;
+  ts: number;
+  time_str: string;
+  level: 'INFO' | 'CMD' | 'HTTP' | 'OTA' | 'WARN' | 'ERROR';
+  source: string;
+  command: string;
+  message: string;
+}
+
+const DEV_CONSOLE_RETENTION_SEC = 86400;
+let devConsoleNextId = 1;
+const devConsoleLogs: DevConsoleLogEntry[] = [];
+
+function redactDevConsoleSecrets(text: string): string {
+  return String(text || '')
+    .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s,;\]"']+/gi, '$1[REDACTED]')
+    .replace(/(bearer\s+)[A-Za-z0-9._\-~+/=]{12,}/gi, '$1[REDACTED]')
+    .replace(/((?:x-device-token|x-session-token|device_token|session_token|access_token|refresh_token|api[_-]?key|password|passwd|secret|signature|hmac|cookie)\s*[:=]\s*)[^\s&,;\]"']+/gi, '$1[REDACTED]')
+    .replace(/([?&](?:token|sig|signature|key|api_key|password|secret)=)[^&\s"']+/gi, '$1[REDACTED]');
+}
+
+function pushDevConsoleLog(
+  message: string,
+  level: DevConsoleLogEntry['level'] = 'INFO',
+  source = 'server',
+  command = ''
+) {
+  const cleanMsg = redactDevConsoleSecrets(message).replace(/\r/g, '').trim().slice(0, 1800);
+  if (!cleanMsg) return;
+  const nowSec = Date.now() / 1000;
+  const d = new Date(nowSec * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const timeStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  devConsoleLogs.push({
+    id: devConsoleNextId++,
+    ts: nowSec,
+    time_str: timeStr,
+    level,
+    source: source.slice(0, 32),
+    command: redactDevConsoleSecrets(command).slice(0, 400),
+    message: cleanMsg,
+  });
+  const cutoff = nowSec - DEV_CONSOLE_RETENTION_SEC;
+  while (devConsoleLogs.length > 0 && (devConsoleLogs[0].ts < cutoff || devConsoleLogs.length > 5000)) {
+    devConsoleLogs.shift();
+  }
+}
+
+pushDevConsoleLog(
+  `Servicio Recursos Cockpit v${readAppVersion()} iniciado (Ubuntu v${readNativeClientVersion('UBUNTU_VERSION')} · Android v${readNativeClientVersion('ANDROID_VERSION')} · retención consola: 24h)`,
+  'INFO',
+  'lifecycle'
+);
+
+const ALLOWED_GH_HOSTS = new Set([
+  'github.com',
+  'api.github.com',
+  'raw.githubusercontent.com',
+  'objects.githubusercontent.com',
+  'release-assets.githubusercontent.com',
+]);
+
+function isAllowedGithubUrlDev(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    return parsed.protocol === 'https:' && ALLOWED_GH_HOSTS.has(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function parseSemverDev(v: string): [number, number, number] {
+  const nums = (String(v || '').match(/\d+/g) || []).slice(0, 3).map((n) => parseInt(n, 10) || 0);
+  while (nums.length < 3) nums.push(0);
+  return [nums[0], nums[1], nums[2]];
+}
+
+function isNewerSemverDev(remoteVer: string, localVer: string): boolean {
+  const r = parseSemverDev(remoteVer);
+  const l = parseSemverDev(localVer);
+  for (let i = 0; i < 3; i++) {
+    if (r[i] > l[i]) return true;
+    if (r[i] < l[i]) return false;
+  }
+  return false;
+}
+
+function fetchHttpsTextDev(urlStr: string, timeoutMs = 4500): Promise<{ status: number; text: string }> {
+  return new Promise((resolve) => {
+    if (!isAllowedGithubUrlDev(urlStr)) {
+      resolve({ status: 0, text: '' });
+      return;
+    }
+    const req = https.get(
+      urlStr,
+      {
+        headers: {
+          'User-Agent': `RecursosCockpit/${readAppVersion()} (+https://github.com/cminewarIA/recursos-ui)`,
+          Accept: 'application/vnd.github+json',
+        },
+        timeout: timeoutMs,
+      },
+      (resp) => {
+        let data = '';
+        resp.on('data', (c) => {
+          data += c.toString('utf-8');
+        });
+        resp.on('end', () => resolve({ status: resp.statusCode || 0, text: data }));
+      }
+    );
+    req.on('error', () => resolve({ status: 0, text: '' }));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ status: 0, text: '' });
+    });
+  });
+}
+
+let devNativeReleasesCache: { ts: number; data: Record<string, unknown> } | null = null;
+
+async function fetchGithubNativeReleasesDev(forceRefresh = false): Promise<Record<string, unknown>> {
+  const now = Date.now();
+  if (!forceRefresh && devNativeReleasesCache && now - devNativeReleasesCache.ts < 60000) {
+    return devNativeReleasesCache.data;
+  }
+  const repo = 'cminewarIA/recursos-ui';
+  const localUbuntu = readNativeClientVersion('UBUNTU_VERSION');
+  const localAndroid = readNativeClientVersion('ANDROID_VERSION');
+  const serverVer = readAppVersion();
+
+  let remoteUbuntu = localUbuntu;
+  let remoteAndroid = localAndroid;
+  let githubReachable = false;
+  let tagName = '';
+  let releaseName = '';
+  let releaseUrl = `https://github.com/${repo}/releases`;
+  let publishedAt = '';
+  let sha256Url = '';
+  let debAsset: Record<string, unknown> | null = null;
+  let apkAsset: Record<string, unknown> | null = null;
+
+  const [ubRes, andRes, relRes] = await Promise.all([
+    fetchHttpsTextDev(`https://raw.githubusercontent.com/${repo}/main/UBUNTU_VERSION`),
+    fetchHttpsTextDev(`https://raw.githubusercontent.com/${repo}/main/ANDROID_VERSION`),
+    fetchHttpsTextDev(`https://api.github.com/repos/${repo}/releases?per_page=8`),
+  ]);
+
+  if (ubRes.status === 200 && /^\d+\.\d+\.\d+$/.test(ubRes.text.trim().replace(/^[vV]/, ''))) {
+    remoteUbuntu = ubRes.text.trim().replace(/^[vV]/, '');
+    githubReachable = true;
+  }
+  if (andRes.status === 200 && /^\d+\.\d+\.\d+$/.test(andRes.text.trim().replace(/^[vV]/, ''))) {
+    remoteAndroid = andRes.text.trim().replace(/^[vV]/, '');
+    githubReachable = true;
+  }
+
+  if (relRes.status === 200) {
+    try {
+      const releases = JSON.parse(relRes.text);
+      if (Array.isArray(releases)) {
+        githubReachable = true;
+        for (const rel of releases) {
+          if (!rel || typeof rel !== 'object' || rel.draft) continue;
+          const rTag = String(rel.tag_name || '').trim();
+          const rName = String(rel.name || rTag).trim();
+          const rHtml = String(rel.html_url || '').trim();
+          const rPub = String(rel.published_at || '').trim();
+          if (!tagName && rTag) {
+            tagName = rTag;
+            releaseName = rName;
+            if (isAllowedGithubUrlDev(rHtml)) releaseUrl = rHtml;
+            publishedAt = rPub;
+          }
+          const assets = Array.isArray(rel.assets) ? rel.assets : [];
+          for (const a of assets) {
+            if (!a || typeof a !== 'object') continue;
+            const aName = String(a.name || '').trim();
+            const aUrl = String(a.browser_download_url || '').trim();
+            if (!aName || !isAllowedGithubUrlDev(aUrl)) continue;
+            const low = aName.toLowerCase();
+            const verMatch = aName.match(/(\d+\.\d+\.\d+)/);
+            if (low === 'sha256sums.txt' && !sha256Url) {
+              sha256Url = aUrl;
+            } else if (low.endsWith('.deb')) {
+              const cand = {
+                version: verMatch ? verMatch[1] : remoteUbuntu,
+                asset_name: aName,
+                download_url: aUrl,
+                size_bytes: Number(a.size || 0),
+                published_at: String(a.updated_at || rPub || ''),
+                tag_name: rTag,
+              };
+              if (!debAsset || (aName.includes('_') && !String(debAsset.asset_name || '').includes('_'))) {
+                debAsset = cand;
+              }
+            } else if (low.endsWith('.apk')) {
+              const cand = {
+                version: verMatch ? verMatch[1] : remoteAndroid,
+                asset_name: aName,
+                download_url: aUrl,
+                size_bytes: Number(a.size || 0),
+                published_at: String(a.updated_at || rPub || ''),
+                tag_name: rTag,
+              };
+              if (!apkAsset || (aName.includes('_') && !String(apkAsset.asset_name || '').includes('_'))) {
+                apkAsset = cand;
+              }
+            }
+          }
+          if (debAsset && apkAsset) break;
+        }
+      }
+    } catch {
+      // Ignore malformed JSON
+    }
+  }
+
+  const debVer = String(debAsset?.version || remoteUbuntu);
+  const apkVer = String(apkAsset?.version || remoteAndroid);
+  const payload: Record<string, unknown> = {
+    ok: true,
+    repo,
+    repo_url: `https://github.com/${repo}`,
+    server_version: serverVer,
+    local_ubuntu_version: localUbuntu,
+    local_android_version: localAndroid,
+    github_reachable: githubReachable,
+    tag_name: tagName,
+    release_name: releaseName || (tagName ? `Release ${tagName}` : ''),
+    release_url: releaseUrl,
+    published_at: publishedAt,
+    sha256_url: sha256Url,
+    deb: {
+      version: debVer,
+      local_version: localUbuntu,
+      asset_name: String(debAsset?.asset_name || `recursos-cockpit_${debVer}_amd64.deb`),
+      download_url: String(debAsset?.download_url || `https://github.com/${repo}/releases/latest/download/recursos-cockpit.deb`),
+      size_bytes: Number(debAsset?.size_bytes || 0),
+      published_at: String(debAsset?.published_at || publishedAt),
+      tag_name: String(debAsset?.tag_name || tagName),
+      available: Boolean(debAsset),
+      update_available: isNewerSemverDev(debVer, localUbuntu),
+    },
+    apk: {
+      version: apkVer,
+      local_version: localAndroid,
+      asset_name: String(apkAsset?.asset_name || `recursos-cockpit_${apkVer}.apk`),
+      download_url: String(apkAsset?.download_url || `https://github.com/${repo}/releases/latest/download/recursos-cockpit.apk`),
+      size_bytes: Number(apkAsset?.size_bytes || 0),
+      published_at: String(apkAsset?.published_at || publishedAt),
+      tag_name: String(apkAsset?.tag_name || tagName),
+      available: Boolean(apkAsset),
+      update_available: isNewerSemverDev(apkVer, localAndroid),
+    },
+    checked_at: new Date().toTimeString().slice(0, 8),
+  };
+
+  devNativeReleasesCache = { ts: now, data: payload };
+  return payload;
+}
+
 interface ParsedViteDict {
   meta: {
     default_locale: string;
@@ -4407,6 +4679,17 @@ function realOsTelemetryMiddleware(): Plugin {
           enqueueRemoteIpsForGeoIp([xff]);
         }
 
+        if (
+          url.startsWith('/api/') &&
+          url !== '/api/system/console-logs' &&
+          url !== '/api/metrics' &&
+          !url.startsWith('/api/metrics/')
+        ) {
+          const lvl: DevConsoleLogEntry['level'] =
+            url.includes('/themes') || url.includes('/update') || url.includes('/github-releases') ? 'OTA' : 'HTTP';
+          pushDevConsoleLog(`${xff || '127.0.0.1'} ${req.method || 'GET'} ${url}`, lvl, 'http');
+        }
+
         if (url === '/manual' || url === '/manual.html' || url === '/readme') {
           const manualPath = path.resolve(ROOT_DIR, 'static', 'manual.html');
           const fallbackDocsPath = path.resolve(ROOT_DIR, 'docs', 'index.html');
@@ -5386,6 +5669,59 @@ function realOsTelemetryMiddleware(): Plugin {
         if (url === '/api/version') {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(getRealVersionPayload(hostHdr)));
+          return;
+        }
+
+        if (url === '/api/native/github-releases' && req.method === 'GET') {
+          const forceRef = /(?:^|&)(?:refresh=1|refresh=true)(?:&|$)/.test(queryStr || '');
+          fetchGithubNativeReleasesDev(forceRef).then((payload) => {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.end(JSON.stringify(payload));
+          });
+          return;
+        }
+
+        if (url === '/api/system/console-logs' && req.method === 'GET') {
+          const params = new URLSearchParams(queryStr || '');
+          const afterId = Math.max(0, parseInt(params.get('after_id') || '0', 10) || 0);
+          const winKey = (params.get('window') || '24h').toLowerCase();
+          const levelFilter = (params.get('level') || '').toUpperCase();
+          const qFilter = (params.get('q') || '').trim().toLowerCase();
+          const limit = Math.max(20, Math.min(600, parseInt(params.get('limit') || '350', 10) || 350));
+          const nowSec = Date.now() / 1000;
+          const maxCutoff = nowSec - DEV_CONSOLE_RETENTION_SEC;
+          while (devConsoleLogs.length > 0 && devConsoleLogs[0].ts < maxCutoff) {
+            devConsoleLogs.shift();
+          }
+          const winSecMap: Record<string, number> = { live: 1800, '1h': 3600, '6h': 21600, '24h': DEV_CONSOLE_RETENTION_SEC };
+          const cutoff = Math.max(maxCutoff, nowSec - (winSecMap[winKey] || DEV_CONSOLE_RETENTION_SEC));
+          let filtered = devConsoleLogs.filter((e) => e.ts >= cutoff);
+          if (afterId > 0) filtered = filtered.filter((e) => e.id > afterId);
+          if (levelFilter && levelFilter !== 'ALL') filtered = filtered.filter((e) => e.level === levelFilter);
+          if (qFilter) {
+            filtered = filtered.filter(
+              (e) =>
+                e.message.toLowerCase().includes(qFilter) ||
+                e.source.toLowerCase().includes(qFilter) ||
+                e.command.toLowerCase().includes(qFilter)
+            );
+          }
+          const entries = afterId > 0 ? filtered.slice(0, limit) : filtered.slice(-limit);
+          const lastId = devConsoleLogs.length > 0 ? devConsoleLogs[devConsoleLogs.length - 1].id : afterId;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.end(
+            JSON.stringify({
+              ok: true,
+              read_only: true,
+              retention_hours: 24,
+              window: winSecMap[winKey] ? winKey : '24h',
+              last_id: lastId,
+              total_24h: devConsoleLogs.length,
+              entries,
+            })
+          );
           return;
         }
 

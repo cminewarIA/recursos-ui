@@ -1047,7 +1047,64 @@ export interface TrustedDevice {
   verified_in_lan?: boolean;
   trusted?: boolean;
   is_current?: boolean;
+  client_version?: string;
+  root_access?: boolean;
+  root_method?: string;
   device_telemetry?: Record<string, unknown>;
+}
+
+export interface ServiceConsoleLogEntry {
+  id: number;
+  ts: number;
+  time_str: string;
+  level: 'INFO' | 'CMD' | 'HTTP' | 'OTA' | 'WARN' | 'ERROR' | string;
+  source: string;
+  command: string;
+  message: string;
+}
+
+export interface ServiceConsoleLogsResponse {
+  ok: boolean;
+  read_only: boolean;
+  retention_hours: number;
+  window: string;
+  last_id: number;
+  total_24h: number;
+  entries: ServiceConsoleLogEntry[];
+  error?: string;
+}
+
+export interface GithubNativeAssetInfo {
+  version: string;
+  local_version: string;
+  asset_name: string;
+  download_url: string;
+  size_bytes: number;
+  published_at: string;
+  tag_name: string;
+  available: boolean;
+  update_available: boolean;
+}
+
+export interface GithubNativeReleasesPayload {
+  ok: boolean;
+  is_ubuntu_native?: boolean;
+  downloads_dir?: string;
+  repo: string;
+  repo_url: string;
+  server_version: string;
+  local_ubuntu_version: string;
+  local_android_version: string;
+  github_reachable: boolean;
+  tag_name: string;
+  release_name: string;
+  release_url: string;
+  published_at: string;
+  sha256_url: string;
+  deb: GithubNativeAssetInfo;
+  apk: GithubNativeAssetInfo;
+  checked_at: number;
+  error?: string;
 }
 
 export interface AiSystemFaultInsight {

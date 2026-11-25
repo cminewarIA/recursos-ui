@@ -122,6 +122,9 @@ data class NativeDeviceTelemetry(
     @SerializedName("full_access") val fullAccess: Boolean = true,
     @SerializedName("dex_capable") val dexCapable: Boolean = false,
     @SerializedName("app_version") val appVersion: String = "",
+    @SerializedName("client_version") val clientVersion: String = "",
+    @SerializedName("root_access") val rootAccess: Boolean = false,
+    @SerializedName("root_method") val rootMethod: String = "none",
     @SerializedName("hardware_id") val hardwareId: String = "",
     @SerializedName("name") val name: String = "",
     @SerializedName("hostname") val hostname: String = "",
@@ -155,4 +158,22 @@ data class NativeDeviceTelemetry(
     @SerializedName("interface_name") val interfaceName: String = "",
     @SerializedName("mac_address") val macAddress: String = ""
 )
+
+data class DiscoveredServerNode(
+    val url: String,
+    val host: String,
+    val port: Int,
+    val serverVersion: String = "",
+    val isRevoked: Boolean = false
+)
+
+data class GithubAndroidReleaseInfo(
+    val latestVersion: String,
+    val apkUrl: String,
+    val assetName: String,
+    val sizeBytes: Long = 0L,
+    val releaseUrl: String = "https://github.com/cminewarIA/recursos-ui/releases",
+    val updateAvailable: Boolean = false
+)
+
 

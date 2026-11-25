@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 PKG_NAME="recursos-cockpit"
-VERSION="$(tr -d '[:space:]' < "$PROJECT_ROOT/VERSION")"
+VERSION="$(tr -d '[:space:]' < "$PROJECT_ROOT/ANDROID_VERSION")"
 ANDROID_DIR="$PROJECT_ROOT/android_app"
 OUTPUT_DIR="$PROJECT_ROOT/dist"
 

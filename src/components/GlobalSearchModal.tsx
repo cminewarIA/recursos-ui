@@ -228,6 +228,15 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         hint: 'Matrix · OTA · JSON',
       },
       {
+        id: 'nav-console',
+        title: t('more.subtabs.console'),
+        category: t('nav.mas'),
+        tab: 'mas',
+        subTab: 'console',
+        icon: <Terminal className="h-4 w-4 text-[#1e6b38] dark:text-[#c6f19d]" />,
+        hint: '24h · Live · Read-only',
+      },
+      {
         id: 'nav-more-devices',
         title: t('more.subtabs.devices'),
         category: t('nav.mas'),

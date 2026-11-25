@@ -66,9 +66,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Search
 import com.cminewar.recursoscockpit.BuildConfig
 import com.cminewar.recursoscockpit.R
 import com.cminewar.recursoscockpit.data.ConnectionMode
+import com.cminewar.recursoscockpit.data.DiscoveredServerNode
+import com.cminewar.recursoscockpit.data.GithubAndroidReleaseInfo
 import com.cminewar.recursoscockpit.data.SecurePreferences
 import com.cminewar.recursoscockpit.i18n.I18nDictionary
 import com.cminewar.recursoscockpit.theme.*
@@ -175,7 +181,16 @@ fun CockpitDashboard(
     scanningMessage: String,
     isDarkTheme: Boolean,
     serverVersion: String = "",
-    availableApkUpdateVersion: String = "",
+    githubAndroidRelease: GithubAndroidReleaseInfo? = null,
+    apkUpdateProgress: Int? = null,
+    apkUpdateStatus: String = "",
+    showServerDiscoverer: Boolean = false,
+    isDiscoveringServers: Boolean = false,
+    discoveredServers: List<DiscoveredServerNode> = emptyList(),
+    discovererError: String = "",
+    onSelectDiscoveredServer: (String) -> Unit = {},
+    onRescanLocalServers: () -> Unit = {},
+    onTriggerApkUpdate: (GithubAndroidReleaseInfo) -> Unit = {},
     onThemeChanged: (String) -> Unit,
     deviceTelemetryProvider: () -> String,
     webViewHeadersProvider: () -> Map<String, String> = { emptyMap() },
@@ -192,6 +207,8 @@ fun CockpitDashboard(
     var retryBtnFocused by remember { mutableStateOf(false) }
     var revokedBtnFocused by remember { mutableStateOf(false) }
     var updateBtnFocused by remember { mutableStateOf(false) }
+    var manualHostInput by remember { mutableStateOf(securePreferences.savedHost) }
+    val availableApkUpdateVersion = if (githubAndroidRelease?.updateAvailable == true) githubAndroidRelease.latestVersion else ""
     var updateBannerDismissed by remember(availableApkUpdateVersion) { mutableStateOf(false) }
 
     val latestMode by rememberUpdatedState(connectionMode)
@@ -375,10 +392,10 @@ fun CockpitDashboard(
         }
     }
 
-    val isSearching = connectionMode == ConnectionMode.SCANNING_LAN || connectionMode == ConnectionMode.CONNECTING
+    val isSearching = isDiscoveringServers || connectionMode == ConnectionMode.SCANNING_LAN || connectionMode == ConnectionMode.CONNECTING
     val isOfflineFallback =
         (connectionMode == ConnectionMode.DISCONNECTED || connectionMode == ConnectionMode.ERROR) && activeUrl.isEmpty()
-    val showConnectionOverlay = isSearching || isOfflineFallback || (isPageLoading && activeUrl.isEmpty())
+    val showConnectionOverlay = showServerDiscoverer || isSearching || isOfflineFallback || (isPageLoading && activeUrl.isEmpty())
 
     // Interfaz única de borde a borde: sin cabecera nativa duplicada compitiendo con la barra web Alethia
     Box(
@@ -598,7 +615,11 @@ fun CockpitDashboard(
                     }
 
                     Text(
-                        text = I18nDictionary.t(context, "native_android.server_panel", "Panel del Servidor"),
+                        text = if (showServerDiscoverer) {
+                            I18nDictionary.t(context, "native_android.discoverer_title", "Buscador de servidores locales")
+                        } else {
+                            I18nDictionary.t(context, "native_android.server_panel", "Panel del Servidor")
+                        },
                         color = paletteTextPrimary,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
@@ -606,14 +627,150 @@ fun CockpitDashboard(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = scanningMessage,
-                        color = paletteTextSecondary,
+                        text = discovererError.ifBlank { scanningMessage },
+                        color = if (discovererError.isNotBlank()) dangerColor else paletteTextSecondary,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,
                         lineHeight = 19.sp
                     )
 
-                    if (isOfflineFallback) {
+                    if (showServerDiscoverer) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 210.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            discoveredServers.forEach { node ->
+                                var itemFocused by remember(node.url) { mutableStateOf(false) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(paletteSubtle)
+                                        .border(
+                                            width = if (itemFocused) 2.dp else 1.dp,
+                                            color = if (itemFocused) accentPrimary else paletteBorder,
+                                            shape = RoundedCornerShape(14.dp)
+                                        )
+                                        .onFocusChanged { itemFocused = it.isFocused }
+                                        .focusable()
+                                        .clickable { onSelectDiscoveredServer(node.url) }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Dns,
+                                        contentDescription = null,
+                                        tint = accentPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "${node.host}:${node.port}",
+                                            color = paletteTextPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        if (node.serverVersion.isNotBlank()) {
+                                            Text(
+                                                text = "Recursos v${node.serverVersion}",
+                                                color = paletteTextSecondary,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = I18nDictionary.t(context, "native_android.pair_btn", "Emparejar"),
+                                        color = accentPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = manualHostInput,
+                            onValueChange = { manualHostInput = it },
+                            singleLine = true,
+                            label = {
+                                Text(
+                                    text = I18nDictionary.t(context, "native_android.manual_ip_label", "IP o dominio del servidor"),
+                                    fontSize = 11.sp
+                                )
+                            },
+                            placeholder = { Text("192.168.1.50:8085", fontSize = 12.sp) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(paletteSubtle)
+                                    .border(1.dp, paletteBorder, RoundedCornerShape(12.dp))
+                                    .focusable()
+                                    .clickable { onRescanLocalServers() }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = paletteTextPrimary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = I18nDictionary.t(context, "native_android.rescan_btn", "Buscar"),
+                                    color = paletteTextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isDarkTheme) AlethiaLime else AlethiaObsidian)
+                                    .border(
+                                        width = if (retryBtnFocused) 2.dp else 1.dp,
+                                        color = if (retryBtnFocused) accentPrimary else paletteBorder,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .onFocusChanged { retryBtnFocused = it.isFocused }
+                                    .focusable()
+                                    .clickable {
+                                        if (manualHostInput.isNotBlank()) {
+                                            onSelectDiscoveredServer(manualHostInput)
+                                        } else {
+                                            onRescanLocalServers()
+                                        }
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = I18nDictionary.t(context, "native_android.connect_btn", "Conectar"),
+                                    color = if (isDarkTheme) AlethiaObsidian else AlethiaLime,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    } else if (isOfflineFallback) {
                         Spacer(modifier = Modifier.height(18.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -719,94 +876,98 @@ fun CockpitDashboard(
             }
         }
 
-        // Aviso discreto Alethia cuando existe una APK más reciente que la instalada
+        // Aviso discreto Alethia cuando existe una APK más reciente en GitHub frente a la instalada (1.1.1)
+        val pendingRelease = githubAndroidRelease
         AnimatedVisibility(
-            visible = availableApkUpdateVersion.isNotBlank() &&
+            visible = pendingRelease != null &&
+                pendingRelease.updateAvailable &&
                 !updateBannerDismissed &&
                 !showConnectionOverlay &&
                 connectionMode != ConnectionMode.REVOKED,
             enter = fadeIn(tween(240)) + slideInVertically(initialOffsetY = { 48 }),
             exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { 48 })
         ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(paletteCard)
-                    .border(1.dp, accentPillBorder, RoundedCornerShape(16.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+            if (pendingRelease != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(paletteCard)
+                        .border(1.dp, accentPillBorder, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = null,
-                        tint = accentPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = I18nDictionary.t(
-                                context,
-                                "native_android.apk_update_title",
-                                "Nueva app Android disponible"
-                            ),
-                            color = paletteTextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${formatDisplayVersion()} → v$availableApkUpdateVersion",
-                            color = paletteTextSecondary,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isDarkTheme) AlethiaLime else AlethiaObsidian)
-                            .border(
-                                width = if (updateBtnFocused) 2.dp else 1.dp,
-                                color = if (updateBtnFocused) accentPrimary else Color.Transparent,
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            .onFocusChanged { updateBtnFocused = it.isFocused }
-                            .focusable()
-                            .clickable {
-                                val targetApkUrl = if (activeUrl.isNotBlank()) {
-                                    "${activeUrl.trimEnd('/')}/download/recursos-cockpit.apk"
-                                } else {
-                                    "https://github.com/cminewarIA/recursos-ui/releases/download/v$availableApkUpdateVersion/recursos-cockpit_$availableApkUpdateVersion.apk"
-                                }
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetApkUrl)).apply {
-                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {}
-                            }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = I18nDictionary.t(context, "native_android.apk_update_action", "Actualizar"),
-                            color = if (isDarkTheme) AlethiaObsidian else AlethiaLime,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            tint = accentPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = apkUpdateStatus.ifBlank {
+                                    I18nDictionary.t(
+                                        context,
+                                        "native_android.apk_update_title",
+                                        "Nueva app Android disponible en GitHub"
+                                    )
+                                },
+                                color = paletteTextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (apkUpdateProgress != null) {
+                                    "${formatDisplayVersion()} → v${pendingRelease.latestVersion} · $apkUpdateProgress%"
+                                } else {
+                                    "${formatDisplayVersion()} → v${pendingRelease.latestVersion}"
+                                },
+                                color = paletteTextSecondary,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isDarkTheme) AlethiaLime else AlethiaObsidian)
+                                .border(
+                                    width = if (updateBtnFocused) 2.dp else 1.dp,
+                                    color = if (updateBtnFocused) accentPrimary else Color.Transparent,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .onFocusChanged { updateBtnFocused = it.isFocused }
+                                .focusable()
+                                .clickable(enabled = apkUpdateProgress == null) {
+                                    onTriggerApkUpdate(pendingRelease)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                        ) {
+                            Text(
+                                text = if (apkUpdateProgress != null) {
+                                    "$apkUpdateProgress%"
+                                } else {
+                                    I18nDictionary.t(context, "native_android.apk_update_action", "Descargar")
+                                },
+                                color = if (isDarkTheme) AlethiaObsidian else AlethiaLime,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            tint = paletteTextSecondary,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clickable { updateBannerDismissed = true }
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = null,
-                        tint = paletteTextSecondary,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .clickable { updateBannerDismissed = true }
-                    )
                 }
             }
         }

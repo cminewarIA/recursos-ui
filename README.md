@@ -6,11 +6,11 @@
 
 # Panel de Recursos · Manual Interactivo (`Recursos Cockpit`)
 
-[![Versión](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2FcminewarIA%2Frecursos-ui%2Fmain%2FVERSION&search=%5B0-9.%5D%2B&prefix=v&label=Versi%C3%B3n&style=for-the-badge&color=1E6B38)](./VERSION)
+[![Versión](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2FcminewarIA%2Frecursos-ui%2Fmain%2FVERSION&search=%5B0-9.%5D%2B&prefix=v&label=Servidor&style=for-the-badge&color=1E6B38)](./VERSION)
+[![Ubuntu](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2FcminewarIA%2Frecursos-ui%2Fmain%2FUBUNTU_VERSION&search=%5B0-9.%5D%2B&prefix=v&label=Ubuntu_.deb&style=for-the-badge&color=E95420&logo=ubuntu&logoColor=white)](./UBUNTU_VERSION)
+[![Android](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2FcminewarIA%2Frecursos-ui%2Fmain%2FANDROID_VERSION&search=%5B0-9.%5D%2B&prefix=v&label=Android_.apk&style=for-the-badge&color=3DDC84&logo=android&logoColor=black)](./ANDROID_VERSION)
 [![Manual HTML5 en Vivo](https://img.shields.io/badge/Manual_HTML5-Simuladores_%2B_API_en_Vivo-059669?style=for-the-badge&logo=readthedocs&logoColor=white)](./docs/index.html)
 [![Frontend](https://img.shields.io/badge/Interfaz-React_19_%2B_Tailwind_v4-0EA5E9?style=for-the-badge&logo=react&logoColor=white)](#-cap%C3%ADtulo-1--tour-visual-e-interactivo-por-las-5-pantallas)
-[![Linux](https://img.shields.io/badge/Ubuntu-.deb_WebKit2_%2B_DeX_USB-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)](#-cap%C3%ADtulo-4--manual-de-aplicaciones-nativas-deb--apk-y-dex-usb)
-[![Android](https://img.shields.io/badge/Android_%26_TV-.apk_Compose_%2B_Leanback-3DDC84?style=for-the-badge&logo=android&logoColor=black)](#-cap%C3%ADtulo-4--manual-de-aplicaciones-nativas-deb--apk-y-dex-usb)
 [![Seguridad](https://img.shields.io/badge/Seguridad-HMAC--256_%2B_AES--256--GCM-DC2626?style=for-the-badge&logo=shield&logoColor=white)](#-cap%C3%ADtulo-3--topolog%C3%ADa-aimesh-mapa-geoip-y-zero-trust)
 
 <p align="center">
@@ -123,12 +123,13 @@ Toda la plataforma se organiza en **5 dominios funcionales sin duplicidades**, c
 </details>
 
 <details>
-<summary><b>⚙️ Vista 5 · <code>/sistema/*</code> — Sistema, Temas OTA, Seguridad y Puente Nativo (5 páginas independientes)</b></summary>
+<summary><b>⚙️ Vista 5 · <code>/sistema/*</code> — Sistema, Temas OTA, Consola 24h, Seguridad y Puente Nativo (6 páginas independientes)</b></summary>
 
 1. **Páginas Independientes de Sistema y Configuración**:
-   - **`/sistema/actualizaciones`**: Diagnóstico de salud (`journalctl` + asistencia IA), selector de modo claro/oscuro e idioma (31 idiomas OTA) y gestor de actualizaciones `.deb` / Web OTA (con descarga completa forzada desde GitHub).
-   - **`/sistema/temas`**: Catálogo de **temas visuales independientes** (`./themes/themes.json` + `./themes/<id>.json`) sincronizable vía OTA desde GitHub sin recompilar ni actualizar la aplicación, estrenando **Alethia Matrix** (lluvia de terminal alimentada por métricas reales del servidor en tiempo real y paneles translúcidos en modo claro y oscuro).
-   - **`/sistema/dispositivos`**: Bóveda Zero-Trust, gestión de dispositivos autorizados, claves HMAC-SHA256 y revocación remota.
+   - **`/sistema/actualizaciones`**: Diagnóstico de salud (`journalctl` + asistencia IA), selector de modo claro/oscuro e idioma (31 idiomas OTA), gestor de actualizaciones Web/Servidor OTA y **panel dinámico de compilaciones nativas en GitHub** (`Ubuntu .deb` y `Android .apk` con ciclo desacoplado en [`./UBUNTU_VERSION`](./UBUNTU_VERSION) y [`./ANDROID_VERSION`](./ANDROID_VERSION)). En Ubuntu nativo permite descargar e instalar automáticamente el `.deb` y guardar el `.apk` directamente en `Descargas`.
+   - **`/sistema/temas`**: Catálogo de **temas visuales independientes** (`./themes/themes.json` + `./themes/<id>.json`) sincronizable vía OTA desde GitHub sin recompilar ni subir la versión de la app ni de los clientes (solo sube el campo `version` del tema), estrenando **Alethia Matrix** (lluvia de terminal con telemetría real en vivo y paneles translúcidos en modo claro y oscuro).
+   - **`/sistema/consola`**: **Consola del servicio en tiempo real estrictamente de solo lectura** (sin entrada de comandos) que muestra las trazas de ejecución, peticiones y sincronizaciones persistidas en `recursos_history.db` (`service_console_logs`) con **retención máxima automática de 24 horas** y sanitización de secretos.
+   - **`/sistema/dispositivos`**: Bóveda Zero-Trust, gestión de dispositivos autorizados, claves HMAC-SHA256, revocación remota y estado de **acceso root detectado silenciosamente en segundo plano** reflejado únicamente dentro de los detalles de la credencial del dispositivo.
    - **`/sistema/manual`**: Manual interactivo completo con simuladores en vivo sobre `<canvas>` y explorador de API REST.
    - **`/sistema/dex`**: Conexión de pantalla móvil USB (DeX a 60 FPS) desbloqueada exclusivamente en el cliente nativo de Ubuntu Linux.
 
@@ -233,20 +234,21 @@ Las aplicaciones nativas siguen el **Principio Contractual de Paridad y Simetrí
 | Característica | Interfaz Web SPA | App Nativa Ubuntu (`.deb`) | App Nativa Android &amp; Android TV (`.apk`) |
 | :--- | :--- | :--- | :--- |
 | **Contenedor Nativo** | Navegador Web Moderno | `GTK 3` + `WebKit2` + `LocalHtmlBridgeServer` | `Jetpack Compose` + `android.webkit.WebView` + `Leanback` |
-| **Detección del Nodo** | Manual por URL / IP | Escaneo LAN / `mDNS` + Lanzador 3 tarjetas | Descubrimiento dual `mDNS/NSD` (`_recursos._tcp`) + `ConnectivityManager` (`Wi-Fi`/`Ethernet` con `SocketFactory` dedicado, aislando `5G`/`VPN`) + permiso `ACCESS_LOCAL_NETWORK` (Android 16/17) |
-| **Almacén de Credenciales** | `Cookie HttpOnly` + `localStorage` | Configuración protegida / Keyring local | `Android KeyStore` + `EncryptedSharedPreferences` |
+| **Detección del Nodo** | Manual por URL / IP | Escaneo LAN / `mDNS` + Lanzador 3 tarjetas | **Descubridor local automático al iniciar** (si no está emparejado o falla el nodo guardado) con escaneo dual `mDNS/NSD` (`_recursos._tcp`) + subred `Wi-Fi`/`Ethernet`, emparejamiento en 1 toque e IP manual |
+| **Almacén de Credenciales** | `Cookie HttpOnly` + `localStorage` | Configuración protegida / Keyring local + detección silenciosa de root | `Android KeyStore` + `EncryptedSharedPreferences` + detección silenciosa de root reflejada solo en la credencial |
 | **Conmutación `LAN ↔ WAN`** | Según ruta accedida | IP LAN mínima latencia ↔ DDNS WAN cifrado | Automática al cambiar entre red local (LAN/Wi-Fi) y WAN exterior |
 | **Control y Ergonomía** | Ratón / Táctil | Ratón / Táctil / Atajos nativos | Táctil móvil/tablet + **D-Pad / Mando Android TV** (anillo cian + overscan) |
-| **Actualización OTA en Sitio** | Refresco del servidor o botón unificado | Botón único inteligente (`check_github_app_update()` + `perform_unified_update()`) que compara App Ubuntu, Servidor web local y GitHub, y actualiza la web local en caliente si la app supera a GitHub o al servidor | Keystore oficial permanente (`v1/v2/v3`, sin desinstalar) + despliegue ADB en TV con `install_all.sh` |
+| **Ciclo de Versiones y Descargas GitHub** | [`./VERSION`](./VERSION) | [`./UBUNTU_VERSION`](./UBUNTU_VERSION) independiente · descarga e instala `.deb` desde GitHub y guarda `.apk` en `Descargas` tanto desde el lanzador GTK como desde **Sistema → Actualizaciones** | [`./ANDROID_VERSION`](./ANDROID_VERSION) independiente · comprobación en segundo plano frente a GitHub, banner discreto y autoinstalación inteligente (`root` → `FileProvider` → navegador) |
 | **Pantalla Móvil USB (`DeX`)** | Oculto por arquitectura | **Desbloqueado en exclusiva** (`adb`, `scrcpy`, `/dev/uhid`) | Oculto por arquitectura |
 
 <details>
 <summary><b>🐧 Guía paso a paso · App Nativa Ubuntu (<code>.deb</code>) y Lanzador en 3 Tarjetas</b></summary>
 
 1. **Tarjeta 1 · Conectar con el nodo**: Busca automáticamente tu servidor en la red local o utiliza el dominio DDNS guardado para conmutar a WAN cuando sales de casa.
-2. **Tarjeta 2 · Nodo local y actualización unificada en un clic**: Compara automáticamente las tres versiones (**App Ubuntu**, **Servidor web local** y **GitHub Releases**) mediante SemVer:
-   - Si GitHub es superior a la App Ubuntu, descarga el `.deb` oficial con firma GPG + `SHA256SUMS.txt` y lo instala sin desinstalar ni perder tokens.
-   - Si la **App Ubuntu y/o GitHub** superan al servidor local (incluso cuando tu App Ubuntu es más reciente que la publicada en GitHub), el mismo botón único sincroniza la web compilada directamente al servidor vía `POST /api/system/sync-web` en caliente sin sobrescribir `recursos_history.db`.
+2. **Tarjeta 2 · Compilaciones GitHub (`.deb` / `.apk`) y Nodo local**: Consulta dinámicamente la última publicación oficial en GitHub (separada del ciclo del servidor gracias a [`./UBUNTU_VERSION`](./UBUNTU_VERSION) y [`./ANDROID_VERSION`](./ANDROID_VERSION)):
+   - **Descargar e instalar `.deb` (GitHub)**: descarga el paquete `.deb` verificado desde GitHub e instala la actualización automáticamente sin perder tokens.
+   - **Descargar `.apk` a Descargas**: descarga la última compilación Android desde GitHub y la guarda directamente en tu carpeta `Descargas` (`xdg-user-dir DOWNLOAD`).
+   - **Sincronización web en caliente**: actualiza el servidor local sin sobrescribir `recursos_history.db` ni forzar nuevas compilaciones nativas cuando solo cambian la web o los temas.
 3. **Tarjeta 3 · Configuraciones y Verificación CLI**: Puedes verificar todo el entorno nativo y el puente loopback sin abrir ventana ejecutando:
    ```bash
    /usr/bin/recursos-cockpit --test-mode
@@ -406,6 +408,18 @@ curl -fsS -X POST -H "Content-Type: application/json" -H "X-Device-Token: $TOKEN
 </details>
 
 <details>
+<summary><b><code>GET /api/system/console-logs</code> y <code>GET /api/native/github-releases</code></b> — Consola de solo lectura 24 h y compilaciones nativas en GitHub</summary>
+
+```bash
+curl -fsS -H "X-Device-Token: $TOKEN" "http://127.0.0.1:8085/api/system/console-logs?window=live&level=ALL&limit=100" | jq '{ok, read_only, retention_hours, total_24h, count: (.entries | length)}'
+curl -fsS -H "X-Device-Token: $TOKEN" "http://127.0.0.1:8085/api/native/github-releases?refresh=1" | jq '{ok, local_ubuntu_version, local_android_version, deb: .deb.version, apk: .apk.version}'
+```
+- `GET /api/system/console-logs` expone únicamente lectura (sin entrada ni ejecución de comandos) de la tabla `service_console_logs` en `recursos_history.db`, con poda automática de entradas mayores a `24 h` y redacción de tokens/credenciales antes de guardar.
+- `GET /api/native/github-releases` consulta dinámicamente las compilaciones `.deb` y `.apk` publicadas en GitHub frente a [`./UBUNTU_VERSION`](./UBUNTU_VERSION) y [`./ANDROID_VERSION`](./ANDROID_VERSION). En Ubuntu nativo se habilitan además `POST /api/native/download-deb` (descarga e instala automáticamente) y `POST /api/native/download-apk` (guarda el `.apk` en `Descargas`).
+
+</details>
+
+<details>
 <summary><b><code>POST /api/wol/wake</code> y <code>POST /api/wol/shutdown</code></b> — Encendido y apagado remoto multicanal</summary>
 
 ```bash
@@ -511,17 +525,19 @@ tu-subdominio.duckdns.org {
 
 ## 📏 Capítulo 7 · Reglas de Ingeniería y Diferencias de Arquitectura
 
-Todo el proyecto se rige por [`./GEMINI.md`](./GEMINI.md) manteniendo [`./VERSION`](./VERSION) como **única fuente de verdad** propagada automáticamente a [`package.json`](./package.json), [`packaging/debian/control`](./packaging/debian/control), Android Gradle, [`server.py`](./server.py), [`desktop_app/recursos_app.py`](./desktop_app/recursos_app.py), React 19 y [`static/manual.html`](./static/manual.html):
+Todo el proyecto se rige por [`./GEMINI.md`](./GEMINI.md) manteniendo [`./VERSION`](./VERSION) como versión canónica del servidor/web y archivos independientes [`./UBUNTU_VERSION`](./UBUNTU_VERSION) y [`./ANDROID_VERSION`](./ANDROID_VERSION) para los clientes nativos:
 
 * **`X.0.0` (`MAJOR`)**: Rediseño completo global de toda la aplicación.
 * **`0.X.0` (`MINOR`)**: Adición, retiro o rediseño completo de una funcionalidad o vista concreta.
 * **`0.0.X` (`PATCH`)**: Optimización interna, corrección de errores, reglas o mejoras documentales.
+* **Excepciones sin incremento de versión principal**: las traducciones en `./i18n/dictionary.csv` y los ajustes de temas visuales (`./themes/*.json`) **nunca** incrementan `./VERSION`, `./UBUNTU_VERSION` ni `./ANDROID_VERSION` (los ajustes de temas solo actualizan su propio campo `version` dentro del JSON del tema).
 
 <details open>
 <summary><b>🔄 Diferencias Clave de la Versión Vigente (<a href="./VERSION"><code>./VERSION</code></a>) frente a Arquitecturas Anteriores</b></summary>
 
 | Ámbito | Arquitectura Anterior | Versión Vigente ([`./VERSION`](./VERSION)) |
 | :--- | :--- | :--- |
+| **Desacoplo de Versiones Nativas, Consola 24 h Solo Lectura, Descargas GitHub, Descubridor Android y Root Silencioso** | Los clientes Ubuntu (`.deb`) y Android (`.apk`) compartían la misma versión del servidor (`./VERSION`), publicando compilaciones innecesarias al modificar la interfaz web o temas; Android no abría automáticamente el buscador local al iniciar sin emparejar ni ofrecía autoinstalación inteligente; no existía una consola de solo lectura del servicio con retención 24 h; y el estado root no se detectaba en segundo plano. | **Ciclo desacoplado (`UBUNTU_VERSION` y `ANDROID_VERSION` independientes con CI filtrado por rutas nativas)** y política estricta de **versionado exclusivo por tema** (ajustar temas nunca sube la versión de servidor ni clientes); **Consola del servicio en tiempo real de solo lectura (`/sistema/consola`)** persistida en `recursos_history.db` (`service_console_logs`) con poda automática a 24 h y sanitización de secretos; **panel dinámico de compilaciones GitHub (`.deb` + `.apk`)** en **Sistema → Actualizaciones** y el **lanzador GTK de Ubuntu** (autoinstalación `.deb` y guardado de `.apk` en `Descargas`); **descubridor local automático al arranque en Android** (al iniciar sin emparejar o si falla el nodo guardado) junto a banner de actualización desde GitHub con autoinstalación inteligente (`root` → `FileProvider` → navegador); y **detección silenciosa de root en segundo plano** (sin interruptores en UI) reflejada únicamente dentro de la credencial del dispositivo en **Sistema → Dispositivos**. |
 | **Gráfica Térmica de CPU, 6 Widgets CPU Dinámicos e Historial SQLite Universal en Todas las Gráficas** | La gráfica principal de CPU solo mostraba el porcentaje de uso sin temperatura (`°C`), `/equipo/cpu` carecía de sub-gráficas modulares con selector de sensores, las tarjetas individuales por disco/NIC carecían de persistencia granular y 5 sub-gráficas de GPU (`VRAM`, `Video`, `Energía/Temp`, `Relojes`, `PCIe`) estaban limitadas a una ventana local de 20 minutos en memoria. | **Serie térmica `°C` integrada como curva discontinua en el eje derecho de todas las gráficas de CPU (`/inicio`, `/equipo/cpu` e Inspección Táctil)** con lectura dinámica en `/sys/class/hwmon`, `/sys/class/thermal` y `psutil`; **panel `/equipo/cpu` reestructurado con 6 widgets adaptados al modelo GPU** (banda resumen de 4 sensores, selector dinámico de gráficas activas y rejilla adaptable con pie `Media · Pico · Actual` para `Uso y Temperatura`, `Consumo RAPL / Temperatura`, `Frecuencia de Reloj`, `Usuario/Sistema/E/S`, `Cola de Carga 1m/5m` y `Sensores Térmicos por Sonda` con inspección por sonda individual); y **persistencia universal en `recursos_history.db` (18 columnas extendidas en `telemetry_history` + tabla granular `device_series_history` con `GET /api/metrics/entity-history` para cada disco, NIC y sonda térmica)** desbloqueando el historial completo (`En vivo · 20m · 1h · 6h · 24h · Todo`) y el desplazamiento temporal en todas las gráficas de CPU, GPU, red y disco sin tope de 20 min. |
 | **Autodescubrimiento LAN Robusto en Android 16/17 (`ConnectivityManager` + `mDNS/NSD` `_recursos._tcp`)** | `DiscoveryManager` tomaba la primera interfaz `NetworkInterface` activa (`10.*`/`172.*`/`192.168.*`), pudiendo quedar atrapado en `rmnet_data*` (5G/IMS) o túneles VPN; faltaba el permiso de red local en Android 16/17 (`ACCESS_LOCAL_NETWORK`), no se publicaba ni resolvía `_recursos._tcp` por mDNS/Avahi y `probeNode` recalculaba la telemetría completa en las 254 sondas `/24`. | **Selección prioritaria de subred `TRANSPORT_WIFI`/`TRANSPORT_ETHERNET` mediante `ConnectivityManager.LinkProperties`** (aislada de interfaces celulares/VPN, con filtro estricto RFC1918 y binding al `SocketFactory` Wi-Fi), **permiso en tiempo de ejecución `ACCESS_LOCAL_NETWORK` + `NEARBY_WIFI_DEVICES`** para Android 16/17 (`SDK 36+`), **descubrimiento paralelo mDNS/NSD (`_recursos._tcp`) respaldado por Avahi (`/etc/avahi/services/recursos-cockpit.service` + `start_mdns_service_advertiser()` en [`server.py`](./server.py))** y **sondas rápidas ligeras con caché de telemetría de 30 s**. |
 | **Interfaz Única Multiplataforma (Ubuntu GTK 3 + Android/TV), Descarga Exacta de APK/DEB, Caché Blindada y Retiro de Firebase** | La app Android mostraba una barra superior nativa duplicada con colores heredados, mantenía 11 vistas Compose obsoletas, podía retener versiones antiguas de la UI en caché de WebView y `/download/recursos-cockpit.apk` (así como `install_tv_apk.sh`) servían APKs obsoletas en `dist/` renombradas con la versión nueva; la app Ubuntu carecía de CSS oscuro GTK, presentaba contraste roto en `.launcher-hero` y dependía de Firebase/Firestore. | **Interfaz única real de borde a borde en Web, Ubuntu (`.deb`) y Android/TV (`.apk`) bajo normativa `3.3` y `5.1–5.2` de [`./GEMINI.md`](./GEMINI.md)**: eliminación de los 11 componentes Compose obsoletos y de la cabecera nativa duplicada en Android, sincronización dinámica de tema Claro/Oscuro (`Web ↔ Android` y `Web ↔ Ubuntu GTK 3`), **entrega estricta por versión exacta en `/download/recursos-cockpit.apk` y `.deb`** (poda automática de APKs obsoletos en OTA + redirección directa a GitHub Releases sin caché + descarga oficial automática en `install_tv_apk.sh`), **Android WebView con `LOAD_NO_CACHE`, limpieza automática de caché al actualizar servidor, soporte nativo de descargas (`DownloadListener`) y aviso Alethia in-app cuando hay una APK superior**, y **retiro íntegro de Firebase/Firestore** consolidando toda la persistencia en `recursos_history.db`. |

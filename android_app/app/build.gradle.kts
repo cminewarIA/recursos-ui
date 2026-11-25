@@ -3,19 +3,19 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val canonicalVersionFile = file("../../VERSION")
+val canonicalVersionFile = file("../../ANDROID_VERSION")
 val canonicalVersion = if (canonicalVersionFile.exists()) {
     canonicalVersionFile.readText().trim().ifEmpty {
-        throw GradleException("El archivo VERSION raíz está vacío.")
+        throw GradleException("El archivo ANDROID_VERSION raíz está vacío.")
     }
 } else {
-    throw GradleException("No se encontró el archivo canónico ../../VERSION.")
+    throw GradleException("No se encontró el archivo canónico ../../ANDROID_VERSION.")
 }
 val verParts = canonicalVersion.split(".").mapNotNull { it.toIntOrNull() }
 val computedVersionCode = if (verParts.size >= 3) {
     verParts[0] * 10000 + verParts[1] * 100 + verParts[2]
 } else {
-    throw GradleException("VERSION inválida para calcular versionCode: $canonicalVersion")
+    throw GradleException("ANDROID_VERSION inválida para calcular versionCode: $canonicalVersion")
 }
 
 android {

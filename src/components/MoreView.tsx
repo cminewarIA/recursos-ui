@@ -22,15 +22,18 @@ import {
   Smartphone,
   Sparkles,
   Sun,
+  Terminal,
   Trash2,
   Usb,
 } from 'lucide-react';
 import { COCKPIT_SPRING, MorphPill, ViewStage } from './MotionPrimitives';
+import { ServiceConsoleView } from './ServiceConsoleView';
 import {
   AiSimplifyFaultsResponse,
   AiSystemFaultInsight,
   DexStatusPayload,
   FailedSystemdUnit,
+  GithubNativeReleasesPayload,
   MetricsPayload,
   SystemErrorLogEntry,
   SystemErrorsSummary,
@@ -39,17 +42,18 @@ import {
   VersionInfo,
 } from '../types/telemetry';
 import { apiFetchJson, detectNativeEnvironment } from '../utils/api';
-import { getDisplayVersionString } from '../utils/formatters';
+import { formatBytes, getDisplayVersionString } from '../utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion } from '../utils/version';
 import { useI18n } from '../i18n';
 import { resolveThemeLocalizedText, useThemeCatalog } from '../themes';
 
-type MoreSubTab = 'updates' | 'themes' | 'devices' | 'manual' | 'dex';
+type MoreSubTab = 'updates' | 'themes' | 'console' | 'devices' | 'manual' | 'dex';
 
 function resolveMoreSubTab(hint?: string): MoreSubTab | undefined {
   if (!hint) return undefined;
   const h = hint.toLowerCase();
   if (['themes', 'temas', 'apariencia', 'appearance', 'matrix'].includes(h)) return 'themes';
+  if (['console', 'consola', 'terminal', 'shell', 'stdout'].includes(h)) return 'console';
   if (['updates', 'actualizaciones', 'logs', 'sistema', 'version', 'settings', 'ajustes', 'health', 'salud'].includes(h)) return 'updates';
   if (['devices', 'dispositivos', 'nodos', 'security', 'seguridad'].includes(h)) return 'devices';
   if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(h)) return 'manual';
@@ -90,11 +94,11 @@ export const MoreView: React.FC<MoreViewProps> = ({
     isSyncingThemes,
     syncThemesFromGitHub,
   } = useThemeCatalog();
-  const { isUbuntuNative, isAndroidNative, isNativeApp } = detectNativeEnvironment();
+  const { isUbuntuNative, isAndroidNative } = detectNativeEnvironment();
   const installedAndroidVersion = useMemo(() => {
     if (!isAndroidNative || typeof window === 'undefined') return '';
-    const tel = window.__RECURSOS_DEVICE_TELEMETRY__ as { app_version?: string } | undefined;
-    const raw = String(tel?.app_version || '').trim().replace(/^v/i, '');
+    const tel = window.__RECURSOS_DEVICE_TELEMETRY__ as { app_version?: string; client_version?: string } | undefined;
+    const raw = String(tel?.client_version || tel?.app_version || '').trim().replace(/^v/i, '');
     if (raw) return raw;
     const uaMatch = (navigator.userAgent || '').match(/RecursosCockpit-Android\/([0-9.]+)/i);
     return uaMatch ? uaMatch[1] : '';
@@ -194,6 +198,24 @@ export const MoreView: React.FC<MoreViewProps> = ({
   const [dexResolution, setDexResolution] = useState('1920x1080');
   const [dexFps, setDexFps] = useState(60);
   const [dexFullscreen, setDexFullscreen] = useState(false);
+
+  // GitHub Native Releases state (Ubuntu .deb & Android .apk decoupled from server version)
+  const [githubReleases, setGithubReleases] = useState<GithubNativeReleasesPayload | null>(null);
+  const [loadingGithubReleases, setLoadingGithubReleases] = useState(false);
+  const [downloadingDeb, setDownloadingDeb] = useState(false);
+  const [downloadingApk, setDownloadingApk] = useState(false);
+  const [apkSavedPath, setApkSavedPath] = useState('');
+
+  const loadGithubReleases = useCallback(async (force = false) => {
+    setLoadingGithubReleases(true);
+    const res = await apiFetchJson<GithubNativeReleasesPayload>(
+      `/api/native/github-releases${force ? '?refresh=1' : ''}`
+    );
+    setLoadingGithubReleases(false);
+    if (res.ok && res.data) {
+      setGithubReleases(res.data);
+    }
+  }, []);
 
   const loadVersion = useCallback(async (force = false) => {
     setCheckingUpdate(true);
@@ -339,13 +361,14 @@ export const MoreView: React.FC<MoreViewProps> = ({
   useEffect(() => {
     if (subTab === 'updates') {
       void loadVersion(false);
+      void loadGithubReleases(false);
       void loadLogs();
     } else if (subTab === 'devices') {
       void loadDevices();
     } else if (subTab === 'dex') {
       void loadDex();
     }
-  }, [subTab, loadVersion, loadLogs, loadDevices, loadDex]);
+  }, [subTab, loadVersion, loadGithubReleases, loadLogs, loadDevices, loadDex]);
 
   const activeVer = versionInfo || metrics?.version_info;
   const displayVer = getCanonicalDisplayVersion(activeVer);
@@ -515,6 +538,67 @@ export const MoreView: React.FC<MoreViewProps> = ({
     }
   };
 
+  const triggerDirectDownload = (url: string, fallbackHref: string) => {
+    const clean = String(url || '').trim();
+    const safeUrl = clean.startsWith('https://') ? clean : fallbackHref;
+    const anchor = document.createElement('a');
+    anchor.href = safeUrl;
+    anchor.rel = 'noopener noreferrer';
+    anchor.setAttribute('download', '');
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  };
+
+  const handleDownloadGithubDeb = async () => {
+    const ubuntuNativeBridge = isUbuntuNative || Boolean(githubReleases?.is_ubuntu_native);
+    if (ubuntuNativeBridge) {
+      setDownloadingDeb(true);
+      const res = await apiFetchJson<{ ok?: boolean; message?: string; error?: string; relaunching?: boolean }>(
+        '/api/native/download-deb',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+      );
+      setDownloadingDeb(false);
+      if (res.ok && res.data?.ok !== false) {
+        onNotify(res.data?.message || t('updates.native_deb_installed_toast'));
+        void loadGithubReleases(true);
+      } else {
+        onNotify(res.data?.error || res.data?.message || res.error || t('updates.native_deb_error_toast'), true);
+      }
+      return;
+    }
+    triggerDirectDownload(githubReleases?.deb?.download_url || '', '/download/recursos-cockpit.deb');
+  };
+
+  const handleDownloadGithubApk = async () => {
+    const ubuntuNativeBridge = isUbuntuNative || Boolean(githubReleases?.is_ubuntu_native);
+    if (ubuntuNativeBridge) {
+      setDownloadingApk(true);
+      setApkSavedPath('');
+      const res = await apiFetchJson<{
+        ok?: boolean;
+        message?: string;
+        saved_path?: string;
+        downloads_dir?: string;
+        error?: string;
+      }>('/api/native/download-apk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      setDownloadingApk(false);
+      if (res.ok && res.data?.ok !== false) {
+        const saved = res.data?.saved_path || res.data?.downloads_dir || '';
+        setApkSavedPath(saved);
+        onNotify(res.data?.message || t('updates.native_apk_saved_toast', { path: saved }));
+      } else {
+        onNotify(res.data?.error || res.data?.message || res.error || t('updates.native_apk_error_toast'), true);
+      }
+      return;
+    }
+    triggerDirectDownload(githubReleases?.apk?.download_url || '', '/download/recursos-cockpit.apk');
+  };
+
   return (
     <div className="space-y-[clamp(0.85rem,1.8dvh,1.25rem)]">
       {/* Sub-navigation auto-wrapping fluid bar (zero clipped tabs) */}
@@ -523,6 +607,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
           {[
             { id: 'updates' as const, label: t('more.subtabs.updates'), icon: <GitCommit className="h-4 w-4" /> },
             { id: 'themes' as const, label: t('more.subtabs.themes'), icon: <Palette className="h-4 w-4" /> },
+            { id: 'console' as const, label: t('more.subtabs.console'), icon: <Terminal className="h-4 w-4" /> },
             { id: 'devices' as const, label: t('more.subtabs.devices'), icon: <ShieldCheck className="h-4 w-4" /> },
             { id: 'manual' as const, label: t('more.subtabs.manual'), icon: <BookOpen className="h-4 w-4" /> },
             ...(isUbuntuNative
@@ -1197,69 +1282,175 @@ export const MoreView: React.FC<MoreViewProps> = ({
             );
           })()}
 
-          {/* Native apps download (Web shows Ubuntu + Android; Android native also exposes APK update) */}
-          {(!isNativeApp || isAndroidNative) && (
-            <section className="cockpit-bento p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200/70 dark:border-slate-800">
-                <div>
+          {/* Dynamic GitHub Native Builds (Ubuntu .deb & Android .apk — decoupled 1.1.1 lifecycle) */}
+          <section className="cockpit-bento p-5" data-testid="github-native-releases-panel">
+            <div className="flex flex-col gap-3 border-b border-slate-200/70 pb-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
                   <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-                    {t('more.native_apps_title')}
+                    {t('updates.native_releases_title')}
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {t('more.devices_desc')}
-                  </p>
-                </div>
-                <span className="cockpit-pill-emerald rounded-lg px-2.5 py-1 font-mono text-[11px] font-bold tabular-nums">
-                  v{displayVer}
-                </span>
-              </div>
-              <div className={`mt-4 grid grid-cols-1 gap-3 ${!isAndroidNative ? 'sm:grid-cols-2' : ''}`}>
-                {!isAndroidNative && (
-                  <a
-                    href="/download/recursos-cockpit.deb"
-                    className="cockpit-subtile flex min-h-[60px] items-center justify-between px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:border-sky-400 dark:text-slate-100"
-                  >
-                    <span className="flex items-center gap-3">
-                      <span className="cockpit-pill-cyan inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
-                        <Laptop className="h-5 w-5" />
-                      </span>
-                      <span>
-                        <span className="block">{t('more.ubuntu_app')}</span>
-                        <span className="font-normal text-slate-500 dark:text-slate-400">{t('more.ubuntu_app_sub')}</span>
-                      </span>
+                  {githubReleases?.tag_name && (
+                    <span className="cockpit-pill-emerald rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold">
+                      GitHub {githubReleases.tag_name}
                     </span>
-                    <Download className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {t('updates.native_releases_desc')}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {githubReleases?.release_url && (
+                  <a
+                    href={githubReleases.release_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="cockpit-subtile inline-flex min-h-[36px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-sky-700 dark:text-slate-200 dark:hover:text-sky-300"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>GitHub</span>
                   </a>
                 )}
-                <a
-                  href="/download/recursos-cockpit.apk"
-                  className={`cockpit-subtile flex min-h-[60px] items-center justify-between px-4 py-3 text-xs font-semibold text-slate-800 transition-colors hover:border-emerald-400 dark:text-slate-100 ${
-                    installedAndroidVersion && installedAndroidVersion !== displayVer
-                      ? 'ring-1 ring-[#1e6b38]/40 dark:ring-[#c6f19d]/40'
-                      : ''
-                  }`}
+                <button
+                  type="button"
+                  disabled={loadingGithubReleases}
+                  onClick={() => void loadGithubReleases(true)}
+                  className="cockpit-subtile inline-flex min-h-[36px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-sky-700 disabled:opacity-50 dark:text-slate-200 dark:hover:text-sky-300 cursor-pointer"
                 >
-                  <span className="flex items-center gap-3">
-                    <span className="cockpit-pill-emerald inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingGithubReleases ? 'animate-spin' : ''}`} />
+                  <span>{t('more.check_btn')}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {/* Ubuntu .deb Card */}
+              <div className="cockpit-subtile flex flex-col justify-between gap-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="cockpit-pill-cyan inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+                      <Laptop className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                        {t('more.ubuntu_app')}
+                      </p>
+                      <p className="truncate font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                        {githubReleases?.deb?.asset_name || 'recursos-cockpit.deb'}
+                        {githubReleases?.deb?.size_bytes
+                          ? ` · ${formatBytes(githubReleases.deb.size_bytes)}`
+                          : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0 font-mono text-[10.5px] tabular-nums">
+                    <span className="cockpit-pill-cyan rounded-md px-2 py-0.5 font-semibold">
+                      GitHub v{githubReleases?.deb?.version || githubReleases?.local_ubuntu_version || '1.1.1'}
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {t('updates.native_local_ver', {
+                        ver: githubReleases?.local_ubuntu_version || '1.1.1',
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 pt-3 dark:border-slate-800">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isUbuntuNative || githubReleases?.is_ubuntu_native
+                      ? t('updates.native_deb_ubuntu_hint')
+                      : t('more.ubuntu_app_sub')}
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="download-github-deb-btn"
+                    disabled={downloadingDeb}
+                    onClick={handleDownloadGithubDeb}
+                    className="cockpit-btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold disabled:opacity-55 cursor-pointer"
+                  >
+                    {downloadingDeb ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" />
+                    )}
+                    <span>
+                      {downloadingDeb
+                        ? t('updates.native_deb_installing')
+                        : isUbuntuNative || githubReleases?.is_ubuntu_native
+                          ? t('updates.native_deb_install_btn')
+                          : t('updates.native_deb_download_btn')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Android .apk Card */}
+              <div className="cockpit-subtile flex flex-col justify-between gap-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="cockpit-pill-emerald inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
                       <Smartphone className="h-5 w-5" />
                     </span>
-                    <span>
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span>{t('more.android_app')}</span>
-                        {installedAndroidVersion && installedAndroidVersion !== displayVer && (
-                          <span className="cockpit-pill-lime rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums">
-                            v{installedAndroidVersion} → v{displayVer}
-                          </span>
-                        )}
-                      </span>
-                      <span className="font-normal text-slate-500 dark:text-slate-400">{t('more.android_app_sub')}</span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                        {t('more.android_app')}
+                      </p>
+                      <p className="truncate font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                        {githubReleases?.apk?.asset_name || 'recursos-cockpit.apk'}
+                        {githubReleases?.apk?.size_bytes
+                          ? ` · ${formatBytes(githubReleases.apk.size_bytes)}`
+                          : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0 font-mono text-[10.5px] tabular-nums">
+                    <span className="cockpit-pill-emerald rounded-md px-2 py-0.5 font-semibold">
+                      GitHub v{githubReleases?.apk?.version || githubReleases?.local_android_version || '1.1.1'}
                     </span>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {t('updates.native_local_ver', {
+                        ver: installedAndroidVersion || githubReleases?.local_android_version || '1.1.1',
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 pt-3 dark:border-slate-800">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isUbuntuNative || githubReleases?.is_ubuntu_native
+                      ? t('updates.native_apk_ubuntu_hint')
+                      : t('more.android_app_sub')}
                   </span>
-                  <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                </a>
+                  <button
+                    type="button"
+                    data-testid="download-github-apk-btn"
+                    disabled={downloadingApk}
+                    onClick={handleDownloadGithubApk}
+                    className="cockpit-btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold disabled:opacity-55 cursor-pointer"
+                  >
+                    {downloadingApk ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" />
+                    )}
+                    <span>
+                      {downloadingApk
+                        ? t('updates.native_apk_downloading')
+                        : isUbuntuNative || githubReleases?.is_ubuntu_native
+                          ? t('updates.native_apk_downloads_btn')
+                          : t('updates.native_apk_download_btn')}
+                    </span>
+                  </button>
+                </div>
+                {apkSavedPath && (
+                  <p className="truncate rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1.5 font-mono text-[10.5px] text-emerald-800 dark:text-emerald-300">
+                    {apkSavedPath}
+                  </p>
+                )}
               </div>
-            </section>
-          )}
+            </div>
+          </section>
         </div>
       )}
 
@@ -1478,6 +1669,9 @@ export const MoreView: React.FC<MoreViewProps> = ({
         </div>
       )}
 
+      {/* 1c. Consola del servicio en tiempo real (Solo lectura · Retención máx. 24h) */}
+      {subTab === 'console' && <ServiceConsoleView onNotify={onNotify} />}
+
       {/* 2. Dispositivos conectados (Zero-Trust pairing) */}
       {subTab === 'devices' && (
         <section className="cockpit-bento p-5">
@@ -1665,22 +1859,60 @@ export const MoreView: React.FC<MoreViewProps> = ({
                       </button>
                     </div>
 
-                    {isOpen && (
-                      <pre
-                        data-cockpit-scroll-contain="true"
-                        className="cockpit-scroll-panel w-full max-w-full overflow-auto overscroll-contain rounded-xl border border-slate-200/70 bg-slate-950/[0.03] p-2.5 font-mono text-[10.5px] leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300"
-                      >
-                        {JSON.stringify(
-                          {
-                            id: dev.id,
-                            certificado: dev.certificate_serial,
-                            hardware: dev.device_telemetry,
-                          },
-                          null,
-                          2
-                        )}
-                      </pre>
-                    )}
+                    {isOpen && (() => {
+                      const hasRoot = Boolean(dev.root_access ?? tel.root_access);
+                      const rootMethod = String(dev.root_method || tel.root_method || '').trim();
+                      const rootLabel = hasRoot
+                        ? rootMethod
+                          ? t('devices.root_active_method', { method: rootMethod })
+                          : t('devices.root_active')
+                        : t('devices.root_not_detected');
+
+                      return (
+                        <div className="space-y-2.5">
+                          <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200/70 bg-slate-950/[0.03] p-2.5 text-[11px] dark:border-slate-800 dark:bg-slate-950/40 sm:grid-cols-2">
+                            <div className="min-w-0">
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                {t('devices.credential_root_label')}
+                              </span>
+                              <span
+                                className={`mt-0.5 inline-flex items-center gap-1 font-mono font-semibold ${
+                                  hasRoot
+                                    ? 'text-emerald-700 dark:text-[#c6f19d]'
+                                    : 'text-slate-600 dark:text-slate-300'
+                                }`}
+                              >
+                                {rootLabel}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                {t('devices.credential_cert_label')}
+                              </span>
+                              <span className="mt-0.5 block truncate font-mono text-slate-700 dark:text-slate-200">
+                                {dev.certificate_serial || '--'}
+                              </span>
+                            </div>
+                          </div>
+                          <pre
+                            data-cockpit-scroll-contain="true"
+                            className="cockpit-scroll-panel w-full max-w-full overflow-auto overscroll-contain rounded-xl border border-slate-200/70 bg-slate-950/[0.03] p-2.5 font-mono text-[10.5px] leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300"
+                          >
+                            {JSON.stringify(
+                              {
+                                id: dev.id,
+                                certificado: dev.certificate_serial,
+                                root_access: hasRoot,
+                                root_method: rootMethod || 'none',
+                                hardware: dev.device_telemetry,
+                              },
+                              null,
+                              2
+                            )}
+                          </pre>
+                        </div>
+                      );
+                    })()}
                   </article>
                 );
               })}

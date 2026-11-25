@@ -1,26 +1,118 @@
-name: Compilación Automática de Paquetes Firmados (.deb Linux & .apk Android)
+name: Compilación Selectiva de Clientes Nativos (.deb Ubuntu & .apk Android)
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'desktop_app/**'
+      - 'packaging/build_deb.sh'
+      - 'packaging/debian/**'
+      - 'packaging/sign_deb.py'
+      - 'UBUNTU_VERSION'
+      - 'android_app/**'
+      - 'packaging/build_apk.sh'
+      - 'ANDROID_VERSION'
+      - '.github/workflows/build-deb.yml'
     tags:
-      - 'v*'
+      - 'ubuntu-v*'
+      - 'android-v*'
+      - 'native-v*'
   workflow_dispatch:
+    inputs:
+      build_ubuntu:
+        description: 'Compilar y publicar paquete Ubuntu (.deb)'
+        required: false
+        default: true
+        type: boolean
+      build_android:
+        description: 'Compilar y publicar paquete Android (.apk)'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
 
 concurrency:
-  group: build-packages-release
+  group: build-native-clients-release
   cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  detect-native-changes:
+    name: 🔍 Detectar Cambios en Clientes Nativos (Desacoplado de Web/Temas)
+    runs-on: ubuntu-24.04
+    outputs:
+      build_ubuntu: ${{ steps.detect.outputs.build_ubuntu }}
+      build_android: ${{ steps.detect.outputs.build_android }}
+      ubuntu_version: ${{ steps.detect.outputs.ubuntu_version }}
+      android_version: ${{ steps.detect.outputs.android_version }}
+      release_tag: ${{ steps.detect.outputs.release_tag }}
+    steps:
+      - name: 📥 Clonar Repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 🧭 Analizar Rutas Modificadas
+        id: detect
+        run: |
+          UBUNTU_VER=$(tr -d '[:space:]' < UBUNTU_VERSION)
+          ANDROID_VER=$(tr -d '[:space:]' < ANDROID_VERSION)
+          echo "ubuntu_version=$UBUNTU_VER" >> "$GITHUB_OUTPUT"
+          echo "android_version=$ANDROID_VER" >> "$GITHUB_OUTPUT"
+
+          BUILD_UBUNTU="false"
+          BUILD_ANDROID="false"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BUILD_UBUNTU="${{ github.event.inputs.build_ubuntu }}"
+            BUILD_ANDROID="${{ github.event.inputs.build_android }}"
+          elif [[ "${{ github.ref }}" == refs/tags/ubuntu-v* ]]; then
+            BUILD_UBUNTU="true"
+          elif [[ "${{ github.ref }}" == refs/tags/android-v* ]]; then
+            BUILD_ANDROID="true"
+          elif [[ "${{ github.ref }}" == refs/tags/native-v* ]]; then
+            BUILD_UBUNTU="true"
+            BUILD_ANDROID="true"
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff-tree --no-commit-id --name-only -r HEAD)
+            echo "Archivos modificados:"
+            echo "$CHANGED"
+            if echo "$CHANGED" | grep -qE '^(desktop_app/|packaging/build_deb\.sh$|packaging/debian/|packaging/sign_deb\.py$|UBUNTU_VERSION$)'; then
+              BUILD_UBUNTU="true"
+            fi
+            if echo "$CHANGED" | grep -qE '^(android_app/|packaging/build_apk\.sh$|ANDROID_VERSION$)'; then
+              BUILD_ANDROID="true"
+            fi
+          fi
+
+          if [ "$BUILD_UBUNTU" = "true" ] && [ "$BUILD_ANDROID" = "true" ]; then
+            if [ "$UBUNTU_VER" = "$ANDROID_VER" ]; then
+              RELEASE_TAG="native-v$UBUNTU_VER"
+            else
+              RELEASE_TAG="native-u${UBUNTU_VER}-a${ANDROID_VER}"
+            fi
+          elif [ "$BUILD_UBUNTU" = "true" ]; then
+            RELEASE_TAG="ubuntu-v$UBUNTU_VER"
+          elif [ "$BUILD_ANDROID" = "true" ]; then
+            RELEASE_TAG="android-v$ANDROID_VER"
+          else
+            RELEASE_TAG=""
+          fi
+
+          echo "build_ubuntu=$BUILD_UBUNTU" >> "$GITHUB_OUTPUT"
+          echo "build_android=$BUILD_ANDROID" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "Resultado -> build_ubuntu=$BUILD_UBUNTU (v$UBUNTU_VER), build_android=$BUILD_ANDROID (v$ANDROID_VER), tag=$RELEASE_TAG"
+
   build-packages:
-    name: 📦 Compilar y Firmar Recursos Cockpit (.deb & .apk)
+    name: 📦 Compilar y Firmar Clientes Nativos (.deb / .apk)
+    needs: detect-native-changes
+    if: needs.detect-native-changes.outputs.build_ubuntu == 'true' || needs.detect-native-changes.outputs.build_android == 'true'
     runs-on: ubuntu-24.04
 
     steps:
@@ -30,26 +122,33 @@ jobs:
           fetch-depth: 0
 
       - name: 🛠️ Instalar Dependencias Linux (.deb) (Offline-First)
+        if: needs.detect-native-changes.outputs.build_ubuntu == 'true'
         run: |
           chmod +x packages/scripts/*.sh
           bash packages/scripts/install_packages.sh
 
-      - name: 🌐 Configurar Node.js y Compilar Interfaz Unificada (static/index.html)
+      - name: 🌐 Configurar Node.js y Compilar Fallback Web Embutido para Ubuntu
+        if: needs.detect-native-changes.outputs.build_ubuntu == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: |
+
+      - name: 🏗️ Compilar static/index.html para el contenedor Ubuntu
+        if: needs.detect-native-changes.outputs.build_ubuntu == 'true'
+        run: |
           npm install --legacy-peer-deps --no-audit --no-fund
           npm run build
 
       - name: ☕ Configurar Java JDK 17 para Android (Node 24)
+        if: needs.detect-native-changes.outputs.build_android == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
 
-      - name: 🚀 Compilar y Firmar Paquete Linux (.deb + GPG)
+      - name: 🚀 Compilar y Firmar Paquete Ubuntu (.deb + GPG)
+        if: needs.detect-native-changes.outputs.build_ubuntu == 'true'
         env:
           DEB_GPG_PRIVATE_KEY: ${{ secrets.DEB_GPG_PRIVATE_KEY }}
           DEB_GPG_PASSPHRASE: ${{ secrets.DEB_GPG_PASSPHRASE }}
@@ -58,74 +157,81 @@ jobs:
           bash packaging/build_deb.sh
 
       - name: 🤖 Compilar y Verificar Firma Oficial del APK de Android
+        if: needs.detect-native-changes.outputs.build_android == 'true'
         run: |
           cd android_app
           chmod +x gradlew
           ./gradlew assembleRelease
           cd ..
-          VERSION=$(cat VERSION | tr -d '[:space:]')
+          ANDROID_VER=$(tr -d '[:space:]' < ANDROID_VERSION)
           mkdir -p dist
           APK_FILE=$(find android_app/app/build/outputs/apk/release/ -type f -name "*.apk" ! -name "*unsigned*" | head -n 1)
           if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
-            cp "$APK_FILE" "dist/recursos-cockpit_${VERSION}.apk"
+            cp "$APK_FILE" "dist/recursos-cockpit_${ANDROID_VER}.apk"
             cp "$APK_FILE" "dist/recursos-cockpit.apk"
             APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner 2>/dev/null | sort -V | tail -n 1 || true)
             if [ -n "$APKSIGNER" ]; then
-              "$APKSIGNER" verify --print-certs "dist/recursos-cockpit_${VERSION}.apk"
+              "$APKSIGNER" verify --print-certs "dist/recursos-cockpit_${ANDROID_VER}.apk"
             fi
-            echo "✅ APK firmado y verificado: dist/recursos-cockpit_${VERSION}.apk"
+            echo "✅ APK firmado y verificado: dist/recursos-cockpit_${ANDROID_VER}.apk"
           else
             echo "❌ Error: No se encontró APK firmado en release"
             exit 1
           fi
 
-      - name: 🔐 Calcular Sumas SHA256 y Firma GPG de Todos los Paquetes
+      - name: 🔐 Calcular Sumas SHA256 y Firma GPG de los Artefactos Generados
         env:
           DEB_GPG_PRIVATE_KEY: ${{ secrets.DEB_GPG_PRIVATE_KEY }}
           DEB_GPG_PASSPHRASE: ${{ secrets.DEB_GPG_PASSPHRASE }}
         run: |
+          mkdir -p dist
           cd dist
-          sha256sum *.deb *.apk > SHA256SUMS.txt
+          TARGETS=()
+          for f in *.deb *.apk; do
+            [ -f "$f" ] && TARGETS+=("$f")
+          done
+          if [ "${#TARGETS[@]}" -gt 0 ]; then
+            sha256sum "${TARGETS[@]}" > SHA256SUMS.txt
+          fi
           cd ..
-          python3 packaging/sign_deb.py --sha-only dist/SHA256SUMS.txt || true
-
-      - name: 📋 Extraer Información de Versión
-        id: pkg_info
-        run: |
-          VERSION=$(cat VERSION | tr -d '[:space:]')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag_name=v$VERSION" >> $GITHUB_OUTPUT
+          if [ -f dist/SHA256SUMS.txt ]; then
+            python3 packaging/sign_deb.py --sha-only dist/SHA256SUMS.txt || true
+          fi
 
       - name: 📤 Subir Artefactos de Compilación
         uses: actions/upload-artifact@v4
         with:
-          name: recursos-cockpit-${{ steps.pkg_info.outputs.version }}-binaries
+          name: recursos-cockpit-${{ needs.detect-native-changes.outputs.release_tag }}-binaries
           path: |
             dist/*.deb
             dist/*.apk
             dist/*.gpg
             dist/*.asc
             dist/SHA256SUMS.txt
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
 
-      - name: 🏷️ Asegurar Etiqueta Git para la Release
+      - name: 🏷️ Asegurar Etiqueta Git para la Release Nativa
         run: |
-          TAG_NAME="v${{ steps.pkg_info.outputs.version }}"
+          TAG_NAME="${{ needs.detect-native-changes.outputs.release_tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
             echo "Creando etiqueta local $TAG_NAME..."
-            git tag -a "$TAG_NAME" -m "Recursos Cockpit $TAG_NAME"
+            git tag -a "$TAG_NAME" -m "Recursos Cockpit Native Clients $TAG_NAME"
           fi
           echo "Sincronizando etiqueta $TAG_NAME con origin..."
           git push origin "$TAG_NAME" || true
 
-      - name: 🚀 Publicar en GitHub Releases (Público y Descargable)
+      - name: 🚀 Publicar Clientes Nativos en GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.pkg_info.outputs.version }}
-          name: Recursos Cockpit v${{ steps.pkg_info.outputs.version }}
+          tag_name: ${{ needs.detect-native-changes.outputs.release_tag }}
+          name: Recursos Cockpit Clientes Nativos (${{ needs.detect-native-changes.outputs.release_tag }})
+          body: |
+            Paquetes de clientes nativos compilados de forma independiente al servidor web:
+            - **Ubuntu (.deb)**: v${{ needs.detect-native-changes.outputs.ubuntu_version }}
+            - **Android / Android TV (.apk)**: v${{ needs.detect-native-changes.outputs.android_version }}
           files: |
             dist/*.deb
             dist/*.apk
@@ -137,3 +243,4 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
