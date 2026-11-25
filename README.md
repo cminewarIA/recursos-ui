@@ -27,7 +27,7 @@
   <tr>
     <td width="33%" valign="top">
       <b>📺 1. Tour por las 5 Pantallas</b><br/>
-      Aprende a interpretar cada tarjeta Bento, curva HiDPI, tooltip flotante y control de <code>/inicio</code>, <code>/equipo</code>, <code>/red</code>, <code>/programas</code> y <code>/mas</code>.<br/><br/>
+      Aprende a interpretar cada tarjeta Bento translúcida, curva HiDPI, tooltip flotante y control de <code>/inicio</code>, <code>/equipo</code>, <code>/red</code>, <code>/programas</code> y <code>/sistema</code>.<br/><br/>
       <a href="#-cap%C3%ADtulo-1--tour-visual-e-interactivo-por-las-5-pantallas">Ir al Capítulo 1 →</a>
     </td>
     <td width="33%" valign="top">
@@ -62,7 +62,7 @@
 
 > [!TIP]
 > **¿Buscas el manual interactivo con gráficos `<canvas>` ejecutándose en directo?**
-> 1. **Desde tu servidor**: abre `http://<tu-nodo>:8085/manual` (o `/readme`), o entra dentro de la interfaz en **Más → Manual interactivo**.
+> 1. **Desde tu servidor**: abre `http://<tu-nodo>:8085/manual` (o `/readme`), o entra dentro de la interfaz en **Sistema → Manual interactivo**.
 > 2. **Offline o desde navegador**: abre [`./docs/index.html`](./docs/index.html) o el [**Manual Web en GitHub Pages**](https://cminewaria.github.io/recursos-ui/) con buscador instantáneo (`Ctrl+K`), simulador HiDPI de CPU/RAM/Disco, gráfico Donut interactivo y consola REST en vivo.
 
 ---
@@ -71,7 +71,7 @@
 
 <img src="./docs/assets/cockpit-ui-preview.svg" alt="Vista general interactiva de la interfaz Recursos Cockpit" width="100%" />
 
-Toda la plataforma se organiza en **5 dominios funcionales sin duplicidades**, con una **barra superior editorial limpia**, **buscador rápido global (`Ctrl+K`)** y un **dock flotante obsidiana centrado** (`MorphPill` elástico) que libera el **100 % del ancho del viewport** tanto en escritorio como en móvil y tablet. Además, **cada submenú es una página independiente con URL semántica propia** (deep-linking bidireccional con `History API` y soporte completo en `server.py` sin errores `404`), permitiendo abrir, compartir o recargar directamente rutas como `/red/testdevelocidad`, `/equipo/almacenamiento`, `/programas/procesos` o `/mas/actualizaciones`.
+Toda la plataforma se organiza en **5 dominios funcionales sin duplicidades**, con una **barra superior editorial limpia**, **buscador rápido global (`Ctrl+K`)**, **superficies translúcidas adaptativas en modo claro y oscuro** sobre el motor de temas independientes (**Alethia Matrix** con lluvia de terminal de telemetría real en vivo) y un **dock flotante obsidiana centrado** (`MorphPill` elástico) que libera el **100 % del ancho del viewport** tanto en escritorio como en móvil y tablet. Además, **cada submenú es una página independiente con URL semántica propia** (deep-linking bidireccional con `History API` y soporte completo en `server.py` sin errores `404`), permitiendo abrir, compartir o recargar directamente rutas como `/red/testdevelocidad`, `/equipo/almacenamiento`, `/programas/procesos`, `/sistema/temas` o `/sistema/actualizaciones` (con alias compatibles `/mas/*`).
 
 <details open>
 <summary><b>🟢 Vista 1 · <code>/</code> (<code>/inicio</code>) — HUD Ejecutivo de Telemetría y Cargas Activas</b> <i>(Desplegado por defecto · Pulsa otras vistas para explorar)</i></summary>
@@ -123,13 +123,14 @@ Toda la plataforma se organiza en **5 dominios funcionales sin duplicidades**, c
 </details>
 
 <details>
-<summary><b>⚙️ Vista 5 · <code>/mas/*</code> — Sistema, Seguridad y Puente Nativo (4 páginas independientes)</b></summary>
+<summary><b>⚙️ Vista 5 · <code>/sistema/*</code> — Sistema, Temas OTA, Seguridad y Puente Nativo (5 páginas independientes)</b></summary>
 
 1. **Páginas Independientes de Sistema y Configuración**:
-   - **`/mas/actualizaciones`**: Diagnóstico de salud (`journalctl` + asistencia IA), selector de tema e idioma (31 idiomas OTA) y gestor de actualizaciones `.deb` / Web OTA.
-   - **`/mas/dispositivos`**: Bóveda Zero-Trust, gestión de dispositivos autorizados, claves HMAC-SHA256 y revocación remota.
-   - **`/mas/manual`**: Manual interactivo completo con simuladores en vivo sobre `<canvas>` y explorador de API REST.
-   - **`/mas/dex`**: Conexión de pantalla móvil USB (DeX a 60 FPS) desbloqueada exclusivamente en el cliente nativo de Ubuntu Linux.
+   - **`/sistema/actualizaciones`**: Diagnóstico de salud (`journalctl` + asistencia IA), selector de modo claro/oscuro e idioma (31 idiomas OTA) y gestor de actualizaciones `.deb` / Web OTA (con descarga completa forzada desde GitHub).
+   - **`/sistema/temas`**: Catálogo de **temas visuales independientes** (`./themes/themes.json` + `./themes/<id>.json`) sincronizable vía OTA desde GitHub sin recompilar ni actualizar la aplicación, estrenando **Alethia Matrix** (lluvia de terminal alimentada por métricas reales del servidor en tiempo real y paneles translúcidos en modo claro y oscuro).
+   - **`/sistema/dispositivos`**: Bóveda Zero-Trust, gestión de dispositivos autorizados, claves HMAC-SHA256 y revocación remota.
+   - **`/sistema/manual`**: Manual interactivo completo con simuladores en vivo sobre `<canvas>` y explorador de API REST.
+   - **`/sistema/dex`**: Conexión de pantalla móvil USB (DeX a 60 FPS) desbloqueada exclusivamente en el cliente nativo de Ubuntu Linux.
 
 </details>
 

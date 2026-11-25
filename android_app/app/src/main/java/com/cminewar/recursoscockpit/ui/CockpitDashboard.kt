@@ -114,6 +114,11 @@ class RecursosAndroidBridge(
     }
 
     @JavascriptInterface
+    fun onThemePaletteChanged(theme: String, themeId: String, canvasHex: String, accentHex: String) {
+        onThemeChanged(theme)
+    }
+
+    @JavascriptInterface
     fun getPreferredTheme(): String {
         return preferredThemeProvider()
     }

@@ -15,11 +15,14 @@ import { MoreView } from './components/MoreView';
 import { ExpandedChartModal } from './components/ExpandedChartModal';
 import { NavigationSidebar } from './components/NavigationSidebar';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
-import { MainTabId, MetricsPayload, TelemetryHistoryResponse, ThemeMode, VersionInfo, WifiClient } from './types/telemetry';
+import { MatrixTelemetryBackdrop } from './components/MatrixTelemetryBackdrop';
+import { recordProcessCpuSamples } from './components/ProcessCpuSparkline';
+import { MainTabId, MetricsPayload, TelemetryHistoryResponse, VersionInfo, WifiClient } from './types/telemetry';
 import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/api';
 import { formatCanonicalRoute, normalizeSubTabForView, resolveAppRoute } from './utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion, isRemoteVersionHigher } from './utils/version';
 import { useI18n } from './i18n';
+import { useThemeCatalog } from './themes';
 import { installCockpitScrollContainment } from './utils/scrollContain';
 
 interface ToastState {
@@ -30,22 +33,7 @@ interface ToastState {
 
 export function App() {
   const { t } = useI18n();
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    try {
-      const stored = localStorage.getItem('recursos_theme');
-      if (stored === 'dark' || stored === 'light') return stored;
-      const nativePref =
-        window.__RECURSOS_INITIAL_THEME__ ||
-        window.RecursosAndroidBridge?.getPreferredTheme?.();
-      if (nativePref === 'dark' || nativePref === 'light') return nativePref;
-      if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-        return 'dark';
-      }
-      return 'light';
-    } catch {
-      return 'light';
-    }
-  });
+  const { mode: theme, setMode: applyTheme, activeTheme } = useThemeCatalog();
 
   const [activeTab, setActiveTab] = useState<MainTabId>(() => {
     if (typeof window !== 'undefined') {
@@ -115,51 +103,14 @@ export function App() {
     }, 3600);
   }, []);
 
-  // Sync theme with DOM, localStorage & native shells (Android WebView + Ubuntu GTK3/WebKit2)
-  const applyTheme = useCallback((next: ThemeMode) => {
-    setTheme(next);
-    try {
-      localStorage.setItem('recursos_theme', next);
-    } catch {
-      // ignore
-    }
-    if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', next);
-      if (next === 'dark') document.documentElement.classList.add('dark');
-      else document.documentElement.classList.remove('dark');
-    }
-    if (typeof window !== 'undefined') {
-      try {
-        window.RecursosAndroidBridge?.onThemeChanged?.(next);
-      } catch {
-        // ignore
-      }
-      try {
-        window.webkit?.messageHandlers?.recursosTheme?.postMessage?.(next);
-      } catch {
-        // ignore
-      }
-      if (detectNativeEnvironment().isUbuntuNative) {
-        void fetch('/api/native/theme', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ theme: next }),
-        }).catch(() => {
-          // ignore
-        });
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    applyTheme(theme);
-  }, [applyTheme, theme]);
+  // Theme mode, CSS tokens & native shells are synchronized automatically by ThemeCatalogProvider
 
   // Fetch telemetry
   const fetchMetrics = useCallback(async () => {
     const res = await apiFetchJson<MetricsPayload>('/api/metrics');
     setLoading(false);
     if (res.ok && res.data) {
+      recordProcessCpuSamples(res.data.system_processes);
       setMetrics(res.data);
       setConnError(null);
       if (res.data.auth_status?.token) {
@@ -488,8 +439,13 @@ export function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="min-h-dvh bg-[var(--bg-canvas)] text-[var(--text-primary)] pb-[clamp(5rem,12dvh,7.25rem)]">
-        <div id="cockpit-scroll-stage" data-cockpit-jelly-stage="true">
+      <div className="relative min-h-dvh text-[var(--text-primary)] pb-[clamp(5rem,12dvh,7.25rem)]">
+        <MatrixTelemetryBackdrop
+          metrics={metrics}
+          effect={activeTheme.backgroundEffect}
+          mode={theme}
+        />
+        <div id="cockpit-scroll-stage" data-cockpit-jelly-stage="true" className="relative z-10">
           {/* Clean Editorial Top Header: Brand + Route · Quick Search (Ctrl+K) · Health & Theme */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}

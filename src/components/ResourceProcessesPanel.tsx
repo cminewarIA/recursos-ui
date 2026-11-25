@@ -3,6 +3,12 @@ import { Cpu, HardDrive, ListChecks, MemoryStick, Monitor, Network } from 'lucid
 import { MetricsPayload } from '../types/telemetry';
 import { formatBytes, formatPct, formatSpeed } from '../utils/formatters';
 import { formatGpuProcessName, useI18n } from '../i18n';
+import {
+  getProcessCpuTrend,
+  isHighConsumptionCpuProcess,
+  ProcessCpuSparkline,
+  recordProcessCpuSamples,
+} from './ProcessCpuSparkline';
 
 export type ResourceProcessKind = 'cpu' | 'ram' | 'gpu' | 'storage' | 'net';
 
@@ -23,6 +29,8 @@ interface NormalizedResourceRow {
   metaLabel?: string;
   sortScore: number;
   barPct: number;
+  rawCpu?: number;
+  cpuSamples?: number[];
 }
 
 export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
@@ -45,6 +53,7 @@ export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
     let outRows: NormalizedResourceRow[] = [];
 
     if (kind === 'cpu') {
+      recordProcessCpuSamples(sysProcs);
       outRows = sysProcs
         .filter((p) => Number(p.cpu_percent || 0) > 0 || Number(p.cpu_norm_percent || 0) > 0)
         .map((p) => {
@@ -65,6 +74,8 @@ export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
             }),
             sortScore: rawCpu,
             barPct: Math.min(100, Math.max(2, normPct * 2.5)),
+            rawCpu,
+            cpuSamples: getProcessCpuTrend(p.pid, p.name, normPct),
           };
         })
         .sort((a, b) => b.sortScore - a.sortScore);
@@ -359,7 +370,17 @@ export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
-              {visibleRows.map((row) => (
+              {visibleRows.map((row, rowIdx) => {
+                const showCpuSparkline =
+                  kind === 'cpu' &&
+                  Boolean(row.cpuSamples) &&
+                  isHighConsumptionCpuProcess({
+                    normPct: row.pct,
+                    rawPct: row.rawCpu,
+                    rankIndex: rowIdx,
+                    samples: row.cpuSamples ?? [],
+                  });
+                return (
                 <tr key={`${kind}-${row.pid}-${row.name}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                   <td className="py-2 pr-3 min-w-[140px]">
                     <div className="flex items-center gap-2 min-w-0">
@@ -382,12 +403,18 @@ export const ResourceProcessesPanel: React.FC<ResourceProcessesPanelProps> = ({
                     </div>
                   </td>
                   <td className="py-2 pl-3 text-right whitespace-nowrap">
-                    <span className={`${pillClass} inline-flex rounded-full px-2.5 py-0.5 font-mono text-[11px] font-bold tabular-nums`}>
-                      {row.pctLabel}
-                    </span>
+                    <div className="inline-flex items-center justify-end gap-2">
+                      {showCpuSparkline && row.cpuSamples && (
+                        <ProcessCpuSparkline samples={row.cpuSamples} currentPct={row.pct} />
+                      )}
+                      <span className={`${pillClass} inline-flex rounded-full px-2.5 py-0.5 font-mono text-[11px] font-bold tabular-nums`}>
+                        {row.pctLabel}
+                      </span>
+                    </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

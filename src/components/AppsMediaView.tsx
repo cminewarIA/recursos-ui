@@ -18,6 +18,13 @@ import {
 import { COCKPIT_EASE, MorphPill, ViewStage } from './MotionPrimitives';
 import { ProcessHistoryStackedChart } from './ProcessHistoryStackedChart';
 import {
+  getProcessCpuTrend,
+  getProcessHistoryKey,
+  isHighConsumptionCpuProcess,
+  ProcessCpuSparkline,
+  recordProcessCpuSamples,
+} from './ProcessCpuSparkline';
+import {
   DockerActivity,
   MetricsPayload,
   SystemdService,
@@ -136,9 +143,17 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
     return fallback;
   };
 
-  const filteredProcesses = useMemo(() => {
+  const { filteredProcesses, cpuRankByKey } = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list: SystemProcess[] = [...(metrics?.system_processes ?? [])];
+    recordProcessCpuSamples(metrics?.system_processes);
+
+    const byCpuDesc = [...list].sort((a, b) => Number(b.cpu_percent || 0) - Number(a.cpu_percent || 0));
+    const rankMap = new Map<string, number>();
+    byCpuDesc.forEach((p, idx) => {
+      rankMap.set(getProcessHistoryKey(p.pid, p.name), idx);
+    });
+
     const filtered = q
       ? list.filter(
           (p) =>
@@ -153,7 +168,10 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
       if (procSort === 'io') return Number(b.io_total_bps || 0) - Number(a.io_total_bps || 0);
       return Number(b.cpu_percent || 0) - Number(a.cpu_percent || 0);
     });
-    return filtered.slice(0, 80);
+    return {
+      filteredProcesses: filtered.slice(0, 80),
+      cpuRankByKey: rankMap,
+    };
   }, [metrics?.system_processes, query, procSort]);
 
   const containers: DockerActivity[] = useMemo(() => {
@@ -297,7 +315,18 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      filteredProcesses.map((proc) => (
+                      filteredProcesses.map((proc) => {
+                        const rawCpu = Number(proc.cpu_percent || 0);
+                        const normCpu = Number(proc.cpu_norm_percent ?? proc.cpu_percent ?? 0);
+                        const procKey = getProcessHistoryKey(proc.pid, proc.name);
+                        const cpuSamples = getProcessCpuTrend(proc.pid, proc.name, normCpu);
+                        const showSparkline = isHighConsumptionCpuProcess({
+                          normPct: normCpu,
+                          rawPct: rawCpu,
+                          rankIndex: cpuRankByKey.get(procKey) ?? 999,
+                          samples: cpuSamples,
+                        });
+                        return (
                         <tr key={`${proc.pid}-${proc.name}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                           <td className="py-2.5 pr-3">
                             <p className="font-medium text-slate-900 dark:text-slate-100">{proc.name}</p>
@@ -308,8 +337,13 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                           <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
                             {proc.user || t('equipment.user_system')}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-white">
-                            {formatPct(proc.cpu_norm_percent ?? proc.cpu_percent)}
+                          <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+                            <div className="inline-flex items-center justify-end gap-2">
+                              {showSparkline && (
+                                <ProcessCpuSparkline samples={cpuSamples} currentPct={normCpu} />
+                              )}
+                              <span>{formatPct(normCpu)}</span>
+                            </div>
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
                             {formatBytes(Number(proc.priv_mb ?? proc.mem_mb ?? 0) * 1024 * 1024)}
@@ -321,7 +355,8 @@ export const AppsMediaView: React.FC<AppsMediaViewProps> = ({
                             {proc.io_total_bps ? formatSpeed(proc.io_total_bps) : '--'}
                           </td>
                         </tr>
-                      ))
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

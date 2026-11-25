@@ -50,10 +50,18 @@ cp "$PROJECT_ROOT/desktop_app/dex_controller.py" "$PKG_DIR/usr/lib/$PKG_NAME/dex
 if [ -f "$PROJECT_ROOT/i18n_catalog.py" ]; then
     cp "$PROJECT_ROOT/i18n_catalog.py" "$PKG_DIR/usr/lib/$PKG_NAME/i18n_catalog.py"
 fi
+if [ -f "$PROJECT_ROOT/themes_catalog.py" ]; then
+    cp "$PROJECT_ROOT/themes_catalog.py" "$PKG_DIR/usr/lib/$PKG_NAME/themes_catalog.py"
+fi
 if [ -f "$PROJECT_ROOT/i18n/dictionary.csv" ]; then
     mkdir -p "$PKG_DIR/usr/lib/$PKG_NAME/i18n"
     cp "$PROJECT_ROOT/i18n/dictionary.csv" "$PKG_DIR/usr/lib/$PKG_NAME/i18n/dictionary.csv"
     chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/i18n/dictionary.csv"
+fi
+if [ -d "$PROJECT_ROOT/themes" ]; then
+    mkdir -p "$PKG_DIR/usr/lib/$PKG_NAME/themes"
+    cp "$PROJECT_ROOT/themes/"*.json "$PKG_DIR/usr/lib/$PKG_NAME/themes/" 2>/dev/null || true
+    chmod 644 "$PKG_DIR/usr/lib/$PKG_NAME/themes/"*.json 2>/dev/null || true
 fi
 if [ -f "$PROJECT_ROOT/static/index.html" ]; then
     cp "$PROJECT_ROOT/static/index.html" "$PKG_DIR/usr/lib/$PKG_NAME/static/index.html"

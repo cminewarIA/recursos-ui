@@ -4089,7 +4089,11 @@ function getRecentCommitsCached(localSha: string): Array<{ sha: string; message:
   return cachedRecentCommits;
 }
 
-function triggerViteAutoBuildAndInstallAsync(targetVer: string, doGitPull = false): Promise<{ success: boolean; output: string }> {
+function triggerViteAutoBuildAndInstallAsync(
+  targetVer: string,
+  doGitPull = false,
+  forceDownload = false
+): Promise<{ success: boolean; output: string; code_updated?: boolean }> {
   if (autoInstallInProgress) {
     return Promise.resolve({ success: true, output: 'Actualización en marcha...' });
   }
@@ -4109,9 +4113,81 @@ function triggerViteAutoBuildAndInstallAsync(targetVer: string, doGitPull = fals
       const logs: string[] = [];
       let pullOk = true;
       let debOk = false;
+      let codeUpdated = false;
       try {
         if (doGitPull) {
-          if (hasGitRepo()) {
+          if (forceDownload) {
+            logs.push('[+] Descarga completa forzada desde GitHub (todos los archivos aunque no haya versión nueva)...');
+            const pyScript = [
+              'import os, shutil, tarfile, tempfile, urllib.request',
+              'base = os.getcwd()',
+              'preserve = {',
+              '  "recursos_history.db", "recursos_history.db-wal", "recursos_history.db-shm",',
+              '  "geoip_history.db", "geoip_history.db-wal", "geoip_history.db-shm",',
+              '  "nic_history_2h.json", "auto_install_config.json", "trusted_devices.json",',
+              '  "custom_logos.json", "telegram_bot_config.json", "parental_control.json",',
+              '  ".env", ".router_credentials.json", ".admin_master_key",',
+              '  ".admin_secondary_key_hash", ".device_tokens.json"',
+              '}',
+              'req = urllib.request.Request("https://codeload.github.com/cminewarIA/recursos-ui/tar.gz/refs/heads/main", headers={"User-Agent": "Recursos-Updater"})',
+              'data = urllib.request.urlopen(req, timeout=35).read()',
+              'tmp = tempfile.mkdtemp(prefix="recursos_ota_")',
+              'try:',
+              '  tp = os.path.join(tmp, "repo.tar.gz")',
+              '  with open(tp, "wb") as f: f.write(data)',
+              '  ex = os.path.join(tmp, "ex")',
+              '  os.makedirs(ex, exist_ok=True)',
+              '  with tarfile.open(tp, "r:gz") as tf:',
+              '    try: tf.extractall(path=ex, filter="data")',
+              '    except TypeError: tf.extractall(path=ex)',
+              '  entries = [os.path.join(ex, d) for d in os.listdir(ex) if os.path.isdir(os.path.join(ex, d))]',
+              '  src = entries[0] if entries else ex',
+              '  copied = 0',
+              '  for rd, ds, fs in os.walk(src):',
+              '    ds[:] = [d for d in ds if d not in (".git", "node_modules", "__pycache__", ".venv", "venv")]',
+              '    rel = os.path.relpath(rd, src)',
+              '    dst = base if rel == "." else os.path.join(base, rel)',
+              '    os.makedirs(dst, exist_ok=True)',
+              '    for fn in fs:',
+              '      rf = (fn if rel == "." else os.path.join(rel, fn)).replace("\\\\", "/")',
+              '      if rf in preserve or rf.endswith((".db", ".db-wal", ".db-shm", ".vault", "_dev.json")):',
+              '        continue',
+              '      shutil.copy2(os.path.join(rd, fn), os.path.join(dst, fn))',
+              '      copied += 1',
+              '  print(f"[✓] Descarga directa HTTPS desde GitHub completada ({copied} archivos sincronizados).")',
+              'finally:',
+              '  shutil.rmtree(tmp, ignore_errors=True)',
+            ].join('\n');
+            const dlRes = await new Promise<{ ok: boolean; out: string }>((res) => {
+              const child = spawn('python3', ['-c', pyScript], { cwd: ROOT_DIR });
+              let out = '';
+              let err = '';
+              const timer = setTimeout(() => {
+                try { child.kill('SIGKILL'); } catch { /* ignore */ }
+              }, 60000);
+              child.stdout.on('data', (d) => { out += String(d); });
+              child.stderr.on('data', (d) => { err += String(d); });
+              child.on('error', (e) => {
+                clearTimeout(timer);
+                res({ ok: false, out: String(e) });
+              });
+              child.on('close', (code) => {
+                clearTimeout(timer);
+                res({ ok: code === 0, out: `${out}\n${err}`.trim() });
+              });
+            });
+            if (dlRes.out) logs.push(dlRes.out);
+            pullOk = dlRes.ok;
+            if (!pullOk && hasGitRepo()) {
+              await runStep(`git config --global --add safe.directory "${ROOT_DIR}"`, 5000);
+              const fRes = await runStep('git fetch --force --prune origin main && git reset --hard origin/main', 35000);
+              pullOk = fRes.ok;
+              logs.push(`$ git fetch --force && git reset --hard origin/main\n${fRes.out || 'OK'}`);
+            } else if (pullOk && hasGitRepo()) {
+              await runStep('git fetch origin main && git reset --soft origin/main 2>/dev/null || true', 15000);
+            }
+            codeUpdated = pullOk;
+          } else if (hasGitRepo()) {
             await runStep(`git config --global --add safe.directory "${ROOT_DIR}"`, 5000);
             await runStep('git checkout -- static/index.html dist/ 2>/dev/null || true', 5000);
             const pRes = await runStep('git pull --ff-only origin main', 25000);
@@ -4127,13 +4203,13 @@ function triggerViteAutoBuildAndInstallAsync(targetVer: string, doGitPull = fals
         const debAbs = path.resolve(ROOT_DIR, debRel);
         const buildScript = path.resolve(ROOT_DIR, 'packaging/build_deb.sh');
 
-        if (!fs.existsSync(debAbs) && fs.existsSync(buildScript)) {
+        if ((forceDownload || !fs.existsSync(debAbs)) && fs.existsSync(buildScript)) {
           const bRes = await runStep(`bash "${buildScript}"`, 60000);
           if (bRes.out) logs.push(bRes.out);
         }
 
         const instVer = getInstalledDebVersion();
-        if (instVer !== ver && fs.existsSync(debAbs)) {
+        if ((forceDownload || instVer !== ver) && fs.existsSync(debAbs)) {
           const cmds = [
             `sudo -n apt-get install --reinstall -y "${debAbs}"`,
             `sudo -n dpkg --force-depends -i "${debAbs}"`,
@@ -4167,7 +4243,7 @@ function triggerViteAutoBuildAndInstallAsync(targetVer: string, doGitPull = fals
         lastAutoInstallStatus = debOk
           ? `Al día · v${dispVer} (${lastAutoInstallAt})`
           : `Código sincronizado · Paquete pendiente de permisos (${lastAutoInstallAt})`;
-        resolve({ success: pullOk, output: logs.join('\n') || `v${dispVer} sincronizado.` });
+        resolve({ success: pullOk, code_updated: codeUpdated, output: logs.join('\n') || `v${dispVer} sincronizado.` });
       } finally {
         autoInstallInProgress = false;
       }
@@ -5244,6 +5320,69 @@ function realOsTelemetryMiddleware(): Plugin {
           return;
         }
 
+        if (
+          !isViteModuleImport &&
+          (url === '/api/themes' ||
+            url === '/api/themes/sync' ||
+            url.startsWith('/api/themes/') ||
+            url.startsWith('/themes/'))
+        ) {
+          const isSync =
+            url === '/api/themes/sync' ||
+            /(?:^|&)(?:refresh=1|refresh=true|sync=1)(?:&|$)/.test(queryStr || '');
+          const requestedItem =
+            url.startsWith('/api/themes/') && url !== '/api/themes/sync'
+              ? url.slice('/api/themes/'.length)
+              : url.startsWith('/themes/')
+                ? url.slice('/themes/'.length)
+                : '';
+
+          const pyThemesScript = [
+            'import json, sys',
+            `sys.path.insert(0, ${JSON.stringify(ROOT_DIR)})`,
+            'import themes_catalog as tc',
+            isSync ? `sync_res = tc.sync_themes_from_github(${JSON.stringify(ROOT_DIR)}, force=True, timeout=5.0)` : 'sync_res = None',
+            requestedItem && requestedItem !== 'themes.json'
+              ? `out = tc.get_single_theme_payload(${JSON.stringify(requestedItem)}, ${JSON.stringify(ROOT_DIR)})`
+              : `out = tc.get_themes_catalog_payload(${JSON.stringify(ROOT_DIR)})`,
+            'if isinstance(out, dict) and sync_res is not None: out["sync_result"] = sync_res',
+            'print(json.dumps(out, ensure_ascii=False))',
+          ].join('\n');
+
+          const child = spawn('python3', ['-c', pyThemesScript], { cwd: ROOT_DIR });
+          let stdoutBuf = '';
+          child.stdout.on('data', (chunk) => {
+            stdoutBuf += chunk.toString('utf-8');
+          });
+          child.on('close', (code) => {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            if (code === 0 && stdoutBuf.trim() && stdoutBuf.trim() !== 'null') {
+              res.statusCode = 200;
+              res.end(stdoutBuf.trim());
+              return;
+            }
+            if (requestedItem && requestedItem !== 'themes.json') {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ ok: false, error: 'Theme not found' }));
+              return;
+            }
+            const fallbackPath = path.resolve(ROOT_DIR, 'themes/alethia-matrix.json');
+            const fallbackTheme = fs.existsSync(fallbackPath) ? JSON.parse(fs.readFileSync(fallbackPath, 'utf-8')) : null;
+            res.statusCode = 200;
+            res.end(
+              JSON.stringify({
+                ok: true,
+                schema_version: 1,
+                default_theme: 'alethia-matrix',
+                source: 'local',
+                themes: fallbackTheme ? [fallbackTheme] : [],
+              })
+            );
+          });
+          return;
+        }
+
         if (url === '/api/version') {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(getRealVersionPayload(hostHdr)));
@@ -5628,18 +5767,36 @@ function realOsTelemetryMiddleware(): Plugin {
 
         if ((url === '/api/system/update' || url === '/api/update') && req.method === 'POST') {
           permCooldownUntil = 0;
-          const curVer = readAppVersion();
-          const dispVer = getDisplayVersion(curVer);
-          void triggerViteAutoBuildAndInstallAsync(curVer, true).then((result) => {
-            res.setHeader('Content-Type', 'application/json');
-            res.end(
-              JSON.stringify({
-                success: result.success,
-                message: `Comprobación y actualización v${dispVer} completada.`,
-                output: result.output,
-                version_info: getRealVersionPayload(hostHdr),
-              })
-            );
+          let bodyStr = '';
+          req.on('data', (chunk) => {
+            bodyStr += chunk;
+          });
+          req.on('end', () => {
+            let forceDl = true;
+            try {
+              if (bodyStr.trim()) {
+                const parsed = JSON.parse(bodyStr);
+                if (typeof parsed?.force === 'boolean') forceDl = parsed.force;
+              }
+            } catch {
+              // default true
+            }
+            const curVer = readAppVersion();
+            void triggerViteAutoBuildAndInstallAsync(curVer, true, forceDl).then((result) => {
+              const afterVer = readAppVersion() || curVer;
+              const dispVer = getDisplayVersion(afterVer);
+              res.setHeader('Content-Type', 'application/json');
+              res.end(
+                JSON.stringify({
+                  success: result.success,
+                  code_updated: Boolean(result.code_updated),
+                  web_synced: Boolean(result.code_updated),
+                  message: `Descarga completa y actualización v${dispVer} desde GitHub completada.`,
+                  output: result.output,
+                  version_info: getRealVersionPayload(hostHdr),
+                })
+              );
+            });
           });
           return;
         }

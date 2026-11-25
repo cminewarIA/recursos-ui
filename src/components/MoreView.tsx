@@ -15,6 +15,7 @@ import {
   Laptop,
   Lock,
   Moon,
+  Palette,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -41,12 +42,14 @@ import { apiFetchJson, detectNativeEnvironment } from '../utils/api';
 import { getDisplayVersionString } from '../utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion } from '../utils/version';
 import { useI18n } from '../i18n';
+import { resolveThemeLocalizedText, useThemeCatalog } from '../themes';
 
-type MoreSubTab = 'updates' | 'devices' | 'manual' | 'dex';
+type MoreSubTab = 'updates' | 'themes' | 'devices' | 'manual' | 'dex';
 
 function resolveMoreSubTab(hint?: string): MoreSubTab | undefined {
   if (!hint) return undefined;
   const h = hint.toLowerCase();
+  if (['themes', 'temas', 'apariencia', 'appearance', 'matrix'].includes(h)) return 'themes';
   if (['updates', 'actualizaciones', 'logs', 'sistema', 'version', 'settings', 'ajustes', 'health', 'salud'].includes(h)) return 'updates';
   if (['devices', 'dispositivos', 'nodos', 'security', 'seguridad'].includes(h)) return 'devices';
   if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(h)) return 'manual';
@@ -78,6 +81,15 @@ export const MoreView: React.FC<MoreViewProps> = ({
   onSubTabChange,
 }) => {
   const { locale, supportedLocales, localeNames, otaSource, isSyncingLanguages, setLocale, syncFromGitHub, t } = useI18n();
+  const {
+    themes: themeCatalog,
+    activeThemeId,
+    selectTheme,
+    otaSource: themesOtaSource,
+    syncedAt: themesSyncedAt,
+    isSyncingThemes,
+    syncThemesFromGitHub,
+  } = useThemeCatalog();
   const { isUbuntuNative, isAndroidNative, isNativeApp } = detectNativeEnvironment();
   const installedAndroidVersion = useMemo(() => {
     if (!isAndroidNative || typeof window === 'undefined') return '';
@@ -368,7 +380,14 @@ export const MoreView: React.FC<MoreViewProps> = ({
       message?: string;
       output?: string;
       version_info?: VersionInfo;
-    }>('/api/system/update', { method: 'POST' });
+    }>('/api/system/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ force: true }),
+    });
+    // Sincronizar también el diccionario de idiomas y el catálogo de temas directamente desde GitHub
+    void syncFromGitHub();
+    void syncThemesFromGitHub();
     setInstallingUpdate(false);
     if (res.data?.output) setUpdateOutput(res.data.output);
     if (res.data?.version_info) {
@@ -388,13 +407,13 @@ export const MoreView: React.FC<MoreViewProps> = ({
       onRefreshMetrics();
       if (res.data?.relaunching) {
         onNotify(res.data?.message || t('more.update_restarting'));
-      } else if (res.data?.restarting || res.data?.web_synced) {
+      } else if (res.data?.restarting || res.data?.web_synced || res.data?.code_updated) {
         const delayMs = res.data?.restarting ? 2500 : 900;
         setTimeout(() => {
           window.location.reload();
         }, delayMs);
       } else {
-        void loadVersion(false);
+        void loadVersion(true);
       }
     } else {
       onNotify(res.error || res.data?.message || t('more.update_failed'), true);
@@ -503,6 +522,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
         <div className="cockpit-segmented cockpit-subtabs-bar">
           {[
             { id: 'updates' as const, label: t('more.subtabs.updates'), icon: <GitCommit className="h-4 w-4" /> },
+            { id: 'themes' as const, label: t('more.subtabs.themes'), icon: <Palette className="h-4 w-4" /> },
             { id: 'devices' as const, label: t('more.subtabs.devices'), icon: <ShieldCheck className="h-4 w-4" /> },
             { id: 'manual' as const, label: t('more.subtabs.manual'), icon: <BookOpen className="h-4 w-4" /> },
             ...(isUbuntuNative
@@ -1240,6 +1260,221 @@ export const MoreView: React.FC<MoreViewProps> = ({
               </div>
             </section>
           )}
+        </div>
+      )}
+
+      {/* 1b. Catálogo de Temas independientes con sincronización OTA desde GitHub */}
+      {subTab === 'themes' && (
+        <div className="space-y-4">
+          <section className="cockpit-bento p-5">
+            <div className="flex flex-col gap-4 pb-4 border-b border-slate-200/70 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="inline-flex items-center gap-2 font-display text-base font-semibold text-slate-900 dark:text-white">
+                    <Palette className="h-4 w-4 text-[#1e6b38] dark:text-[#c6f19d]" />
+                    <span>{t('themes.title')}</span>
+                  </h2>
+                  <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold">
+                    {t('themes.count_badge', { count: themeCatalog.length })}
+                  </span>
+                  <span className="cockpit-pill-emerald rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold">
+                    {themesOtaSource === 'github' ? t('themes.ota_github') : t('themes.ota_local')}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {t('themes.subtitle')}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <LayoutGroup id="themes-tab-mode-switcher">
+                  <div className="cockpit-subtile inline-flex items-center gap-1 p-1">
+                    {(['light', 'dark'] as const).map((modeOpt) => {
+                      const active = theme === modeOpt;
+                      return (
+                        <button
+                          key={modeOpt}
+                          type="button"
+                          onClick={() => onChangeTheme(modeOpt)}
+                          className={`relative inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+                            active
+                              ? 'text-sky-700 dark:text-sky-300'
+                              : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                          }`}
+                        >
+                          {active && <MorphPill layoutId="themes-tab-mode-pill" className="rounded-lg" />}
+                          <span className="relative z-10 inline-flex items-center gap-1.5">
+                            {modeOpt === 'light' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+                            <span>{modeOpt === 'light' ? t('more.theme_light') : t('more.theme_dark')}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </LayoutGroup>
+
+                <button
+                  type="button"
+                  data-testid="sync-themes-btn"
+                  disabled={isSyncingThemes}
+                  onClick={async () => {
+                    const res = await syncThemesFromGitHub();
+                    if (res.ok) {
+                      onNotify(t('themes.synced_ok', { count: res.count }));
+                    } else {
+                      onNotify(t('themes.sync_error'), true);
+                    }
+                  }}
+                  className="cockpit-btn-accent inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold disabled:opacity-60 transition-colors cursor-pointer"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isSyncingThemes ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingThemes ? t('themes.syncing') : t('themes.sync_btn')}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 cockpit-auto-grid-cards">
+              {themeCatalog.map((item) => {
+                const isActive = item.id === activeThemeId;
+                const itemName = resolveThemeLocalizedText(item.name, locale, item.id);
+                const itemDesc = resolveThemeLocalizedText(item.description, locale, '');
+                const lightPrev = item.preview?.light || {
+                  canvas: item.tokens.light['--bg-canvas'] || '#eaf2e6',
+                  surface: item.tokens.light['--surface-bento'] || 'rgba(255,255,255,0.78)',
+                  accent: item.tokens.light['--accent'] || '#1e6b38',
+                  rain: item.backgroundEffect?.light?.headColor || '#1e6b38',
+                };
+                const darkPrev = item.preview?.dark || {
+                  canvas: item.tokens.dark['--bg-canvas'] || '#061007',
+                  surface: item.tokens.dark['--surface-bento'] || 'rgba(11,23,13,0.75)',
+                  accent: item.tokens.dark['--accent'] || '#c6f19d',
+                  rain: item.backgroundEffect?.dark?.headColor || '#c6f19d',
+                };
+                const isAnimated = item.backgroundEffect?.type === 'matrix-telemetry';
+
+                return (
+                  <motion.div
+                    key={item.id}
+                    layout
+                    className={`cockpit-subtile flex flex-col justify-between gap-4 p-4 transition-all ${
+                      isActive ? 'ring-2 ring-[#1e6b38]/60 dark:ring-[#c6f19d]/65' : ''
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      {/* Dual Light / Dark Translucent Preview Canvas */}
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { key: 'light', label: t('themes.preview_light'), p: lightPrev, ink: '#0b1a0c' },
+                          { key: 'dark', label: t('themes.preview_dark'), p: darkPrev, ink: '#f4f7f2' },
+                        ].map((sw) => (
+                          <div
+                            key={sw.key}
+                            className="relative h-24 overflow-hidden rounded-xl border border-black/10 dark:border-white/10 p-2"
+                            style={{ backgroundColor: sw.p.canvas }}
+                          >
+                            {isAnimated && (
+                              <div
+                                aria-hidden="true"
+                                className="pointer-events-none absolute inset-0 flex justify-around px-1.5 font-mono text-[8px] font-bold leading-tight opacity-75 select-none"
+                                style={{ color: sw.p.rain || sw.p.accent }}
+                              >
+                                <span className="flex flex-col">
+                                  <span>C</span><span>P</span><span>U</span><span>4</span><span>2</span><span>%</span>
+                                </span>
+                                <span className="flex flex-col pt-2">
+                                  <span>5</span><span>1</span><span>°</span><span>C</span><span>R</span><span>A</span>
+                                </span>
+                                <span className="flex flex-col">
+                                  <span>W</span><span>A</span><span>N</span><span>↓</span><span>8</span><span>M</span>
+                                </span>
+                                <span className="flex flex-col pt-1">
+                                  <span>I</span><span>O</span><span>1</span><span>2</span><span>M</span><span>S</span>
+                                </span>
+                              </div>
+                            )}
+                            <div
+                              className="relative z-10 flex h-full flex-col justify-between rounded-lg border border-black/10 dark:border-white/15 p-2 backdrop-blur-md"
+                              style={{ backgroundColor: sw.p.surface, color: sw.ink }}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-mono text-[9px] font-semibold uppercase tracking-wider opacity-80">
+                                  {sw.label}
+                                </span>
+                                <span
+                                  className="h-2.5 w-2.5 rounded-full"
+                                  style={{ backgroundColor: sw.p.accent }}
+                                />
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="h-1.5 flex-1 rounded-full opacity-80"
+                                  style={{ backgroundColor: sw.p.accent }}
+                                />
+                                <span className="h-1.5 w-5 rounded-full bg-current opacity-25" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white">
+                            {itemName}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="cockpit-subtile rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                              v{item.version || '1.0.0'}
+                            </span>
+                            <span className="cockpit-pill-cyan rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold">
+                              {isAnimated ? t('themes.animated_badge') : t('themes.static_badge')}
+                            </span>
+                          </div>
+                        </div>
+                        {itemDesc && (
+                          <p className="mt-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                            {itemDesc}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/80">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {item.id}.json
+                      </span>
+                      {isActive ? (
+                        <span className="cockpit-pill-lime inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold">
+                          <Check className="h-3.5 w-3.5" />
+                          <span>{t('themes.active_badge')}</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            selectTheme(item.id);
+                            onNotify(t('themes.applied_toast', { name: itemName }));
+                          }}
+                          className="cockpit-btn-accent inline-flex min-h-[34px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          <span>{t('themes.apply_btn')}</span>
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 cockpit-subtile flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-[11px] text-slate-600 dark:text-slate-300">
+              <span>{t('themes.ota_hint')}</span>
+              {themesSyncedAt ? (
+                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 tabular-nums">
+                  {new Date(themesSyncedAt * 1000).toLocaleString()}
+                </span>
+              ) : null}
+            </div>
+          </section>
         </div>
       )}
 

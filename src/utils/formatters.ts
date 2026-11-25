@@ -123,6 +123,7 @@ const CANONICAL_SUBTAB_SLUG: Record<AppViewId, Record<string, string>> = {
   },
   mas: {
     updates: 'actualizaciones',
+    themes: 'temas',
     devices: 'dispositivos',
     manual: 'manual',
     dex: 'dex',
@@ -157,6 +158,7 @@ export function normalizeSubTabForView(view: AppViewId, hint?: string): string |
     return 'processes';
   }
   if (view === 'mas') {
+    if (['themes', 'temas', 'apariencia', 'appearance', 'matrix'].includes(h)) return 'themes';
     if (['devices', 'dispositivos', 'nodos', 'security', 'seguridad'].includes(h)) return 'devices';
     if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(h)) return 'manual';
     if (['dex'].includes(h)) return 'dex';
@@ -176,7 +178,7 @@ export function resolveAppRoute(pathStr: string): AppRouteInfo {
   const p0 = parts[0];
   const p1 = parts.length > 1 ? parts[1] : undefined;
 
-  // View-prefixed independent submenu routes (/red/testdevelocidad, /equipo/almacenamiento, /programas/procesos, /mas/actualizaciones)
+  // View-prefixed independent submenu routes (/red/testdevelocidad, /equipo/almacenamiento, /programas/procesos, /sistema/temas)
   if (['equipo', 'hardware'].includes(p0)) {
     return { view: 'equipo', subTab: normalizeSubTabForView('equipo', p1) };
   }
@@ -190,7 +192,7 @@ export function resolveAppRoute(pathStr: string): AppRouteInfo {
     return { view: 'mas', subTab: normalizeSubTabForView('mas', p1) };
   }
 
-  // Direct top-level shorthand aliases (/speedtest, /testdevelocidad, /cpu, /procesos, /dex, etc.)
+  // Direct top-level shorthand aliases (/speedtest, /testdevelocidad, /cpu, /procesos, /temas, /dex, etc.)
   if (['speedtest', 'testdevelocidad', 'velocidad'].includes(p0)) return { view: 'red', subTab: 'speedtest' };
   if (['mapa', 'map', 'geoip'].includes(p0)) return { view: 'red', subTab: 'map' };
   if (['trafico', 'traffic', 'historial', 'history'].includes(p0)) return { view: 'red', subTab: 'traffic' };
@@ -205,6 +207,7 @@ export function resolveAppRoute(pathStr: string): AppRouteInfo {
   if (['aplicaciones', 'servicios', 'services', 'systemd'].includes(p0)) return { view: 'programas', subTab: 'services' };
   if (['multimedia', 'media', 'descargas', 'downloads', 'emby', 'torrents'].includes(p0)) return { view: 'programas', subTab: 'media' };
   if (['bots', 'bot', 'telegram'].includes(p0)) return { view: 'programas', subTab: 'bots' };
+  if (['temas', 'themes', 'apariencia', 'appearance'].includes(p0)) return { view: 'mas', subTab: 'themes' };
   if (['actualizaciones', 'updates', 'version', 'ajustes', 'settings', 'cloud', 'nube', 'health', 'salud', 'logs'].includes(p0)) return { view: 'mas', subTab: 'updates' };
   if (['dispositivos', 'devices', 'nodos'].includes(p0)) return { view: 'mas', subTab: 'devices' };
   if (['dex'].includes(p0)) return { view: 'mas', subTab: 'dex' };
@@ -215,10 +218,11 @@ export function resolveAppRoute(pathStr: string): AppRouteInfo {
 
 export function formatCanonicalRoute(view: AppViewId, subTab?: string): string {
   if (view === 'inicio') return '/';
+  const viewSlug = view === 'mas' ? 'sistema' : view;
   const normalized = normalizeSubTabForView(view, subTab);
-  if (!normalized) return `/${view}`;
+  if (!normalized) return `/${viewSlug}`;
   const slug = CANONICAL_SUBTAB_SLUG[view]?.[normalized] || normalized;
-  return `/${view}/${slug}`;
+  return `/${viewSlug}/${slug}`;
 }
 
 export function normalizeExternalRoute(pathStr: string): AppViewId {

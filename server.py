@@ -74,6 +74,26 @@ except ImportError:
         return None
 
 try:
+    from themes_catalog import (
+        get_single_theme_payload,
+        get_themes_catalog_payload,
+        start_background_themes_ota_sync,
+        sync_themes_from_github,
+    )
+except ImportError:
+    def get_themes_catalog_payload(base_dir=None):
+        return {"ok": True, "schema_version": 1, "default_theme": "alethia-matrix", "source": "local", "themes": []}
+
+    def get_single_theme_payload(theme_id, base_dir=None):
+        return None
+
+    def sync_themes_from_github(base_dir=None, force=False, timeout=5.0):
+        return {"ok": False, "source": "local"}
+
+    def start_background_themes_ota_sync(base_dir=None):
+        return None
+
+try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 except Exception:
     AESGCM = None
@@ -8286,6 +8306,10 @@ def _download_and_apply_github_tarball(out_lines):
         "telegram_bot_config.json",
         "parental_control.json",
         ".env",
+        ".router_credentials.json",
+        ".admin_master_key",
+        ".admin_secondary_key_hash",
+        ".device_tokens.json",
     }
     last_err = ""
     for t_url in tar_urls:
@@ -8349,10 +8373,13 @@ def _download_and_apply_github_tarball(out_lines):
         out_lines.append(f"[-] Respaldo HTTPS desde GitHub falló: {last_err}")
     return False
 
-def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
+def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True, force_github_download=False):
     """
     Ejecuta la sincronización desde GitHub (`git pull` / `git reset` o descarga directa HTTPS Tarball)
     y compila + instala inmediatamente el paquete local `.deb` según se detecta.
+    Cuando `force_github_download=True` o `trigger_source` es manual (`api_request`/`manual`),
+    descarga siempre todos los archivos y traducciones desde GitHub aunque no detecte novedades,
+    preservando `recursos_history.db`, secretos y configuraciones locales.
     """
     global _LOCAL_GIT_SHA_CACHE, METRICS_CACHE_BYTES
     if not AUTO_INSTALL_EXEC_LOCK.acquire(blocking=False):
@@ -8365,6 +8392,7 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
 
     try:
         is_manual = trigger_source in ("api_request", "manual")
+        force_full = bool(force_github_download or is_manual)
         if is_manual:
             with AUTO_INSTALL_LOCK:
                 AUTO_INSTALL_STATE["perm_cooldown_until"] = 0.0
@@ -8372,7 +8400,7 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
         with AUTO_INSTALL_LOCK:
             AUTO_INSTALL_STATE["in_progress"] = True
             AUTO_INSTALL_STATE["last_attempt_ts"] = time.time()
-            AUTO_INSTALL_STATE["last_status"] = "Comprobando y aplicando mejoras..."
+            AUTO_INSTALL_STATE["last_status"] = "Descargando todos los datos desde GitHub..." if force_full else "Comprobando y aplicando mejoras..."
 
         _ensure_git_safe_directory()
         out_lines = []
@@ -8393,13 +8421,37 @@ def perform_auto_update_and_install(trigger_source="auto", do_git_pull=True):
             except Exception:
                 pass
 
-            if not has_git:
+            if force_full:
+                # Descarga completa garantizada desde GitHub aunque la versión local coincida o no haya novedades
+                target_label = f"v{remote_ver_target}" if remote_ver_target else f"rama {GITHUB_BRANCH}"
+                out_lines.append(f"[+] Descarga completa forzada desde GitHub ({target_label})...")
+                pull_ok = _download_and_apply_github_tarball(out_lines)
+                if not pull_ok and has_git:
+                    out_lines.append("[i] Reintentando sincronización completa vía git fetch/reset desde GitHub...")
+                    try:
+                        p_fetch = subprocess.run(
+                            ["git", "fetch", "--force", "--prune", "origin", GITHUB_BRANCH],
+                            cwd=BASE_DIR, capture_output=True, text=True, timeout=25
+                        )
+                        p_reset = subprocess.run(
+                            ["git", "reset", "--hard", f"origin/{GITHUB_BRANCH}"],
+                            cwd=BASE_DIR, capture_output=True, text=True, timeout=15
+                        )
+                        pull_ok = (p_fetch.returncode == 0 and p_reset.returncode == 0)
+                        out_lines.append(f"$ git reset --hard origin/{GITHUB_BRANCH}\n{(p_reset.stdout or p_reset.stderr or '').strip()}")
+                    except Exception as e_git:
+                        out_lines.append(f"[-] Fallback git también falló: {e_git}")
+                        pull_ok = False
+                try:
+                    dict_sync = sync_dictionary_from_github(BASE_DIR, force=True, timeout=8.0)
+                    if isinstance(dict_sync, dict) and dict_sync.get("ok"):
+                        out_lines.append("[✓] Diccionario multi-idioma sincronizado desde GitHub.")
+                except Exception:
+                    pass
+                code_updated = bool(pull_ok)
+            elif not has_git:
                 if remote_ver_target and _parse_semver_tuple(remote_ver_target) > _parse_semver_tuple(before_ver):
                     out_lines.append(f"[+] Sincronizando v{remote_ver_target} desde GitHub mediante paquete HTTPS directo...")
-                    pull_ok = _download_and_apply_github_tarball(out_lines)
-                    code_updated = bool(pull_ok and get_app_version() != before_ver)
-                elif is_manual and remote_ver_target:
-                    out_lines.append(f"[i] Verificando archivos de v{remote_ver_target} desde GitHub HTTPS...")
                     pull_ok = _download_and_apply_github_tarball(out_lines)
                     code_updated = bool(pull_ok and get_app_version() != before_ver)
                 else:
@@ -15001,6 +15053,9 @@ VALID_WEB_PREFIXES = (
     "/bots",
     "/telegram",
     "/sistema",
+    "/system",
+    "/temas",
+    "/themes",
     "/version",
     "/actualizaciones",
     "/updates",
@@ -15888,6 +15943,41 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(out_bytes)
             return
 
+        # 1b-themes. CATÁLOGO DE TEMAS INDEPENDIENTES CON SINCRONIZACIÓN OTA DESDE GITHUB
+        elif clean_path == "/api/themes":
+            if ("refresh=1" in self.path or "refresh=true" in self.path or "sync=1" in self.path):
+                sync_themes_from_github(BASE_DIR, force=True, timeout=5.0)
+            themes_bytes = json.dumps(get_themes_catalog_payload(BASE_DIR), ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(themes_bytes)))
+            self.end_headers()
+            self.wfile.write(themes_bytes)
+            return
+
+        elif clean_path.startswith("/api/themes/") or clean_path.startswith("/themes/"):
+            rel_name = clean_path.split("/", 2)[-1] if clean_path.startswith("/themes/") else clean_path[len("/api/themes/"):]
+            if rel_name == "themes.json":
+                payload = get_themes_catalog_payload(BASE_DIR)
+            else:
+                payload = get_single_theme_payload(rel_name, BASE_DIR)
+            if payload is None:
+                self.send_response(404)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            out_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(out_bytes)))
+            self.end_headers()
+            self.wfile.write(out_bytes)
+            return
+
         # 1b. API VERSION & GITHUB SYNC STATUS
         elif clean_path == "/api/version":
             if not auth["is_trusted"]:
@@ -16675,6 +16765,21 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         client_ip = get_client_ip(self)
         clean_path = self.path.split('?')[0].rstrip('/') or '/'
+
+        # 0. Sincronización OTA de catálogo de temas independientes desde GitHub (no modifica código ni DB)
+        if clean_path == "/api/themes/sync":
+            sync_res = sync_themes_from_github(BASE_DIR, force=True, timeout=6.0)
+            catalog = get_themes_catalog_payload(BASE_DIR)
+            catalog["sync_result"] = sync_res
+            resp = json.dumps(catalog, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
 
         # 1. Desbloqueo remoto con clave maestra (Blindado contra fuerza bruta)
         if clean_path in ("/api/auth/unlock", "/api/unlock"):
@@ -17806,7 +17911,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 return
 
             try:
-                res_obj = perform_auto_update_and_install(trigger_source="api_request", do_git_pull=True)
+                body_upd, _err_upd = self._read_json_body(max_bytes=16384)
+                force_dl = True if not isinstance(body_upd, dict) else bool(body_upd.get("force", True))
+                res_obj = perform_auto_update_and_install(
+                    trigger_source="api_request",
+                    do_git_pull=True,
+                    force_github_download=force_dl,
+                )
                 resp = json.dumps(res_obj).encode('utf-8')
             except Exception as e:
                 resp = json.dumps({
@@ -18353,6 +18464,7 @@ def run_server(port=None):
     threading.Thread(target=telegram_bot_polling_worker, daemon=True, name="TelegramBotPolling").start()
     threading.Thread(target=telegram_bot_monitor_worker, daemon=True, name="TelegramBotMonitor").start()
     schedule_background_dictionary_sync(BASE_DIR, interval_sec=1800.0)
+    start_background_themes_ota_sync(BASE_DIR)
     start_mdns_service_advertiser(port)
     
     bind_host = os.environ.get("HOST", "0.0.0.0")

@@ -120,6 +120,20 @@ except Exception:
     def _catalog_sync_github(*_a, **_kw):
         return {"ok": False, "updated": False, "source": "local", "supported_locales": ["es"]}
 
+try:
+    from themes_catalog import (
+        get_single_theme_payload as _themes_get_single,
+        get_themes_catalog_payload as _themes_get_catalog,
+        sync_themes_from_github as _themes_sync_github,
+    )
+except Exception:
+    def _themes_get_catalog(*_a, **_kw):
+        return {"ok": True, "schema_version": 1, "default_theme": "alethia-matrix", "source": "local", "themes": []}
+    def _themes_get_single(*_a, **_kw):
+        return None
+    def _themes_sync_github(*_a, **_kw):
+        return {"ok": False, "source": "local"}
+
 
 def i18n_t(key, params=None, fallback=None, locale=None):
     base_dir = _catalog_base_dir(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
@@ -1760,14 +1774,13 @@ class ServerConnectionManager:
         except Exception as e:
             return False, i18n_t("native_ubuntu.download_error", {"error": e}), ""
 
-    def perform_unified_update(self, gh_info=None, target_url=None, relaunch_on_deb=True, interactive=True):
+    def perform_unified_update(self, gh_info=None, target_url=None, relaunch_on_deb=True, interactive=True, force_download=False):
         """
         Actualización unificada en un solo botón:
-        1. Si GitHub Releases supera a la App Ubuntu: descarga e instala el .deb oficial sin desinstalar.
-        2. Si la App Ubuntu supera al Servidor web local (incluido cuando la App supera a GitHub):
-           sincroniza la web local mediante POST /api/system/sync-web.
-        3. Si GitHub supera al Servidor web local y no al cliente local: pide al servidor ejecutar POST /api/system/update.
-        4. Nunca realiza downgrades cuando la App Ubuntu supera la versión publicada en GitHub.
+        - En modo manual (`force_download=True`), descarga siempre todos los datos desde GitHub
+          (paquete `.deb` oficial, actualización completa del servidor `/api/system/update` con `force=true`,
+          diccionario multi-idioma y repositorio git local si existe) aunque no se detecten novedades.
+        - En modo automático en segundo plano (`force_download=False`), solo actúa cuando existe versión superior.
         """
         if not self._update_exec_lock.acquire(blocking=False):
             cur_info = self.github_update_info or self.check_github_app_update(target_url=target_url, refresh_server=False)
@@ -1806,11 +1819,23 @@ class ServerConnectionManager:
                 f"[i] Estado de versiones -> App Ubuntu: v{app_ver} · Servidor web: "
                 f"{('v' + srv_ver) if srv_ver else 'no detectado'} · GitHub: {('v' + gh_ver) if gh_ver else 'sin acceso'}"
                 + (f" (Release .deb: v{deb_rel_ver})" if deb_rel_ver and deb_rel_ver != gh_ver else "")
+                + (" · [Modo descarga completa forzada]" if force_download else "")
             )
 
-            # Paso 1: Si GitHub Releases supera a la App Ubuntu, descargar e instalar nuevo .deb oficial
-            if github_above_app:
-                logs.append(f"[+] GitHub Release (v{deb_rel_ver}) es superior a la App Ubuntu (v{app_ver}). Instalando paquete .deb...")
+            # Paso 0: En descarga forzada, refrescar siempre también el diccionario multi-idioma desde GitHub
+            if force_download:
+                try:
+                    _catalog_sync_github(force=True, timeout=8.0)
+                    logs.append("[✓] Diccionario multi-idioma descargado desde GitHub.")
+                except Exception as e_dict:
+                    logs.append(f"[!] Aviso descargando diccionario desde GitHub: {e_dict}")
+
+            # Paso 1: Descargar e instalar .deb oficial desde GitHub (si supera a la App o en descarga forzada)
+            if github_above_app or (force_download and deb_rel_ver):
+                if force_download and not github_above_app:
+                    logs.append(f"[+] Descarga completa forzada: reinstalando paquete .deb oficial v{deb_rel_ver} desde GitHub...")
+                else:
+                    logs.append(f"[+] GitHub Release (v{deb_rel_ver}) es superior a la App Ubuntu (v{app_ver}). Instalando paquete .deb...")
                 deb_ok, deb_msg, installed_new_ver = self._install_deb_from_github(
                     info,
                     relaunch_on_deb=relaunch_on_deb,
@@ -1819,20 +1844,54 @@ class ServerConnectionManager:
                 if not deb_ok:
                     logs.append(f"[-] {deb_msg}")
                     self.auto_install_status = deb_msg
-                    return False, deb_msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
-                deb_installed = True
-                updated_parts.append(deb_msg)
-                logs.append(f"[✓] {deb_msg} instalada correctamente.")
-                app_ver = installed_new_ver or get_app_version()
-                if server_reachable and srv_ver:
-                    app_above_server = parse_semver_tuple(app_ver) > parse_semver_tuple(srv_ver)
-                app_above_github = bool(gh_ver and parse_semver_tuple(app_ver) > parse_semver_tuple(gh_ver))
-                github_above_server = bool(server_reachable and srv_ver and gh_ver and parse_semver_tuple(gh_ver) > parse_semver_tuple(srv_ver))
+                    if not (force_download and server_reachable):
+                        return False, deb_msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
+                else:
+                    deb_installed = True
+                    updated_parts.append(deb_msg)
+                    logs.append(f"[✓] {deb_msg} instalada correctamente.")
+                    app_ver = installed_new_ver or get_app_version()
+                    if server_reachable and srv_ver:
+                        app_above_server = parse_semver_tuple(app_ver) > parse_semver_tuple(srv_ver)
+                    app_above_github = bool(gh_ver and parse_semver_tuple(app_ver) > parse_semver_tuple(gh_ver))
+                    github_above_server = bool(server_reachable and srv_ver and gh_ver and parse_semver_tuple(gh_ver) > parse_semver_tuple(srv_ver))
 
-            # Paso 2: Actualizar el servidor web local (push de bundle si App >= GitHub, o pull en servidor si GitHub > App)
-            if server_reachable and (app_above_server or github_above_server):
+            # Paso 2: Actualizar el servidor web local (descarga forzada directa desde GitHub o sincronización)
+            if server_reachable and (force_download or app_above_server or github_above_server):
                 app_covers_github = bool(not gh_ver or parse_semver_tuple(app_ver) >= parse_semver_tuple(gh_ver))
-                if app_above_server and app_covers_github:
+                if force_download or (github_above_server and not (app_above_server and app_covers_github)):
+                    logs.append(
+                        f"[+] Solicitando al servidor ({srv_url}) descarga completa directa desde GitHub"
+                        + (f" (v{gh_ver})..." if gh_ver else "...")
+                    )
+                    srv_upd_err = ""
+                    try:
+                        req_srv = urllib.request.Request(
+                            f"{srv_url.rstrip('/')}/api/system/update",
+                            data=json.dumps({"force": bool(force_download)}).encode("utf-8"),
+                            headers=self._build_auth_headers({"Content-Type": "application/json"}),
+                            method="POST",
+                        )
+                        with urllib.request.urlopen(req_srv, timeout=60.0) as r_srv:
+                            r_obj = json.loads(r_srv.read().decode("utf-8"))
+                            if r_obj.get("output"):
+                                logs.append(str(r_obj.get("output")))
+                            if r_obj.get("success"):
+                                web_synced = True
+                                updated_parts.append(i18n_t("native_ubuntu.srv_github_part"))
+                                logs.append(f"[✓] Servidor actualizado desde GitHub: {r_obj.get('message', 'OK')}")
+                            else:
+                                srv_upd_err = str(r_obj.get("message") or r_obj.get("error") or "Error al actualizar servidor")
+                    except Exception as e_srv:
+                        srv_upd_err = str(e_srv)
+                        logs.append(f"[-] Actualización remota /api/system/update falló: {e_srv}")
+                    if not web_synced and not deb_installed:
+                        return False, srv_upd_err or "Error actualizando servidor desde GitHub", info, {
+                            "deb_installed": False,
+                            "web_synced": False,
+                            "output": "\n".join(logs),
+                        }
+                elif app_above_server and app_covers_github:
                     if app_above_github:
                         logs.append(
                             f"[+] App Ubuntu (v{app_ver}) supera a GitHub (v{gh_ver}) y al servidor local (v{srv_ver}). Sincronizando web local..."
@@ -1853,39 +1912,10 @@ class ServerConnectionManager:
                         logs.append(f"[!] Aviso en sincronización directa (/api/system/sync-web): {sync_msg}")
                         if not deb_installed:
                             return False, sync_msg, info, {"deb_installed": False, "web_synced": False, "output": "\n".join(logs)}
-                elif github_above_server:
-                    logs.append(f"[+] Solicitando al servidor ({srv_url}) actualizar directamente desde GitHub a v{gh_ver}...")
-                    srv_upd_err = ""
-                    try:
-                        req_srv = urllib.request.Request(
-                            f"{srv_url.rstrip('/')}/api/system/update",
-                            data=b"{}",
-                            headers=self._build_auth_headers({"Content-Type": "application/json"}),
-                            method="POST",
-                        )
-                        with urllib.request.urlopen(req_srv, timeout=45.0) as r_srv:
-                            r_obj = json.loads(r_srv.read().decode("utf-8"))
-                            if r_obj.get("output"):
-                                logs.append(str(r_obj.get("output")))
-                            if r_obj.get("success"):
-                                web_synced = True
-                                updated_parts.append(i18n_t("native_ubuntu.srv_github_part"))
-                                logs.append(f"[✓] Servidor actualizado desde GitHub: {r_obj.get('message', 'OK')}")
-                            else:
-                                srv_upd_err = str(r_obj.get("message") or r_obj.get("error") or "Error al actualizar servidor")
-                    except Exception as e_srv:
-                        srv_upd_err = str(e_srv)
-                        logs.append(f"[-] Actualización remota /api/system/update falló: {e_srv}")
-                    if not web_synced and not deb_installed:
-                        return False, srv_upd_err or "Error actualizando servidor desde GitHub", info, {
-                            "deb_installed": False,
-                            "web_synced": False,
-                            "output": "\n".join(logs),
-                        }
 
-            # Paso 3: Si existen fuentes git locales y GitHub va por delante (sin conflicto con versión local superior)
+            # Paso 3: Sincronizar fuentes git locales desde GitHub si existen
             repo_dir = st.get("repo_dir")
-            if repo_dir and os.path.isdir(os.path.join(repo_dir, ".git")) and github_above_app and not app_above_github:
+            if repo_dir and os.path.isdir(os.path.join(repo_dir, ".git")) and (force_download or (github_above_app and not app_above_github)):
                 try:
                     status_p = subprocess.run(
                         ["git", "-C", repo_dir, "status", "--porcelain"],
@@ -1899,23 +1929,37 @@ class ServerConnectionManager:
                             capture_output=True,
                             timeout=10,
                         )
-                    pull_p = subprocess.run(
-                        ["git", "-C", repo_dir, "pull", "--rebase", "origin", "main"],
+                    subprocess.run(
+                        ["git", "-C", repo_dir, "fetch", "--force", "--prune", "origin", "main"],
                         capture_output=True,
                         text=True,
-                        timeout=45,
+                        timeout=30,
                     )
-                    if pull_p.returncode != 0:
+                    if force_download:
                         subprocess.run(
-                            ["git", "-C", repo_dir, "pull", "origin", "main"],
+                            ["git", "-C", repo_dir, "reset", "--hard", "origin/main"],
+                            capture_output=True,
+                            text=True,
+                            timeout=20,
+                        )
+                    else:
+                        pull_p = subprocess.run(
+                            ["git", "-C", repo_dir, "pull", "--rebase", "origin", "main"],
                             capture_output=True,
                             text=True,
                             timeout=45,
                         )
+                        if pull_p.returncode != 0:
+                            subprocess.run(
+                                ["git", "-C", repo_dir, "pull", "origin", "main"],
+                                capture_output=True,
+                                text=True,
+                                timeout=45,
+                            )
                     if st.get("service_exists"):
                         runner = "pkexec" if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0 else "sudo"
                         subprocess.run([runner, "systemctl", "restart", "system-dashboard.service"], capture_output=True, timeout=20)
-                    logs.append("[✓] Repositorio local sincronizado.")
+                    logs.append("[✓] Repositorio local sincronizado desde GitHub.")
                 except Exception as ge:
                     logs.append(f"[!] Aviso al actualizar repositorio git local: {ge}")
 
@@ -2039,8 +2083,8 @@ class ServerConnectionManager:
         threading.Thread(target=_watcher, daemon=True, name="UbuntuAutoUpdater").start()
 
     def update_installed_app_from_github(self, gh_info=None):
-        """Envoltorio compatible para el lanzador GTK: ejecuta la actualización unificada de App y Web local."""
-        ok, msg, info, _flags = self.perform_unified_update(gh_info=gh_info, relaunch_on_deb=True, interactive=True)
+        """Envoltorio compatible para el lanzador GTK: ejecuta la descarga completa desde GitHub de App y Web local."""
+        ok, msg, info, _flags = self.perform_unified_update(gh_info=gh_info, relaunch_on_deb=True, interactive=True, force_download=True)
         return ok, msg, info
 
     def install_or_enable_local_node(self):
@@ -2871,6 +2915,20 @@ class LocalHtmlBridgeServer:
                         self.end_headers()
                         self.wfile.write(raw_dict)
                         return
+                    if clean_path == "/api/themes" or clean_path.startswith("/api/themes/"):
+                        base_dir = _catalog_base_dir(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
+                        if "refresh=1" in self.path or "refresh=true" in self.path or "sync=1" in self.path:
+                            _themes_sync_github(base_dir=base_dir, force=True, timeout=5.0)
+                        if clean_path == "/api/themes":
+                            self._send_json(_themes_get_catalog(base_dir=base_dir))
+                        else:
+                            item_name = clean_path[len("/api/themes/"):]
+                            item = _themes_get_catalog(base_dir=base_dir) if item_name == "themes.json" else _themes_get_single(item_name, base_dir=base_dir)
+                            if item is None:
+                                self._send_json({"ok": False, "error": "Theme not found"}, 404)
+                            else:
+                                self._send_json(item)
+                        return
                     if clean_path.startswith("/api/maps/tile/"):
                         m_tile = re.match(r"^/api/maps/tile/(light|dark|osm)/(\d+)/(\d+)/(\d+)(?:\.(?:png|jpg|jpeg))?$", clean_path)
                         if not m_tile:
@@ -3054,6 +3112,16 @@ class LocalHtmlBridgeServer:
                     self._send_json({"ok": True, "theme": parent.conn_mgr.ui_theme})
                     return
 
+                if clean_path == "/api/themes/sync":
+                    base_dir = _catalog_base_dir(os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
+                    sync_res = _themes_sync_github(base_dir=base_dir, force=True, timeout=6.0)
+                    if self._proxy_to_remote("POST", raw_body):
+                        return
+                    cat = _themes_get_catalog(base_dir=base_dir)
+                    cat["sync_result"] = sync_res
+                    self._send_json(cat)
+                    return
+
                 if clean_path == "/api/dex/start":
                     try:
                         payload = json.loads(raw_body.decode("utf-8"))
@@ -3093,6 +3161,7 @@ class LocalHtmlBridgeServer:
                     ok, msg, updated_info, flags = parent.conn_mgr.perform_unified_update(
                         relaunch_on_deb=False,
                         interactive=True,
+                        force_download=True,
                     )
                     srv_payload_after, _srv_ok, active_base_after = parent.conn_mgr.probe_server_version_info(refresh=False)
                     app_disp_cur = get_display_version(
@@ -3887,7 +3956,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             self.lbl_github_info.set_text(i18n_t("native_ubuntu.updating_desc"))
 
         def worker():
-            ok, msg, gh, flags = self.conn_mgr.perform_unified_update(relaunch_on_deb=False)
+            ok, msg, gh, flags = self.conn_mgr.perform_unified_update(relaunch_on_deb=False, interactive=True, force_download=True)
             GLib.idle_add(self._on_github_update_finished, ok, msg, gh, flags)
 
         threading.Thread(target=worker, daemon=True).start()

@@ -14,6 +14,7 @@ import {
   Layers,
   MapPin,
   Network,
+  Palette,
   Search,
   Server,
   Shield,
@@ -216,6 +217,15 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         subTab: 'updates',
         icon: <Download className="h-4 w-4 text-blue-400" />,
         hint: 'OTA · Idiomas · Logs',
+      },
+      {
+        id: 'nav-themes',
+        title: t('more.subtabs.themes'),
+        category: t('nav.mas'),
+        tab: 'mas',
+        subTab: 'themes',
+        icon: <Palette className="h-4 w-4 text-emerald-500" />,
+        hint: 'Matrix · OTA · JSON',
       },
       {
         id: 'nav-more-devices',

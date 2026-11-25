@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "default_theme": "alethia-matrix",
+  "themes": [
+    {
+      "id": "alethia-matrix",
+      "file": "alethia-matrix.json",
+      "version": "1.0.0",
+      "name": {
+        "es": "Alethia Matrix",
+        "en": "Alethia Matrix",
+        "fr": "Alethia Matrix",
+        "de": "Alethia Matrix",
+        "it": "Alethia Matrix",
+        "pt": "Alethia Matrix"
+      },
+      "description": {
+        "es": "Estética botánica con lluvia de terminal alimentada por métricas reales del servidor y paneles translúcidos en modo claro y oscuro.",
+        "en": "Botanical editorial aesthetic with live server telemetry terminal rain and translucent panels in light and dark modes.",
+        "fr": "Esthétique botanique avec pluie de terminal alimentée par la télémétrie réelle du serveur et panneaux translucides en mode clair et sombre.",
+        "de": "Botanische Ästhetik mit Live-Server-Telemetrie-Terminalregen und transluzenten Panels im hellen und dunklen Modus.",
+        "it": "Estetica botanica con pioggia da terminale alimentata dalla telemetria reale del server e pannelli traslucidi in modalità chiara e scura.",
+        "pt": "Estética botânica com chuva de terminal alimentada pela telemetria real do servidor e painéis translúcidos no modo claro e escuro."
+      },
+      "tags": ["matrix", "telemetry", "botanical", "translucent"],
+      "has_animation": true,
+      "preview": {
+        "light": {
+          "canvas": "#eaf2e6",
+          "surface": "rgba(255, 255, 255, 0.78)",
+          "accent": "#1e6b38",
+          "rain": "#1c7a3e"
+        },
+        "dark": {
+          "canvas": "#061007",
+          "surface": "rgba(12, 24, 14, 0.76)",
+          "accent": "#c6f19d",
+          "rain": "#74e888"
+        }
+      }
+    }
+  ]
+}

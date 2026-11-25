@@ -1210,6 +1210,7 @@ declare global {
       getDeviceToken?: () => string;
       onTokenUpdated?: (token: string) => void;
       onThemeChanged?: (theme: ThemeMode) => void;
+      onThemePaletteChanged?: (theme: ThemeMode, themeId: string, canvas: string, accent: string) => void;
       getPreferredTheme?: () => string;
       getConnectionMode?: () => string;
       getActiveNodeUrl?: () => string;
