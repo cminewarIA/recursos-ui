@@ -171,6 +171,14 @@ conn.execute("""
     )
 """)
 conn.execute("CREATE INDEX IF NOT EXISTS idx_speedtest_history_ts ON speedtest_history(ts DESC);")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS device_series_history (
+        ts REAL NOT NULL, entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL,
+        val1 REAL DEFAULT 0, val2 REAL DEFAULT 0, val3 REAL DEFAULT 0, val4 REAL DEFAULT 0,
+        PRIMARY KEY (entity_kind, entity_id, ts)
+    )
+""")
+conn.execute("CREATE INDEX IF NOT EXISTS idx_dev_series_lookup ON device_series_history(entity_kind, entity_id, ts DESC);")
 conn.commit()
 conn.close()
 

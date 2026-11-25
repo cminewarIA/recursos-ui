@@ -2841,6 +2841,19 @@ def init_geoip_history_db():
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_speedtest_history_ts ON speedtest_history(ts DESC);")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS device_series_history (
+                    ts REAL NOT NULL,
+                    entity_kind TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    val1 REAL DEFAULT 0,
+                    val2 REAL DEFAULT 0,
+                    val3 REAL DEFAULT 0,
+                    val4 REAL DEFAULT 0,
+                    PRIMARY KEY (entity_kind, entity_id, ts)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_dev_series_lookup ON device_series_history(entity_kind, entity_id, ts DESC);")
             conn.commit()
             _TELEMETRY_HISTORY_INITIALIZED = True
         except Exception as e:
@@ -3302,6 +3315,392 @@ def query_telemetry_history_from_sqlite(before_ts=None, after_ts=None, window_se
                     conn.close()
                 except Exception:
                     pass
+
+
+_LAST_DEV_SERIES_SQLITE_TS = 0.0
+_DEV_SERIES_SQLITE_INTERVAL_SEC = 5.0
+_CPU_THERMAL_PROBES_LIVE = collections.deque(maxlen=200)
+
+
+def _push_cpu_thermal_probes_live(ts_now, time_str, sensors):
+    """Mantiene historial en vivo (últimos ~5 min) por cada sonda térmica de CPU."""
+    if not sensors:
+        return
+    probe_map = {}
+    for s in sensors[:8]:
+        lbl = str(s.get("label") or "").strip()
+        if not lbl:
+            continue
+        try:
+            probe_map[lbl] = round(float(s.get("temp_c") or 0.0), 1)
+        except Exception:
+            continue
+    if probe_map:
+        _CPU_THERMAL_PROBES_LIVE.append({
+            "ts": round(float(ts_now), 3),
+            "time_str": str(time_str or ""),
+            "probes": probe_map,
+        })
+
+
+def get_cpu_thermal_probes_live_payload():
+    """Devuelve las series en vivo alineadas de todas las sondas térmicas de CPU."""
+    items = list(_CPU_THERMAL_PROBES_LIVE)
+    if not items:
+        return {"timestamps": [], "epoch_ts": [], "probes": {}}
+    labels = []
+    seen = set()
+    for it in reversed(items):
+        for lbl in it["probes"].keys():
+            if lbl not in seen:
+                seen.add(lbl)
+                labels.append(lbl)
+        if len(labels) >= 8:
+            break
+    timestamps = [it["time_str"] for it in items]
+    epoch_ts = [it["ts"] for it in items]
+    probes = {}
+    for lbl in labels:
+        last_val = 0.0
+        arr = []
+        for it in items:
+            if lbl in it["probes"]:
+                last_val = it["probes"][lbl]
+            arr.append(last_val)
+        probes[lbl] = arr
+    return {"timestamps": timestamps, "epoch_ts": epoch_ts, "probes": probes}
+
+
+def record_device_series_batch_to_sqlite(ts_now, rows, force=False):
+    """Persiste muestras por entidad (discos, interfaces NIC y sondas térmicas CPU) en recursos_history.db."""
+    global _LAST_DEV_SERIES_SQLITE_TS
+    if not rows:
+        return
+    if not force and (ts_now - _LAST_DEV_SERIES_SQLITE_TS) < _DEV_SERIES_SQLITE_INTERVAL_SEC:
+        return
+    init_geoip_history_db()
+    ts_bucket = round(float(ts_now), 3)
+    with GEOIP_HISTORY_DB_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=5.0)
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO device_series_history
+                (ts, entity_kind, entity_id, val1, val2, val3, val4)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        ts_bucket,
+                        str(kind),
+                        str(eid)[:128],
+                        round(float(v1 or 0.0), 2),
+                        round(float(v2 or 0.0), 2),
+                        round(float(v3 or 0.0), 2),
+                        round(float(v4 or 0.0), 2),
+                    )
+                    for (kind, eid, v1, v2, v3, v4) in rows
+                    if kind and eid
+                ],
+            )
+            conn.commit()
+            _LAST_DEV_SERIES_SQLITE_TS = ts_now
+        except Exception as e:
+            print(f"[-] Error guardando device_series_history en SQLite: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+
+def query_device_series_history_from_sqlite(entity_kind, entity_id, before_ts=None, after_ts=None, window_sec=None, limit=180):
+    """Consulta historial SQLite completo por entidad ('disk' | 'nic' | 'cpu_sensor') con submuestreo GROUP BY."""
+    init_geoip_history_db()
+    kind = str(entity_kind or "").strip().lower()
+    eid = str(entity_id or "").strip()
+    empty_series = {"timestamps": [], "date_timestamps": [], "epoch_ts": []}
+    if kind not in ("disk", "nic", "cpu_sensor") or not eid:
+        return {
+            "ok": False,
+            "error": "invalid_entity",
+            "db_file": "recursos_history.db",
+            "entity_kind": kind,
+            "entity_id": eid,
+            "oldest_ts": None,
+            "newest_ts": None,
+            "window_start_ts": None,
+            "window_end_ts": None,
+            "total_samples": 0,
+            "returned_samples": 0,
+            "has_older": False,
+            "has_newer": False,
+            "series": empty_series,
+        }
+
+    try:
+        limit_val = max(20, min(600, int(limit or 180)))
+    except Exception:
+        limit_val = 180
+
+    b_ts = None
+    a_ts = None
+    win_sec_val = None
+    is_all = False
+    try:
+        if before_ts is not None and str(before_ts).strip() != "":
+            b_ts = float(before_ts)
+    except Exception:
+        b_ts = None
+    try:
+        if after_ts is not None and str(after_ts).strip() != "":
+            a_ts = float(after_ts)
+    except Exception:
+        a_ts = None
+    if window_sec is not None and str(window_sec).strip() != "":
+        w_raw = str(window_sec).strip().lower()
+        if w_raw == "all":
+            is_all = True
+        else:
+            try:
+                win_sec_val = max(60.0, float(w_raw))
+            except Exception:
+                win_sec_val = None
+
+    def _fmt_dt(ts_f):
+        try:
+            lt = time.localtime(ts_f)
+            return time.strftime("%H:%M:%S", lt), time.strftime("%d/%m %H:%M:%S", lt)
+        except Exception:
+            return "", ""
+
+    with GEOIP_HISTORY_DB_LOCK:
+        conn = None
+        try:
+            conn = sqlite3.connect(RECURSOS_HISTORY_DB_FILE, timeout=5.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+
+            # Modo multi-sonda térmica ('cpu_sensor' + entity_id == '*')
+            if kind == "cpu_sensor" and eid == "*":
+                bounds = cur.execute(
+                    "SELECT MIN(ts) AS min_ts, MAX(ts) AS max_ts, COUNT(DISTINCT ts) AS cnt FROM device_series_history WHERE entity_kind = 'cpu_sensor'"
+                ).fetchone()
+                oldest_ts = float(bounds["min_ts"]) if bounds and bounds["min_ts"] is not None else None
+                newest_ts = float(bounds["max_ts"]) if bounds and bounds["max_ts"] is not None else None
+                total_samples = int(bounds["cnt"] or 0) if bounds else 0
+                if total_samples == 0 or newest_ts is None:
+                    return {
+                        "ok": True, "db_file": "recursos_history.db", "entity_kind": kind, "entity_id": eid,
+                        "oldest_ts": oldest_ts, "newest_ts": newest_ts, "window_start_ts": None, "window_end_ts": None,
+                        "total_samples": 0, "returned_samples": 0, "has_older": False, "has_newer": False,
+                        "series": {**empty_series, "temp_c": [], "probes": {}},
+                    }
+                end_ref = b_ts if b_ts is not None else newest_ts
+                start_ref = oldest_ts if is_all else (max(oldest_ts, end_ref - win_sec_val) if win_sec_val else (a_ts if a_ts is not None else max(oldest_ts, end_ref - 1200.0)))
+                span_sec = max(1.0, end_ref - start_ref)
+                bucket_sec = max(1.0, span_sec / float(limit_val))
+                rows = cur.execute(
+                    """
+                    SELECT CAST(ts / ? AS INTEGER) AS bkt,
+                           MAX(ts) AS ts,
+                           entity_id,
+                           AVG(val1) AS v1
+                    FROM device_series_history
+                    WHERE entity_kind = 'cpu_sensor' AND ts >= ? AND ts <= ?
+                    GROUP BY bkt, entity_id
+                    ORDER BY ts ASC
+                    """,
+                    (bucket_sec, start_ref, end_ref),
+                ).fetchall()
+                buckets = {}
+                probe_order = []
+                probe_seen = set()
+                for r in rows:
+                    bkt = int(r["bkt"])
+                    lbl = str(r["entity_id"])
+                    if lbl not in probe_seen and len(probe_order) < 8:
+                        probe_seen.add(lbl)
+                        probe_order.append(lbl)
+                    if lbl not in probe_seen:
+                        continue
+                    entry = buckets.get(bkt)
+                    if entry is None:
+                        entry = {"ts": float(r["ts"]), "vals": {}}
+                        buckets[bkt] = entry
+                    else:
+                        entry["ts"] = max(entry["ts"], float(r["ts"]))
+                    entry["vals"][lbl] = round(float(r["v1"] or 0.0), 1)
+                sorted_items = [buckets[k] for k in sorted(buckets.keys())]
+                if len(sorted_items) > limit_val:
+                    sorted_items = sorted_items[-limit_val:]
+                ts_labels, dt_labels, epochs, temp_max_arr = [], [], [], []
+                probes_out = {lbl: [] for lbl in probe_order}
+                last_vals = {lbl: 0.0 for lbl in probe_order}
+                for it in sorted_items:
+                    t_s, d_s = _fmt_dt(it["ts"])
+                    ts_labels.append(t_s)
+                    dt_labels.append(d_s)
+                    epochs.append(round(it["ts"], 3))
+                    cur_vals = []
+                    for lbl in probe_order:
+                        if lbl in it["vals"]:
+                            last_vals[lbl] = it["vals"][lbl]
+                        probes_out[lbl].append(last_vals[lbl])
+                        if last_vals[lbl] > 0:
+                            cur_vals.append(last_vals[lbl])
+                    temp_max_arr.append(round(max(cur_vals), 1) if cur_vals else 0.0)
+                win_start = epochs[0] if epochs else None
+                win_end = epochs[-1] if epochs else None
+                return {
+                    "ok": True,
+                    "db_file": "recursos_history.db",
+                    "entity_kind": kind,
+                    "entity_id": eid,
+                    "oldest_ts": oldest_ts,
+                    "newest_ts": newest_ts,
+                    "window_start_ts": win_start,
+                    "window_end_ts": win_end,
+                    "total_samples": total_samples,
+                    "returned_samples": len(epochs),
+                    "has_older": bool(win_start is not None and oldest_ts is not None and win_start > oldest_ts + 0.5),
+                    "has_newer": bool(win_end is not None and newest_ts is not None and win_end < newest_ts - 0.5),
+                    "series": {
+                        "timestamps": ts_labels,
+                        "date_timestamps": dt_labels,
+                        "epoch_ts": epochs,
+                        "temp_c": temp_max_arr,
+                        "probes": probes_out,
+                    },
+                }
+
+            bounds = cur.execute(
+                "SELECT MIN(ts) AS min_ts, MAX(ts) AS max_ts, COUNT(*) AS cnt FROM device_series_history WHERE entity_kind = ? AND entity_id = ?",
+                (kind, eid),
+            ).fetchone()
+            oldest_ts = float(bounds["min_ts"]) if bounds and bounds["min_ts"] is not None else None
+            newest_ts = float(bounds["max_ts"]) if bounds and bounds["max_ts"] is not None else None
+            total_samples = int(bounds["cnt"] or 0) if bounds else 0
+            if total_samples == 0 or newest_ts is None:
+                return {
+                    "ok": True, "db_file": "recursos_history.db", "entity_kind": kind, "entity_id": eid,
+                    "oldest_ts": oldest_ts, "newest_ts": newest_ts, "window_start_ts": None, "window_end_ts": None,
+                    "total_samples": 0, "returned_samples": 0, "has_older": False, "has_newer": False,
+                    "series": empty_series,
+                }
+
+            end_ref = b_ts if b_ts is not None else newest_ts
+            if is_all:
+                start_ref = oldest_ts
+            elif win_sec_val is not None:
+                start_ref = max(oldest_ts, end_ref - win_sec_val)
+            elif a_ts is not None and b_ts is None:
+                start_ref = a_ts
+                end_ref = newest_ts
+            else:
+                start_ref = a_ts if a_ts is not None else max(oldest_ts, end_ref - 1200.0)
+
+            cnt_win = int(cur.execute(
+                "SELECT COUNT(*) FROM device_series_history WHERE entity_kind = ? AND entity_id = ? AND ts >= ? AND ts <= ?",
+                (kind, eid, start_ref, end_ref),
+            ).fetchone()[0] or 0)
+
+            if cnt_win > limit_val and end_ref > start_ref:
+                bucket_sec = max(1.0, (end_ref - start_ref) / float(limit_val))
+                rows = cur.execute(
+                    """
+                    SELECT MAX(ts) AS ts,
+                           MAX(val1) AS val1,
+                           MAX(val2) AS val2,
+                           AVG(val3) AS val3,
+                           MAX(val4) AS val4
+                    FROM device_series_history
+                    WHERE entity_kind = ? AND entity_id = ? AND ts >= ? AND ts <= ?
+                    GROUP BY CAST(ts / ? AS INTEGER)
+                    ORDER BY ts ASC
+                    """,
+                    (kind, eid, start_ref, end_ref, bucket_sec),
+                ).fetchall()
+            else:
+                rows = cur.execute(
+                    """
+                    SELECT ts, val1, val2, val3, val4
+                    FROM device_series_history
+                    WHERE entity_kind = ? AND entity_id = ? AND ts >= ? AND ts <= ?
+                    ORDER BY ts ASC
+                    LIMIT ?
+                    """,
+                    (kind, eid, start_ref, end_ref, limit_val),
+                ).fetchall()
+
+            ts_labels, dt_labels, epochs = [], [], []
+            v1_list, v2_list, v3_list, v4_list = [], [], [], []
+            for r in rows:
+                ts_f = float(r["ts"] or 0.0)
+                t_s, d_s = _fmt_dt(ts_f)
+                ts_labels.append(t_s)
+                dt_labels.append(d_s)
+                epochs.append(round(ts_f, 3))
+                v1_list.append(round(float(r["val1"] or 0.0), 2))
+                v2_list.append(round(float(r["val2"] or 0.0), 2))
+                v3_list.append(round(float(r["val3"] or 0.0), 2))
+                v4_list.append(round(float(r["val4"] or 0.0), 2))
+
+            series_out = {
+                "timestamps": ts_labels,
+                "date_timestamps": dt_labels,
+                "epoch_ts": epochs,
+            }
+            if kind == "disk":
+                series_out["disk_r"] = v1_list
+                series_out["disk_w"] = v2_list
+                series_out["disk_pct"] = v3_list
+            elif kind == "nic":
+                series_out["net_wan_rx"] = v1_list
+                series_out["net_wan_tx"] = v2_list
+                series_out["net_lan_rx"] = v3_list
+                series_out["net_lan_tx"] = v4_list
+                series_out["net_rx"] = [round(a + b, 2) for a, b in zip(v1_list, v3_list)]
+                series_out["net_tx"] = [round(a + b, 2) for a, b in zip(v2_list, v4_list)]
+            elif kind == "cpu_sensor":
+                series_out["temp_c"] = v1_list
+                series_out["cpu_temp"] = v1_list
+
+            win_start = epochs[0] if epochs else None
+            win_end = epochs[-1] if epochs else None
+            return {
+                "ok": True,
+                "db_file": "recursos_history.db",
+                "entity_kind": kind,
+                "entity_id": eid,
+                "oldest_ts": oldest_ts,
+                "newest_ts": newest_ts,
+                "window_start_ts": win_start,
+                "window_end_ts": win_end,
+                "total_samples": total_samples,
+                "returned_samples": len(epochs),
+                "has_older": bool(win_start is not None and oldest_ts is not None and win_start > oldest_ts + 0.5),
+                "has_newer": bool(win_end is not None and newest_ts is not None and win_end < newest_ts - 0.5),
+                "series": series_out,
+            }
+        except Exception as e:
+            print(f"[-] Error consultando device_series_history en SQLite: {e}")
+            return {
+                "ok": False, "error": str(e), "db_file": "recursos_history.db",
+                "entity_kind": kind, "entity_id": eid,
+                "oldest_ts": None, "newest_ts": None, "window_start_ts": None, "window_end_ts": None,
+                "total_samples": 0, "returned_samples": 0, "has_older": False, "has_newer": False,
+                "series": empty_series,
+            }
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
 
 def _format_ping_history_targets(ordered_ts, rows_by_ts, target_meta):
     target_palette = ["#0284c7", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4"]
@@ -14443,6 +14842,40 @@ def background_collector():
                 net_lan_tx_val=net_lan_tx_sample,
                 extra=extra_telemetry,
             )
+
+            # Historial en vivo + SQLite por entidad (sondas térmicas CPU, discos individuales e interfaces NIC)
+            cpu_sensors_now = cpu_info.get("temp_sensors") or []
+            _push_cpu_thermal_probes_live(now, t_str_sample, cpu_sensors_now)
+            cpu_info["temp_sensors_history"] = get_cpu_thermal_probes_live_payload()
+            dev_series_rows = []
+            for s_item in cpu_sensors_now[:8]:
+                s_lbl = str(s_item.get("label") or "").strip()
+                if s_lbl:
+                    dev_series_rows.append(("cpu_sensor", s_lbl, float(s_item.get("temp_c") or 0.0), 0.0, 0.0, 0.0))
+            for d_item in disks_info:
+                d_key = str(d_item.get("device") or d_item.get("mountpoint") or "").strip()
+                if d_key:
+                    dev_series_rows.append((
+                        "disk",
+                        d_key,
+                        round(float(d_item.get("read_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                        round(float(d_item.get("write_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                        round(float(d_item.get("percent") or 0.0), 1),
+                        0.0,
+                    ))
+            for nic_item in (net_info.get("interfaces") or []):
+                n_key = str(nic_item.get("name") or "").strip()
+                if n_key:
+                    dev_series_rows.append((
+                        "nic",
+                        n_key,
+                        round(float(nic_item.get("wan_rx_bytes_sec") or nic_item.get("rx_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                        round(float(nic_item.get("wan_tx_bytes_sec") or nic_item.get("tx_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                        round(float(nic_item.get("lan_rx_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                        round(float(nic_item.get("lan_tx_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                    ))
+            if dev_series_rows:
+                record_device_series_batch_to_sqlite(now, dev_series_rows)
             
             with DOCKER_LOCK:
                 systemd_acts = list(SYSTEMD_CACHE)
@@ -15211,6 +15644,47 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 limit=limit_param,
             )
             resp = json.dumps(hist_payload).encode('utf-8')
+            wants_gz = 'gzip' in (self.headers.get('Accept-Encoding') or '').lower() and len(resp) > 2048
+            if wants_gz:
+                resp = gzip.compress(resp, compresslevel=4)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Vary', 'Accept-Encoding')
+            if wants_gz:
+                self.send_header('Content-Encoding', 'gzip')
+            self.send_security_headers()
+            if auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # 1a-bis2. HISTORIAL PERSISTENTE POR ENTIDAD (discos individuales, NICs y sondas térmicas CPU)
+        elif clean_path == "/api/metrics/entity-history":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            query_str = self.path.split('?', 1)[1] if '?' in self.path else ''
+            params = urllib.parse.parse_qs(query_str)
+            entity_kind = params.get('kind', [''])[0]
+            entity_id = params.get('id', [''])[0]
+            before_ts = params.get('before_ts', [None])[0]
+            after_ts = params.get('after_ts', [None])[0]
+            window_sec = params.get('window_sec', params.get('window', [None]))[0]
+            limit_param = params.get('limit', [180])[0]
+            ent_payload = query_device_series_history_from_sqlite(
+                entity_kind=entity_kind,
+                entity_id=entity_id,
+                before_ts=before_ts,
+                after_ts=after_ts,
+                window_sec=window_sec,
+                limit=limit_param,
+            )
+            resp = json.dumps(ent_payload).encode('utf-8')
             wants_gz = 'gzip' in (self.headers.get('Accept-Encoding') or '').lower() and len(resp) > 2048
             if wants_gz:
                 resp = gzip.compress(resp, compresslevel=4)

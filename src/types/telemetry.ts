@@ -21,6 +21,12 @@ export interface CpuTempSensor {
   temp_c: number;
 }
 
+export interface CpuThermalProbesHistory {
+  timestamps: string[];
+  epoch_ts: number[];
+  probes: Record<string, number[]>;
+}
+
 export interface CpuCapabilities {
   usage?: boolean;
   temp?: boolean;
@@ -46,6 +52,7 @@ export interface CpuInfo {
   governor?: string | null;
   temp_c?: number | null;
   temp_sensors?: CpuTempSensor[];
+  temp_sensors_history?: CpuThermalProbesHistory;
   power_watts?: number | null;
   user_percent?: number;
   system_percent?: number;
@@ -926,6 +933,25 @@ export interface TelemetryHistoryResponse {
   has_older: boolean;
   has_newer: boolean;
   series: HistorySeries;
+}
+
+export interface EntityHistoryResponse {
+  ok: boolean;
+  db_file?: string;
+  entity_kind: 'disk' | 'nic' | 'cpu_sensor' | string;
+  entity_id: string;
+  oldest_ts: number | null;
+  newest_ts: number | null;
+  window_start_ts: number | null;
+  window_end_ts: number | null;
+  total_samples: number;
+  returned_samples: number;
+  has_older: boolean;
+  has_newer: boolean;
+  series: HistorySeries & {
+    temp_c?: number[];
+    probes?: Record<string, number[]>;
+  };
 }
 
 export interface RecentCommitItem {

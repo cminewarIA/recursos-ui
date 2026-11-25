@@ -65,6 +65,8 @@ export interface ExpandChartSpec {
   gpuSubmetric?: 'compute' | 'vram' | 'video' | 'power_temp' | 'clocks' | 'pcie';
   nicName?: string;
   diskMountpoint?: string;
+  entityKind?: 'disk' | 'nic' | 'cpu_sensor';
+  entityId?: string;
 }
 
 interface OverviewViewProps {
@@ -248,6 +250,8 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
         leftUnit: 'MB/s',
         chartKind: 'storage',
         diskMountpoint: d.mountpoint,
+        entityKind: 'disk',
+        entityId: d.device || d.mountpoint,
       }),
       [widgetTitle, isMounted, d.free_bytes, d.total_bytes, d.mountpoint, d.device, diskSeries, diskTimestamps, diskEpochTs, t]
     );

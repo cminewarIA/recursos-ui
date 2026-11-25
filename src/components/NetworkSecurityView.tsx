@@ -109,6 +109,8 @@ const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, on
       leftUnit: 'MB/s',
       chartKind: 'net',
       nicName: nic.name,
+      entityKind: 'nic',
+      entityId: nic.name,
     };
     return { nicSeries: series, nicTimestamps: timestamps, nicEpochTs: epochTs, expandNicSpec: spec };
   }, [hist2h, nic.name, nic.ip, locale, theme, t]);

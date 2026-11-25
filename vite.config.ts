@@ -430,6 +430,104 @@ for (const s of devTelemetrySamples) {
 }
 syncHistoryBufferDev();
 
+interface DevEntitySeriesRow {
+  ts: number;
+  time_str: string;
+  kind: 'disk' | 'nic' | 'cpu_sensor';
+  id: string;
+  val1: number;
+  val2: number;
+  val3: number;
+  val4: number;
+}
+
+const devEntitySeriesSamples: DevEntitySeriesRow[] = [];
+const devCpuProbesLive: Array<{ ts: number; time_str: string; probes: Record<string, number> }> = [];
+let lastDevEntityRecordTs = 0;
+
+function recordEntitySamplesDev(
+  ts: number,
+  timeStr: string,
+  cpuSensors: Array<{ label: string; temp_c: number }>,
+  disks: Array<{ device?: string; mountpoint?: string; read_bytes_sec?: number; write_bytes_sec?: number; percent?: number }>,
+  nics: Array<{ name?: string; rx_bytes_sec?: number; tx_bytes_sec?: number; wan_rx_bytes_sec?: number; wan_tx_bytes_sec?: number; lan_rx_bytes_sec?: number; lan_tx_bytes_sec?: number }>
+) {
+  if (cpuSensors.length > 0) {
+    const probes: Record<string, number> = {};
+    for (const s of cpuSensors.slice(0, 8)) {
+      if (s.label) probes[s.label] = Math.round(Number(s.temp_c || 0) * 10) / 10;
+    }
+    if (Object.keys(probes).length > 0) {
+      devCpuProbesLive.push({ ts, time_str: timeStr, probes });
+      if (devCpuProbesLive.length > 200) devCpuProbesLive.shift();
+    }
+  }
+  if (ts - lastDevEntityRecordTs < 4.5) return;
+  lastDevEntityRecordTs = ts;
+  for (const s of cpuSensors.slice(0, 8)) {
+    if (!s.label) continue;
+    devEntitySeriesSamples.push({
+      ts, time_str: timeStr, kind: 'cpu_sensor', id: s.label,
+      val1: Math.round(Number(s.temp_c || 0) * 10) / 10, val2: 0, val3: 0, val4: 0,
+    });
+  }
+  for (const d of disks) {
+    const dKey = String(d.device || d.mountpoint || '').trim();
+    if (!dKey) continue;
+    devEntitySeriesSamples.push({
+      ts, time_str: timeStr, kind: 'disk', id: dKey,
+      val1: Math.round((Number(d.read_bytes_sec || 0) / (1024 * 1024)) * 100) / 100,
+      val2: Math.round((Number(d.write_bytes_sec || 0) / (1024 * 1024)) * 100) / 100,
+      val3: Math.round(Number(d.percent || 0) * 10) / 10,
+      val4: 0,
+    });
+  }
+  for (const n of nics) {
+    const nKey = String(n.name || '').trim();
+    if (!nKey) continue;
+    devEntitySeriesSamples.push({
+      ts, time_str: timeStr, kind: 'nic', id: nKey,
+      val1: Math.round((Number(n.wan_rx_bytes_sec ?? n.rx_bytes_sec ?? 0) / (1024 * 1024)) * 100) / 100,
+      val2: Math.round((Number(n.wan_tx_bytes_sec ?? n.tx_bytes_sec ?? 0) / (1024 * 1024)) * 100) / 100,
+      val3: Math.round((Number(n.lan_rx_bytes_sec ?? 0) / (1024 * 1024)) * 100) / 100,
+      val4: Math.round((Number(n.lan_tx_bytes_sec ?? 0) / (1024 * 1024)) * 100) / 100,
+    });
+  }
+  if (devEntitySeriesSamples.length > 24000) {
+    devEntitySeriesSamples.splice(0, devEntitySeriesSamples.length - 20000);
+  }
+}
+
+function getCpuProbesLiveDev() {
+  if (devCpuProbesLive.length === 0) {
+    return { timestamps: [] as string[], epoch_ts: [] as number[], probes: {} as Record<string, number[]> };
+  }
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  for (let i = devCpuProbesLive.length - 1; i >= 0; i--) {
+    for (const lbl of Object.keys(devCpuProbesLive[i].probes)) {
+      if (!seen.has(lbl)) {
+        seen.add(lbl);
+        labels.push(lbl);
+      }
+    }
+    if (labels.length >= 8) break;
+  }
+  const probes: Record<string, number[]> = {};
+  for (const lbl of labels) {
+    let last = 0;
+    probes[lbl] = devCpuProbesLive.map((it) => {
+      if (lbl in it.probes) last = it.probes[lbl];
+      return last;
+    });
+  }
+  return {
+    timestamps: devCpuProbesLive.map((it) => it.time_str),
+    epoch_ts: devCpuProbesLive.map((it) => it.ts),
+    probes,
+  };
+}
+
 function readAppVersion(): string {
   try {
     return fs.readFileSync(path.resolve(ROOT_DIR, 'VERSION'), 'utf-8').trim() || '0.0.0';
@@ -4377,6 +4475,149 @@ function realOsTelemetryMiddleware(): Plugin {
           return;
         }
 
+        if (url === '/api/metrics/entity-history' && req.method === 'GET') {
+          const params = new URLSearchParams(queryStr || '');
+          const kind = (params.get('kind') || '').trim().toLowerCase();
+          const eid = (params.get('id') || '').trim();
+          const beforeTsRaw = params.get('before_ts');
+          const afterTsRaw = params.get('after_ts');
+          const windowRaw = params.get('window_sec') || params.get('window') || '';
+          const limit = Math.max(20, Math.min(600, Number.parseInt(params.get('limit') || '180', 10) || 180));
+          const beforeTs = beforeTsRaw ? Number.parseFloat(beforeTsRaw) : null;
+          const afterTs = afterTsRaw ? Number.parseFloat(afterTsRaw) : null;
+          const isAll = windowRaw.trim().toLowerCase() === 'all';
+          const windowSec = !isAll && windowRaw && windowRaw !== 'live' ? Number.parseFloat(windowRaw) : null;
+
+          const fmtDt = (ts: number) => {
+            const d = new Date(ts * 1000);
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `${dd}/${mm} ${d.toLocaleTimeString('es-ES')}`;
+          };
+
+          const allForEntity = devEntitySeriesSamples.filter((s) =>
+            s.kind === kind && (eid === '*' ? true : s.id === eid)
+          );
+          const uniqueTs = Array.from(new Set(allForEntity.map((s) => s.ts))).sort((a, b) => a - b);
+          const oldestTs = uniqueTs.length > 0 ? uniqueTs[0] : null;
+          const newestTs = uniqueTs.length > 0 ? uniqueTs[uniqueTs.length - 1] : null;
+
+          let startRef = oldestTs ?? 0;
+          let endRef = newestTs ?? 0;
+          if (newestTs !== null && oldestTs !== null) {
+            endRef = beforeTs !== null && Number.isFinite(beforeTs) ? beforeTs : newestTs;
+            if (isAll) {
+              startRef = oldestTs;
+            } else if (windowSec && Number.isFinite(windowSec) && windowSec > 0) {
+              startRef = Math.max(oldestTs, endRef - windowSec);
+            } else if (afterTs !== null && Number.isFinite(afterTs) && beforeTs === null) {
+              startRef = afterTs;
+              endRef = newestTs;
+            } else {
+              startRef = afterTs !== null && Number.isFinite(afterTs) ? afterTs : Math.max(oldestTs, endRef - 1200);
+            }
+          }
+
+          const inWin = allForEntity.filter((s) => s.ts >= startRef && s.ts <= endRef);
+          if (kind === 'cpu_sensor' && eid === '*') {
+            const tsList = Array.from(new Set(inWin.map((s) => s.ts))).sort((a, b) => a - b).slice(-limit);
+            const probeOrder = Array.from(new Set(inWin.map((s) => s.id))).slice(0, 8);
+            const probesOut: Record<string, number[]> = {};
+            const lastMap: Record<string, number> = {};
+            for (const p of probeOrder) {
+              probesOut[p] = [];
+              lastMap[p] = 0;
+            }
+            const byTs = new Map<number, Map<string, number>>();
+            for (const row of inWin) {
+              let m = byTs.get(row.ts);
+              if (!m) {
+                m = new Map();
+                byTs.set(row.ts, m);
+              }
+              m.set(row.id, row.val1);
+            }
+            const tempMax: number[] = [];
+            for (const tVal of tsList) {
+              const m = byTs.get(tVal);
+              const curVals: number[] = [];
+              for (const p of probeOrder) {
+                if (m && m.has(p)) lastMap[p] = m.get(p)!;
+                probesOut[p].push(lastMap[p]);
+                if (lastMap[p] > 0) curVals.push(lastMap[p]);
+              }
+              tempMax.push(curVals.length > 0 ? Math.max(...curVals) : 0);
+            }
+            res.setHeader('Content-Type', 'application/json');
+            res.end(
+              JSON.stringify({
+                ok: true,
+                db_file: 'recursos_history.db',
+                entity_kind: kind,
+                entity_id: eid,
+                oldest_ts: oldestTs,
+                newest_ts: newestTs,
+                window_start_ts: tsList[0] ?? null,
+                window_end_ts: tsList[tsList.length - 1] ?? null,
+                total_samples: uniqueTs.length,
+                returned_samples: tsList.length,
+                has_older: Boolean(tsList.length && oldestTs !== null && tsList[0] > oldestTs + 0.5),
+                has_newer: Boolean(tsList.length && newestTs !== null && tsList[tsList.length - 1] < newestTs - 0.5),
+                series: {
+                  timestamps: tsList.map((t) => new Date(t * 1000).toLocaleTimeString('es-ES')),
+                  date_timestamps: tsList.map((t) => fmtDt(t)),
+                  epoch_ts: tsList,
+                  temp_c: tempMax,
+                  probes: probesOut,
+                },
+              })
+            );
+            return;
+          }
+
+          const sliced = inWin.slice(-limit);
+          const epochs = sliced.map((s) => s.ts);
+          const baseSeries: Record<string, unknown> = {
+            timestamps: sliced.map((s) => s.time_str),
+            date_timestamps: sliced.map((s) => fmtDt(s.ts)),
+            epoch_ts: epochs,
+          };
+          if (kind === 'disk') {
+            baseSeries.disk_r = sliced.map((s) => s.val1);
+            baseSeries.disk_w = sliced.map((s) => s.val2);
+            baseSeries.disk_pct = sliced.map((s) => s.val3);
+          } else if (kind === 'nic') {
+            baseSeries.net_wan_rx = sliced.map((s) => s.val1);
+            baseSeries.net_wan_tx = sliced.map((s) => s.val2);
+            baseSeries.net_lan_rx = sliced.map((s) => s.val3);
+            baseSeries.net_lan_tx = sliced.map((s) => s.val4);
+            baseSeries.net_rx = sliced.map((s) => Math.round((s.val1 + s.val3) * 100) / 100);
+            baseSeries.net_tx = sliced.map((s) => Math.round((s.val2 + s.val4) * 100) / 100);
+          } else if (kind === 'cpu_sensor') {
+            baseSeries.temp_c = sliced.map((s) => s.val1);
+            baseSeries.cpu_temp = sliced.map((s) => s.val1);
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              ok: true,
+              db_file: 'recursos_history.db',
+              entity_kind: kind,
+              entity_id: eid,
+              oldest_ts: oldestTs,
+              newest_ts: newestTs,
+              window_start_ts: epochs[0] ?? null,
+              window_end_ts: epochs[epochs.length - 1] ?? null,
+              total_samples: uniqueTs.length,
+              returned_samples: sliced.length,
+              has_older: Boolean(epochs.length && oldestTs !== null && epochs[0] > oldestTs + 0.5),
+              has_newer: Boolean(epochs.length && newestTs !== null && epochs[epochs.length - 1] < newestTs - 0.5),
+              series: baseSeries,
+            })
+          );
+          return;
+        }
+
         if (url === '/api/net/ping-history' && req.method === 'GET') {
           const params = new URLSearchParams(queryStr || '');
           res.setHeader('Content-Type', 'application/json');
@@ -4785,6 +5026,13 @@ function realOsTelemetryMiddleware(): Plugin {
           };
           pushHistoryBucketDev(devSampleRow, true);
           appendTelemetrySampleDev(devSampleRow);
+          recordEntitySamplesDev(
+            nowEpochSec,
+            timeStr,
+            cpu.tempSensors || [],
+            disks as Array<{ device?: string; mountpoint?: string; read_bytes_sec?: number; write_bytes_sec?: number; percent?: number }>,
+            (net.interfaces_list || []) as Array<{ name?: string; rx_bytes_sec?: number; tx_bytes_sec?: number; wan_rx_bytes_sec?: number; wan_tx_bytes_sec?: number; lan_rx_bytes_sec?: number; lan_tx_bytes_sec?: number }>
+          );
 
           const payload = {
             maps_engine: 'leaflet',
@@ -4856,6 +5104,7 @@ function realOsTelemetryMiddleware(): Plugin {
               governor: cpu.governor,
               temp_c: cpu.tempC,
               temp_sensors: cpu.tempSensors,
+              temp_sensors_history: getCpuProbesLiveDev(),
               power_watts: null,
               user_percent: cpu.userPct,
               system_percent: cpu.systemPct,

@@ -10,11 +10,12 @@ import {
   Monitor,
 } from 'lucide-react';
 import { AccordionBody, AnimatedMetricValue, MorphPill, ViewStage } from './MotionPrimitives';
+import { ChartNarrativeFooter } from './DataVizPrimitives';
 import { ExpandChartSpec } from './OverviewView';
 import { ResourceProcessesPanel } from './ResourceProcessesPanel';
 import { TelemetryChart, ChartSeries } from './TelemetryChart';
 import { FloatingTooltip, FloatingTooltipData } from './FloatingTooltip';
-import { MainTabId, MetricsPayload, ThemeMode } from '../types/telemetry';
+import { CpuTempSensor, MainTabId, MetricsPayload, ThemeMode } from '../types/telemetry';
 import { formatBytes, formatMbRate, formatPct, formatTemp } from '../utils/formatters';
 import { formatDiskFstype, formatDiskLabel, formatDiskTransport, useI18n } from '../i18n';
 
@@ -145,7 +146,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     );
 
     const cards: Array<{
-      id: 'usage_temp' | 'power_temp' | 'freq' | 'times' | 'load';
+      id: 'usage_temp' | 'power_temp' | 'freq' | 'times' | 'load' | 'thermal_probes';
       title: string;
       subtitle: string;
       headline: string;
@@ -156,6 +157,9 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
       timestamps: string[];
       epochTs: number[];
       series: ChartSeries[];
+      entityKind?: 'cpu_sensor';
+      entityId?: string;
+      probesList?: CpuTempSensor[];
     }> = [];
 
     // 1. Uso y Temperatura del Procesador
@@ -379,6 +383,71 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
       ],
     });
 
+    // 6. Sensores Térmicos Individuales por Sonda
+    const probePalette =
+      theme === 'dark'
+        ? ['#fb923c', '#f87171', '#fbbf24', '#2dd4bf', '#a5b4fc', '#c6f19d']
+        : ['#ea580c', '#dc2626', '#d97706', '#0d9488', '#6366f1', '#1e6b38'];
+    const sensorsList = cpu?.temp_sensors ?? [];
+    const probesHist = cpu?.temp_sensors_history;
+    const hasProbes = sensorsList.length > 0;
+    const probeSeries: ChartSeries[] = [];
+    let probeTimestamps = cTimestamps;
+    let probeEpochTs = cEpochTs;
+
+    if (hasProbes) {
+      if (probesHist && probesHist.epoch_ts.length >= 2 && Object.keys(probesHist.probes).length > 0) {
+        probeTimestamps = probesHist.timestamps;
+        probeEpochTs = probesHist.epoch_ts;
+        Object.entries(probesHist.probes)
+          .slice(0, 6)
+          .forEach(([lbl, arr], idx) => {
+            probeSeries.push({
+              id: `cpu_probe_${idx}_${lbl}`,
+              label: lbl,
+              data: arr,
+              color: probePalette[idx % probePalette.length],
+              unit: '°C',
+              decimals: 1,
+              fillAlpha: idx === 0 ? 0.12 : 0,
+            });
+          });
+      } else {
+        sensorsList.slice(0, 6).forEach((s, idx) => {
+          probeSeries.push({
+            id: `cpu_probe_${idx}_${s.label}`,
+            label: s.label,
+            data: [s.temp_c, s.temp_c],
+            color: probePalette[idx % probePalette.length],
+            unit: '°C',
+            decimals: 1,
+            fillAlpha: idx === 0 ? 0.12 : 0,
+          });
+        });
+      }
+    }
+    const maxProbeTemp = hasProbes ? Math.max(...sensorsList.map((s) => s.temp_c)) : null;
+    cards.push({
+      id: 'thermal_probes',
+      title: t('hardware.cpu.graph_probes_title'),
+      subtitle: hasProbes
+        ? t('hardware.cpu.graph_probes_sub', {
+            count: sensorsList.length,
+            max: formatTemp(maxProbeTemp),
+          })
+        : t('hardware.cpu.sensor_unavailable'),
+      headline: hasProbes ? formatTemp(maxProbeTemp) : '--',
+      available: hasProbes,
+      leftUnit: '°C',
+      maxLeft: 100,
+      timestamps: probeTimestamps,
+      epochTs: probeEpochTs,
+      series: probeSeries,
+      entityKind: 'cpu_sensor',
+      entityId: '*',
+      probesList: sensorsList,
+    });
+
     return cards;
   }, [
     metrics?.cpu,
@@ -395,6 +464,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     cpuCores.length,
     timestamps,
     epochTs,
+    theme,
     primaryBotanical,
     thermalOrange,
     secondaryTeal,
@@ -808,7 +878,6 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
           const toggleCpuGraph = (id: string) => {
             setDisabledCpuGraphs((prev) => ({ ...prev, [id]: !prev[id] }));
           };
-          const cpuSensors = metrics?.cpu?.temp_sensors ?? [];
           return (
             <div className="space-y-4">
               {/* Cabecera de resumen de sensores y barra dinámica de sub-gráficas (paridad con GPU) */}
@@ -972,6 +1041,8 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                       maxLeft: g.maxLeft,
                       maxRight: g.maxRight,
                       chartKind: 'cpu',
+                      entityKind: g.entityKind,
+                      entityId: g.entityId,
                     });
                     return (
                       <div key={g.id} className="cockpit-bento flex min-w-0 flex-col justify-between p-5">
@@ -985,7 +1056,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                             </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-xs font-bold tabular-nums">
+                            <span className="font-mono text-xs font-bold tabular-nums text-slate-900 dark:text-[#c6f19d]">
                               {g.headline}
                             </span>
                             {onExpandChart && (
@@ -1012,14 +1083,94 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                             theme={theme}
                             onExpandClick={onExpandChart ? () => onExpandChart(buildExpandSpec()) : undefined}
                           />
+                          <ChartNarrativeFooter
+                            data={g.series[0]?.data ?? []}
+                            unit={g.series[0]?.unit ?? g.leftUnit}
+                            decimals={g.series[0]?.decimals ?? 1}
+                          />
                         </div>
+                        {g.id === 'thermal_probes' && g.probesList && g.probesList.length > 0 && (
+                          <div className="mt-3 grid grid-cols-1 gap-1.5 border-t border-slate-200/70 pt-3 dark:border-slate-800 sm:grid-cols-2">
+                            {g.probesList.slice(0, 8).map((probe, pIdx) => {
+                              const pctBar = Math.max(8, Math.min(100, probe.temp_c));
+                              const isCrit = probe.temp_c >= 85;
+                              const isWarn = !isCrit && probe.temp_c >= 70;
+                              const toneText = isCrit
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : isWarn
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-emerald-700 dark:text-[#c6f19d]';
+                              const toneBar = isCrit
+                                ? 'bg-rose-500'
+                                : isWarn
+                                  ? 'bg-amber-500'
+                                  : 'bg-[#1e6b38] dark:bg-[#c6f19d]';
+                              const statusTxt = isCrit
+                                ? t('hardware.cpu.probe_status_crit')
+                                : isWarn
+                                  ? t('hardware.cpu.probe_status_warn')
+                                  : t('hardware.cpu.probe_status_ok');
+                              const openSingleProbe = () => {
+                                if (!onExpandChart) return;
+                                const pHist = metrics?.cpu?.temp_sensors_history;
+                                const arr = pHist?.probes?.[probe.label];
+                                onExpandChart({
+                                  title: `${t('hardware.cpu.graph_probes_title')} · ${probe.label}`,
+                                  subtitle: `${metrics?.cpu?.model || t('equipment.cpu_main_fallback')} · ${formatTemp(probe.temp_c)} · ${statusTxt}`,
+                                  series: [
+                                    {
+                                      id: `probe_${probe.label}`,
+                                      label: probe.label,
+                                      data: arr && arr.length >= 2 ? arr : [probe.temp_c, probe.temp_c],
+                                      color: thermalOrange,
+                                      unit: '°C',
+                                      decimals: 1,
+                                      fillAlpha: 0.16,
+                                    },
+                                  ],
+                                  timestamps: pHist?.timestamps?.length ? pHist.timestamps : g.timestamps,
+                                  epochTs: pHist?.epoch_ts?.length ? pHist.epoch_ts : g.epochTs,
+                                  leftUnit: '°C',
+                                  maxLeft: 100,
+                                  chartKind: 'cpu',
+                                  entityKind: 'cpu_sensor',
+                                  entityId: probe.label,
+                                });
+                              };
+                              return (
+                                <button
+                                  key={`${probe.label}-${pIdx}`}
+                                  type="button"
+                                  onClick={openSingleProbe}
+                                  aria-label={t('hardware.cpu.probe_inspect_aria', { label: probe.label })}
+                                  className="cockpit-subtile flex min-w-0 flex-col gap-1 px-2.5 py-2 text-left transition-colors hover:border-[#1e6b38]/40 dark:hover:border-[#c6f19d]/40 cursor-pointer"
+                                >
+                                  <div className="flex items-center justify-between gap-2 text-[11px]">
+                                    <span className="truncate font-medium text-slate-700 dark:text-slate-200" title={probe.label}>
+                                      {probe.label}
+                                    </span>
+                                    <span className={`shrink-0 font-mono font-semibold tabular-nums ${toneText}`}>
+                                      {formatTemp(probe.temp_c)} · {statusTxt}
+                                    </span>
+                                  </div>
+                                  <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-200 ${toneBar}`}
+                                      style={{ width: `${pctBar}%` }}
+                                    />
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               )}
 
-              {/* Carga por núcleo + sensores térmicos detectados + detalles técnicos */}
+              {/* Carga por núcleo + detalles técnicos */}
               <div className="cockpit-bento p-5">
                 {cpuCores.length > 0 && (
                   <div>
@@ -1059,37 +1210,6 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                           </div>
                           <span className="mt-1 block font-mono text-[10px] font-semibold tabular-nums text-slate-700 dark:text-slate-300">
                             {Math.round(val)}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {cpuSensors.length > 1 && (
-                  <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-800">
-                    <p className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      {t('hardware.cpu.thermal_sensors_title')}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {cpuSensors.map((s, idx) => (
-                        <div
-                          key={`${s.label}-${idx}`}
-                          className="cockpit-subtile flex items-center justify-between gap-2 px-3 py-2 text-xs"
-                        >
-                          <span className="truncate text-slate-600 dark:text-slate-300" title={s.label}>
-                            {s.label}
-                          </span>
-                          <span
-                            className={`shrink-0 font-mono font-semibold tabular-nums ${
-                              s.temp_c >= 85
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : s.temp_c >= 70
-                                  ? 'text-amber-600 dark:text-amber-400'
-                                  : 'text-slate-900 dark:text-white'
-                            }`}
-                          >
-                            {formatTemp(s.temp_c)}
                           </span>
                         </div>
                       ))}
@@ -1557,9 +1677,59 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                             })}
                       </p>
                     </div>
-                    <span className="cockpit-pill-amber rounded-full px-2.5 py-0.5 font-mono text-xs font-bold tabular-nums">
-                      {isMounted ? formatPct(d.percent) : t('hardware.storage.unmounted')}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-mono text-xs font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                        {isMounted ? formatPct(d.percent) : t('hardware.storage.unmounted')}
+                      </span>
+                      {onExpandChart && (
+                        <button
+                          type="button"
+                          aria-label={t('hardware.storage.expand_aria', { name: formatDiskLabel(d, locale) })}
+                          onClick={() => {
+                            const dHist = d.io_history ?? [];
+                            const dTs = dHist.length
+                              ? dHist.map((b) => new Date(b.t).toLocaleTimeString(locale))
+                              : timestamps;
+                            const dEpoch = dHist.length ? dHist.map((b) => Math.round(b.t / 1000)) : epochTs;
+                            onExpandChart({
+                              title: formatDiskLabel(d, locale),
+                              subtitle: `${d.mountpoint}${d.device && d.device !== d.mountpoint ? ` · ${d.device}` : ''}`,
+                              series: [
+                                {
+                                  id: 'disk_r',
+                                  metricKey: 'disk_r',
+                                  label: t('hardware.storage.read'),
+                                  data: dHist.length ? dHist.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) : [0, 0],
+                                  color: barColor,
+                                  unit: 'MB/s',
+                                  decimals: 2,
+                                },
+                                {
+                                  id: 'disk_w',
+                                  metricKey: 'disk_w',
+                                  label: t('hardware.storage.write'),
+                                  data: dHist.length ? dHist.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) : [0, 0],
+                                  color: '#f59e0b',
+                                  unit: 'MB/s',
+                                  decimals: 2,
+                                  fillAlpha: 0.08,
+                                },
+                              ],
+                              timestamps: dTs,
+                              epochTs: dEpoch,
+                              leftUnit: 'MB/s',
+                              chartKind: 'storage',
+                              diskMountpoint: d.mountpoint,
+                              entityKind: 'disk',
+                              entityId: d.device || d.mountpoint,
+                            });
+                          }}
+                          className="cockpit-subtile flex min-h-[34px] min-w-[34px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-amber-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-amber-300 cursor-pointer"
+                        >
+                          <Maximize2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                     {d.transport && (

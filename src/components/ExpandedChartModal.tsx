@@ -16,6 +16,7 @@ import { ChartSeries, TelemetryChart } from './TelemetryChart';
 import { ExpandChartSpec } from './OverviewView';
 import { ResourceProcessesPanel } from './ResourceProcessesPanel';
 import {
+  EntityHistoryResponse,
   GpuHistorySample,
   HistorySeries,
   MetricsPayload,
@@ -46,10 +47,8 @@ const WINDOW_PRESETS: Array<{ key: HistoryPresetKey; labelKey: string; sec?: num
   { key: 'all', labelKey: 'charts.presets.all' },
 ];
 
-const GPU_SUB_PRESETS: Array<{ key: HistoryPresetKey; labelKey: string; sec?: number }> = [
-  { key: 'live', labelKey: 'charts.presets.live' },
-  { key: '1200', labelKey: 'charts.presets.gpu_20m', sec: 1200 },
-];
+const PROBE_PALETTE_LIGHT = ['#ea580c', '#dc2626', '#d97706', '#0d9488', '#6366f1', '#1e6b38', '#0284c7', '#be185d'];
+const PROBE_PALETTE_DARK = ['#fb923c', '#f87171', '#fbbf24', '#2dd4bf', '#a5b4fc', '#c6f19d', '#38bdf8', '#f472b6'];
 
 const GPU_SUB_HISTORY_FIELD_MAP: Record<string, keyof Omit<GpuHistorySample, 't'>> = {
   gpu_vram_pct: 'vram_pct',
@@ -81,12 +80,14 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   const { locale, t } = useI18n();
   const hasMetricKeys = useMemo(() => spec.series.some((s) => Boolean(s.metricKey)), [spec.series]);
   const isPingHistoryMode = spec.chartKind === 'ping';
-  const hasDatabaseHistory = hasMetricKeys || isPingHistoryMode;
+  const isEntityHistoryMode = Boolean(spec.entityKind && spec.entityId);
+  const hasDatabaseHistory = hasMetricKeys || isPingHistoryMode || isEntityHistoryMode;
 
   const [preset, setPreset] = useState<HistoryPresetKey>('live');
   const [interactionMode, setInteractionMode] = useState<'inspect' | 'pan'>('inspect');
   const [cursorEndTs, setCursorEndTs] = useState<number | null>(null);
   const [historyData, setHistoryData] = useState<TelemetryHistoryResponse | null>(null);
+  const [entityHistoryData, setEntityHistoryData] = useState<EntityHistoryResponse | null>(null);
   const [pingHistoryData, setPingHistoryData] = useState<PingHistoryResponse | null>(null);
   const [metaBounds, setMetaBounds] = useState<{
     oldestTs: number | null;
@@ -145,6 +146,40 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
             setPingHistoryData(res.data);
           }
         }
+      } else if (isEntityHistoryMode && spec.entityKind && spec.entityId) {
+        q.set('kind', spec.entityKind);
+        q.set('id', spec.entityId);
+        const res = await apiFetchJson<EntityHistoryResponse>(`/api/metrics/entity-history?${q.toString()}`);
+        if (!opts.metaOnly && seq !== fetchSeqRef.current) return;
+        if (res.ok && res.data?.ok && res.data.total_samples > 0) {
+          setMetaBounds({
+            oldestTs: res.data.oldest_ts,
+            newestTs: res.data.newest_ts,
+            totalSamples: res.data.total_samples,
+          });
+          if (!opts.metaOnly) {
+            setEntityHistoryData(res.data);
+            setHistoryData(null);
+          }
+        } else if (hasMetricKeys) {
+          // Respaldo transparente a telemetry_history si device_series_history aún no acumuló muestras para esta entidad
+          const qGlobal = new URLSearchParams(q.toString());
+          qGlobal.delete('kind');
+          qGlobal.delete('id');
+          const resGlobal = await apiFetchJson<TelemetryHistoryResponse>(`/api/metrics/history?${qGlobal.toString()}`);
+          if (!opts.metaOnly && seq !== fetchSeqRef.current) return;
+          if (resGlobal.ok && resGlobal.data?.ok) {
+            setMetaBounds({
+              oldestTs: resGlobal.data.oldest_ts,
+              newestTs: resGlobal.data.newest_ts,
+              totalSamples: resGlobal.data.total_samples,
+            });
+            if (!opts.metaOnly) {
+              setHistoryData(resGlobal.data);
+              setEntityHistoryData(null);
+            }
+          }
+        }
       } else {
         const res = await apiFetchJson<TelemetryHistoryResponse>(`/api/metrics/history?${q.toString()}`);
         if (!opts.metaOnly && seq !== fetchSeqRef.current) return;
@@ -162,7 +197,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       if (!opts.metaOnly) setLoadingHistory(false);
     },
-    [hasDatabaseHistory, isPingHistoryMode]
+    [hasDatabaseHistory, isPingHistoryMode, isEntityHistoryMode, hasMetricKeys, spec.entityKind, spec.entityId]
   );
 
   // Obtener límites temporales totales de la BD una sola vez al abrir la inspección
@@ -210,6 +245,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     if (nextPreset === 'live') {
       setCursorEndTs(null);
       setHistoryData(null);
+      setEntityHistoryData(null);
       setPingHistoryData(null);
       return;
     }
@@ -237,6 +273,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       if (clampedEnd >= newestTs - 1.5 && preset === 'live') {
         setCursorEndTs(null);
         setHistoryData(null);
+        setEntityHistoryData(null);
         setPingHistoryData(null);
         return;
       }
@@ -368,6 +405,10 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     return { filterByEpoch };
   }, []);
 
+  const liveCpuProbesHist = liveMetrics?.cpu?.temp_sensors_history;
+
+  const hasSqlEntitySeries = Boolean(entityHistoryData?.series?.epoch_ts?.length);
+
   const useLocal20mGpu = Boolean(
     preset === '1200' &&
       cursorEndTs === null &&
@@ -382,8 +423,8 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       spec.chartKind === 'storage' &&
       liveDiskHist &&
       liveDiskHist.length > 10 &&
-      ((liveDiskHist[liveDiskHist.length - 1].t - liveDiskHist[0].t) >= 1020_000 ||
-        !(historyData?.series?.disk_r?.length))
+      !hasSqlEntitySeries &&
+      !(historyData?.series?.disk_r?.length)
   );
   const useLocal20mNet = Boolean(
     preset === '1200' &&
@@ -392,8 +433,8 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       spec.nicName &&
       liveNicHist &&
       liveNicHist.length > 10 &&
-      ((liveNicHist[liveNicHist.length - 1].t - liveNicHist[0].t) >= 1020_000 ||
-        !(historyData?.series?.net_rx?.length))
+      !hasSqlEntitySeries &&
+      !(historyData?.series?.net_rx?.length)
   );
 
   const useLocal20mRouter = Boolean(
@@ -402,8 +443,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       spec.chartKind === 'router' &&
       liveRouterHist &&
       liveRouterHist.length > 10 &&
-      ((liveRouterHist[liveRouterHist.length - 1].t - liveRouterHist[0].t) >= 1020_000 ||
-        !(historyData?.series?.net_wan_rx?.length))
+      !(historyData?.series?.net_wan_rx?.length)
   );
 
   const liveBucketWindow = useMemo(() => {
@@ -470,7 +510,19 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       };
     }
 
-    if (isLiveHead && liveMetrics?.history && (spec.chartKind !== 'net' || !spec.nicName) && spec.chartKind !== 'router' && spec.chartKind !== 'ping' && !(hasGpuSubHist && liveGpuHist && liveGpuHist.length >= 2)) {
+    if (isLiveHead && spec.entityKind === 'cpu_sensor' && liveCpuProbesHist && liveCpuProbesHist.epoch_ts.length >= 2) {
+      const epochsAll = liveCpuProbesHist.epoch_ts;
+      const startIdx = liveSliceWindow.filterByEpoch(epochsAll, LIVE_WINDOW_SECONDS);
+      return {
+        kind: 'cpu_probes' as const,
+        liveCpuProbesHist,
+        startIdx,
+        epochs: epochsAll.slice(startIdx),
+        timestamps: liveCpuProbesHist.timestamps.slice(startIdx),
+      };
+    }
+
+    if (isLiveHead && liveMetrics?.history && (spec.chartKind !== 'net' || !spec.nicName) && spec.chartKind !== 'router' && spec.chartKind !== 'ping' && spec.entityKind !== 'cpu_sensor' && !(hasGpuSubHist && liveGpuHist && liveGpuHist.length >= 2)) {
       const liveHist = liveMetrics.history;
       const epochsAll = liveHist.epoch_ts ?? [];
       const startIdx = liveSliceWindow.filterByEpoch(epochsAll, LIVE_WINDOW_SECONDS);
@@ -490,11 +542,13 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     spec.chartKind,
     spec.nicName,
     spec.gpuSubmetric,
+    spec.entityKind,
     liveNicHist,
     liveRouterHist,
     livePingLatency,
     liveDiskHist,
     liveGpuHist,
+    liveCpuProbesHist,
     hasGpuSubHist,
     useLocal20mNet,
     useLocal20mRouter,
@@ -572,6 +626,41 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       });
     }
 
+    if (liveBucketWindow?.kind === 'cpu_probes') {
+      const { liveCpuProbesHist: pHist, startIdx } = liveBucketWindow;
+      const palette = theme === 'dark' ? PROBE_PALETTE_DARK : PROBE_PALETTE_LIGHT;
+      if (spec.entityId && spec.entityId !== '*') {
+        const arr = pHist.probes[spec.entityId];
+        if (arr && arr.length > startIdx) {
+          return [
+            {
+              id: `probe_${spec.entityId}`,
+              label: spec.entityId,
+              data: arr.slice(startIdx),
+              color: palette[0],
+              unit: '°C',
+              decimals: 1,
+              fillAlpha: 0.16,
+            },
+          ];
+        }
+        return spec.series;
+      }
+      const entries = Object.entries(pHist.probes).slice(0, 6);
+      if (entries.length > 0) {
+        return entries.map(([lbl, arr], idx) => ({
+          id: `probe_${idx}_${lbl}`,
+          label: lbl,
+          data: arr.slice(startIdx),
+          color: palette[idx % palette.length],
+          unit: '°C',
+          decimals: 1,
+          fillAlpha: idx === 0 ? 0.12 : 0,
+        }));
+      }
+      return spec.series;
+    }
+
     if (liveBucketWindow?.kind === 'main_live') {
       const { liveHist, startIdx } = liveBucketWindow;
       return spec.series.map((s) => {
@@ -600,6 +689,52 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }));
     }
 
+    if (isEntityHistoryMode && entityHistoryData?.series) {
+      const entSeries = entityHistoryData.series;
+      if (spec.entityKind === 'cpu_sensor') {
+        const palette = theme === 'dark' ? PROBE_PALETTE_DARK : PROBE_PALETTE_LIGHT;
+        if (spec.entityId === '*' && entSeries.probes) {
+          const entries = Object.entries(entSeries.probes).slice(0, 6);
+          if (entries.length > 0) {
+            return entries.map(([lbl, arr], idx) => ({
+              id: `probe_sql_${idx}_${lbl}`,
+              label: lbl,
+              data: arr || [],
+              color: palette[idx % palette.length],
+              unit: '°C',
+              decimals: 1,
+              fillAlpha: idx === 0 ? 0.12 : 0,
+            }));
+          }
+        }
+        if (Array.isArray(entSeries.temp_c) && entSeries.temp_c.length > 0) {
+          const first = spec.series[0];
+          return [
+            {
+              ...(first || {
+                id: 'cpu_probe_temp',
+                label: spec.entityId || '°C',
+                color: palette[0],
+                unit: '°C',
+                decimals: 1,
+                fillAlpha: 0.16,
+              }),
+              data: entSeries.temp_c,
+            },
+          ];
+        }
+      }
+      return spec.series.map((s) => {
+        if (s.metricKey && Array.isArray(entSeries[s.metricKey])) {
+          return { ...s, data: entSeries[s.metricKey] ?? [] };
+        }
+        if (s.id === 'disk_r' && Array.isArray(entSeries.disk_r)) return { ...s, data: entSeries.disk_r };
+        if (s.id === 'disk_w' && Array.isArray(entSeries.disk_w)) return { ...s, data: entSeries.disk_w };
+        if (s.id === 'disk_pct' && Array.isArray(entSeries.disk_pct)) return { ...s, data: entSeries.disk_pct };
+        return s;
+      });
+    }
+
     const sqlHist: HistorySeries | undefined = historyData?.series;
     if (!sqlHist) return spec.series;
     return spec.series.map((s) => {
@@ -608,7 +743,20 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       }
       return s;
     });
-  }, [liveBucketWindow, preset, cursorEndTs, spec.series, isPingHistoryMode, pingHistoryData, historyData]);
+  }, [
+    liveBucketWindow,
+    preset,
+    cursorEndTs,
+    spec.series,
+    spec.entityKind,
+    spec.entityId,
+    isPingHistoryMode,
+    isEntityHistoryMode,
+    pingHistoryData,
+    entityHistoryData,
+    historyData,
+    theme,
+  ]);
 
   const resolvedTimestamps = useMemo(() => {
     if (liveBucketWindow) {
@@ -620,14 +768,20 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     if (isPingHistoryMode) {
       return pingHistoryData?.series?.timestamps ?? spec.timestamps;
     }
+    if (isEntityHistoryMode && entityHistoryData?.series?.timestamps?.length) {
+      return entityHistoryData.series.timestamps;
+    }
     return historyData?.series?.timestamps ?? spec.timestamps;
-  }, [liveBucketWindow, preset, cursorEndTs, isPingHistoryMode, pingHistoryData, spec.timestamps, historyData]);
+  }, [liveBucketWindow, preset, cursorEndTs, isPingHistoryMode, isEntityHistoryMode, pingHistoryData, entityHistoryData, spec.timestamps, historyData]);
 
   const resolvedDateTimestamps = useMemo(() => {
     if (preset === 'live' && cursorEndTs === null) return undefined;
     if (useLocal20mGpu || useLocal20mStorage || useLocal20mNet || useLocal20mRouter) return undefined;
     if (isPingHistoryMode) {
       return pingHistoryData?.series?.date_timestamps;
+    }
+    if (isEntityHistoryMode && entityHistoryData?.series?.date_timestamps?.length) {
+      return entityHistoryData.series.date_timestamps;
     }
     return historyData?.series?.date_timestamps;
   }, [
@@ -638,7 +792,9 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     useLocal20mNet,
     useLocal20mRouter,
     isPingHistoryMode,
+    isEntityHistoryMode,
     pingHistoryData,
+    entityHistoryData,
     historyData,
   ]);
 
@@ -652,8 +808,11 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     if (isPingHistoryMode) {
       return pingHistoryData?.series?.epoch_ts ?? spec.epochTs;
     }
+    if (isEntityHistoryMode && entityHistoryData?.series?.epoch_ts?.length) {
+      return entityHistoryData.series.epoch_ts;
+    }
     return historyData?.series?.epoch_ts ?? spec.epochTs;
-  }, [liveBucketWindow, preset, cursorEndTs, isPingHistoryMode, pingHistoryData, spec.epochTs, historyData]);
+  }, [liveBucketWindow, preset, cursorEndTs, isPingHistoryMode, isEntityHistoryMode, pingHistoryData, entityHistoryData, spec.epochTs, historyData]);
 
   // Para velocidades/flujos delegamos en TelemetryChart el autoajuste exacto al pico visible en la ventana
   const dynamicMaxLeft = useMemo(() => {
@@ -701,8 +860,12 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   }, [resolvedSeries, spec.leftUnit]);
 
   const isLiveNow = preset === 'live' && cursorEndTs === null;
-  const activeStartTs = isPingHistoryMode ? pingHistoryData?.window_start_ts : historyData?.window_start_ts;
-  const activeWinEndTs = isPingHistoryMode ? pingHistoryData?.window_end_ts : historyData?.window_end_ts;
+  const activeStartTs = isPingHistoryMode
+    ? pingHistoryData?.window_start_ts
+    : entityHistoryData?.window_start_ts ?? historyData?.window_start_ts;
+  const activeWinEndTs = isPingHistoryMode
+    ? pingHistoryData?.window_end_ts
+    : entityHistoryData?.window_end_ts ?? historyData?.window_end_ts;
   const activeEndTs = sliderDraftTs ?? cursorEndTs ?? activeWinEndTs ?? newestTs;
   const canStepBack = Boolean(oldestTs && newestTs && (isLiveNow ? metaBounds.totalSamples > 10 : (activeStartTs ?? activeEndTs ?? 0) > oldestTs + 2));
   const canStepForward = Boolean(!isLiveNow && newestTs && (activeEndTs ?? 0) < newestTs - 2);
@@ -778,7 +941,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <LayoutGroup id="expanded-presets">
               <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('charts.window_aria')}>
-                {(hasDatabaseHistory ? WINDOW_PRESETS : GPU_SUB_PRESETS).map((p) => {
+                {WINDOW_PRESETS.map((p) => {
                   const active = preset === p.key;
                   return (
                     <button
