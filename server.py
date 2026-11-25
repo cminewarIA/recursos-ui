@@ -15380,35 +15380,49 @@ def background_collector():
             cpu_sensors_now = cpu_info.get("temp_sensors") or []
             _push_cpu_thermal_probes_live(now, t_str_sample, cpu_sensors_now)
             cpu_info["temp_sensors_history"] = get_cpu_thermal_probes_live_payload()
-            dev_series_rows = []
-            for s_item in cpu_sensors_now[:8]:
-                s_lbl = str(s_item.get("label") or "").strip()
-                if s_lbl:
-                    dev_series_rows.append(("cpu_sensor", s_lbl, float(s_item.get("temp_c") or 0.0), 0.0, 0.0, 0.0))
-            for d_item in disks_info:
-                d_key = str(d_item.get("device") or d_item.get("mountpoint") or "").strip()
-                if d_key:
-                    dev_series_rows.append((
-                        "disk",
-                        d_key,
-                        round(float(d_item.get("read_bytes_sec") or 0.0) / (1024 * 1024), 2),
-                        round(float(d_item.get("write_bytes_sec") or 0.0) / (1024 * 1024), 2),
-                        round(float(d_item.get("percent") or 0.0), 1),
-                        0.0,
-                    ))
-            for nic_item in (net_info.get("interfaces") or []):
-                n_key = str(nic_item.get("name") or "").strip()
-                if n_key:
-                    dev_series_rows.append((
-                        "nic",
-                        n_key,
-                        round(float(nic_item.get("wan_rx_bytes_sec") or nic_item.get("rx_bytes_sec") or 0.0) / (1024 * 1024), 2),
-                        round(float(nic_item.get("wan_tx_bytes_sec") or nic_item.get("tx_bytes_sec") or 0.0) / (1024 * 1024), 2),
-                        round(float(nic_item.get("lan_rx_bytes_sec") or 0.0) / (1024 * 1024), 2),
-                        round(float(nic_item.get("lan_tx_bytes_sec") or 0.0) / (1024 * 1024), 2),
-                    ))
-            if dev_series_rows:
-                record_device_series_batch_to_sqlite(now, dev_series_rows)
+            try:
+                dev_series_rows = []
+                for s_item in cpu_sensors_now[:8]:
+                    if not isinstance(s_item, dict):
+                        continue
+                    s_lbl = str(s_item.get("label") or "").strip()
+                    if s_lbl:
+                        dev_series_rows.append(("cpu_sensor", s_lbl, float(s_item.get("temp_c") or 0.0), 0.0, 0.0, 0.0))
+                for d_item in (disks_info or []):
+                    if not isinstance(d_item, dict):
+                        continue
+                    d_key = str(d_item.get("device") or d_item.get("mountpoint") or "").strip()
+                    if d_key:
+                        dev_series_rows.append((
+                            "disk",
+                            d_key,
+                            round(float(d_item.get("read_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                            round(float(d_item.get("write_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                            round(float(d_item.get("percent") or 0.0), 1),
+                            0.0,
+                        ))
+                raw_nics = net_info.get("interfaces_list")
+                if not isinstance(raw_nics, list):
+                    ifaces_map = net_info.get("interfaces")
+                    raw_nics = list(ifaces_map.values()) if isinstance(ifaces_map, dict) else []
+                for nic_item in raw_nics:
+                    if not isinstance(nic_item, dict):
+                        continue
+                    n_key = str(nic_item.get("name") or "").strip()
+                    if n_key:
+                        dev_series_rows.append((
+                            "nic",
+                            n_key,
+                            round(float(nic_item.get("wan_rx_bytes_sec") or nic_item.get("rx_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                            round(float(nic_item.get("wan_tx_bytes_sec") or nic_item.get("tx_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                            round(float(nic_item.get("lan_rx_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                            round(float(nic_item.get("lan_tx_bytes_sec") or 0.0) / (1024 * 1024), 2),
+                        ))
+                if dev_series_rows:
+                    record_device_series_batch_to_sqlite(now, dev_series_rows)
+            except Exception as dev_series_err:
+                if int(cycle_counter) % 20 == 1:
+                    print(f"[-] Error preparando series por entidad: {dev_series_err}")
             
             with DOCKER_LOCK:
                 systemd_acts = list(SYSTEMD_CACHE)
@@ -15459,8 +15473,9 @@ def background_collector():
                 METRICS_CACHE = payload
                 _invalidate_metrics_bytes_cache()
                 
-        except Exception:
-            pass
+        except Exception as loop_err:
+            if int(cycle_counter) % 20 == 1:
+                print(f"[-] Error en bucle de métricas: {loop_err}")
         time.sleep(1.5)
 
 
