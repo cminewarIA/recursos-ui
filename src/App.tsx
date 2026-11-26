@@ -2,17 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import {
   Activity,
-  Eye,
-  EyeOff,
-  KeyRound,
   Lock,
   Moon,
   RefreshCw,
   Search,
-  ShieldAlert,
   Sun,
 } from 'lucide-react';
 import { COCKPIT_EASE, COCKPIT_SPRING, ViewStage } from './components/MotionPrimitives';
+import { LoginModal } from './components/LoginModal';
 import { OverviewView, ExpandChartSpec } from './components/OverviewView';
 import { EquipmentView } from './components/EquipmentView';
 import { NetworkSecurityView } from './components/NetworkSecurityView';
@@ -55,9 +52,8 @@ export function App() {
   } = useThemeCatalog();
 
   const [certState, setCertState] = useState<'checking' | 'certified' | 'locked'>('checking');
+  const isAuthenticated = certState === 'certified';
   const [retryingAuth, setRetryingAuth] = useState(false);
-  const [masterPwdInput, setMasterPwdInput] = useState('');
-  const [masterPwdVisible, setMasterPwdVisible] = useState(false);
   const [unlockingMasterPwd, setUnlockingMasterPwd] = useState(false);
   const [masterPwdError, setMasterPwdError] = useState<string | null>(null);
 
@@ -161,7 +157,7 @@ export function App() {
       if (res.data.auth_status?.token) {
         setStoredToken(res.data.auth_status.token);
       }
-    } else if (res.status === 403) {
+    } else if (res.status === 401 || res.status === 403) {
       purgeSensitiveState();
       clearStoredToken();
       setCertState('locked');
@@ -192,10 +188,9 @@ export function App() {
   }, [fetchMetrics, purgeSensitiveState, t]);
 
   const handleUnlockWithMasterPassword = useCallback(
-    async (ev: React.FormEvent) => {
-      ev.preventDefault();
-      const pwd = masterPwdInput.trim();
-      if (!pwd || unlockingMasterPwd) return;
+    async (rawPassword: string): Promise<boolean> => {
+      const pwd = rawPassword.trim();
+      if (!pwd || unlockingMasterPwd) return false;
       setUnlockingMasterPwd(true);
       setMasterPwdError(null);
       try {
@@ -205,23 +200,27 @@ export function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: pwd, device_telemetry: telemetry }),
         });
-        if (res.ok && res.data?.success && res.data?.token) {
-          setStoredToken(res.data.token);
-          setMasterPwdInput('');
+        if (res.ok && res.data?.success) {
+          if (res.data.token) {
+            setStoredToken(res.data.token);
+          }
           setMasterPwdError(null);
           await fetchMetrics();
+          return true;
         } else if (res.status === 429 || res.data?.status === 'locked_out') {
           setMasterPwdError(t('lock.master_pwd_locked'));
         } else {
           setMasterPwdError(t('lock.master_pwd_invalid'));
         }
+        return false;
       } catch {
         setMasterPwdError(t('lock.master_pwd_invalid'));
+        return false;
       } finally {
         setUnlockingMasterPwd(false);
       }
     },
-    [fetchMetrics, masterPwdInput, t, unlockingMasterPwd]
+    [fetchMetrics, t, unlockingMasterPwd]
   );
 
   useEffect(() => {
@@ -578,93 +577,17 @@ export function App() {
     );
   }
 
-  if (certState === 'locked') {
+  if (!isAuthenticated) {
     return (
       <MotionConfig reducedMotion="user">
-        <div className="flex min-h-dvh items-center justify-center bg-[var(--bg-canvas)] px-4 py-8 text-[var(--text-primary)]">
-          <motion.section
-            initial={{ opacity: 0, y: 12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={COCKPIT_SPRING}
-            className="cockpit-bento flex w-full max-w-md flex-col items-center gap-4 p-7 text-center"
-          >
-            {!logoBroken ? (
-              <img
-                src="/recursos-cockpit.png"
-                alt={t('app.brand_alt')}
-                onError={() => setLogoBroken(true)}
-                className="h-16 w-16 object-contain drop-shadow-[0_6px_16px_rgba(30,107,56,0.22)] dark:drop-shadow-[0_6px_18px_rgba(198,241,157,0.25)]"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-500/10 text-amber-600 dark:text-amber-300">
-                <ShieldAlert className="h-7 w-7" />
-              </div>
-            )}
-
-            <span className="cockpit-pill-amber inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[11px] font-semibold">
-              <Lock className="h-3 w-3" />
-              <span>{t('lock.badge')}</span>
-            </span>
-
-            <div className="space-y-2">
-              <h1 className="font-display text-lg font-bold tracking-tight text-slate-900 dark:text-[#f5f4f2]">
-                {t('lock.title')}
-              </h1>
-              <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                {t('lock.desc')}
-              </p>
-            </div>
-
-            <form onSubmit={(e) => void handleUnlockWithMasterPassword(e)} className="w-full space-y-2.5 text-left">
-              <div className="relative flex items-center">
-                <KeyRound className="pointer-events-none absolute left-3.5 h-4 w-4 text-slate-400" />
-                <input
-                  type={masterPwdVisible ? 'text' : 'password'}
-                  value={masterPwdInput}
-                  onChange={(e) => {
-                    setMasterPwdInput(e.target.value);
-                    if (masterPwdError) setMasterPwdError(null);
-                  }}
-                  placeholder={t('lock.master_pwd_label')}
-                  autoComplete="current-password"
-                  disabled={unlockingMasterPwd}
-                  className="cockpit-input w-full rounded-xl py-2.5 pl-10 pr-10 text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() => setMasterPwdVisible((v) => !v)}
-                  className="absolute right-2.5 rounded-lg p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  aria-label={t('lock.master_pwd_label')}
-                >
-                  {masterPwdVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {masterPwdError && (
-                <p className="text-center text-[11px] font-medium text-rose-600 dark:text-rose-400">
-                  {masterPwdError}
-                </p>
-              )}
-              <button
-                type="submit"
-                disabled={unlockingMasterPwd || !masterPwdInput.trim()}
-                className="cockpit-btn-accent inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-60 cursor-pointer"
-              >
-                <KeyRound className="h-3.5 w-3.5" />
-                <span>{unlockingMasterPwd ? t('lock.checking') : t('lock.master_pwd_btn')}</span>
-              </button>
-            </form>
-
-            <button
-              type="button"
-              disabled={retryingAuth}
-              onClick={() => void handleRetryLanVerification()}
-              className="cockpit-btn inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-60 cursor-pointer"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${retryingAuth ? 'animate-spin' : ''}`} />
-              <span>{retryingAuth ? t('lock.checking') : t('lock.retry_btn')}</span>
-            </button>
-          </motion.section>
-        </div>
+        <LoginModal
+          onSubmitMasterPassword={handleUnlockWithMasterPassword}
+          onRetryLanVerification={handleRetryLanVerification}
+          unlockingMasterPwd={unlockingMasterPwd}
+          retryingAuth={retryingAuth}
+          errorMessage={masterPwdError}
+          onClearError={() => setMasterPwdError(null)}
+        />
       </MotionConfig>
     );
   }

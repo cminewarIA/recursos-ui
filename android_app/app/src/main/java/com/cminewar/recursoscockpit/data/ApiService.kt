@@ -430,7 +430,7 @@ class ApiService(
         return host.contains(".")
     }
 
-    private fun learnWanDomain(raw: String) {
+    fun learnWanDomain(raw: String) {
         val clean = raw.trim()
         if (isValidWanDomain(clean) && clean != securePreferences.wanDomain) {
             securePreferences.wanDomain = clean
