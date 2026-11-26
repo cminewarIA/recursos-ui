@@ -1009,6 +1009,8 @@ export interface VersionInfo {
 export interface AuthStatus {
   is_local?: boolean;
   is_trusted?: boolean;
+  verified_in_lan?: boolean;
+  certificate_serial?: string;
   client_ip?: string;
   public_domain?: string;
   local_ip?: string;
@@ -1020,9 +1022,23 @@ export interface TrustedClientEntry {
   client_key?: string;
   client_type?: string;
   client_label?: string;
+  browser_engine?: string;
+  connection_mode?: string;
+  ip?: string;
+  user_agent?: string;
+  app_version?: string;
+  install_id?: string;
   full_access?: boolean;
+  first_seen?: string;
   last_seen?: string;
   is_current_client?: boolean;
+}
+
+export interface ObservedIpEntry {
+  ip: string;
+  mode?: string;
+  first_seen?: string;
+  last_seen?: string;
 }
 
 export interface TrustedDevice {
@@ -1038,11 +1054,22 @@ export interface TrustedDevice {
   full_access?: boolean;
   app_version?: string;
   hardware_id?: string;
+  physical_key?: string;
   certificate_serial?: string;
+  certificate_scope?: string;
   first_seen?: string;
   last_seen?: string;
+  lan_verified_at?: string;
   local_ip?: string;
   last_external_ip?: string;
+  observed_ips?: ObservedIpEntry[];
+  installation_ids?: string[];
+  os_info?: string;
+  architecture?: string;
+  hostname?: string;
+  mac_address?: string;
+  model?: string;
+  manufacturer?: string;
   connection_mode?: string;
   verified_in_lan?: boolean;
   trusted?: boolean;

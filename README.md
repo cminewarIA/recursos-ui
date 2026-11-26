@@ -126,10 +126,10 @@ Toda la plataforma se organiza en **5 dominios funcionales sin duplicidades**, c
 <summary><b>⚙️ Vista 5 · <code>/sistema/*</code> — Sistema, Temas OTA, Consola 24h, Seguridad y Puente Nativo (6 páginas independientes)</b></summary>
 
 1. **Páginas Independientes de Sistema y Configuración**:
-   - **`/sistema/actualizaciones`**: Diagnóstico de salud (`journalctl` + asistencia IA), selector de modo claro/oscuro e idioma (31 idiomas OTA), gestor de actualizaciones Web/Servidor OTA y **panel dinámico de compilaciones nativas en GitHub** (`Ubuntu .deb` y `Android .apk` con ciclo desacoplado en [`./UBUNTU_VERSION`](./UBUNTU_VERSION) y [`./ANDROID_VERSION`](./ANDROID_VERSION)). En Ubuntu nativo permite descargar e instalar automáticamente el `.deb` y guardar el `.apk` directamente en `Descargas`.
-   - **`/sistema/temas`**: Motor de **transformación espacial de temas** y **paquete único desacoplado** (`./themes/themes-pack.rcpack.gz`, sincronizable vía OTA desde GitHub sin recompilar ni subir `./VERSION`, `./UBUNTU_VERSION` ni `./ANDROID_VERSION`), conservando intacto el logo oficial en todos los temas. Incluye **9 temas completos** con reubicación libre de menús, tipografías, paneles, gráficas adaptadas y fondos/arte embebido en WebP: **Alethia Matrix** (modo claro con mayor transparencia sobre lluvia de telemetría real), **Navidad · Escarcha Boreal** (paneles helados, nieve animada y paleta navideña en gráficas), **Cyberpunk 2077** (HUD Netrunner izquierdo con paneles biselados) y 6 entregas independientes de **Grand Theft Auto** (**GTA III**, **Vice City**, **San Andreas**, **GTA IV**, **GTA V** y **GTA VI**).
-   - **`/sistema/consola`**: **Consola del servicio en tiempo real estrictamente de solo lectura** (sin entrada de comandos) que muestra las trazas de ejecución, peticiones y sincronizaciones persistidas en `recursos_history.db` (`service_console_logs`) con **retención máxima automática de 24 horas** y sanitización de secretos.
-   - **`/sistema/dispositivos`**: Bóveda Zero-Trust, gestión de dispositivos autorizados, claves HMAC-SHA256, revocación remota y estado de **acceso root detectado silenciosamente en segundo plano** reflejado únicamente dentro de los detalles de la credencial del dispositivo.
+   - **`/sistema/actualizaciones`**: Diagnóstico de salud (`journalctl` + asistencia IA), selector de modo claro/oscuro e idioma (31 idiomas OTA), gestor de actualizaciones Web/Servidor OTA y **panel dinámico de compilaciones nativas en GitHub** (`Ubuntu .deb` y `Android .apk` con ciclo desacoplado en [`./UBUNTU_VERSION`](./UBUNTU_VERSION) y [`./ANDROID_VERSION`](./ANDROID_VERSION), comparando estrictamente la versión instalada de cada cliente frente a tags nativos `ubuntu-v*`/`android-v*`/`native-*` sin mezclarlos con la versión del servidor). En Ubuntu nativo permite descargar e instalar automáticamente el `.deb` y guardar el `.apk` directamente en `Descargas`.
+   - **`/sistema/temas`**: Motor de **transformación espacial de temas** y **sincronización híbrida OTA desde GitHub** (descarga el paquete compilado `./themes/themes-pack.rcpack.gz` y también los archivos JSON independientes nuevos o actualizados declarados en `./themes/themes.json` sin recompilar ni subir `./VERSION`, `./UBUNTU_VERSION` ni `./ANDROID_VERSION`), conservando intacto el logo oficial en todos los temas. Incluye **9 temas completos** con reubicación libre de menús, tipografías, paneles, gráficas adaptadas y fondos/arte embebido en WebP: **Alethia Matrix** (modo claro con mayor transparencia sobre lluvia de telemetría real), **Navidad · Escarcha Boreal** (paneles helados, nieve animada y paleta navideña en gráficas), **Cyberpunk 2077** (HUD Netrunner izquierdo con paneles biselados) y 6 entregas independientes de **Grand Theft Auto** (**GTA III**, **Vice City**, **San Andreas**, **GTA IV**, **GTA V** y **GTA VI**).
+   - **`/sistema/consola`**: **Consola del servicio en tiempo real estrictamente de solo lectura** (sin entrada de comandos) que muestra trazas de ejecución, peticiones HTTP con **IP real del cliente y nombre del dispositivo certificado** (resolviendo cabeceras de proxy local confiable sin suplantación externa) y sincronizaciones persistidas en `recursos_history.db` (`service_console_logs`) con **retención máxima automática de 24 horas** y sanitización de secretos.
+   - **`/sistema/dispositivos`**: **Certificado único unificado por dispositivo físico**, emitido automáticamente al conectar desde la red local (LAN). Agrupa todos los navegadores web y aplicaciones nativas de un mismo equipo bajo una sola credencial consolidando de forma incremental modelo, SO, arquitectura, MAC, IDs de instalación, IPs observadas, fecha de verificación LAN y acceso root (si aplica), sin exponer nunca datos del sistema a clientes no certificados.
    - **`/sistema/manual`**: Manual interactivo completo con simuladores en vivo sobre `<canvas>` y explorador de API REST.
    - **`/sistema/dex`**: Conexión de pantalla móvil USB (DeX a 60 FPS) desbloqueada exclusivamente en el cliente nativo de Ubuntu Linux.
 
@@ -172,41 +172,39 @@ xychart-beta
 
 <img src="./docs/assets/network-mesh-radar.svg" alt="Módulo de Red Mesh, GeoIP y Ciberdefensa Zero-Trust" width="100%" />
 
-### Flujo Interactivo de Autenticación `LAN ↔ WAN`
+### Flujo Interactivo de Certificación Única `LAN ↔ WAN` (Zero-Trust Estricto)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PeticionEntrante: "Cliente solicita /api/metrics o /manual"
+    [*] --> PeticionEntrante: "Cliente solicita /, /api/metrics o /api/themes"
     PeticionEntrante --> EvaluarOrigen: "check_trust_status()"
-    EvaluarOrigen --> AccesoLAN: "IP RFC1918 Local"
+    EvaluarOrigen --> AccesoLAN: "IP RFC1918 / Red Local verificada"
     EvaluarOrigen --> EvaluarTokenWAN: "IP Externa (Caddy TLS / DDNS)"
 
-    AccesoLAN --> SesionEmitida: "Asocia hardware_id + Cookie HttpOnly + X-Device-Token"
-    EvaluarTokenWAN --> SesionEmitida: "HMAC-SHA256 válido en tiempo constante"
-    EvaluarTokenWAN --> Bloqueo403: "Token ausente / revocado (máx. 3 intentos)"
-    Bloqueo403 --> [*]
-    SesionEmitida --> [*]
+    AccesoLAN --> CertificadoUnico: "Unifica por MAC / hardware_id / IP LAN (navegadores + app nativa)"
+    EvaluarTokenWAN --> CertificadoUnico: "Certificado emitido en LAN y firma HMAC-SHA256 válida"
+    EvaluarTokenWAN --> BloqueoEstricto403: "Sin certificado LAN previo o revocado (0 datos expuestos)"
+    BloqueoEstricto403 --> [*]
+    CertificadoUnico --> [*]
 ```
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant C as Cliente (Web / Ubuntu .deb / Android .apk)
+    participant C as Cliente (Navegadores Web / Ubuntu .deb / Android .apk)
     participant G as Guardián Zero-Trust (server.py)
-    participant B as Bóveda AES-256-GCM & Fail2ban
+    participant B as Bóveda de Certificados Unificados
 
     C->>G: GET /api/metrics (cabecera X-Device-Token o Bearer)
     alt Origen en Red Local (Wi-Fi / Cable LAN)
-        G->>B: Agrupa dispositivo físico por MAC / hardware_id
-        G-->>C: 200 OK + Cookie HttpOnly + credencial rotada
+        G->>B: Resuelve dispositivo físico único (MAC / hardware_id / LAN) y fusiona metadatos sin pérdida
+        G-->>C: 200 OK + Cookie HttpOnly + certificado unificado ZT-*
     else Origen desde Internet (WAN TLS)
-        G->>B: Verifica firma HMAC-SHA256 en tiempo constante
-        alt Token válido
+        G->>B: Verifica firma HMAC-SHA256 y marca verified_in_lan
+        alt Certificado LAN previo válido
             G-->>C: 200 OK · Telemetría cifrada completa
-        else Sin autorización o tras 3 fallos
-            G-->>C: 403 Forbidden · Pantalla de desbloqueo WAN
-            C->>G: POST /api/auth/unlock (clave maestra PBKDF2-HMAC-SHA256)
-            G-->>C: Emite nuevo X-Device-Token o registra bloqueo IPS
+        else Sin certificado LAN previo o revocado
+            G-->>C: 403 Forbidden · Pantalla de bloqueo sin exponer versión, dominio ni métricas
         end
     end
 ```
@@ -238,7 +236,7 @@ Las aplicaciones nativas siguen el **Principio Contractual de Paridad y Simetrí
 | **Almacén de Credenciales** | `Cookie HttpOnly` + `localStorage` | Configuración protegida / Keyring local + detección silenciosa de root | `Android KeyStore` + `EncryptedSharedPreferences` + detección silenciosa de root reflejada solo en la credencial |
 | **Conmutación `LAN ↔ WAN`** | Según ruta accedida | IP LAN mínima latencia ↔ DDNS WAN cifrado | Automática al cambiar entre red local (LAN/Wi-Fi) y WAN exterior |
 | **Control y Ergonomía** | Ratón / Táctil | Ratón / Táctil / Atajos nativos | Táctil móvil/tablet + **D-Pad / Mando Android TV** (anillo cian + overscan) |
-| **Ciclo de Versiones y Descargas GitHub** | [`./VERSION`](./VERSION) | [`./UBUNTU_VERSION`](./UBUNTU_VERSION) independiente · descarga e instala `.deb` desde GitHub y guarda `.apk` en `Descargas` tanto desde el lanzador GTK como desde **Sistema → Actualizaciones** | [`./ANDROID_VERSION`](./ANDROID_VERSION) independiente · comprobación en segundo plano frente a GitHub, banner discreto y autoinstalación inteligente (`root` → `FileProvider` → navegador) |
+| **Ciclo de Versiones y Descargas GitHub** | [`./VERSION`](./VERSION) | [`./UBUNTU_VERSION`](./UBUNTU_VERSION) independiente · compara estrictamente su versión instalada contra releases nativas `ubuntu-v*`/`native-*`; descarga e instala `.deb` y guarda `.apk` en `Descargas` | [`./ANDROID_VERSION`](./ANDROID_VERSION) independiente · compara su `versionName` instalado contra releases `android-v*`/`native-*`; autoinstalación in-app con `root` o **`PackageInstaller.Session`** oficial sin root (guiando el permiso una única vez) |
 | **Pantalla Móvil USB (`DeX`)** | Oculto por arquitectura | **Desbloqueado en exclusiva** (`adb`, `scrcpy`, `/dev/uhid`) | Oculto por arquitectura |
 
 <details>

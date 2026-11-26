@@ -333,11 +333,12 @@ class ApiService(
             accessLevel = "FULL_NATIVE_ACCESS",
             fullAccess = true,
             dexCapable = false,
-            appVersion = BuildConfig.VERSION_NAME,
-            clientVersion = BuildConfig.VERSION_NAME,
+            appVersion = getInstalledClientVersion(),
+            clientVersion = getInstalledClientVersion(),
             rootAccess = RootManager.hasRootAccess,
             rootMethod = RootManager.rootMethod,
             hardwareId = hardwareId,
+            installId = hardwareId,
             name = if (deviceCodename.isNotBlank()) "$displayModel ($deviceCodename)" else displayModel,
             hostname = cleanHost,
             manufacturer = manufacturer,
@@ -355,9 +356,11 @@ class ApiService(
                 I18nDictionary.t(context, "native_android.chassis_mobile", "Android Mobile / Tablet")
             },
             osDistro = osDistro,
+            osInfo = osDistro,
             securityPatch = securityPatch,
             kernel = kernel,
             arch = arch,
+            architecture = arch,
             supportedAbis = supportedAbis,
             cpuModel = cpuModel,
             cpuCoresPhysical = cores,
@@ -590,16 +593,49 @@ class ApiService(
         }
     }
 
+    fun getInstalledClientVersion(): String {
+        val fromPkg = try {
+            val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(
+                    context.packageName,
+                    PackageManager.PackageInfoFlags.of(0)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            info?.versionName?.trim()?.removePrefix("v")?.removePrefix("V") ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+        return fromPkg.ifBlank { BuildConfig.VERSION_NAME.trim().removePrefix("v").removePrefix("V") }
+    }
+
+    private fun isNativeAndroidReleaseTag(tagName: String): Boolean {
+        val low = tagName.trim().lowercase(Locale.ROOT)
+        return low.startsWith("android-v") || low.startsWith("native-")
+    }
+
+    private fun isCompatibleNativeAndroidVersion(candVer: String, canonicalRemoteVer: String): Boolean {
+        val candMajor = candVer.split(".").firstOrNull()?.toIntOrNull() ?: return false
+        val canonMajor = canonicalRemoteVer.split(".").firstOrNull()?.toIntOrNull() ?: 0
+        // Descartar artefactos heredados de la etapa monolítica (14.x) cuando el cliente usa esquema 1.x
+        if (canonMajor in 1..9 && candMajor >= 10) return false
+        return true
+    }
+
     suspend fun checkGithubAndroidRelease(): GithubAndroidReleaseInfo? = withContext(Dispatchers.IO) {
         val repo = "cminewarIA/recursos-ui"
-        val ua = "RecursosCockpit-Android/${BuildConfig.VERSION_NAME}"
-        var remoteVer = ""
+        val installedVer = getInstalledClientVersion()
+        val ua = "RecursosCockpit-Android/$installedVer"
+        var canonicalRemoteVer = ""
+        var matchedAssetVer = ""
         var apkUrl = ""
         var assetName = ""
         var sizeBytes = 0L
         var releaseUrl = "https://github.com/$repo/releases"
 
-        // 1. Leer ANDROID_VERSION independiente desde main
+        // 1. Leer ANDROID_VERSION independiente desde main (referencia canónica del cliente Android)
         val rawVerUrl = "https://raw.githubusercontent.com/$repo/main/ANDROID_VERSION"
         if (isAllowedGithubUrl(rawVerUrl)) {
             try {
@@ -608,15 +644,15 @@ class ApiService(
                     if (resp.isSuccessful) {
                         val txt = (resp.body?.string() ?: "").trim().removePrefix("v").removePrefix("V")
                         if (Regex("""^\d+\.\d+\.\d+$""").matches(txt)) {
-                            remoteVer = txt
+                            canonicalRemoteVer = txt
                         }
                     }
                 }
             } catch (_: Exception) {}
         }
 
-        // 2. Consultar GitHub Releases buscando el artefacto .apk más reciente
-        val relApiUrl = "https://api.github.com/repos/$repo/releases?per_page=8"
+        // 2. Consultar GitHub Releases filtrando estrictamente etiquetas nativas de Android (android-v* / native-*)
+        val relApiUrl = "https://api.github.com/repos/$repo/releases?per_page=15"
         if (isAllowedGithubUrl(relApiUrl)) {
             try {
                 val req = Request.Builder()
@@ -631,10 +667,10 @@ class ApiService(
                         for (i in 0 until arr.length()) {
                             val rel = arr.optJSONObject(i) ?: continue
                             if (rel.optBoolean("draft", false)) continue
+                            val tagName = rel.optString("tag_name", "").trim()
+                            if (!isNativeAndroidReleaseTag(tagName)) continue
+
                             val htmlUrl = rel.optString("html_url", "").trim()
-                            if (htmlUrl.isNotEmpty() && isAllowedGithubUrl(htmlUrl)) {
-                                releaseUrl = htmlUrl
-                            }
                             val assets = rel.optJSONArray("assets") ?: continue
                             for (j in 0 until assets.length()) {
                                 val a = assets.optJSONObject(j) ?: continue
@@ -643,12 +679,21 @@ class ApiService(
                                 if (!name.lowercase(Locale.ROOT).endsWith(".apk")) continue
                                 if (!isAllowedGithubUrl(dlUrl)) continue
                                 val mVer = Regex("""(\d+\.\d+\.\d+)""").find(name)?.groupValues?.getOrNull(1)
+                                val effCandVer = mVer ?: canonicalRemoteVer
+                                if (effCandVer.isNotBlank() && canonicalRemoteVer.isNotBlank() &&
+                                    !isCompatibleNativeAndroidVersion(effCandVer, canonicalRemoteVer)
+                                ) {
+                                    continue
+                                }
                                 if (apkUrl.isEmpty() || (name.contains("_") && !assetName.contains("_"))) {
                                     apkUrl = dlUrl
                                     assetName = name
                                     sizeBytes = a.optLong("size", 0L)
                                     if (!mVer.isNullOrBlank()) {
-                                        remoteVer = mVer
+                                        matchedAssetVer = mVer
+                                    }
+                                    if (htmlUrl.isNotEmpty() && isAllowedGithubUrl(htmlUrl)) {
+                                        releaseUrl = htmlUrl
                                     }
                                 }
                             }
@@ -661,14 +706,16 @@ class ApiService(
             }
         }
 
-        if (remoteVer.isBlank()) return@withContext null
+        val effectiveRemoteVer = matchedAssetVer.ifBlank { canonicalRemoteVer }
+        if (effectiveRemoteVer.isBlank()) return@withContext null
         val finalApkUrl = apkUrl.ifBlank {
-            "https://github.com/$repo/releases/latest/download/recursos-cockpit.apk"
+            "https://github.com/$repo/releases/tag/android-v$effectiveRemoteVer"
         }
-        val finalAssetName = assetName.ifBlank { "recursos-cockpit_$remoteVer.apk" }
-        val updateAvailable = isRemoteVersionNewer(remoteVer, BuildConfig.VERSION_NAME)
+        val finalAssetName = assetName.ifBlank { "recursos-cockpit_$effectiveRemoteVer.apk" }
+        // Comparar exclusivamente la versión instalada del cliente Android frente a la release nativa disponible
+        val updateAvailable = apkUrl.isNotBlank() && isRemoteVersionNewer(effectiveRemoteVer, installedVer)
         GithubAndroidReleaseInfo(
-            latestVersion = remoteVer,
+            latestVersion = effectiveRemoteVer,
             apkUrl = finalApkUrl,
             assetName = finalAssetName,
             sizeBytes = sizeBytes,

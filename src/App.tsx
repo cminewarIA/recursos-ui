@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import {
   Activity,
+  Lock,
   Moon,
+  RefreshCw,
   Search,
+  ShieldAlert,
   Sun,
 } from 'lucide-react';
 import { COCKPIT_EASE, COCKPIT_SPRING, ViewStage } from './components/MotionPrimitives';
@@ -18,7 +21,13 @@ import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { MatrixTelemetryBackdrop } from './components/MatrixTelemetryBackdrop';
 import { recordProcessCpuSamples } from './components/ProcessCpuSparkline';
 import { MainTabId, MetricsPayload, TelemetryHistoryResponse, VersionInfo, WifiClient } from './types/telemetry';
-import { apiFetchJson, detectNativeEnvironment, setStoredToken } from './utils/api';
+import {
+  apiFetchJson,
+  clearStoredToken,
+  collectBrowserDeviceTelemetry,
+  detectNativeEnvironment,
+  setStoredToken,
+} from './utils/api';
 import { formatCanonicalRoute, normalizeSubTabForView, resolveAppRoute } from './utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion, isRemoteVersionHigher } from './utils/version';
 import { useI18n } from './i18n';
@@ -39,7 +48,11 @@ export function App() {
     isModeLocked,
     activeTheme,
     activeBackdropUrl,
+    reloadThemesFromServer,
   } = useThemeCatalog();
+
+  const [certState, setCertState] = useState<'checking' | 'certified' | 'locked'>('checking');
+  const [retryingAuth, setRetryingAuth] = useState(false);
 
   const [activeTab, setActiveTab] = useState<MainTabId>(() => {
     if (typeof window !== 'undefined') {
@@ -58,8 +71,9 @@ export function App() {
   const [navTick, setNavTick] = useState(0);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
 
-  // Global Ctrl+K / Cmd+K quick search shortcut
+  // Global Ctrl+K / Cmd+K quick search shortcut (only when certified)
   useEffect(() => {
+    if (certState !== 'certified') return;
     const handleGlobalKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -68,7 +82,7 @@ export function App() {
     };
     window.addEventListener('keydown', handleGlobalKey);
     return () => window.removeEventListener('keydown', handleGlobalKey);
-  }, []);
+  }, [certState]);
 
   // Bidirectional browser Back / Forward (popstate) sync for independent submenu pages
   useEffect(() => {
@@ -94,6 +108,7 @@ export function App() {
   const [netHistoryLoading, setNetHistoryLoading] = useState<boolean>(true);
   const [netHistoryError, setNetHistoryError] = useState<boolean>(false);
   const netHistorySeqRef = useRef(0);
+  const didRegisterCertifiedRef = useRef(false);
 
   const [expandedChart, setExpandedChart] = useState<ExpandChartSpec | null>(null);
   const [pendingMac, setPendingMac] = useState<string | null>(null);
@@ -109,25 +124,64 @@ export function App() {
     }, 3600);
   }, []);
 
-  // Theme mode, CSS tokens & native shells are synchronized automatically by ThemeCatalogProvider
+  const purgeSensitiveState = useCallback(() => {
+    setMetrics(null);
+    setNetHistory24h(null);
+    setVersionInfo(null);
+    setUpdateAvailable(false);
+    setExpandedChart(null);
+    setSearchModalOpen(false);
+    setConfirmShutdownClient(null);
+    didRegisterCertifiedRef.current = false;
+  }, []);
 
-  // Fetch telemetry
+  // Fetch telemetry with strict Zero-Trust LAN gate
   const fetchMetrics = useCallback(async () => {
     const res = await apiFetchJson<MetricsPayload>('/api/metrics');
     setLoading(false);
     if (res.ok && res.data) {
+      if (res.data.auth_status?.is_trusted === false) {
+        purgeSensitiveState();
+        clearStoredToken();
+        setCertState('locked');
+        setConnError(t('status.verify_lan_required'));
+        return;
+      }
       recordProcessCpuSamples(res.data.system_processes);
       setMetrics(res.data);
+      setCertState('certified');
       setConnError(null);
       if (res.data.auth_status?.token) {
         setStoredToken(res.data.auth_status.token);
       }
     } else if (res.status === 403) {
+      purgeSensitiveState();
+      clearStoredToken();
+      setCertState('locked');
       setConnError(t('status.verify_lan_required'));
     } else {
       setConnError(t('status.reconnecting_server'));
     }
-  }, [t]);
+  }, [purgeSensitiveState, t]);
+
+  const handleRetryLanVerification = useCallback(async () => {
+    setRetryingAuth(true);
+    try {
+      const authRes = await apiFetchJson<{ is_trusted?: boolean; is_local?: boolean; token?: string }>(
+        '/api/auth/status'
+      );
+      if (authRes.ok && authRes.data?.is_trusted) {
+        if (authRes.data.token) setStoredToken(authRes.data.token);
+        await fetchMetrics();
+      } else {
+        purgeSensitiveState();
+        setCertState('locked');
+        setConnError(t('status.verify_lan_required'));
+      }
+    } finally {
+      setRetryingAuth(false);
+    }
+  }, [fetchMetrics, purgeSensitiveState, t]);
 
   useEffect(() => {
     const isPaused = () =>
@@ -149,11 +203,21 @@ export function App() {
       void fetchMetrics();
     }
 
+    const pollIntervalMs = certState === 'locked' ? 10000 : 1500;
     const timer = setInterval(() => {
       if (!isPaused()) {
-        void fetchMetrics();
+        if (certState === 'locked') {
+          void apiFetchJson<{ is_trusted?: boolean; token?: string }>('/api/auth/status').then((authRes) => {
+            if (authRes.ok && authRes.data?.is_trusted) {
+              if (authRes.data.token) setStoredToken(authRes.data.token);
+              void fetchMetrics();
+            }
+          });
+        } else {
+          void fetchMetrics();
+        }
       }
-    }, 1500);
+    }, pollIntervalMs);
 
     const onVisibilityOrPause = () => {
       syncDomPauseAttr();
@@ -169,7 +233,7 @@ export function App() {
       document.removeEventListener('visibilitychange', onVisibilityOrPause);
       window.removeEventListener('recursos-visibility', onVisibilityOrPause);
     };
-  }, [fetchMetrics]);
+  }, [certState, fetchMetrics]);
 
   // Native bridge helpers (Ubuntu WebKit2 / Android WebView)
   useEffect(() => {
@@ -241,49 +305,44 @@ export function App() {
     return installCockpitScrollContainment();
   }, []);
 
-  // Register current browser/native session periodically on first mount
+  // Register enriched browser/native telemetry & reload themes ONLY once certified
   useEffect(() => {
+    if (certState !== 'certified' || didRegisterCertifiedRef.current) return;
+    didRegisterCertifiedRef.current = true;
     const env = detectNativeEnvironment();
     if (env.isAndroidTv) {
       document.documentElement.setAttribute('data-tv', 'true');
     }
-    const payload: Record<string, unknown> = {
-      ...(window.__RECURSOS_DEVICE_TELEMETRY__ || {}),
-      client_type: env.isUbuntuNative
-        ? 'ubuntu_native'
-        : env.isAndroidNative
-          ? 'android_native'
-          : 'web_browser',
-      full_access: env.isNativeApp,
-      app_version: getCanonicalVersion(),
-      screen_width: window.screen?.width,
-      screen_height: window.screen?.height,
-    };
-    void apiFetchJson<{ token?: string }>('/api/auth/register-device', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_telemetry: payload }),
-    }).then((res) => {
-      if (res.ok && res.data?.token) {
-        setStoredToken(res.data.token);
-      }
+    void reloadThemesFromServer();
+    void collectBrowserDeviceTelemetry(getCanonicalVersion()).then((payload) => {
+      void apiFetchJson<{ token?: string }>('/api/auth/register-device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_telemetry: payload }),
+      }).then((res) => {
+        if (res.ok && res.data?.token) {
+          setStoredToken(res.data.token);
+        }
+      });
     });
-  }, []);
+  }, [certState, reloadThemesFromServer]);
 
   const handleVersionChange = useCallback((nextVer: VersionInfo) => {
     setVersionInfo(nextVer);
     setUpdateAvailable(isRemoteVersionHigher(nextVer));
   }, []);
 
-  // Fetch /api/version on app load & periodically, update display version and updateAvailable state
+  // Fetch /api/version only when certified
   const refreshVersionInfo = useCallback(async () => {
+    if (certState !== 'certified') return;
     const res = await apiFetchJson<VersionInfo>('/api/version');
     if (res.ok && res.data) {
       handleVersionChange(res.data);
     }
-  }, [handleVersionChange]);
+  }, [certState, handleVersionChange]);
 
   useEffect(() => {
+    if (certState !== 'certified') return;
     void refreshVersionInfo();
     const timerId = window.setInterval(() => {
       if (typeof document === 'undefined' || !document.hidden) {
@@ -291,11 +350,11 @@ export function App() {
       }
     }, 300000);
     return () => window.clearInterval(timerId);
-  }, [refreshVersionInfo]);
+  }, [certState, refreshVersionInfo]);
 
   const metricsCurrentVersion = metrics?.version_info?.current_version;
   useEffect(() => {
-    if (!metricsCurrentVersion) return;
+    if (certState !== 'certified' || !metricsCurrentVersion) return;
     if (!versionInfo) {
       setUpdateAvailable(isRemoteVersionHigher(metrics?.version_info));
       return;
@@ -303,10 +362,11 @@ export function App() {
     if (metricsCurrentVersion !== versionInfo.current_version && !versionInfo.ubuntu_native_bridge) {
       void refreshVersionInfo();
     }
-  }, [metricsCurrentVersion, metrics?.version_info, versionInfo, refreshVersionInfo]);
+  }, [certState, metricsCurrentVersion, metrics?.version_info, versionInfo, refreshVersionInfo]);
 
-  // Fetch 24h persistent network traffic history from /api/metrics/history
+  // Fetch 24h persistent network traffic history ONLY when certified
   const fetchNetworkHistory24h = useCallback(async (showSpinner = false) => {
+    if (certState !== 'certified') return;
     const seq = ++netHistorySeqRef.current;
     if (showSpinner) {
       setNetHistoryLoading(true);
@@ -320,9 +380,10 @@ export function App() {
       setNetHistoryError(true);
     }
     setNetHistoryLoading(false);
-  }, []);
+  }, [certState]);
 
   useEffect(() => {
+    if (certState !== 'certified') return;
     const isPaused = () =>
       (typeof document !== 'undefined' && document.hidden) ||
       Boolean((window as unknown as { __RECURSOS_PAUSED__?: boolean }).__RECURSOS_PAUSED__);
@@ -334,7 +395,7 @@ export function App() {
       }
     }, 30000);
     return () => window.clearInterval(intervalId);
-  }, [fetchNetworkHistory24h]);
+  }, [certState, fetchNetworkHistory24h]);
 
   const navigateTo = useCallback((tab: MainTabId, sub?: string) => {
     const normalizedSub = normalizeSubTabForView(tab, sub);
@@ -442,6 +503,95 @@ export function App() {
   const isHealthy = !connError && topbarErrors === 0 && cpuNow < 88 && ramNow < 90;
 
   const currentRoutePath = formatCanonicalRoute(activeTab, subTabHint);
+
+  // Strict Zero-Trust Gate: render ZERO system data, navigation, hostname, or metrics until certified on LAN
+  if (certState === 'checking') {
+    return (
+      <MotionConfig reducedMotion="user">
+        <div className="flex min-h-dvh items-center justify-center bg-[var(--bg-canvas)] px-4 text-[var(--text-primary)]">
+          <div className="cockpit-bento flex w-full max-w-sm flex-col items-center gap-4 p-7 text-center">
+            {!logoBroken ? (
+              <img
+                src="/recursos-cockpit.png"
+                alt={t('app.brand_alt')}
+                onError={() => setLogoBroken(true)}
+                className="h-14 w-14 object-contain"
+              />
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#9bd86b] bg-[#e5f8d3] text-[#144d23] dark:border-[#c6f19d]/25 dark:bg-[#0f1f10] dark:text-[#c6f19d]">
+                <Lock className="h-6 w-6" />
+              </div>
+            )}
+            <div className="space-y-1">
+              <h1 className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-[#f5f4f2]">
+                {t('app.brand')}
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {connError || t('lock.checking')}
+              </p>
+            </div>
+            <RefreshCw className="h-4 w-4 animate-spin text-[#1e6b38] dark:text-[#c6f19d]" />
+          </div>
+        </div>
+      </MotionConfig>
+    );
+  }
+
+  if (certState === 'locked') {
+    return (
+      <MotionConfig reducedMotion="user">
+        <div className="flex min-h-dvh items-center justify-center bg-[var(--bg-canvas)] px-4 py-8 text-[var(--text-primary)]">
+          <motion.section
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={COCKPIT_SPRING}
+            className="cockpit-bento flex w-full max-w-md flex-col items-center gap-4 p-7 text-center"
+          >
+            {!logoBroken ? (
+              <img
+                src="/recursos-cockpit.png"
+                alt={t('app.brand_alt')}
+                onError={() => setLogoBroken(true)}
+                className="h-16 w-16 object-contain drop-shadow-[0_6px_16px_rgba(30,107,56,0.22)] dark:drop-shadow-[0_6px_18px_rgba(198,241,157,0.25)]"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-500/10 text-amber-600 dark:text-amber-300">
+                <ShieldAlert className="h-7 w-7" />
+              </div>
+            )}
+
+            <span className="cockpit-pill-amber inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[11px] font-semibold">
+              <Lock className="h-3 w-3" />
+              <span>{t('lock.badge')}</span>
+            </span>
+
+            <div className="space-y-2">
+              <h1 className="font-display text-lg font-bold tracking-tight text-slate-900 dark:text-[#f5f4f2]">
+                {t('lock.title')}
+              </h1>
+              <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                {t('lock.desc')}
+              </p>
+            </div>
+
+            <div className="cockpit-subtile w-full p-3.5 text-left text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+              {t('lock.lan_note')}
+            </div>
+
+            <button
+              type="button"
+              disabled={retryingAuth}
+              onClick={() => void handleRetryLanVerification()}
+              className="cockpit-btn-accent inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-60 cursor-pointer"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${retryingAuth ? 'animate-spin' : ''}`} />
+              <span>{retryingAuth ? t('lock.checking') : t('lock.retry_btn')}</span>
+            </button>
+          </motion.section>
+        </div>
+      </MotionConfig>
+    );
+  }
 
   return (
     <MotionConfig reducedMotion="user">

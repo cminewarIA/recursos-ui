@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import bundledAlethiaMatrix from '../../themes/alethia-matrix.json';
 import { ThemeMode } from '../types/telemetry';
-import { detectNativeEnvironment } from '../utils/api';
+import { buildApiHeaders, detectNativeEnvironment } from '../utils/api';
 import {
   ALLOWED_THEME_CSS_TOKENS,
   getActiveThemeModeTokens,
@@ -16,7 +16,9 @@ import {
 const STORAGE_THEME_ID_KEY = 'recursos_theme_id';
 const STORAGE_THEME_MODE_KEY = 'recursos_theme';
 const STORAGE_THEMES_OTA_CACHE_KEY = 'recursos_themes_ota_cache_v2';
-const GITHUB_THEMES_PACK_URL = 'https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/themes/themes-pack.rcpack.gz';
+const GITHUB_THEMES_BASE_URL = 'https://raw.githubusercontent.com/cminewarIA/recursos-ui/main/themes';
+const GITHUB_THEMES_PACK_URL = `${GITHUB_THEMES_BASE_URL}/themes-pack.rcpack.gz`;
+const GITHUB_THEMES_MANIFEST_URL = `${GITHUB_THEMES_BASE_URL}/themes.json`;
 const MAX_CLIENT_PACK_BYTES = 8 * 1024 * 1024;
 const THEME_FONTS_LINK_ID = 'cockpit-theme-fonts';
 
@@ -62,6 +64,7 @@ interface ThemeCatalogContextValue {
   syncedAt: number | null;
   isSyncingThemes: boolean;
   syncThemesFromGitHub: () => Promise<ThemeSyncResult>;
+  reloadThemesFromServer: () => Promise<void>;
 }
 
 const ThemeCatalogContext = createContext<ThemeCatalogContextValue | null>(null);
@@ -238,10 +241,17 @@ function notifyNativeThemeBridges(theme: ThemeDefinition, effectiveMode: ThemeMo
   }
 }
 
-async function fetchDirectPackFromUrl(url: string, source: 'local' | 'github'): Promise<ThemeCatalogResponse | null> {
+async function fetchDirectPackFromUrl(
+  url: string,
+  source: 'local' | 'github',
+  useApiAuth = false
+): Promise<ThemeCatalogResponse | null> {
   try {
     if (typeof DecompressionStream === 'undefined') return null;
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, {
+      cache: 'no-store',
+      ...(useApiAuth ? { headers: buildApiHeaders(), credentials: 'same-origin' as RequestCredentials } : {}),
+    });
     if (!res.ok || !res.body) return null;
     const contentLen = Number(res.headers.get('content-length') || 0);
     if (contentLen > MAX_CLIENT_PACK_BYTES) return null;
@@ -272,6 +282,63 @@ async function fetchDirectPackFromUrl(url: string, source: 'local' | 'github'): 
     };
   } catch {
     return null;
+  }
+}
+
+function parseSemverTuple(v: string): number[] {
+  const m = String(v || '').trim().match(/(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+  if (!m) return [0, 0, 0];
+  return [Number(m[1] || 0), Number(m[2] || 0), Number(m[3] || 0)];
+}
+
+function isVersionHigher(candidate: string, current: string): boolean {
+  const a = parseSemverTuple(candidate);
+  const b = parseSemverTuple(current);
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i];
+  }
+  return false;
+}
+
+async function fetchDirectLooseThemesFromGitHub(
+  existingThemes: ThemeDefinition[]
+): Promise<ThemeDefinition[]> {
+  try {
+    const manifestRes = await fetch(GITHUB_THEMES_MANIFEST_URL, { cache: 'no-store' });
+    if (!manifestRes.ok) return [];
+    const manifest = (await manifestRes.json()) as {
+      themes?: Array<{ id?: string; file?: string; version?: string }>;
+    };
+    const entries = Array.isArray(manifest?.themes) ? manifest.themes : [];
+    const existingById = new Map(existingThemes.map((t) => [t.id, t]));
+    const downloaded: ThemeDefinition[] = [];
+
+    for (const entry of entries) {
+      const file = String(entry?.file || '').trim();
+      if (!file || !/^[a-zA-Z0-9._-]+\.json$/.test(file) || file === 'themes.json') continue;
+      const tid = String(entry?.id || '').trim().toLowerCase();
+      const manifestVer = String(entry?.version || '').trim();
+      const existing = tid ? existingById.get(tid) : undefined;
+      if (existing && manifestVer && !isVersionHigher(manifestVer, existing.version || '0.0.0')) {
+        continue;
+      }
+      try {
+        const tRes = await fetch(`${GITHUB_THEMES_BASE_URL}/${encodeURIComponent(file)}`, {
+          cache: 'no-store',
+        });
+        if (!tRes.ok) continue;
+        const raw = await tRes.json();
+        const cleaned = sanitizeClientThemeDefinition(raw, 'github');
+        if (cleaned) {
+          downloaded.push(cleaned);
+        }
+      } catch {
+        // skip individual theme fetch failure
+      }
+    }
+    return downloaded;
+  } catch {
+    return [];
   }
 }
 
@@ -401,7 +468,12 @@ export const ThemeCatalogProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const apiRes = await fetch('/api/themes/sync', {
         method: 'POST',
         cache: 'no-store',
+        headers: buildApiHeaders(),
+        credentials: 'same-origin',
       });
+      if (apiRes.status === 403) {
+        return { ok: false, count: themes.length, source: otaSource, packVersion };
+      }
       if (apiRes.ok) {
         const data = (await apiRes.json()) as ThemeCatalogResponse & { sync_result?: { ok?: boolean } };
         if (data && Array.isArray(data.themes) && data.themes.length > 0) {
@@ -413,17 +485,31 @@ export const ThemeCatalogProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
       }
     } catch {
-      // fall through to direct single-file pack from GitHub
+      // fall through to direct hybrid sync from GitHub
     }
 
     try {
       const directPack = await fetchDirectPackFromUrl(GITHUB_THEMES_PACK_URL, 'github');
-      if (directPack && directPack.themes.length > 0) {
-        const count = commitCatalog(directPack);
-        return { ok: true, count, source: 'github', packVersion: directPack.pack_version };
+      const baseThemes = directPack?.themes || themes;
+      const looseThemes = await fetchDirectLooseThemesFromGitHub(baseThemes);
+      if (directPack || looseThemes.length > 0) {
+        const mergedList = mergeThemeLists(directPack?.themes || [], looseThemes);
+        const combinedPayload: ThemeCatalogResponse = {
+          ok: true,
+          schema_version: 2,
+          pack_version: directPack?.pack_version || packVersion,
+          pack_file: directPack?.pack_file || packFile,
+          pack_sha256: directPack?.pack_sha256 || '',
+          default_theme: directPack?.default_theme || BUNDLED_DEFAULT_THEME.id,
+          source: 'github',
+          synced_at: Math.floor(Date.now() / 1000),
+          assets: directPack?.assets || {},
+          themes: mergedList,
+        };
+        const count = commitCatalog(combinedPayload);
+        return { ok: true, count, source: 'github', packVersion: combinedPayload.pack_version };
       }
-      // Fallback: reload local single-file pack so local pack changes still refresh cleanly
-      const localPack = await fetchDirectPackFromUrl('/api/themes/pack', 'local');
+      const localPack = await fetchDirectPackFromUrl('/api/themes/pack', 'local', true);
       if (localPack && localPack.themes.length > 0) {
         const count = commitCatalog(localPack);
         return { ok: true, count, source: 'local', packVersion: localPack.pack_version };
@@ -432,45 +518,42 @@ export const ThemeCatalogProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       setIsSyncingThemes(false);
     }
-  }, [commitCatalog, otaSource, packVersion, themes.length]);
+  }, [commitCatalog, otaSource, packFile, packVersion, themes]);
 
-  // Automatic background fetch of /api/themes (or /api/themes/pack) on mount
+  const reloadThemesFromServer = useCallback(async (): Promise<void> => {
+    try {
+      const res = await fetch('/api/themes', {
+        cache: 'no-store',
+        headers: buildApiHeaders(),
+        credentials: 'same-origin',
+      });
+      if (res.status === 403) {
+        // Zero-Trust locked: do not load extra themes until LAN certification succeeds
+        return;
+      }
+      if (res.ok) {
+        const data = (await res.json()) as ThemeCatalogResponse;
+        if (data && Array.isArray(data.themes) && data.themes.length > 0) {
+          commitCatalog(data);
+          return;
+        }
+      }
+    } catch {
+      // fallback below
+    }
+    const localPack = await fetchDirectPackFromUrl('/api/themes/pack', 'local', true);
+    if (localPack) {
+      commitCatalog(localPack);
+    }
+  }, [commitCatalog]);
+
+  // Automatic background fetch of /api/themes on mount (respects Zero-Trust 403 silently)
   const didBootFetchRef = useRef(false);
   useEffect(() => {
     if (didBootFetchRef.current) return;
     didBootFetchRef.current = true;
-
-    let cancelled = false;
-    const bootFetch = async () => {
-      try {
-        const res = await fetch('/api/themes', { cache: 'no-store' });
-        if (res.ok && !cancelled) {
-          const data = (await res.json()) as ThemeCatalogResponse;
-          if (data && Array.isArray(data.themes) && data.themes.length > 0) {
-            commitCatalog(data);
-            return;
-          }
-        }
-      } catch {
-        // fallback below
-      }
-      if (!cancelled) {
-        const localPack = await fetchDirectPackFromUrl('/api/themes/pack', 'local');
-        if (localPack && !cancelled) {
-          commitCatalog(localPack);
-          return;
-        }
-        const direct = await fetchDirectPackFromUrl(GITHUB_THEMES_PACK_URL, 'github');
-        if (direct && !cancelled) {
-          commitCatalog(direct);
-        }
-      }
-    };
-    void bootFetch();
-    return () => {
-      cancelled = true;
-    };
-  }, [commitCatalog]);
+    void reloadThemesFromServer();
+  }, [reloadThemesFromServer]);
 
   const value = useMemo<ThemeCatalogContextValue>(
     () => ({
@@ -491,6 +574,7 @@ export const ThemeCatalogProvider: React.FC<{ children: React.ReactNode }> = ({ 
       syncedAt,
       isSyncingThemes,
       syncThemesFromGitHub,
+      reloadThemesFromServer,
     }),
     [
       effectiveMode,
@@ -509,6 +593,7 @@ export const ThemeCatalogProvider: React.FC<{ children: React.ReactNode }> = ({ 
       syncedAt,
       isSyncingThemes,
       syncThemesFromGitHub,
+      reloadThemesFromServer,
     ]
   );
 

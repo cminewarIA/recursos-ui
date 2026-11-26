@@ -1,5 +1,6 @@
 import json
 import gzip
+import html
 import os
 import pwd
 import re
@@ -3212,8 +3213,31 @@ def _extract_asset_version(asset_name, fallback_ver=""):
     return m.group(1) if m else str(fallback_ver or "")
 
 
+def _is_native_release_tag(tag_str, platform):
+    """Acepta únicamente etiquetas de releases nativas desacopladas (ubuntu-v*, android-v*, native-*), descartando v14.x heredadas."""
+    low = str(tag_str or "").strip().lower()
+    if not low:
+        return False
+    if platform == "ubuntu":
+        return low.startswith("ubuntu-v") or low.startswith("native-")
+    if platform == "android":
+        return low.startswith("android-v") or low.startswith("native-")
+    return low.startswith(("ubuntu-v", "android-v", "native-"))
+
+
+def _is_compatible_native_version(cand_ver, canonical_remote_ver):
+    """Evita que artefactos antiguos de la era monolítica (14.x) sobrescriban versiones desacopladas de cliente (1.x)."""
+    cand_t = _parse_semver_tuple(cand_ver)
+    canon_t = _parse_semver_tuple(canonical_remote_ver)
+    if cand_t == (0, 0, 0):
+        return False
+    if canon_t[0] > 0 and canon_t[0] < 10 and cand_t[0] >= 10:
+        return False
+    return True
+
+
 def get_github_native_releases_info(force_refresh=False):
-    """Consulta dinámicamente la última compilación en GitHub para clientes nativos Ubuntu (.deb) y Android (.apk)."""
+    """Consulta dinámicamente la última compilación nativa en GitHub para Ubuntu (.deb) y Android (.apk), aislada de la versión del servidor."""
     now_ts = time.time()
     with _NATIVE_RELEASES_LOCK:
         if not force_refresh and _NATIVE_RELEASES_CACHE["data"] and (now_ts - _NATIVE_RELEASES_CACHE["ts"] < 60.0):
@@ -3256,7 +3280,7 @@ def get_github_native_releases_info(force_refresh=False):
 
     releases_list = []
     try:
-        rel_api = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=8"
+        rel_api = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=15"
         if is_allowed_github_release_url(rel_api):
             r = requests.get(rel_api, headers=headers, timeout=5.0)
             if r.status_code == 200:
@@ -3269,6 +3293,8 @@ def get_github_native_releases_info(force_refresh=False):
 
     for rel in releases_list:
         r_tag = str(rel.get("tag_name") or "").strip()
+        if not _is_native_release_tag(r_tag, "any"):
+            continue
         r_name = str(rel.get("name") or r_tag).strip()
         r_html = str(rel.get("html_url") or "").strip()
         r_pub = str(rel.get("published_at") or "").strip()
@@ -3292,9 +3318,12 @@ def get_github_native_releases_info(force_refresh=False):
             low_name = a_name.lower()
             if low_name == "sha256sums.txt" and not sha256_url:
                 sha256_url = a_url
-            elif low_name.endswith(".deb"):
+            elif low_name.endswith(".deb") and _is_native_release_tag(r_tag, "ubuntu"):
+                cand_ver = _extract_asset_version(a_name, remote_ubuntu_ver)
+                if not _is_compatible_native_version(cand_ver, remote_ubuntu_ver):
+                    continue
                 cand = {
-                    "version": _extract_asset_version(a_name, remote_ubuntu_ver),
+                    "version": cand_ver,
                     "asset_name": a_name,
                     "download_url": a_url,
                     "size_bytes": a_size,
@@ -3303,9 +3332,12 @@ def get_github_native_releases_info(force_refresh=False):
                 }
                 if deb_asset is None or ("_" in a_name and "_" not in deb_asset["asset_name"]):
                     deb_asset = cand
-            elif low_name.endswith(".apk"):
+            elif low_name.endswith(".apk") and _is_native_release_tag(r_tag, "android"):
+                cand_ver = _extract_asset_version(a_name, remote_android_ver)
+                if not _is_compatible_native_version(cand_ver, remote_android_ver):
+                    continue
                 cand = {
-                    "version": _extract_asset_version(a_name, remote_android_ver),
+                    "version": cand_ver,
                     "asset_name": a_name,
                     "download_url": a_url,
                     "size_bytes": a_size,
@@ -3324,23 +3356,23 @@ def get_github_native_releases_info(force_refresh=False):
         "version": deb_ver,
         "local_version": local_ubuntu_ver,
         "asset_name": (deb_asset or {}).get("asset_name") or f"recursos-cockpit_{deb_ver}_amd64.deb",
-        "download_url": (deb_asset or {}).get("download_url") or f"https://github.com/{GITHUB_REPO}/releases/latest/download/recursos-cockpit.deb",
+        "download_url": (deb_asset or {}).get("download_url") or f"https://github.com/{GITHUB_REPO}/releases/tag/ubuntu-v{deb_ver}",
         "size_bytes": int((deb_asset or {}).get("size_bytes") or 0),
         "published_at": (deb_asset or {}).get("published_at") or published_at,
-        "tag_name": (deb_asset or {}).get("tag_name") or tag_name,
+        "tag_name": (deb_asset or {}).get("tag_name") or f"ubuntu-v{deb_ver}",
         "available": bool(deb_asset),
-        "update_available": _parse_semver_tuple(deb_ver) > _parse_semver_tuple(local_ubuntu_ver),
+        "update_available": bool(deb_asset) and (_parse_semver_tuple(deb_ver) > _parse_semver_tuple(local_ubuntu_ver)),
     }
     apk_info = {
         "version": apk_ver,
         "local_version": local_android_ver,
         "asset_name": (apk_asset or {}).get("asset_name") or f"recursos-cockpit_{apk_ver}.apk",
-        "download_url": (apk_asset or {}).get("download_url") or f"https://github.com/{GITHUB_REPO}/releases/latest/download/recursos-cockpit.apk",
+        "download_url": (apk_asset or {}).get("download_url") or f"https://github.com/{GITHUB_REPO}/releases/tag/android-v{apk_ver}",
         "size_bytes": int((apk_asset or {}).get("size_bytes") or 0),
         "published_at": (apk_asset or {}).get("published_at") or published_at,
-        "tag_name": (apk_asset or {}).get("tag_name") or tag_name,
+        "tag_name": (apk_asset or {}).get("tag_name") or f"android-v{apk_ver}",
         "available": bool(apk_asset),
-        "update_available": _parse_semver_tuple(apk_ver) > _parse_semver_tuple(local_android_ver),
+        "update_available": bool(apk_asset) and (_parse_semver_tuple(apk_ver) > _parse_semver_tuple(local_android_ver)),
     }
 
     payload = {
@@ -9561,12 +9593,145 @@ def verify_device_token(token_str):
     dev_id, _ = parse_verified_device_token(token_str)
     return dev_id
 
+_NEIGH_MAC_CACHE = {}
+_NEIGH_MAC_CACHE_LOCK = threading.Lock()
+_DEVICE_IDENTITY_CACHE = {"by_id": {}, "by_ip": {}, "updated_at": 0.0}
+_DEVICE_IDENTITY_CACHE_LOCK = threading.Lock()
+
+
+def _refresh_device_identity_cache(devices):
+    """Mantiene un índice rápido en memoria (ID/alias/IP -> nombre de dispositivo) para enriquecer logs HTTP sin I/O."""
+    if not isinstance(devices, dict):
+        return
+    by_id = {}
+    by_ip = {}
+    for dev_k, entry in devices.items():
+        if not isinstance(entry, dict):
+            continue
+        dev_name = str(entry.get("custom_alias") or entry.get("name") or "").strip()
+        if not dev_name:
+            continue
+        dev_id = str(entry.get("id") or dev_k).strip()
+        if dev_id:
+            by_id[dev_id] = dev_name
+        for aid in (entry.get("alias_ids") or []):
+            aid_s = str(aid or "").strip()
+            if aid_s:
+                by_id[aid_s] = dev_name
+        for ip_cand in (
+            entry.get("local_ip"),
+            entry.get("last_external_ip"),
+            (entry.get("device_telemetry") or {}).get("local_ip") if isinstance(entry.get("device_telemetry"), dict) else "",
+        ):
+            norm = _normalize_ip_str(ip_cand)
+            if norm and not norm.startswith("Externo"):
+                by_ip[norm] = dev_name
+        for obs in (entry.get("observed_ips") or []):
+            if isinstance(obs, dict):
+                norm = _normalize_ip_str(obs.get("ip"))
+                if norm:
+                    by_ip.setdefault(norm, dev_name)
+    with _DEVICE_IDENTITY_CACHE_LOCK:
+        _DEVICE_IDENTITY_CACHE["by_id"] = by_id
+        _DEVICE_IDENTITY_CACHE["by_ip"] = by_ip
+        _DEVICE_IDENTITY_CACHE["updated_at"] = time.time()
+
+
+def _is_meaningful_device_value(val):
+    """Determina si un valor de telemetría aporta información real y no debe sobrescribir datos ricos."""
+    if val is None:
+        return False
+    if isinstance(val, bool):
+        return True
+    if isinstance(val, (int, float)):
+        return val != 0
+    s = str(val).strip()
+    if not s:
+        return False
+    low = s.lower()
+    return low not in (
+        "unknown",
+        "desconocido",
+        "dispositivo desconocido",
+        "cliente web",
+        "cliente web linux",
+        "cliente web windows",
+        "web",
+        "generic",
+        "n/a",
+        "none",
+        "--",
+        "00:00:00:00:00:00",
+    )
+
+
+def _merge_observed_ips(existing_list, new_ip, mode, now_iso, extra_list=None):
+    """Consolida de forma incremental todas las direcciones IP observadas por el dispositivo físico."""
+    by_ip = {}
+    for src in (existing_list or [], extra_list or []):
+        if not isinstance(src, list):
+            continue
+        for item in src:
+            if isinstance(item, str):
+                ip_c = _normalize_ip_str(item)
+                if not ip_c or ip_c.startswith("Externo"):
+                    continue
+                by_ip[ip_c] = {
+                    "ip": ip_c,
+                    "mode": "LAN" if is_local_ip(ip_c) else "WAN",
+                    "first_seen": now_iso,
+                    "last_seen": now_iso,
+                }
+            elif isinstance(item, dict):
+                ip_c = _normalize_ip_str(item.get("ip"))
+                if not ip_c or ip_c.startswith("Externo"):
+                    continue
+                prev = by_ip.get(ip_c)
+                f_seen = str(item.get("first_seen") or now_iso)
+                l_seen = str(item.get("last_seen") or now_iso)
+                m_val = str(item.get("mode") or ("LAN" if is_local_ip(ip_c) else "WAN")).upper()
+                if prev:
+                    if f_seen and (not prev["first_seen"] or f_seen < prev["first_seen"]):
+                        prev["first_seen"] = f_seen
+                    if l_seen and (not prev["last_seen"] or l_seen > prev["last_seen"]):
+                        prev["last_seen"] = l_seen
+                    if m_val in ("LAN", "WAN"):
+                        prev["mode"] = m_val
+                else:
+                    by_ip[ip_c] = {
+                        "ip": ip_c,
+                        "mode": m_val if m_val in ("LAN", "WAN") else ("LAN" if is_local_ip(ip_c) else "WAN"),
+                        "first_seen": f_seen,
+                        "last_seen": l_seen,
+                    }
+
+    clean_new = _normalize_ip_str(new_ip)
+    if clean_new and not clean_new.startswith("Externo"):
+        norm_mode = "LAN" if mode == "LAN" else "WAN"
+        if clean_new in by_ip:
+            by_ip[clean_new]["last_seen"] = now_iso
+            by_ip[clean_new]["mode"] = norm_mode
+        else:
+            by_ip[clean_new] = {
+                "ip": clean_new,
+                "mode": norm_mode,
+                "first_seen": now_iso,
+                "last_seen": now_iso,
+            }
+
+    ordered = sorted(by_ip.values(), key=lambda x: str(x.get("last_seen") or ""), reverse=True)
+    return ordered[:20]
+
+
 def resolve_arp_mac_for_ip(ip_str):
     """
-    Resuelve dinámicamente la dirección MAC física para una IP local mediante /proc/net/arp
-    o interfaces locales (/sys/class/net) si corresponde al propio nodo servidor.
+    Resuelve dinámicamente la dirección MAC física para una IP local combinando:
+      1. Interfaces físicas del propio servidor (/sys/class/net) si corresponde al host
+      2. Tabla ARP del kernel (/proc/net/arp)
+      3. Tabla de vecinos `ip neigh` (IPv4/IPv6 y entradas STALE/REACHABLE) con caché breve
+      4. Catálogo en memoria de ARP/Pi-hole/Router
     """
-    clean_ip = str(ip_str or "").strip()
+    clean_ip = _normalize_ip_str(ip_str)
     if not clean_ip or clean_ip.startswith("Externo"):
         return ""
     if clean_ip in ("127.0.0.1", "::1", "localhost", SERVER_LOCAL_IP):
@@ -9584,6 +9749,14 @@ def resolve_arp_mac_for_ip(ip_str):
                             return mac
         except Exception:
             pass
+
+    now_ts = time.time()
+    with _NEIGH_MAC_CACHE_LOCK:
+        cached = _NEIGH_MAC_CACHE.get(clean_ip)
+        if cached and (now_ts - cached[1]) < 30.0:
+            return cached[0]
+
+    found_mac = ""
     try:
         if os.path.isfile("/proc/net/arp"):
             with open("/proc/net/arp", "r", encoding="utf-8") as f:
@@ -9592,15 +9765,52 @@ def resolve_arp_mac_for_ip(ip_str):
                     if len(parts) >= 4 and parts[0] == clean_ip:
                         mac = parts[3].strip().lower()
                         if mac and mac != "00:00:00:00:00:00":
-                            return mac
+                            found_mac = mac
+                            break
     except Exception:
         pass
-    return ""
+
+    if not found_mac and shutil.which("ip"):
+        try:
+            ipaddress.ip_address(clean_ip)
+            proc = subprocess.run(
+                ["ip", "neigh", "show", "to", clean_ip],
+                capture_output=True,
+                text=True,
+                timeout=0.6,
+            )
+            if proc.returncode == 0 and proc.stdout:
+                m_ll = re.search(r"lladdr\s+([0-9a-fA-F:]{17})", proc.stdout)
+                if m_ll:
+                    cand = m_ll.group(1).strip().lower()
+                    if cand and cand != "00:00:00:00:00:00":
+                        found_mac = cand
+        except Exception:
+            pass
+
+    if not found_mac:
+        try:
+            arp_map = get_arp_and_pihole_names()
+            if isinstance(arp_map, dict):
+                for mac_k, info in arp_map.items():
+                    if isinstance(info, dict) and _normalize_ip_str(info.get("ip")) == clean_ip:
+                        cand = str(mac_k or "").strip().lower()
+                        if cand and cand != "00:00:00:00:00:00":
+                            found_mac = cand
+                            break
+        except Exception:
+            pass
+
+    with _NEIGH_MAC_CACHE_LOCK:
+        if len(_NEIGH_MAC_CACHE) > 256:
+            _NEIGH_MAC_CACHE.clear()
+        _NEIGH_MAC_CACHE[clean_ip] = (found_mac, now_ts)
+    return found_mac
 
 
 def normalize_lan_ip(ip_str):
     """Normaliza IPs de loopback hacia la IP LAN real del servidor para unificar identidad física."""
-    clean_ip = str(ip_str or "").strip()
+    clean_ip = _normalize_ip_str(ip_str)
     if clean_ip in ("127.0.0.1", "::1", "localhost") and SERVER_LOCAL_IP and SERVER_LOCAL_IP != "127.0.0.1":
         return SERVER_LOCAL_IP
     return clean_ip
@@ -9624,7 +9834,7 @@ def normalize_hardware_id(hw_id):
 def extract_os_family(ua, tel=None):
     """Extrae la familia de sistema operativo normalizada del dispositivo físico."""
     t = tel if isinstance(tel, dict) else {}
-    os_str = f"{t.get('os_distro', '')} {t.get('client_type', '')} {ua or ''}".lower()
+    os_str = f"{t.get('os_distro', '')} {t.get('os_info', '')} {t.get('platform', '')} {t.get('client_type', '')} {ua or ''}".lower()
     if "android" in os_str:
         return "android"
     if "iphone" in os_str or "ipad" in os_str or "ios" in os_str:
@@ -9638,12 +9848,13 @@ def extract_os_family(ua, tel=None):
     return "other"
 
 
-def extract_client_descriptor(ua, tel=None, client_ip="", is_local=True, now_iso=""):
+def extract_client_descriptor(ua, tel=None, client_ip="", is_local=True, now_iso="", prev_client=None):
     """
     Construye el descriptor del cliente/contenedor (App Nativa vs Navegador Web)
-    que se conecta desde un dispositivo físico.
+    que se conecta desde un dispositivo físico, preservando primera visita y metadatos.
     """
     t = tel if isinstance(tel, dict) else {}
+    prev = prev_client if isinstance(prev_client, dict) else {}
     ua_str = str(ua or "")
     ua_lower = ua_str.lower()
     c_type = t.get("client_type") or ""
@@ -9656,28 +9867,40 @@ def extract_client_descriptor(ua, tel=None, client_ip="", is_local=True, now_iso
             c_type = "web_browser"
 
     is_nat = c_type in ("ubuntu_native", "android_native") or bool(t.get("full_access"))
-    browser = "Web"
+    browser = str(t.get("browser_name") or "").strip() or "Web"
     if c_type == "ubuntu_native":
         c_key = "ubuntu_native"
         c_label = "App Nativa Ubuntu (.deb)"
         browser = "GTK3 + WebKit2"
     elif c_type == "android_native":
         c_key = "android_native"
-        c_label = "App Nativa Android (.apk)"
+        c_label = str(t.get("client_label") or "App Nativa Android (.apk)")
         browser = "Kotlin + WebView"
     else:
-        if "edg/" in ua_lower:
-            browser = "Edge"
-        elif "opr/" in ua_lower or "opera" in ua_lower:
-            browser = "Opera"
-        elif "chrome/" in ua_lower or "crios/" in ua_lower:
-            browser = "Chrome"
-        elif "firefox/" in ua_lower or "fxios/" in ua_lower:
-            browser = "Firefox"
-        elif "safari/" in ua_lower and "chrome" not in ua_lower:
-            browser = "Safari"
-        c_key = f"web_{browser.lower()}"
+        if browser == "Web":
+            if "edg/" in ua_lower or "edga/" in ua_lower or "edgios/" in ua_lower:
+                browser = "Edge"
+            elif "opr/" in ua_lower or "opera" in ua_lower:
+                browser = "Opera"
+            elif "brave" in ua_lower:
+                browser = "Brave"
+            elif "vivaldi" in ua_lower:
+                browser = "Vivaldi"
+            elif "samsungbrowser/" in ua_lower:
+                browser = "Samsung Internet"
+            elif "firefox/" in ua_lower or "fxios/" in ua_lower:
+                browser = "Firefox"
+            elif "chrome/" in ua_lower or "crios/" in ua_lower:
+                browser = "Chrome"
+            elif "safari/" in ua_lower and "chrome" not in ua_lower:
+                browser = "Safari"
+        c_key = f"web_{re.sub(r'[^a-z0-9]+', '_', browser.lower()).strip('_') or 'browser'}"
         c_label = f"Navegador Web ({browser})"
+
+    ts_now = now_iso or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    first_seen = str(prev.get("first_seen") or ts_now)
+    install_id = str(t.get("install_id") or t.get("installation_id") or prev.get("install_id") or "").strip()[:64]
+    app_ver = str(t.get("client_version") or t.get("app_version") or prev.get("app_version") or "").strip()[:32]
 
     return {
         "client_key": c_key,
@@ -9688,15 +9911,23 @@ def extract_client_descriptor(ua, tel=None, client_ip="", is_local=True, now_iso
         "full_access": is_nat,
         "connection_mode": "LAN" if is_local else "WAN",
         "ip": normalize_lan_ip(client_ip) if is_local else client_ip,
-        "user_agent": ua_str[:220],
-        "last_seen": now_iso or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "user_agent": ua_str[:240] or str(prev.get("user_agent") or "")[:240],
+        "app_version": app_ver,
+        "install_id": install_id,
+        "first_seen": first_seen,
+        "last_seen": ts_now,
     }
 
 
 def compute_physical_device_key(entry_or_tel, client_ip="", ua="", is_local=True):
     """
-    Calcula la clave canónica del dispositivo físico (Zero-Trust Hardware Identity)
-    para que el certificado se emita por dispositivo físico y agrupe todos sus clientes.
+    Calcula la clave canónica única del dispositivo físico (Zero-Trust Hardware Identity)
+    unificando múltiples navegadores y apps nativas del mismo equipo:
+      1. Dirección MAC física (resuelta por telemetría, ARP, ip neigh o catálogo Pi-hole/router)
+      2. Identificador de hardware nativo (ubn_* / and_*)
+      3. IP LAN real verificada (sin fragmentar por cambios de User-Agent / Modo Escritorio)
+      4. Modelo + fabricante + familia SO
+      5. Huella/ID de hardware web persistente
     """
     d = entry_or_tel if isinstance(entry_or_tel, dict) else {}
     tel = d.get("device_telemetry") if isinstance(d.get("device_telemetry"), dict) else d
@@ -9714,12 +9945,12 @@ def compute_physical_device_key(entry_or_tel, client_ip="", ua="", is_local=True
         if len(clean_mac) >= 12:
             return f"phys_mac_{clean_mac[:12]}"
 
-    if lan_ip and not lan_ip.startswith("Externo") and is_local_ip(lan_ip) and os_fam != "other":
-        return f"phys_lan_{lan_ip}_{os_fam}"
-
     hw_id = normalize_hardware_id(d.get("hardware_id") or tel.get("hardware_id") or "")
     if hw_id and not hw_id.startswith("web_"):
         return f"phys_hw_{hw_id}"
+
+    if lan_ip and not lan_ip.startswith("Externo") and is_local_ip(lan_ip):
+        return f"phys_lan_{lan_ip}"
 
     mfg = str(tel.get("manufacturer") or tel.get("brand") or "").strip().lower()
     mdl = str(tel.get("model") or "").strip().lower()
@@ -9742,11 +9973,47 @@ def generate_certificate_serial(dev_id, physical_key=""):
     return f"ZT-{digest[:4]}-{digest[4:8]}-{digest[8:12]}"
 
 
+def _merge_telemetry_incremental(prev_tel, incoming_tel, prev_is_native=False, incoming_is_native=False):
+    """
+    Fusión incremental (merge-never-downgrade):
+    - Nunca sobrescribe datos reales con vacíos o valores genéricos.
+    - Protege atributos ricos de hardware/SO/arquitectura/MAC/root recopilados por apps nativas o navegadores más detallados.
+    """
+    protected_rich_keys = {
+        "hardware_id", "manufacturer", "brand", "model", "board", "chassis_type",
+        "hostname", "os_distro", "os_info", "kernel", "arch", "architecture", "supported_abis",
+        "cpu_model", "cpu_cores_physical", "cpu_cores_logical", "gpu_model",
+        "ram_total_gb", "ram_total_bytes", "storage_total_gb", "storage_free_gb",
+        "mac_address", "interface_name", "root_access", "root_method", "client_version",
+        "device_codename", "hardware_soc", "security_patch", "bios_version",
+    }
+    merged = dict(prev_tel) if isinstance(prev_tel, dict) else {}
+    inc = incoming_tel if isinstance(incoming_tel, dict) else {}
+    for k, v in inc.items():
+        if not _is_meaningful_device_value(v):
+            continue
+        existing_val = merged.get(k)
+        has_existing = _is_meaningful_device_value(existing_val)
+        if k == "root_access":
+            # Solo actualizar root_access desde cliente nativo o si no existía valor previo
+            if incoming_is_native or not has_existing:
+                merged[k] = bool(v)
+            continue
+        if prev_is_native and not incoming_is_native and k in protected_rich_keys and has_existing:
+            continue
+        if k in protected_rich_keys and has_existing and not incoming_is_native:
+            # Entre navegadores, conservar el valor más descriptivo (más largo) para no perder detalle
+            if isinstance(v, str) and isinstance(existing_val, str) and len(v.strip()) < len(existing_val.strip()):
+                continue
+        merged[k] = v
+    return merged
+
+
 def consolidate_devices_by_hardware(devices):
     """
     Unifica y agrupa registros en trusted_devices.json que pertenezcan al mismo
     dispositivo físico, garantizando 1 certificado por dispositivo físico y
-    conservando la lista de clientes/contenedores agrupados (Native App + Navegadores).
+    conservando todos los clientes, IPs observadas, IDs de instalación y telemetría rica.
     """
     if not isinstance(devices, dict) or not devices:
         return {}
@@ -9779,11 +10046,18 @@ def consolidate_devices_by_hardware(devices):
                 raw_v["device_telemetry"]["local_ip"] = lan_ip
 
         phys_key = compute_physical_device_key(raw_v, lan_ip, ua_str, is_local=bool(lan_ip and not lan_ip.startswith("Externo")))
-        os_fam = extract_os_family(ua_str, tel)
         norm_hw = normalize_hardware_id(raw_v.get("hardware_id") or tel.get("hardware_id") or "")
-        mac_addr = str(tel.get("mac_address") or resolve_arp_mac_for_ip(lan_ip) or "").strip().lower()
+        mac_addr = str(tel.get("mac_address") or raw_v.get("mac_address") or resolve_arp_mac_for_ip(lan_ip) or "").strip().lower()
+        raw_install_ids = {
+            str(x).strip()
+            for x in (
+                list(raw_v.get("installation_ids") or [])
+                + [tel.get("install_id"), tel.get("installation_id"), norm_hw]
+            )
+            if x and str(x).strip()
+        }
 
-        # Buscar si ya existe un grupo para este mismo equipo físico (por phys_key, MAC, hardware_id o IP LAN + SO)
+        # Buscar si ya existe un grupo para este mismo equipo físico (por phys_key, MAC, hardware_id, install_id o IP LAN)
         matched_key = None
         if phys_key in grouped_by_phys:
             matched_key = phys_key
@@ -9791,9 +10065,16 @@ def consolidate_devices_by_hardware(devices):
             for existing_pk, existing_entry in grouped_by_phys.items():
                 ex_tel = existing_entry.get("device_telemetry") if isinstance(existing_entry.get("device_telemetry"), dict) else {}
                 ex_lan = normalize_lan_ip(existing_entry.get("local_ip") or ex_tel.get("local_ip") or "")
-                ex_os = extract_os_family(existing_entry.get("user_agent", ""), ex_tel)
                 ex_hw = normalize_hardware_id(existing_entry.get("hardware_id") or ex_tel.get("hardware_id") or "")
-                ex_mac = str(ex_tel.get("mac_address") or "").strip().lower()
+                ex_mac = str(ex_tel.get("mac_address") or existing_entry.get("mac_address") or "").strip().lower()
+                ex_install_ids = {
+                    str(x).strip()
+                    for x in (
+                        list(existing_entry.get("installation_ids") or [])
+                        + [ex_tel.get("install_id"), ex_tel.get("installation_id"), ex_hw]
+                    )
+                    if x and str(x).strip()
+                }
 
                 if mac_addr and ex_mac and mac_addr == ex_mac and mac_addr != "00:00:00:00:00:00":
                     matched_key = existing_pk
@@ -9801,11 +10082,13 @@ def consolidate_devices_by_hardware(devices):
                 if norm_hw and ex_hw and norm_hw == ex_hw:
                     matched_key = existing_pk
                     break
-                if lan_ip and ex_lan and lan_ip == ex_lan and not lan_ip.startswith("Externo") and os_fam == ex_os and os_fam != "other":
+                if raw_install_ids and ex_install_ids and (raw_install_ids & ex_install_ids):
+                    matched_key = existing_pk
+                    break
+                if lan_ip and ex_lan and lan_ip == ex_lan and not lan_ip.startswith("Externo") and is_local_ip(lan_ip):
                     matched_key = existing_pk
                     break
 
-        # Extraer clientes registrados en este registro
         existing_clients = raw_v.get("clients") if isinstance(raw_v.get("clients"), list) else []
         cur_client_desc = extract_client_descriptor(
             ua_str,
@@ -9814,6 +10097,7 @@ def consolidate_devices_by_hardware(devices):
             is_local=not bool(raw_v.get("last_external_ip") and not lan_ip),
             now_iso=raw_v.get("last_seen", ""),
         )
+        now_fallback = raw_v.get("last_seen") or raw_v.get("first_seen") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if not matched_key:
             matched_key = phys_key
@@ -9823,43 +10107,68 @@ def consolidate_devices_by_hardware(devices):
             base_entry["physical_key"] = matched_key
             alias_ids = list(dict.fromkeys([dev_id] + [str(x) for x in base_entry.get("alias_ids", []) if x]))
             base_entry["alias_ids"] = alias_ids
+            base_entry["installation_ids"] = sorted(raw_install_ids)
+            base_entry["observed_ips"] = _merge_observed_ips(
+                base_entry.get("observed_ips"),
+                lan_ip or raw_v.get("last_external_ip", ""),
+                "LAN" if (lan_ip and not lan_ip.startswith("Externo")) else "WAN",
+                now_fallback,
+            )
+            if raw_v.get("last_external_ip"):
+                base_entry["observed_ips"] = _merge_observed_ips(
+                    base_entry["observed_ips"], raw_v.get("last_external_ip"), "WAN", now_fallback
+                )
 
             clients_map = {}
             for c_item in existing_clients:
                 if isinstance(c_item, dict) and c_item.get("client_key"):
                     clients_map[c_item["client_key"]] = dict(c_item)
-            clients_map[cur_client_desc["client_key"]] = cur_client_desc
+            if cur_client_desc["client_key"] not in clients_map:
+                clients_map[cur_client_desc["client_key"]] = cur_client_desc
             base_entry["clients"] = list(clients_map.values())
             base_entry["certificate_serial"] = generate_certificate_serial(dev_id, matched_key)
             base_entry["certificate_scope"] = "PER_PHYSICAL_DEVICE"
+            if base_entry.get("verified_in_lan") and not base_entry.get("lan_verified_at"):
+                base_entry["lan_verified_at"] = base_entry.get("first_seen") or now_fallback
             grouped_by_phys[matched_key] = base_entry
         else:
             target = grouped_by_phys[matched_key]
-            # Registrar el ID secundario en alias_ids para que su token siga siendo reconocido y unificado
             alias_ids = list(dict.fromkeys(list(target.get("alias_ids", [target["id"]])) + [dev_id] + list(raw_v.get("alias_ids", []))))
             target["alias_ids"] = alias_ids
+            target["installation_ids"] = sorted(set(target.get("installation_ids") or []) | raw_install_ids)
+            target["observed_ips"] = _merge_observed_ips(
+                target.get("observed_ips"),
+                lan_ip,
+                "LAN",
+                now_fallback,
+                extra_list=raw_v.get("observed_ips"),
+            )
+            if raw_v.get("last_external_ip"):
+                target["observed_ips"] = _merge_observed_ips(
+                    target["observed_ips"], raw_v.get("last_external_ip"), "WAN", now_fallback
+                )
 
-            # Conservar primera fecha de emparejamiento y última actividad más reciente
             if raw_v.get("first_seen") and (not target.get("first_seen") or raw_v["first_seen"] < target["first_seen"]):
                 target["first_seen"] = raw_v["first_seen"]
             if raw_v.get("last_seen") and (not target.get("last_seen") or raw_v["last_seen"] > target["last_seen"]):
                 target["last_seen"] = raw_v["last_seen"]
+            if raw_v.get("verified_in_lan"):
+                target["verified_in_lan"] = True
+                rv_lan_ts = raw_v.get("lan_verified_at") or raw_v.get("last_seen") or now_fallback
+                if not target.get("lan_verified_at") or rv_lan_ts > target.get("lan_verified_at", ""):
+                    target["lan_verified_at"] = rv_lan_ts
 
             if raw_v.get("custom_alias") and not target.get("custom_alias"):
                 target["custom_alias"] = raw_v["custom_alias"]
                 target["name"] = raw_v["custom_alias"]
 
-            # Fusionar telemetría priorizando datos nativos (Full Access) sobre Sandbox Web
             target_tel = target.get("device_telemetry") if isinstance(target.get("device_telemetry"), dict) else {}
             incoming_is_native = bool(raw_v.get("full_access") or tel.get("full_access") or raw_v.get("client_type") in ("ubuntu_native", "android_native"))
             target_is_native = bool(target.get("full_access") or target_tel.get("full_access") or target.get("client_type") in ("ubuntu_native", "android_native"))
 
-            merged_tel = dict(target_tel)
-            for tk, tv in tel.items():
-                if tv is None or tv == "":
-                    continue
-                if incoming_is_native or tk not in merged_tel or not merged_tel.get(tk) or not target_is_native:
-                    merged_tel[tk] = tv
+            merged_tel = _merge_telemetry_incremental(
+                target_tel, tel, prev_is_native=target_is_native, incoming_is_native=incoming_is_native
+            )
 
             if incoming_is_native and not target_is_native:
                 target["client_type"] = raw_v.get("client_type") or merged_tel.get("client_type")
@@ -9870,25 +10179,36 @@ def consolidate_devices_by_hardware(devices):
                 merged_tel["client_label"] = target["client_label"]
                 merged_tel["access_level"] = "FULL_NATIVE_ACCESS"
                 merged_tel["full_access"] = True
-                if not target.get("custom_alias") and raw_v.get("name"):
+                if not target.get("custom_alias") and _is_meaningful_device_value(raw_v.get("name")):
                     target["name"] = raw_v["name"]
                     target["auto_name"] = raw_v.get("auto_name") or raw_v["name"]
 
+            if mac_addr and mac_addr != "00:00:00:00:00:00" and not merged_tel.get("mac_address"):
+                merged_tel["mac_address"] = mac_addr
+            if merged_tel.get("mac_address"):
+                target["mac_address"] = merged_tel["mac_address"]
+
             target["device_telemetry"] = merged_tel
 
-            # Fusionar lista de clientes del dispositivo físico
             clients_map = {}
             for c_item in target.get("clients", []):
                 if isinstance(c_item, dict) and c_item.get("client_key"):
                     clients_map[c_item["client_key"]] = dict(c_item)
-            for c_item in existing_clients:
+            for c_item in existing_clients + [cur_client_desc]:
                 if isinstance(c_item, dict) and c_item.get("client_key"):
-                    prev_c = clients_map.get(c_item["client_key"])
-                    if not prev_c or str(c_item.get("last_seen", "")) >= str(prev_c.get("last_seen", "")):
-                        clients_map[c_item["client_key"]] = dict(c_item)
-            prev_cur = clients_map.get(cur_client_desc["client_key"])
-            if not prev_cur or str(cur_client_desc.get("last_seen", "")) >= str(prev_cur.get("last_seen", "")):
-                clients_map[cur_client_desc["client_key"]] = cur_client_desc
+                    ck = c_item["client_key"]
+                    prev_c = clients_map.get(ck)
+                    if not prev_c:
+                        clients_map[ck] = dict(c_item)
+                    else:
+                        merged_c = dict(prev_c)
+                        if str(c_item.get("last_seen", "")) >= str(prev_c.get("last_seen", "")):
+                            for fk, fv in c_item.items():
+                                if _is_meaningful_device_value(fv):
+                                    merged_c[fk] = fv
+                        if prev_c.get("first_seen") and (not merged_c.get("first_seen") or prev_c["first_seen"] < merged_c["first_seen"]):
+                            merged_c["first_seen"] = prev_c["first_seen"]
+                        clients_map[ck] = merged_c
 
             target["clients"] = sorted(
                 clients_map.values(),
@@ -9917,17 +10237,20 @@ def load_trusted_devices():
             consolidated = consolidate_devices_by_hardware(normalized)
             if len(consolidated) != len(normalized):
                 save_trusted_devices(consolidated)
+            else:
+                _refresh_device_identity_cache(consolidated)
             return consolidated
     except Exception:
         return {}
 
 def save_trusted_devices(devices):
-    """Guarda de forma atómica el registro de dispositivos de confianza."""
+    """Guarda de forma atómica el registro de dispositivos de confianza y actualiza el índice en memoria."""
     try:
         temp_file = TRUSTED_FILE + ".tmp"
         with open(temp_file, 'w', encoding='utf-8') as f:
             json.dump(devices, f, indent=2, ensure_ascii=False)
         os.replace(temp_file, TRUSTED_FILE)
+        _refresh_device_identity_cache(devices)
     except Exception as e:
         print(f"[-] Error guardando dispositivos de confianza: {e}")
 
@@ -9995,22 +10318,24 @@ def _is_trusted_proxy_ip(ip_str):
 def get_client_ip(handler):
     """
     Extrae la IP real del cliente con validación estricta anti-spoofing (rightmost-untrusted).
-    Acepta cabeceras de proxy inverso únicamente si el socket directo proviene
-    de loopback, de la IP local del servidor o de subredes bridge Docker (172.16.0.0/12).
+    Acepta cabeceras de proxy inverso (CF-Connecting-IP, X-Real-IP, X-Forwarded-For, X-Recursos-Origin-IP)
+    únicamente si el socket directo proviene de loopback, la IP local del servidor o bridges Docker.
     """
     raw_direct = handler.client_address[0] if getattr(handler, 'client_address', None) else ''
     direct_ip = _normalize_ip_str(raw_direct)
-    if _is_trusted_proxy_ip(direct_ip):
-        x_real = handler.headers.get('X-Real-IP')
-        if x_real:
-            cand = _normalize_ip_str(x_real)
-            if cand:
-                try:
-                    ipaddress.ip_address(cand)
-                    return cand
-                except Exception:
-                    pass
-        xff = handler.headers.get('X-Forwarded-For')
+    hdrs = getattr(handler, 'headers', None)
+    if hdrs and _is_trusted_proxy_ip(direct_ip):
+        for single_hdr in ('CF-Connecting-IP', 'X-Real-IP', 'X-Recursos-Origin-IP'):
+            h_val = hdrs.get(single_hdr)
+            if h_val:
+                cand = _normalize_ip_str(h_val)
+                if cand:
+                    try:
+                        ipaddress.ip_address(cand)
+                        return cand
+                    except Exception:
+                        pass
+        xff = hdrs.get('X-Forwarded-For')
         if xff:
             valid_parts = []
             for raw_part in xff.split(','):
@@ -10023,12 +10348,72 @@ def get_client_ip(handler):
                 except Exception:
                     continue
             if valid_parts:
-                # Recorrer de derecha a izquierda para evitar spoofing por prefijos falsos en proxys que anexan IPs
                 for part in reversed(valid_parts):
                     if not _is_trusted_proxy_ip(part):
                         return part
                 return valid_parts[0]
     return direct_ip
+
+
+def resolve_log_client_identity(handler):
+    """
+    Devuelve la cadena de origen real para los logs HTTP: `IP (NombreDispositivo)`
+    cuando existe un dispositivo certificado o identificado en red local, o solo la IP real.
+    """
+    real_ip = get_client_ip(handler) or "-"
+    dev_name = ""
+    try:
+        with _DEVICE_IDENTITY_CACHE_LOCK:
+            cache_age = time.time() - _DEVICE_IDENTITY_CACHE["updated_at"]
+            by_id = dict(_DEVICE_IDENTITY_CACHE["by_id"])
+            by_ip = dict(_DEVICE_IDENTITY_CACHE["by_ip"])
+        if not by_id and not by_ip and cache_age > 5.0 and os.path.exists(TRUSTED_FILE):
+            with TRUST_LOCK:
+                load_trusted_devices()
+            with _DEVICE_IDENTITY_CACHE_LOCK:
+                by_id = dict(_DEVICE_IDENTITY_CACHE["by_id"])
+                by_ip = dict(_DEVICE_IDENTITY_CACHE["by_ip"])
+
+        hdrs = getattr(handler, 'headers', None)
+        if hdrs:
+            tok = ""
+            auth_h = hdrs.get('Authorization', '')
+            if auth_h and auth_h.lower().startswith('bearer '):
+                tok = auth_h[7:].strip()
+            if not tok:
+                tok = hdrs.get('X-Device-Token', '').strip()
+            if not tok:
+                cookie_h = hdrs.get('Cookie', '')
+                if '_sysmon_trust=' in cookie_h:
+                    c_obj = cookies.SimpleCookie()
+                    try:
+                        c_obj.load(cookie_h)
+                        if '_sysmon_trust' in c_obj:
+                            tok = str(c_obj['_sysmon_trust'].value or '').strip()
+                    except Exception:
+                        pass
+            if tok:
+                vid = verify_device_token(tok)
+                if vid and vid in by_id:
+                    dev_name = by_id[vid]
+            if not dev_name:
+                h_name = str(hdrs.get('X-Recursos-Device-Name') or '').strip()
+                if h_name and _is_trusted_proxy_ip(handler.client_address[0] if getattr(handler, 'client_address', None) else ''):
+                    dev_name = h_name[:48]
+
+        if not dev_name and real_ip and real_ip != "-":
+            norm_r = normalize_lan_ip(real_ip) if is_local_ip(real_ip) else real_ip
+            dev_name = by_ip.get(real_ip) or by_ip.get(norm_r) or ""
+            if not dev_name and is_local_ip(real_ip):
+                if real_ip in ("127.0.0.1", "::1", SERVER_LOCAL_IP):
+                    dev_name = socket.gethostname()
+    except Exception:
+        pass
+
+    if dev_name:
+        safe_name = re.sub(r"[\r\n\t]+", " ", dev_name).strip()[:48]
+        return f"{real_ip} ({safe_name})"
+    return real_ip
 
 def is_local_ip(ip_str):
     """
@@ -10130,9 +10515,8 @@ def extract_header_telemetry(handler):
 
 def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     """
-    Fusiona los metadatos de hardware, SO, red y clientes conectados en el registro
-    del dispositivo físico, preservando la telemetría de silicio de Apps Nativas
-    cuando el mismo equipo también abre sesiones en navegadores web.
+    Fusiona de forma incremental y no destructiva los metadatos de hardware, SO, arquitectura,
+    red, historial de IPs y clientes conectados en el certificado único del dispositivo físico.
     """
     now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     tel = telemetry if isinstance(telemetry, dict) else {}
@@ -10151,20 +10535,9 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     incoming_is_native = incoming_client_type in ("ubuntu_native", "android_native") or bool(tel.get("full_access"))
     prev_is_native = bool(entry.get("full_access") or prev_tel.get("full_access") or entry.get("client_type") in ("ubuntu_native", "android_native"))
 
-    # Proteger campos profundos de hardware obtenidos por App Nativa frente a sobreescritura por Web Sandbox
-    protected_hw_keys = {
-        "hardware_id", "manufacturer", "model", "board", "chassis_type",
-        "os_distro", "kernel", "cpu_model", "cpu_cores_physical",
-        "ram_total_gb", "storage_total_gb", "storage_free_gb", "mac_address", "interface_name",
-        "root_access", "root_method", "client_version"
-    }
-    merged_tel = dict(prev_tel)
-    for k, v in tel.items():
-        if v is None or v == "":
-            continue
-        if prev_is_native and not incoming_is_native and k in protected_hw_keys and (k in merged_tel and merged_tel.get(k) not in (None, "")):
-            continue
-        merged_tel[k] = v
+    merged_tel = _merge_telemetry_incremental(
+        prev_tel, tel, prev_is_native=prev_is_native, incoming_is_native=incoming_is_native
+    )
 
     norm_ip = normalize_lan_ip(merged_tel.get("local_ip") or (client_ip if is_local else entry.get("local_ip", "")))
     if norm_ip and not norm_ip.startswith("Externo"):
@@ -10174,14 +10547,26 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
             if arp_mac:
                 merged_tel["mac_address"] = arp_mac
 
-    # Registrar/actualizar el cliente actual dentro de la lista agrupada de clientes del dispositivo
-    client_desc = extract_client_descriptor(ua, tel, norm_ip if is_local else client_ip, is_local=is_local, now_iso=now_iso)
+    # Registrar/actualizar el cliente actual preservando su first_seen y consolidando todos los clientes
     clients_map = {}
-    for c_item in (entry.get("clients") if isinstance(entry.get("clients"), list) else []):
+    existing_clients_raw = entry.get("clients")
+    existing_clients_iter = (
+        existing_clients_raw
+        if isinstance(existing_clients_raw, list)
+        else list(existing_clients_raw.values())
+        if isinstance(existing_clients_raw, dict)
+        else []
+    )
+    for c_item in existing_clients_iter:
         if isinstance(c_item, dict) and c_item.get("client_key"):
             c_copy = dict(c_item)
             c_copy["is_active_client"] = False
             clients_map[c_copy["client_key"]] = c_copy
+    prelim_desc = extract_client_descriptor(ua, tel, norm_ip if is_local else client_ip, is_local=is_local, now_iso=now_iso)
+    prev_same_client = clients_map.get(prelim_desc["client_key"])
+    client_desc = extract_client_descriptor(
+        ua, tel, norm_ip if is_local else client_ip, is_local=is_local, now_iso=now_iso, prev_client=prev_same_client
+    )
     client_desc["is_active_client"] = True
     clients_map[client_desc["client_key"]] = client_desc
 
@@ -10192,6 +10577,28 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     entry["clients"] = all_clients
     entry["active_client_key"] = client_desc["client_key"]
     entry["active_client_label"] = client_desc["client_label"]
+
+    # Acumular identificadores de instalación / hardware asociados al dispositivo físico
+    install_ids = {str(x).strip() for x in (entry.get("installation_ids") or []) if x and str(x).strip()}
+    for cand_id in (
+        tel.get("install_id"),
+        tel.get("installation_id"),
+        merged_tel.get("install_id"),
+        merged_tel.get("hardware_id"),
+        entry.get("hardware_id"),
+    ):
+        if cand_id and str(cand_id).strip():
+            install_ids.add(str(cand_id).strip()[:64])
+    entry["installation_ids"] = sorted(install_ids)[:24]
+
+    # Acumular historial de IPs observadas (LAN y WAN)
+    active_ip = norm_ip if is_local else _normalize_ip_str(client_ip)
+    entry["observed_ips"] = _merge_observed_ips(
+        entry.get("observed_ips"),
+        active_ip,
+        "LAN" if is_local else "WAN",
+        now_iso,
+    )
 
     has_any_native_client = incoming_is_native or prev_is_native or any(bool(c.get("full_access")) for c in all_clients)
     if has_any_native_client:
@@ -10207,7 +10614,7 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     if primary_client_type == "ubuntu_native":
         primary_client_label = "App Nativa Ubuntu (.deb)"
     elif primary_client_type == "android_native":
-        primary_client_label = "App Nativa Android (.apk)"
+        primary_client_label = str(merged_tel.get("client_label") or "App Nativa Android (.apk)")
     else:
         primary_client_label = client_desc["client_label"]
 
@@ -10217,17 +10624,19 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     merged_tel["access_level"] = access_level
     merged_tel["full_access"] = has_any_native_client
 
-    # Nombre descriptivo del dispositivo físico (sin mezclar el navegador si se conoce el modelo de hardware)
+    # Nombre descriptivo del dispositivo físico (priorizando hardware/hostname frente a genéricos de navegador)
     custom_alias = entry.get("custom_alias", "").strip()
     hw_model_name = (
         merged_tel.get("name")
         or (
             f"{merged_tel.get('manufacturer', '')} {merged_tel.get('model', '')}".strip()
-            if (merged_tel.get("manufacturer") or merged_tel.get("model"))
+            if (_is_meaningful_device_value(merged_tel.get("manufacturer")) or _is_meaningful_device_value(merged_tel.get("model")))
             else ""
         )
+        or merged_tel.get("hostname")
+        or ""
     )
-    if hw_model_name and hw_model_name.lower() in ("cliente web", "cliente web linux", "cliente web windows"):
+    if not _is_meaningful_device_value(hw_model_name):
         hw_model_name = ""
     ua_parsed_name = parse_user_agent(ua)
     device_only_ua_name = ua_parsed_name.split("•")[0].strip() if "•" in ua_parsed_name else ua_parsed_name
@@ -10236,10 +10645,11 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     if custom_alias:
         entry["name"] = custom_alias
     elif auto_name and (
-        not entry.get("name")
-        or entry.get("name") in ("Dispositivo", "Dispositivo desconocido", "PC", "Linux PC", "Android")
+        not _is_meaningful_device_value(entry.get("name"))
+        or entry.get("name") in ("Dispositivo", "Dispositivo desconocido", "PC", "Linux PC", "Android", "Equipo")
         or "•" in str(entry.get("name", ""))
         or incoming_is_native
+        or (hw_model_name and len(hw_model_name) > len(str(entry.get("name", ""))))
     ):
         entry["name"] = auto_name
 
@@ -10248,7 +10658,21 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     entry["client_label"] = primary_client_label
     entry["access_level"] = access_level
     entry["full_access"] = has_any_native_client
-    entry["app_version"] = merged_tel.get("app_version") or entry.get("app_version") or get_app_version()
+    entry["app_version"] = merged_tel.get("client_version") or merged_tel.get("app_version") or entry.get("app_version") or get_app_version()
+    entry["os_info"] = str(merged_tel.get("os_distro") or merged_tel.get("os_info") or merged_tel.get("platform") or entry.get("os_info") or "")
+    entry["architecture"] = str(merged_tel.get("arch") or merged_tel.get("architecture") or entry.get("architecture") or "")
+    entry["hostname"] = str(merged_tel.get("hostname") or entry.get("hostname") or "")
+    entry["mac_address"] = str(merged_tel.get("mac_address") or entry.get("mac_address") or "").lower()
+    entry["model"] = str(merged_tel.get("model") or entry.get("model") or "")
+    entry["manufacturer"] = str(merged_tel.get("manufacturer") or entry.get("manufacturer") or "")
+    has_root_consolidated = bool(entry.get("root_access") or merged_tel.get("root_access"))
+    root_method_consolidated = str(merged_tel.get("root_method") or entry.get("root_method") or "").strip()
+    entry["root_access"] = has_root_consolidated
+    entry["root_method"] = root_method_consolidated
+    if has_root_consolidated:
+        merged_tel["root_access"] = True
+    if root_method_consolidated:
+        merged_tel["root_method"] = root_method_consolidated
 
     norm_hw_id = normalize_hardware_id(merged_tel.get("hardware_id") or entry.get("hardware_id") or "")
     if norm_hw_id:
@@ -10263,12 +10687,14 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
     entry["connection_mode"] = "LAN" if is_local else "WAN"
     if is_local:
         entry["local_ip"] = norm_ip or client_ip
+        entry["verified_in_lan"] = True
+        entry["lan_verified_at"] = now_iso
     else:
         entry["last_external_ip"] = client_ip
         if norm_ip and not entry.get("local_ip"):
             entry["local_ip"] = norm_ip
     if ua:
-        entry["user_agent"] = ua[:220]
+        entry["user_agent"] = ua[:240]
     entry["device_telemetry"] = merged_tel
     return entry
 
@@ -10276,7 +10702,7 @@ def enrich_device_entry(entry, ua, telemetry, client_ip, is_local):
 def find_device_by_id_or_physical(devices, verified_device_id, tel, client_ip, ua, is_local, allow_wan_hw_match=False):
     """
     Localiza el registro único del dispositivo físico ya sea por su ID de certificado,
-    por un alias_id fusionado previamente, o por su identidad física de hardware/red (MAC, IP LAN + SO, hardware_id).
+    por un alias_id fusionado previamente, o por su identidad física de hardware/red (MAC, IP LAN, hardware_id, install_id).
     En peticiones WAN sin token HMAC válido está estrictamente prohibido asociar por cabeceras de telemetría.
     """
     if verified_device_id:
@@ -10291,8 +10717,8 @@ def find_device_by_id_or_physical(devices, verified_device_id, tel, client_ip, u
 
     cand_phys = compute_physical_device_key(tel, client_ip, ua, is_local=is_local)
     cand_lan = normalize_lan_ip((tel or {}).get("local_ip") or (client_ip if is_local else ""))
-    cand_os = extract_os_family(ua, tel)
     cand_hw = normalize_hardware_id((tel or {}).get("hardware_id") or "")
+    cand_install = str((tel or {}).get("install_id") or (tel or {}).get("installation_id") or "").strip()
     cand_mac = str((tel or {}).get("mac_address") or resolve_arp_mac_for_ip(cand_lan) or "").strip().lower()
 
     for ex_id, ex_dev in devices.items():
@@ -10302,16 +10728,17 @@ def find_device_by_id_or_physical(devices, verified_device_id, tel, client_ip, u
         ex_phys = ex_dev.get("physical_key") or compute_physical_device_key(ex_dev, ex_dev.get("local_ip", ""), ex_dev.get("user_agent", ""), is_local=True)
         if cand_phys and ex_phys and cand_phys == ex_phys:
             return ex_id, ex_dev, True
-        ex_mac = str(ex_tel.get("mac_address") or "").strip().lower()
+        ex_mac = str(ex_tel.get("mac_address") or ex_dev.get("mac_address") or "").strip().lower()
         if cand_mac and ex_mac and cand_mac == ex_mac and cand_mac != "00:00:00:00:00:00":
             return ex_id, ex_dev, True
         ex_hw = normalize_hardware_id(ex_dev.get("hardware_id") or ex_tel.get("hardware_id") or "")
         if cand_hw and ex_hw and cand_hw == ex_hw:
             return ex_id, ex_dev, True
-        if is_local and cand_lan and not cand_lan.startswith("Externo"):
+        if cand_install and cand_install in (ex_dev.get("installation_ids") or []):
+            return ex_id, ex_dev, True
+        if is_local and cand_lan and not cand_lan.startswith("Externo") and is_local_ip(cand_lan):
             ex_lan = normalize_lan_ip(ex_dev.get("local_ip") or ex_tel.get("local_ip") or "")
-            ex_os = extract_os_family(ex_dev.get("user_agent", ""), ex_tel)
-            if cand_lan == ex_lan and cand_os == ex_os and cand_os != "other":
+            if cand_lan == ex_lan:
                 return ex_id, ex_dev, True
 
     return None, None, False
@@ -10333,17 +10760,16 @@ def _find_trusted_match_for_token(devices, candidate_token):
 
 def check_trust_status(handler):
     """
-    Verifica el origen de la petición y valida el certificado HMAC por dispositivo físico.
-    - Los certificados se emiten por DISPOSITIVO FÍSICO (no por cada navegador/cliente aislado).
-    - Múltiples clientes del mismo dispositivo comparten el certificado del equipo y se agrupan bajo él.
-    - Prioriza tokens válidos de cabecera (Bearer / X-Device-Token) sobre cookies caducadas o revocadas,
-      y reemite automáticamente la cookie _sysmon_trust si falta en la petición.
+    Verifica el origen de la petición y valida el certificado HMAC único por dispositivo físico.
+    - Bloqueo estricto Zero-Trust: fuera de la red local (WAN), solo acceden dispositivos
+      previamente certificados en LAN con token criptográfico vigente y no revocado.
+    - En red local (LAN), certifica automáticamente unificando múltiples navegadores y apps
+      nativas del mismo equipo físico bajo un único certificado.
     """
     client_ip = get_client_ip(handler)
     is_local = is_local_ip(client_ip)
     norm_client_ip = normalize_lan_ip(client_ip) if is_local else client_ip
 
-    # Extraer candidatos HMAC por separado (cabeceras tienen prioridad frente a cookies antiguas)
     hdr_bearer = ""
     auth_hdr = handler.headers.get('Authorization', '')
     if auth_hdr and auth_hdr.lower().startswith('bearer '):
@@ -10375,7 +10801,7 @@ def check_trust_status(handler):
 
         for cand_tok in [t for t in (hdr_bearer, hdr_xtoken, cookie_token) if t]:
             m_id, m_dev, needs_uni = _find_trusted_match_for_token(devices, cand_tok)
-            if m_id and m_dev and m_dev.get("trusted", True):
+            if m_id and m_dev and m_dev.get("trusted", False) and m_dev.get("verified_in_lan", False):
                 token = cand_tok
                 matched_id = m_id
                 device_entry = m_dev
@@ -10391,7 +10817,7 @@ def check_trust_status(handler):
         cookie_matched_id = None
         if cookie_token:
             c_mid, c_dev, _ = _find_trusted_match_for_token(devices, cookie_token)
-            if c_mid and c_dev and c_dev.get("trusted", True):
+            if c_mid and c_dev and c_dev.get("trusted", False) and c_dev.get("verified_in_lan", False):
                 cookie_matched_id = c_mid
         has_valid_cookie = bool(matched_id and cookie_matched_id == matched_id)
         needs_proactive_rotation = bool(token_ts and (time.time() - token_ts) > TOKEN_ROTATION_AGE_SEC)
@@ -10402,23 +10828,22 @@ def check_trust_status(handler):
             new_token = create_device_token(matched_id)
             token = new_token
         elif matched_id and token and not has_valid_cookie:
-            # Regenerar Set-Cookie si el cliente autenticó por header sin cookie activa
             new_token = token
 
         if is_local:
-            # Omitir persistencia de tokens para herramientas CLI locales sin telemetría nativa
             if ua.startswith(('curl/', 'Wget/', 'python-requests', 'Go-http-client', 'Python-urllib')) and not hdr_telemetry:
                 return {
                     "is_local": True,
                     "is_trusted": True,
+                    "verified_in_lan": True,
                     "client_ip": norm_client_ip,
-                    "device_info": {"id": "cli_local", "name": "Herramienta Local (CLI)", "trusted": True},
+                    "device_info": {"id": "cli_local", "name": "Herramienta Local (CLI)", "trusted": True, "verified_in_lan": True},
                     "device_id": "cli_local",
+                    "certificate_serial": "",
                     "new_token": None,
                     "token": None
                 }
 
-            # Si el dispositivo físico ya existe y es de confianza, reutilizar su certificado único y agrupar el cliente
             if device_entry and device_entry.get("trusted", True):
                 device_entry["last_seen"] = now_iso
                 device_entry["verified_in_lan"] = True
@@ -10428,14 +10853,15 @@ def check_trust_status(handler):
                 return {
                     "is_local": True,
                     "is_trusted": True,
+                    "verified_in_lan": True,
                     "client_ip": norm_client_ip,
                     "device_info": device_entry,
                     "device_id": verified_device_id,
+                    "certificate_serial": device_entry.get("certificate_serial", ""),
                     "new_token": new_token,
                     "token": token
                 }
             else:
-                # Dispositivo físico nuevo en LAN: emitir certificado único de dispositivo
                 dev_id = f"dev_{secrets.token_hex(6)}"
                 new_token = create_device_token(dev_id)
                 ua_parsed = parse_user_agent(ua)
@@ -10446,9 +10872,10 @@ def check_trust_status(handler):
                     "name": device_name,
                     "first_seen": now_iso,
                     "last_seen": now_iso,
+                    "lan_verified_at": now_iso,
                     "local_ip": norm_client_ip,
                     "last_external_ip": "",
-                    "user_agent": ua[:220],
+                    "user_agent": ua[:240],
                     "verified_in_lan": True,
                     "trusted": True
                 }
@@ -10458,15 +10885,17 @@ def check_trust_status(handler):
                 return {
                     "is_local": True,
                     "is_trusted": True,
+                    "verified_in_lan": True,
                     "client_ip": norm_client_ip,
                     "device_info": device_entry,
                     "device_id": dev_id,
+                    "certificate_serial": device_entry.get("certificate_serial", ""),
                     "new_token": new_token,
                     "token": new_token
                 }
         else:
-            # Petición desde el EXTERIOR (Datos móviles / WAN)
-            if device_entry and device_entry.get("trusted", False) and device_entry.get("verified_in_lan", True):
+            # Petición desde el EXTERIOR (WAN): acceso permitido SOLO con certificado emitido en red local
+            if device_entry and device_entry.get("trusted", False) and device_entry.get("verified_in_lan", False):
                 device_entry["last_seen"] = now_iso
                 device_entry["last_external_ip"] = client_ip
                 enrich_device_entry(device_entry, ua, hdr_telemetry, client_ip, is_local=False)
@@ -10474,9 +10903,11 @@ def check_trust_status(handler):
                 return {
                     "is_local": False,
                     "is_trusted": True,
+                    "verified_in_lan": True,
                     "client_ip": client_ip,
                     "device_info": device_entry,
                     "device_id": verified_device_id,
+                    "certificate_serial": device_entry.get("certificate_serial", ""),
                     "new_token": new_token,
                     "token": token
                 }
@@ -10484,421 +10915,305 @@ def check_trust_status(handler):
                 return {
                     "is_local": False,
                     "is_trusted": False,
+                    "verified_in_lan": False,
                     "client_ip": client_ip,
                     "device_info": None,
                     "device_id": None,
+                    "certificate_serial": "",
                     "new_token": None,
                     "token": None
                 }
 
 def get_locked_page_html(client_ip):
-    """Página clara minimalista (con modo oscuro sincronizado) para autorizar navegadores externos."""
-    dom = detect_system_dns_domain()
-    disp_ver = get_display_version()
-    return f"""<!DOCTYPE html>
+    """Pantalla de bloqueo estricto Zero-Trust (Alethia): sin fugas de versión, dominio ni métricas y certificación exclusiva en red local."""
+    _ = html.escape(str(client_ip or ""))
+    return """<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <title>Acceso protegido · Recursos CMineWar</title>
+  <title>Acceso protegido · Recursos Cockpit</title>
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
   <link rel="shortcut icon" href="/favicon.ico">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   <style>
-    :root {{
-      --bg: #F6F7F9;
+    :root {
+      --bg: #F5F4F2;
       --card-bg: #FFFFFF;
-      --surface-2: #F1F5F9;
-      --border: #E2E8F0;
-      --border-focus: #0284C7;
-      --primary: #0284C7;
-      --primary-hover: #0369A1;
-      --text: #0F172A;
-      --text-dim: #475569;
-      --text-muted: #64748B;
-      --success: #16A34A;
+      --surface-2: #EEEDE9;
+      --border: #E0DFDA;
+      --accent: #1E6B38;
+      --accent-hover: #15532B;
+      --accent-ink: #FFFFFF;
+      --badge-bg: rgba(217, 119, 6, 0.12);
+      --badge-fg: #B45309;
+      --text: #0F1F10;
+      --text-dim: #465448;
+      --success: #1E6B38;
       --error: #DC2626;
-      --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-    }}
-    html[data-theme="dark"] {{
-      --bg: #0B1120;
-      --card-bg: #111827;
-      --surface-2: #1E293B;
-      --border: #1F2937;
-      --border-focus: #38BDF8;
-      --primary: #0284C7;
-      --primary-hover: #0EA5E9;
-      --text: #F8FAFC;
-      --text-dim: #94A3B8;
-      --text-muted: #64748B;
-    }}
-    * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }}
-    body {{
+      --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    html[data-theme="dark"] {
+      --bg: #0A140B;
+      --card-bg: #111F13;
+      --surface-2: #18291A;
+      --border: rgba(198, 241, 157, 0.16);
+      --accent: #C6F19D;
+      --accent-hover: #D8F7BA;
+      --accent-ink: #0A140B;
+      --badge-bg: rgba(245, 158, 11, 0.16);
+      --badge-fg: #FCD34D;
+      --text: #F5F4F2;
+      --text-dim: #A6B8A8;
+      --success: #C6F19D;
+      --error: #F87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
+    body {
       background-color: var(--bg);
       color: var(--text);
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
       -webkit-font-smoothing: antialiased;
-    }}
-    .auth-card {{
+    }
+    .auth-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 18px;
+      border-radius: 20px;
       padding: 32px 28px;
       width: 100%;
-      max-width: 430px;
+      max-width: 440px;
       text-align: center;
-      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
-    }}
-    .brand-logo {{
-      width: 120px;
-      height: 120px;
+      box-shadow: 0 18px 42px rgba(10, 20, 11, 0.12);
+    }
+    .brand-logo {
+      width: 84px;
+      height: 84px;
       object-fit: contain;
       margin: 0 auto 14px;
       display: block;
-    }}
-    h1 {{
-      font-size: 21px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--badge-bg);
+      color: var(--badge-fg);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 20px;
       font-weight: 700;
       letter-spacing: -0.02em;
       color: var(--text);
-      margin-bottom: 6px;
-    }}
-    .subtitle {{
-      font-size: 13.5px;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 13px;
       color: var(--text-dim);
       line-height: 1.55;
       margin-bottom: 18px;
-    }}
-    .steps-box {{
+    }
+    .steps-box {
       background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 13px 15px;
-      font-size: 13px;
+      padding: 14px 16px;
+      font-size: 12.5px;
       color: var(--text-dim);
       line-height: 1.55;
       text-align: left;
       margin-bottom: 18px;
-    }}
-    .steps-box strong {{
+    }
+    .steps-box strong {
       color: var(--text);
-    }}
-    .input-box {{
-      position: relative;
-      margin-bottom: 14px;
-    }}
-    input[type="password"], input[type="text"] {{
+    }
+    .retry-btn {
       width: 100%;
-      min-height: 46px;
-      padding: 11px 44px 11px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      color: var(--text);
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }}
-    input:focus {{
-      border-color: var(--border-focus);
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.16);
-    }}
-    .toggle-pwd-btn {{
-      position: absolute;
-      right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 36px;
-      height: 36px;
-      background: transparent;
+      min-height: 44px;
+      padding: 11px 16px;
+      border-radius: 12px;
       border: none;
-      color: var(--text-muted);
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-size: 13.5px;
+      font-weight: 700;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 8px;
-    }}
-    .toggle-pwd-btn:hover {{
-      color: var(--text);
-    }}
-    button[type="submit"] {{
-      width: 100%;
-      min-height: 46px;
-      padding: 12px 16px;
-      border-radius: 10px;
-      border: none;
-      background: var(--primary);
-      color: #FFFFFF;
-      font-size: 14.5px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }}
-    button[type="submit"]:hover:not(:disabled) {{
-      background: var(--primary-hover);
-    }}
-    button[type="submit"]:disabled {{
-      opacity: 0.55;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .retry-btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+    .retry-btn:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
-    }}
-    .status-msg {{
+    }
+    .status-msg {
       margin-top: 12px;
-      font-size: 13px;
+      font-size: 12.5px;
       line-height: 1.45;
-      min-height: 20px;
-    }}
-    details.tech-details {{
-      margin-top: 18px;
-      text-align: left;
-      border-top: 1px solid var(--border);
-      padding-top: 12px;
-      font-size: 12px;
-      color: var(--text-muted);
-    }}
-    details.tech-details summary {{
-      cursor: pointer;
-      font-weight: 600;
+      min-height: 18px;
       color: var(--text-dim);
-      list-style: none;
-      text-align: center;
-    }}
-    .tech-grid {{
-      margin-top: 10px;
-      font-family: var(--font-mono);
-      font-size: 11.5px;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      line-height: 1.6;
-    }}
+    }
   </style>
   <script>
-    try {{
+    try {
       var t = localStorage.getItem('recursos_theme');
-      if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-    }} catch(e) {{}}
+      if (t === 'dark' || (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    } catch (e) {}
   </script>
 </head>
 <body>
-  <div class="auth-card">
-    <img src="/recursos-cockpit.png" alt="CMineWar Recursos" class="brand-logo" />
-    <h1>Acceso protegido</h1>
+  <main class="auth-card">
+    <img src="/recursos-cockpit.png" alt="Recursos Cockpit" class="brand-logo" />
+    <span class="badge">CERTIFICACIÓN LAN REQUERIDA</span>
+    <h1>Dispositivo no certificado</h1>
     <p class="subtitle">
-      Este panel está reservado para los dispositivos de tu casa. Como estás entrando desde fuera sin verificar este navegador todavía, necesitamos comprobar que eres tú.
+      Por seguridad, no se muestra ningún dato del sistema a equipos sin un certificado válido emitido previamente en la red local.
     </p>
-
     <div class="steps-box">
-      <strong>Dos formas fáciles de entrar:</strong><br>
-      1. <strong>Automático:</strong> Abre esta dirección conectado al Wi-Fi de casa una sola vez y quedará recordado.<br>
-      2. <strong>Desde aquí:</strong> Escribe la clave de acceso del equipo para entrar ahora mismo.
+      <strong>Certificación automática en red local:</strong><br>
+      Conecta este dispositivo a tu misma red local (Wi-Fi o Ethernet) y abre el panel una sola vez. Se emitirá automáticamente un único certificado para todos los navegadores y apps de este equipo.
     </div>
-
-    <form id="authForm" onsubmit="handleAuth(event)">
-      <div class="input-box">
-        <input type="password" id="masterKey" placeholder="Clave de acceso" autofocus required />
-        <button type="button" class="toggle-pwd-btn" onclick="togglePasswordVisibility()" title="Mostrar u ocultar clave">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-      </div>
-      <button type="submit" id="btnSubmit">
-        <span>Entrar al panel</span>
-      </button>
-    </form>
+    <button type="button" id="btnRetryLan" class="retry-btn" onclick="retryLanVerification()">
+      Reintentar verificación en red local
+    </button>
     <div class="status-msg" id="statusMsg"></div>
-
-    <details class="tech-details">
-      <summary>Ver detalles técnicos</summary>
-      <div class="tech-grid">
-        <div>Dominio detectado: {dom}</div>
-        <div>Dirección de origen: {client_ip}</div>
-        <div>Edición del panel: v{disp_ver}</div>
-      </div>
-    </details>
-  </div>
+  </main>
 
   <script>
-    let countdownInterval = null;
-
-    function getSavedCandidateToken() {{
-      try {{
-        if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.getDeviceToken === 'function') {{
-          const tBridge = (window.RecursosAndroidBridge.getDeviceToken() || '').trim();
+    function getSavedCandidateToken() {
+      try {
+        if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.getDeviceToken === 'function') {
+          var tBridge = (window.RecursosAndroidBridge.getDeviceToken() || '').trim();
           if (tBridge) return tBridge;
-        }}
-      }} catch (e) {{}}
-      try {{
+        }
+      } catch (e) {}
+      try {
         if (window.__RECURSOS_DEVICE_TOKEN__) return String(window.__RECURSOS_DEVICE_TOKEN__).trim();
-      }} catch (e) {{}}
-      try {{
-        const tRec = (localStorage.getItem('recursos_device_token') || '').trim();
+      } catch (e) {}
+      try {
+        var tRec = (localStorage.getItem('recursos_device_token') || '').trim();
         if (tRec) return tRec;
-        const tLegacy = (localStorage.getItem('sysmon_device_token') || '').trim();
+        var tLegacy = (localStorage.getItem('sysmon_device_token') || '').trim();
         if (tLegacy) return tLegacy;
-        const cfgRaw = localStorage.getItem('recursos_auth_persistence_config');
-        if (cfgRaw) {{
-          const cfg = JSON.parse(cfgRaw);
+        var cfgRaw = localStorage.getItem('recursos_auth_persistence_config');
+        if (cfgRaw) {
+          var cfg = JSON.parse(cfgRaw);
           if (cfg && cfg.token) return String(cfg.token).trim();
-        }}
-      }} catch (e) {{}}
+        }
+      } catch (e) {}
       return '';
-    }}
+    }
 
-    function persistTokenLocally(tok) {{
+    function persistTokenLocally(tok) {
       if (!tok) return;
-      try {{
+      try {
         localStorage.setItem('recursos_device_token', tok);
         localStorage.setItem('sysmon_device_token', tok);
-        let cfg = {{}};
-        try {{ cfg = JSON.parse(localStorage.getItem('recursos_auth_persistence_config') || '{{}}') || {{}}; }} catch (e) {{ cfg = {{}}; }}
-        cfg.token = tok;
-        cfg.origin = window.location.origin;
-        cfg.updatedAt = new Date().toISOString();
-        localStorage.setItem('recursos_auth_persistence_config', JSON.stringify(cfg));
-      }} catch (e) {{}}
-      try {{
-        window.__RECURSOS_DEVICE_TOKEN__ = tok;
-        if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.onTokenUpdated === 'function') {{
-          window.RecursosAndroidBridge.onTokenUpdated(tok);
-        }}
-      }} catch (e) {{}}
-    }}
+      } catch (e) {}
+    }
 
-    function clearStoredTokens() {{
-      try {{
+    function clearStoredTokens() {
+      try {
         localStorage.removeItem('recursos_device_token');
         localStorage.removeItem('sysmon_device_token');
-        let cfg = {{}};
-        try {{ cfg = JSON.parse(localStorage.getItem('recursos_auth_persistence_config') || '{{}}') || {{}}; }} catch (e) {{ cfg = {{}}; }}
-        cfg.token = '';
-        cfg.updatedAt = new Date().toISOString();
-        localStorage.setItem('recursos_auth_persistence_config', JSON.stringify(cfg));
-      }} catch (e) {{}}
-    }}
+      } catch (e) {}
+    }
 
-    async function tryAutoRestoreSession() {{
-      const savedToken = getSavedCandidateToken();
-      if (!savedToken) return;
-      const msg = document.getElementById('statusMsg');
-      try {{
-        const res = await fetch('/api/auth/restore-session', {{
+    async function tryAutoRestoreSession() {
+      var savedToken = getSavedCandidateToken();
+      if (!savedToken) return false;
+      var msg = document.getElementById('statusMsg');
+      try {
+        var res = await fetch('/api/auth/restore-session', {
           method: 'POST',
           credentials: 'same-origin',
-          headers: {{
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + savedToken,
             'X-Device-Token': savedToken
-          }},
-          body: JSON.stringify({{ token: savedToken }})
-        }});
-        if (res.ok) {{
-          const data = await res.json();
-          if (data && data.success) {{
+          },
+          body: JSON.stringify({ token: savedToken })
+        });
+        if (res.ok) {
+          var data = await res.json();
+          if (data && data.success) {
             if (data.token) persistTokenLocally(data.token);
-            if (msg) {{
+            if (msg) {
               msg.style.color = 'var(--success)';
-              msg.textContent = 'Credencial verificada. Restaurando sesión segura...';
-            }}
+              msg.textContent = 'Certificado verificado. Accediendo...';
+            }
+            window.location.reload();
+            return true;
+          }
+        } else if (res.status === 403) {
+          clearStoredTokens();
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    async function retryLanVerification() {
+      var btn = document.getElementById('btnRetryLan');
+      var msg = document.getElementById('statusMsg');
+      if (btn) btn.disabled = true;
+      if (msg) {
+        msg.style.color = 'var(--text-dim)';
+        msg.textContent = 'Comprobando certificación en red local...';
+      }
+      try {
+        var restored = await tryAutoRestoreSession();
+        if (restored) return;
+        var res = await fetch('/api/auth/status', { credentials: 'same-origin', cache: 'no-store' });
+        if (res.ok) {
+          var data = await res.json();
+          if (data && data.is_trusted) {
+            if (data.token) persistTokenLocally(data.token);
+            if (msg) {
+              msg.style.color = 'var(--success)';
+              msg.textContent = 'Certificado emitido en red local. Accediendo...';
+            }
             window.location.reload();
             return;
-          }}
-        }} else if (res.status === 403) {{
-          clearStoredTokens();
-        }}
-      }} catch (e) {{}}
-    }}
+          }
+        }
+        if (msg) {
+          msg.style.color = 'var(--error)';
+          msg.textContent = 'Este equipo aún no está certificado en la red local.';
+        }
+      } catch (e) {
+        if (msg) {
+          msg.style.color = 'var(--error)';
+          msg.textContent = 'No se pudo comprobar la red local ahora mismo.';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
 
-    if (document.readyState === 'loading') {{
+    if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', tryAutoRestoreSession);
-    }} else {{
+    } else {
       tryAutoRestoreSession();
-    }}
-
-    function togglePasswordVisibility() {{
-      const input = document.getElementById('masterKey');
-      input.type = input.type === 'password' ? 'text' : 'password';
-    }}
-
-    function startLockoutCountdown(seconds) {{
-      const btn = document.getElementById('btnSubmit');
-      const msg = document.getElementById('statusMsg');
-      btn.disabled = true;
-      let remaining = seconds;
-      if (countdownInterval) clearInterval(countdownInterval);
-      countdownInterval = setInterval(() => {{
-        remaining--;
-        if (remaining <= 0) {{
-          clearInterval(countdownInterval);
-          btn.disabled = false;
-          btn.innerHTML = '<span>Volver a intentar</span>';
-          msg.style.color = 'var(--text-dim)';
-          msg.textContent = 'Ya puedes volver a introducir tu clave.';
-        }} else {{
-          msg.style.color = 'var(--error)';
-          msg.textContent = `Demasiados intentos incorrectos. Espera ${{remaining}} segundos.`;
-        }}
-      }}, 1000);
-    }}
-
-    async function handleAuth(e) {{
-      e.preventDefault();
-      const key = document.getElementById('masterKey').value.trim();
-      const btn = document.getElementById('btnSubmit');
-      const msg = document.getElementById('statusMsg');
-      if (!key) return;
-
-      btn.disabled = true;
-      btn.innerHTML = '<span>Comprobando clave...</span>';
-      msg.textContent = '';
-
-      try {{
-        const res = await fetch('/api/auth/unlock', {{
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ key: key }})
-        }});
-        const data = await res.json();
-        if (res.ok && data.success) {{
-          if (data.token) {{
-            persistTokenLocally(data.token);
-          }}
-          msg.style.color = 'var(--success)';
-          msg.textContent = '¡Listo! Dispositivo autorizado. Entrando...';
-          setTimeout(() => {{ window.location.reload(); }}, 500);
-        }} else if (res.status === 429) {{
-          const retrySec = parseInt(res.headers.get('Retry-After') || '900', 10);
-          startLockoutCountdown(retrySec);
-        }} else {{
-          msg.style.color = 'var(--error)';
-          msg.textContent = data.error || 'Esa clave no coincide. Revísala e inténtalo de nuevo.';
-          btn.disabled = false;
-          btn.innerHTML = '<span>Entrar al panel</span>';
-        }}
-      }} catch (err) {{
-        msg.style.color = 'var(--error)';
-        msg.textContent = 'No se ha podido hablar con el servidor ahora mismo.';
-        btn.disabled = false;
-        btn.innerHTML = '<span>Entrar al panel</span>';
-      }}
-    }}
+    }
   </script>
 </body>
 </html>"""
+
 
 
 # ==============================================================================
@@ -16092,6 +16407,9 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             auth_status_obj = {
                 "is_local": auth["is_local"],
                 "is_trusted": auth["is_trusted"],
+                "verified_in_lan": bool(auth.get("verified_in_lan", True)),
+                "certificate_serial": auth.get("certificate_serial") or (auth.get("device_info") or {}).get("certificate_serial", ""),
+                "device_id": auth.get("device_id") or "",
                 "client_ip": auth["client_ip"],
                 "public_domain": req_domain,
                 "local_ip": SERVER_LOCAL_IP,
@@ -16442,8 +16760,45 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(out_bytes)
             return
 
-        # 1b-themes. CATÁLOGO DE TEMAS INDEPENDIENTES CON SINCRONIZACIÓN OTA DESDE GITHUB
+        # 1b-auth-status. ESTADO ZERO-TRUST LIGERO (Cero datos del sistema si no está certificado en LAN)
+        elif clean_path == "/api/auth/status":
+            if auth["is_trusted"]:
+                status_payload = {
+                    "is_trusted": True,
+                    "is_local": bool(auth.get("is_local")),
+                    "verified_in_lan": bool(auth.get("verified_in_lan", True)),
+                    "device_id": auth.get("device_id") or "",
+                    "certificate_serial": auth.get("certificate_serial") or "",
+                    "token": auth.get("token") or auth.get("new_token") or "",
+                }
+                code = 200
+            else:
+                status_payload = {
+                    "is_trusted": False,
+                    "is_local": False,
+                    "verified_in_lan": False,
+                    "status": "locked",
+                }
+                code = 403
+            out_bytes = json.dumps(status_payload).encode("utf-8")
+            self.send_response(code)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            if auth["is_trusted"] and auth.get("new_token"):
+                self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+            self.send_header('Content-Length', str(len(out_bytes)))
+            self.end_headers()
+            self.wfile.write(out_bytes)
+            return
+
+        # 1b-themes. CATÁLOGO DE TEMAS INDEPENDIENTES CON SINCRONIZACIÓN OTA HÍBRIDA (Zero-Trust)
         elif clean_path == "/api/themes":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
             if ("refresh=1" in self.path or "refresh=true" in self.path or "sync=1" in self.path):
                 sync_themes_from_github(BASE_DIR, force=True, timeout=5.0)
             themes_bytes = json.dumps(get_themes_catalog_payload(BASE_DIR), ensure_ascii=False).encode("utf-8")
@@ -16457,6 +16812,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         elif clean_path in ("/api/themes/pack", "/themes/themes-pack.rcpack.gz"):
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
             pack_bytes = get_theme_pack_bytes(BASE_DIR)
             if not pack_bytes:
                 self.send_response(404)
@@ -16474,6 +16834,11 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             return
 
         elif clean_path.startswith("/api/themes/") or clean_path.startswith("/themes/"):
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
             rel_name = clean_path.split("/", 2)[-1] if clean_path.startswith("/themes/") else clean_path[len("/api/themes/"):]
             if rel_name == "themes.json":
                 payload = get_themes_catalog_payload(BASE_DIR)
@@ -16754,16 +17119,25 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                         "clients_count": len(clients_out),
                         "access_level": "FULL_NATIVE_ACCESS" if is_nat else (v.get("access_level") or "WEB_SANDBOX"),
                         "full_access": is_nat,
-                        "app_version": v.get("app_version") or tel.get("app_version") or "",
+                        "app_version": v.get("app_version") or tel.get("client_version") or tel.get("app_version") or "",
                         "hardware_id": v.get("hardware_id") or tel.get("hardware_id") or dev_id,
+                        "installation_ids": v.get("installation_ids") if isinstance(v.get("installation_ids"), list) else [],
+                        "observed_ips": v.get("observed_ips") if isinstance(v.get("observed_ips"), list) else [],
+                        "os_info": v.get("os_info") or tel.get("os_distro") or tel.get("os_info") or tel.get("platform") or "",
+                        "architecture": v.get("architecture") or tel.get("arch") or tel.get("architecture") or "",
+                        "hostname": v.get("hostname") or tel.get("hostname") or "",
+                        "mac_address": v.get("mac_address") or tel.get("mac_address") or "",
+                        "model": v.get("model") or tel.get("model") or "",
+                        "manufacturer": v.get("manufacturer") or tel.get("manufacturer") or "",
                         "first_seen": v.get("first_seen", ""),
                         "last_seen": v.get("last_seen", ""),
+                        "lan_verified_at": v.get("lan_verified_at") or v.get("first_seen", ""),
                         "local_ip": normalize_lan_ip(v.get("local_ip") or tel.get("local_ip") or ""),
                         "last_external_ip": v.get("last_external_ip", ""),
                         "connection_mode": v.get("connection_mode", "LAN" if not v.get("last_external_ip") else "WAN"),
                         "user_agent": ua_str,
-                        "verified_in_lan": v.get("verified_in_lan", True),
-                        "trusted": v.get("trusted", True),
+                        "verified_in_lan": bool(v.get("verified_in_lan", False)),
+                        "trusted": bool(v.get("trusted", True)),
                         "is_current": is_cur_dev,
                         "root_access": bool(tel.get("root_access", False)),
                         "root_method": str(tel.get("root_method") or ""),
@@ -17333,8 +17707,14 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
         client_ip = get_client_ip(self)
         clean_path = self.path.split('?')[0].rstrip('/') or '/'
 
-        # 0. Sincronización OTA de catálogo de temas independientes desde GitHub (no modifica código ni DB)
+        # 0. Sincronización OTA híbrida de temas independientes desde GitHub (protegida por Zero-Trust)
         if clean_path == "/api/themes/sync":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
             sync_res = sync_themes_from_github(BASE_DIR, force=True, timeout=6.0)
             catalog = get_themes_catalog_payload(BASE_DIR)
             catalog["sync_result"] = sync_res
@@ -17348,95 +17728,36 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 1. Desbloqueo remoto con clave maestra (Blindado contra fuerza bruta)
+        # 1. Bloqueo estricto Zero-Trust: la certificación se emite exclusivamente en red local (LAN)
         if clean_path in ("/api/auth/unlock", "/api/unlock"):
-            req_lang = self.headers.get('X-Recursos-Lang') or self.headers.get('Accept-Language')
-            locked, rem_time = is_ip_locked_out(client_ip)
-            if locked:
+            auth = check_trust_status(self)
+            if auth["is_trusted"] and auth.get("is_local"):
                 resp = json.dumps({
-                    "success": False,
-                    "error": i18n_t("errors.too_many_attempts_secs", lang=req_lang, base_dir=BASE_DIR, seconds=rem_time)
+                    "success": True,
+                    "token": auth.get("token") or auth.get("new_token") or "",
+                    "device_id": auth.get("device_id") or "",
+                    "certificate_serial": auth.get("certificate_serial") or "",
                 }).encode('utf-8')
-                self.send_response(429)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Retry-After', str(rem_time))
-                self.send_security_headers()
-                self.send_header('Content-Length', str(len(resp)))
-                self.end_headers()
-                self.wfile.write(resp)
-                return
-
-            body, err_code = self._read_json_body(max_bytes=2048)
-            if err_code:
-                self.send_response(err_code)
-                self.send_security_headers()
-                self.end_headers()
-                return
-            entered_key = str((body or {}).get('key', '')).strip()
-            ua = self.headers.get('User-Agent', '')
-            
-            if verify_master_key(entered_key):
-                record_auth_success(client_ip)
-                now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                hdr_tel = extract_header_telemetry(self)
-                ua_parsed = parse_user_agent(ua)
-                device_name = (ua_parsed.split("•")[0].strip() if "•" in ua_parsed else ua_parsed) + " (Desbloqueo Remoto)"
-
-                with TRUST_LOCK:
-                    devices = load_trusted_devices()
-                    matched_id, existing_entry, _ = find_device_by_id_or_physical(
-                        devices, None, hdr_tel, client_ip, ua, is_local=False, allow_wan_hw_match=True
-                    )
-                    if matched_id and existing_entry:
-                        dev_id = matched_id
-                        new_token = create_device_token(dev_id)
-                        existing_entry["last_seen"] = now_iso
-                        existing_entry["last_external_ip"] = client_ip
-                        existing_entry["verified_in_lan"] = True
-                        existing_entry["trusted"] = True
-                        enrich_device_entry(existing_entry, ua, hdr_tel, client_ip, is_local=False)
-                        devices[dev_id] = existing_entry
-                    else:
-                        dev_id = f"dev_{secrets.token_hex(6)}"
-                        new_token = create_device_token(dev_id)
-                        new_entry = {
-                            "id": dev_id,
-                            "alias_ids": [dev_id],
-                            "name": device_name,
-                            "first_seen": now_iso,
-                            "last_seen": now_iso,
-                            "local_ip": f"Externo ({client_ip})",
-                            "last_external_ip": client_ip,
-                            "user_agent": ua[:220],
-                            "verified_in_lan": True,
-                            "trusted": True
-                        }
-                        enrich_device_entry(new_entry, ua, hdr_tel, client_ip, is_local=False)
-                        devices[dev_id] = new_entry
-                    save_trusted_devices(consolidate_devices_by_hardware(devices))
-
-                resp = json.dumps({"success": True, "token": new_token, "device_id": dev_id, "message": i18n_t("errors.cert_issued", lang=req_lang, base_dir=BASE_DIR)}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_security_headers()
-                self.send_header('Set-Cookie', get_cookie_header_value(self, new_token))
+                if auth.get("new_token"):
+                    self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
                 self.send_header('Content-Length', str(len(resp)))
                 self.end_headers()
                 self.wfile.write(resp)
-            else:
-                time.sleep(1)  # Mitigación activa contra fuerza bruta
-                is_locked, remaining = record_auth_failure(client_ip)
-                if is_locked:
-                    err_msg = i18n_t("errors.too_many_attempts", lang=req_lang, base_dir=BASE_DIR, minutes=LOCKOUT_DURATION // 60)
-                else:
-                    err_msg = i18n_t("errors.bad_master_key", lang=req_lang, base_dir=BASE_DIR, remaining=remaining)
-                resp = json.dumps({"success": False, "error": err_msg}).encode('utf-8')
-                self.send_response(401)
-                self.send_header('Content-Type', 'application/json')
-                self.send_security_headers()
-                self.send_header('Content-Length', str(len(resp)))
-                self.end_headers()
-                self.wfile.write(resp)
+                return
+            err_resp = json.dumps({
+                "success": False,
+                "status": "lan_certification_required",
+                "error": "Certificación previa en red local requerida."
+            }).encode('utf-8')
+            self.send_response(403)
+            self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(err_resp)))
+            self.end_headers()
+            self.wfile.write(err_resp)
             return
 
         # 2. Revocación de certificado de dispositivo físico (o de un cliente agrupado concreto)
@@ -18935,9 +19256,9 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             msg = (format % args) if args else str(format)
             if "/api/system/console-logs" in msg or "/api/metrics" in msg:
                 return
-            client_ip = self.client_address[0] if getattr(self, "client_address", None) else "-"
+            client_origin = resolve_log_client_identity(self)
             lvl = "ERROR" if (" 500 " in msg or " 502 " in msg) else ("WARN" if (" 403 " in msg or " 404 " in msg) else "HTTP")
-            record_service_console_log(f"{client_ip} {msg}", level=lvl, source="http")
+            record_service_console_log(f"{client_origin} {msg}", level=lvl, source="http")
         except Exception:
             pass
         return

@@ -1,10 +1,15 @@
 package com.cminewar.recursoscockpit
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,6 +37,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var discoveryManager: DiscoveryManager
 
     private var onLocalNetworkPermissionGranted: (() -> Unit)? = null
+    private var pendingApkUpdateAfterPermission: GithubAndroidReleaseInfo? = null
+    private var onResumePendingApkUpdate: ((GithubAndroidReleaseInfo) -> Unit)? = null
+    private var onApkInstallStatusFeedback: ((String) -> Unit)? = null
 
     private val localNetworkPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -42,6 +50,84 @@ class MainActivity : ComponentActivity() {
                 Log.w("RecursosCockpit", "Permiso ACCESS_LOCAL_NETWORK denegado en Android 16/17; el tráfico LAN puede quedar bloqueado")
             }
         }
+
+    private val unknownSourcesPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            val pending = pendingApkUpdateAfterPermission
+            pendingApkUpdateAfterPermission = null
+            if (pending != null && canAutoInstallPackages()) {
+                Log.i("RecursosCockpit", "Permiso de instalación concedido; reanudando actualización v${pending.latestVersion}")
+                onResumePendingApkUpdate?.invoke(pending)
+            } else if (pending != null) {
+                onApkInstallStatusFeedback?.invoke(
+                    I18nDictionary.t(
+                        this,
+                        "native_android.apk_perm_needed",
+                        "Activa 'Instalar apps desconocidas' para actualizar desde la app."
+                    )
+                )
+            }
+        }
+
+    private val apkInstallStatusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != ApkSessionInstaller.ACTION_INSTALL_STATUS) return
+            val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+            val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""
+            when (status) {
+                PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                    val confirmIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(Intent.EXTRA_INTENT)
+                    }
+                    if (confirmIntent != null) {
+                        confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        try {
+                            startActivity(confirmIntent)
+                        } catch (e: Exception) {
+                            Log.e("RecursosCockpit", "No se pudo abrir confirmación del instalador: ${e.message}")
+                            onApkInstallStatusFeedback?.invoke(
+                                I18nDictionary.t(
+                                    this@MainActivity,
+                                    "native_android.apk_install_error",
+                                    "No se pudo abrir el instalador del sistema."
+                                )
+                            )
+                        }
+                    }
+                }
+                PackageInstaller.STATUS_SUCCESS -> {
+                    onApkInstallStatusFeedback?.invoke("")
+                }
+                PackageInstaller.STATUS_FAILURE_ABORTED -> {
+                    onApkInstallStatusFeedback?.invoke("")
+                }
+                PackageInstaller.STATUS_FAILURE_CONFLICT,
+                PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> {
+                    Log.w("RecursosCockpit", "Conflicto de firma/versión al instalar APK: $message")
+                    onApkInstallStatusFeedback?.invoke(
+                        I18nDictionary.t(
+                            this@MainActivity,
+                            "native_android.apk_signature_conflict",
+                            "Conflicto de firma con la versión instalada. Reinstala el APK oficial."
+                        )
+                    )
+                }
+                else -> {
+                    Log.w("RecursosCockpit", "Error de PackageInstaller (status=$status): $message")
+                    onApkInstallStatusFeedback?.invoke(
+                        I18nDictionary.t(
+                            this@MainActivity,
+                            "native_android.apk_install_error",
+                            "Error al instalar la actualización."
+                        )
+                    )
+                }
+            }
+        }
+    }
 
     private fun ensureLocalNetworkPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < 36) return
@@ -56,6 +142,23 @@ class MainActivity : ComponentActivity() {
         if (ContextCompat.checkSelfPermission(this, localNetPerm) != PackageManager.PERMISSION_GRANTED) {
             Log.i("RecursosCockpit", "Solicitando permiso en tiempo de ejecución: $localNetPerm")
             localNetworkPermissionLauncher.launch(localNetPerm)
+        }
+    }
+
+    private fun requestUnknownAppSourcesPermission(release: GithubAndroidReleaseInfo): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        return try {
+            pendingApkUpdateAfterPermission = release
+            val intent = Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:${BuildConfig.APPLICATION_ID}")
+            )
+            unknownSourcesPermissionLauncher.launch(intent)
+            true
+        } catch (e: Exception) {
+            pendingApkUpdateAfterPermission = null
+            Log.w("RecursosCockpit", "No se pudo abrir el ajuste de orígenes desconocidos: ${e.message}")
+            false
         }
     }
 
@@ -97,6 +200,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        ContextCompat.registerReceiver(
+            this,
+            apkInstallStatusReceiver,
+            IntentFilter(ApkSessionInstaller.ACTION_INSTALL_STATUS),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         securePreferences = SecurePreferences(this)
         apiService = ApiService(applicationContext, securePreferences)
@@ -285,11 +395,22 @@ class MainActivity : ComponentActivity() {
                     if (apkUpdateProgress != null) return
                     lifecycleScope.launch {
                         val hasRoot = RootManager.hasRootAccess
-                        val canInstall = hasRoot || canAutoInstallPackages()
-                        if (!canInstall) {
-                            openDirectDownloadInBrowser(release.apkUrl)
+                        if (!hasRoot && !canAutoInstallPackages()) {
+                            apkUpdateStatus = I18nDictionary.t(
+                                this@MainActivity,
+                                "native_android.apk_perm_guide",
+                                "Concede el permiso de instalación para actualizar..."
+                            )
+                            val openedSettings = withContext(Dispatchers.Main) {
+                                requestUnknownAppSourcesPermission(release)
+                            }
+                            if (!openedSettings) {
+                                apkUpdateStatus = ""
+                                openDirectDownloadInBrowser(release.apkUrl)
+                            }
                             return@launch
                         }
+
                         apkUpdateProgress = 1
                         apkUpdateStatus = I18nDictionary.t(
                             this@MainActivity,
@@ -312,12 +433,13 @@ class MainActivity : ComponentActivity() {
                             return@launch
                         }
 
+                        apkUpdateStatus = I18nDictionary.t(
+                            this@MainActivity,
+                            "native_android.apk_installing",
+                            "Instalando actualización..."
+                        )
+
                         if (hasRoot) {
-                            apkUpdateStatus = I18nDictionary.t(
-                                this@MainActivity,
-                                "native_android.apk_installing",
-                                "Instalando actualización..."
-                            )
                             val silentOk = RootManager.installApkSilently(downloadedFile, File(cacheDir, "updates"))
                             if (silentOk) {
                                 apkUpdateProgress = null
@@ -326,6 +448,19 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
+                        // Instalador oficial in-app de Android (PackageInstaller.Session) sin root
+                        val sessionRes = ApkSessionInstaller.installApkInPlace(applicationContext, downloadedFile)
+                        if (sessionRes.isSuccess) {
+                            apkUpdateProgress = null
+                            apkUpdateStatus = I18nDictionary.t(
+                                this@MainActivity,
+                                "native_android.apk_confirm_system",
+                                "Confirma la actualización en el diálogo del sistema..."
+                            )
+                            return@launch
+                        }
+
+                        // Respaldo FileProvider y navegador solo si PackageInstaller no está disponible
                         val launched = withContext(Dispatchers.Main) {
                             launchFileProviderApkInstaller(downloadedFile)
                         }
@@ -339,7 +474,18 @@ class MainActivity : ComponentActivity() {
 
                 DisposableEffect(Unit) {
                     onLocalNetworkPermissionGranted = { triggerDiscoveryAndRefresh(requestPermission = false) }
-                    onDispose { onLocalNetworkPermissionGranted = null }
+                    onResumePendingApkUpdate = { rel -> handleApkUpdateClick(rel) }
+                    onApkInstallStatusFeedback = { msg ->
+                        lifecycleScope.launch(Dispatchers.Main) {
+                            apkUpdateProgress = null
+                            apkUpdateStatus = msg
+                        }
+                    }
+                    onDispose {
+                        onLocalNetworkPermissionGranted = null
+                        onResumePendingApkUpdate = null
+                        onApkInstallStatusFeedback = null
+                    }
                 }
 
                 LaunchedEffect(Unit) {
@@ -448,5 +594,15 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        try {
+            unregisterReceiver(apkInstallStatusReceiver)
+        } catch (_: Exception) {
+            // Receiver already unregistered or never registered
+        }
+        super.onDestroy()
+    }
 }
+
 

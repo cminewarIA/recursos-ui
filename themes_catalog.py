@@ -584,11 +584,175 @@ def _fetch_remote_bytes(url, etag=None, timeout=8.0, max_bytes=MAX_COMPRESSED_PA
         return 0, None, ""
 
 
+MAX_SINGLE_THEME_JSON_BYTES = 512 * 1024
+
+
+def _parse_theme_semver(ver_str):
+    parts = re.findall(r"\d+", str(ver_str or ""))
+    nums = [int(p) for p in parts[:3]]
+    while len(nums) < 3:
+        nums.append(0)
+    return tuple(nums)
+
+
+def _get_ota_loose_themes_dir():
+    loose_dir = os.path.join(_get_ota_themes_cache_dir(), "loose")
+    os.makedirs(loose_dir, exist_ok=True)
+    return loose_dir
+
+
+def _sync_loose_themes_from_manifest(pack_themes, valid_asset_ids, meta, force=False, timeout=8.0):
+    """
+    Fase B (híbrida): consulta themes/themes.json en GitHub y descarga los JSON
+    individuales nuevos o con versión superior a la del paquete compilado.
+    """
+    loose_dir = _get_ota_loose_themes_dir()
+    manifest_url = f"{GITHUB_THEMES_BASE_URL}/themes.json"
+    prev_etag = None if force else meta.get("manifest_etag")
+    status, raw_bytes, new_etag = _fetch_remote_bytes(
+        manifest_url,
+        etag=prev_etag,
+        timeout=timeout,
+        max_bytes=MAX_SINGLE_THEME_JSON_BYTES,
+    )
+    if status == 304:
+        return {
+            "ok": True,
+            "not_modified": True,
+            "manifest_etag": prev_etag or "",
+            "synced_ids": [],
+        }
+    if status != 200 or not raw_bytes:
+        return {
+            "ok": False,
+            "status": status,
+            "manifest_etag": meta.get("manifest_etag") or "",
+            "synced_ids": [],
+        }
+    try:
+        manifest = json.loads(raw_bytes.decode("utf-8"))
+    except Exception:
+        return {
+            "ok": False,
+            "status": 422,
+            "manifest_etag": meta.get("manifest_etag") or "",
+            "synced_ids": [],
+        }
+    if not isinstance(manifest, dict):
+        return {
+            "ok": False,
+            "status": 422,
+            "manifest_etag": meta.get("manifest_etag") or "",
+            "synced_ids": [],
+        }
+
+    entries = manifest.get("themes") if isinstance(manifest.get("themes"), list) else []
+    synced_ids = []
+    manifest_entries_out = []
+    keep_files = {"themes.json"}
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        tid = str(entry.get("id") or "").strip().lower()
+        tfile = str(entry.get("file") or f"{tid}.json").strip()
+        tver = str(entry.get("version") or "").strip()
+        if not is_valid_theme_id(tid) or not _SAFE_FILE_RE.match(tfile):
+            continue
+
+        # Confinar estrictamente al directorio loose/
+        resolved_target = os.path.realpath(os.path.join(loose_dir, tfile))
+        resolved_base = os.path.realpath(loose_dir)
+        if not resolved_target.startswith(resolved_base + os.sep):
+            continue
+
+        pack_item = pack_themes.get(tid) if isinstance(pack_themes, dict) else None
+        needs_download = False
+        if pack_item is None:
+            needs_download = True
+        elif tver and _parse_theme_semver(tver) > _parse_theme_semver(pack_item.get("version")):
+            needs_download = True
+
+        if not needs_download:
+            continue
+
+        # Comprobar si ya existe en caché loose con la misma o superior versión (salvo force)
+        if not force and os.path.isfile(resolved_target):
+            cached_raw = _read_json_file(resolved_target)
+            cached_san = sanitize_theme_definition(
+                cached_raw, source="github", fallback_id=tid, valid_asset_ids=valid_asset_ids
+            )
+            if cached_san and (not tver or _parse_theme_semver(cached_san.get("version")) >= _parse_theme_semver(tver)):
+                keep_files.add(tfile)
+                manifest_entries_out.append({"id": tid, "file": tfile, "version": cached_san.get("version", tver or "1.0.0")})
+                continue
+
+        theme_url = f"{GITHUB_THEMES_BASE_URL}/{tfile}"
+        t_status, t_bytes, _ = _fetch_remote_bytes(
+            theme_url,
+            etag=None,
+            timeout=timeout,
+            max_bytes=MAX_SINGLE_THEME_JSON_BYTES,
+        )
+        if t_status != 200 or not t_bytes:
+            continue
+        try:
+            raw_theme = json.loads(t_bytes.decode("utf-8"))
+        except Exception:
+            continue
+        sanitized = sanitize_theme_definition(
+            raw_theme, source="github", fallback_id=tid, valid_asset_ids=valid_asset_ids
+        )
+        if not sanitized:
+            continue
+        # Confirmar versión real tras leer el JSON (por si themes.json no declaraba version)
+        if pack_item is not None and _parse_theme_semver(sanitized.get("version")) <= _parse_theme_semver(pack_item.get("version")):
+            continue
+        try:
+            _write_json_atomic(resolved_target, sanitized)
+            keep_files.add(tfile)
+            synced_ids.append(tid)
+            manifest_entries_out.append({"id": tid, "file": tfile, "version": sanitized.get("version", "1.0.0")})
+        except Exception:
+            continue
+
+    # Limpiar JSONs obsoletos en caché loose que ya están incorporados en el paquete o eliminados del índice
+    try:
+        for fname in os.listdir(loose_dir):
+            if fname in keep_files:
+                continue
+            fpath = os.path.join(loose_dir, fname)
+            if os.path.isfile(fpath) and fname.endswith(".json"):
+                os.remove(fpath)
+    except Exception:
+        pass
+
+    try:
+        _write_json_atomic(
+            os.path.join(loose_dir, "themes.json"),
+            {
+                "default_theme": str(manifest.get("default_theme") or "alethia-matrix").strip().lower(),
+                "themes": manifest_entries_out,
+                "synced_at": int(time.time()),
+            },
+        )
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "not_modified": False,
+        "manifest_etag": new_etag,
+        "synced_ids": synced_ids,
+    }
+
+
 def sync_themes_from_github(base_dir=None, force=False, timeout=8.0):
     """
-    Descarga de forma atómica el paquete único `themes-pack.rcpack.gz` desde GitHub
-    al caché OTA local del usuario, validando origen HTTPS, tamaño, descompresión
-    segura y saneamiento estricto sin tocar código ni versiones de la aplicación.
+    Sincronización OTA híbrida desde GitHub:
+      - Fase A: descarga atómica del paquete compilado `themes-pack.rcpack.gz` (temas + imágenes WebP).
+      - Fase B: consulta `themes/themes.json` y descarga cualquier tema JSON individual nuevo o más reciente.
+    Valida origen HTTPS, tamaño máximo, descompresión segura y saneamiento estricto sin tocar código ni versiones.
     """
     global _THEMES_OTA_LAST_TRY
     now = time.time()
@@ -597,6 +761,7 @@ def sync_themes_from_github(base_dir=None, force=False, timeout=8.0):
 
     with _THEMES_OTA_SYNC_LOCK:
         _THEMES_OTA_LAST_TRY = time.time()
+        root = resolve_themes_base_dir(base_dir)
         cache_dir = _get_ota_themes_cache_dir()
         meta_path = os.path.join(cache_dir, "themes_ota.meta.json")
         meta = _read_json_file(meta_path) or {}
@@ -609,46 +774,86 @@ def sync_themes_from_github(base_dir=None, force=False, timeout=8.0):
             timeout=timeout,
             max_bytes=MAX_COMPRESSED_PACK_BYTES,
         )
-        if status == 304:
-            meta["checked_at"] = int(time.time())
-            try:
-                _write_json_atomic(meta_path, meta)
-            except Exception:
-                pass
-            return {"ok": True, "not_modified": True, "source": "github"}
+
+        pack_updated = False
+        pack_not_modified = (status == 304)
+        sanitized_pack = None
 
         if status == 200 and gz_bytes:
             parsed_raw = safe_decompress_pack_bytes(gz_bytes)
             sanitized_pack = _parse_pack_dict(parsed_raw, source="github") if parsed_raw else None
-            if not sanitized_pack:
-                return {"ok": False, "status": 422, "source": "local"}
-            try:
-                _write_bytes_atomic(os.path.join(cache_dir, PACK_FILENAME), gz_bytes)
-                _write_json_atomic(
-                    meta_path,
-                    {
-                        "pack_etag": new_etag,
-                        "pack_version": sanitized_pack["pack_version"],
-                        "pack_sha256": sanitized_pack["pack_sha256"] or hashlib.sha256(gz_bytes).hexdigest(),
-                        "synced_at": int(time.time()),
-                        "checked_at": int(time.time()),
-                        "themes_count": len(sanitized_pack["themes"]),
-                        "assets_count": len(sanitized_pack["assets"]),
-                        "source_url": pack_url,
-                    },
-                )
-            except Exception:
-                return {"ok": False, "status": 500, "source": "local"}
-            return {
-                "ok": True,
-                "source": "github",
-                "pack_version": sanitized_pack["pack_version"],
-                "synced_count": len(sanitized_pack["themes"]),
-                "theme_ids": sanitized_pack["ordered_ids"],
-                "synced_at": int(time.time()),
-            }
+            if sanitized_pack:
+                try:
+                    _write_bytes_atomic(os.path.join(cache_dir, PACK_FILENAME), gz_bytes)
+                    pack_updated = True
+                except Exception:
+                    return {"ok": False, "status": 500, "source": "local"}
 
-        return {"ok": False, "status": status, "source": "local"}
+        # Cargar el paquete activo para comparar versiones contra themes/themes.json
+        active_pack = (
+            sanitized_pack
+            or _load_pack_from_file(os.path.join(cache_dir, PACK_FILENAME), source="github")
+            or _load_pack_from_file(os.path.join(root, "themes", PACK_FILENAME), source="local")
+        )
+        pack_themes = (active_pack or {}).get("themes", {})
+        valid_asset_ids = set(((active_pack or {}).get("assets") or {}).keys())
+
+        # Fase B: sincronizar temas JSON individuales declarados en themes/themes.json
+        loose_res = _sync_loose_themes_from_manifest(
+            pack_themes=pack_themes,
+            valid_asset_ids=valid_asset_ids,
+            meta=meta,
+            force=force,
+            timeout=timeout,
+        )
+
+        any_github_ok = pack_updated or pack_not_modified or bool(loose_res.get("ok"))
+        if not any_github_ok:
+            return {"ok": False, "status": status or loose_res.get("status", 0), "source": "local"}
+
+        now_ts = int(time.time())
+        updated_meta = dict(meta)
+        updated_meta["checked_at"] = now_ts
+        if pack_updated and sanitized_pack:
+            updated_meta["pack_etag"] = new_etag
+            updated_meta["pack_version"] = sanitized_pack["pack_version"]
+            updated_meta["pack_sha256"] = sanitized_pack["pack_sha256"] or hashlib.sha256(gz_bytes).hexdigest()
+            updated_meta["themes_count"] = len(sanitized_pack["themes"])
+            updated_meta["assets_count"] = len(sanitized_pack["assets"])
+            updated_meta["source_url"] = pack_url
+            updated_meta["synced_at"] = now_ts
+        if loose_res.get("ok"):
+            if loose_res.get("manifest_etag"):
+                updated_meta["manifest_etag"] = loose_res["manifest_etag"]
+            if loose_res.get("synced_ids"):
+                updated_meta["loose_synced_ids"] = loose_res["synced_ids"]
+                updated_meta["synced_at"] = now_ts
+        elif "synced_at" not in updated_meta:
+            updated_meta["synced_at"] = now_ts
+
+        try:
+            _write_json_atomic(meta_path, updated_meta)
+        except Exception:
+            pass
+
+        loose_ids = list(loose_res.get("synced_ids") or [])
+        all_ids = list((active_pack or {}).get("ordered_ids") or [])
+        for tid in loose_ids:
+            if tid not in all_ids:
+                all_ids.append(tid)
+
+        return {
+            "ok": True,
+            "not_modified": bool(pack_not_modified and loose_res.get("not_modified") and not loose_ids),
+            "source": "github",
+            "pack_updated": pack_updated,
+            "pack_version": (active_pack or {}).get("pack_version", "2.0.0"),
+            "loose_synced_count": len(loose_ids),
+            "loose_theme_ids": loose_ids,
+            "synced_count": len(all_ids),
+            "theme_ids": all_ids,
+            "synced_at": updated_meta.get("synced_at") or now_ts,
+        }
 
 
 def start_background_themes_ota_sync(base_dir=None):
@@ -685,11 +890,15 @@ def get_theme_pack_bytes(base_dir=None):
 
 def get_themes_catalog_payload(base_dir=None):
     """
-    Devuelve el catálogo unificado Schema v2 (temas + assets WebP embebidos + metadatos del paquete).
+    Devuelve el catálogo unificado Schema v2 combinando:
+      1. Paquete local `themes/themes-pack.rcpack.gz`
+      2. Paquete OTA descargado desde GitHub
+      3. Temas JSON individuales nuevos o más recientes desde `themes/themes.json` (local y OTA)
     """
     root = resolve_themes_base_dir(base_dir)
     local_dir = os.path.join(root, "themes")
     cache_dir = _get_ota_themes_cache_dir()
+    ota_loose_dir = os.path.join(cache_dir, "loose")
 
     local_pack = _load_pack_from_file(os.path.join(local_dir, PACK_FILENAME), source="local")
     ota_pack = _load_pack_from_file(os.path.join(cache_dir, PACK_FILENAME), source="github")
@@ -699,17 +908,23 @@ def get_themes_catalog_payload(base_dir=None):
     merged_assets = {}
     ordered_ids = []
 
+    def _merge_theme_if_newer(tid, tdef):
+        existing = merged_themes.get(tid)
+        if existing is None or _parse_theme_semver(tdef.get("version")) > _parse_theme_semver(existing.get("version")):
+            merged_themes[tid] = tdef
+            if tid not in ordered_ids:
+                ordered_ids.append(tid)
+
     if local_pack:
         merged_assets.update(local_pack["assets"])
         for tid in local_pack["ordered_ids"]:
             merged_themes[tid] = local_pack["themes"][tid]
             ordered_ids.append(tid)
-    else:
-        _, legacy_local = _load_legacy_directory_catalog(local_dir, source="local")
-        for tid, tdef in legacy_local.items():
-            merged_themes[tid] = tdef
-            if tid not in ordered_ids:
-                ordered_ids.append(tid)
+
+    # Mezclar JSONs locales sueltos de themes/themes.json si son nuevos o más recientes que el paquete
+    _, local_loose = _load_legacy_directory_catalog(local_dir, source="local")
+    for tid, tdef in local_loose.items():
+        _merge_theme_if_newer(tid, tdef)
 
     if ota_pack:
         merged_assets.update(ota_pack["assets"])
@@ -717,6 +932,18 @@ def get_themes_catalog_payload(base_dir=None):
             merged_themes[tid] = ota_pack["themes"][tid]
             if tid not in ordered_ids:
                 ordered_ids.append(tid)
+
+    # Mezclar JSONs OTA sueltos sincronizados desde themes/themes.json en GitHub
+    ota_loose_count = 0
+    if os.path.isdir(ota_loose_dir):
+        _, ota_loose = _load_legacy_directory_catalog(ota_loose_dir, source="github")
+        for tid, tdef in ota_loose.items():
+            prev = merged_themes.get(tid)
+            if prev is None or _parse_theme_semver(tdef.get("version")) > _parse_theme_semver(prev.get("version")):
+                merged_themes[tid] = tdef
+                if tid not in ordered_ids:
+                    ordered_ids.append(tid)
+                ota_loose_count += 1
 
     active_pack = ota_pack or local_pack
     default_theme = (
@@ -739,8 +966,9 @@ def get_themes_catalog_payload(base_dir=None):
         "pack_file": PACK_FILENAME,
         "pack_sha256": (active_pack or {}).get("pack_sha256", ""),
         "default_theme": default_theme,
-        "source": "github" if ota_pack else "local",
+        "source": "github" if (ota_pack or ota_loose_count > 0) else "local",
         "synced_at": meta.get("synced_at") or None,
+        "loose_themes_count": ota_loose_count,
         "github_base_url": GITHUB_THEMES_BASE_URL,
         "assets": merged_assets,
         "themes": ordered,

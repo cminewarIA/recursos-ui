@@ -236,6 +236,143 @@ export function detectNativeEnvironment(): {
   };
 }
 
+const WEB_INSTALL_ID_KEY = 'recursos_web_install_id';
+
+export function getOrCreateWebInstallId(): string {
+  try {
+    const existing = (localStorage.getItem(WEB_INSTALL_ID_KEY) || '').trim();
+    if (existing) return existing;
+    const rand =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+        : Math.random().toString(36).slice(2, 14) + Date.now().toString(36).slice(-4);
+    const created = `web_${rand}`;
+    localStorage.setItem(WEB_INSTALL_ID_KEY, created);
+    return created;
+  } catch {
+    return '';
+  }
+}
+
+interface NavigatorUADataLike {
+  brands?: Array<{ brand?: string; version?: string }>;
+  mobile?: boolean;
+  platform?: string;
+  getHighEntropyValues?: (
+    hints: string[]
+  ) => Promise<{
+    architecture?: string;
+    bitness?: string;
+    model?: string;
+    platform?: string;
+    platformVersion?: string;
+  }>;
+}
+
+function detectBrowserNameFromUa(ua: string): string {
+  const s = ua || '';
+  if (/Edg\//i.test(s)) return 'Microsoft Edge';
+  if (/OPR\/|Opera/i.test(s)) return 'Opera';
+  if (/Vivaldi\//i.test(s)) return 'Vivaldi';
+  if (/Brave/i.test(s)) return 'Brave';
+  if (/SamsungBrowser\//i.test(s)) return 'Samsung Internet';
+  if (/Firefox\//i.test(s)) return 'Mozilla Firefox';
+  if (/Chrome\//i.test(s) && !/Chromium/i.test(s)) return 'Google Chrome';
+  if (/Chromium\//i.test(s)) return 'Chromium';
+  if (/Safari\//i.test(s) && !/Chrome|Chromium/i.test(s)) return 'Safari';
+  return '';
+}
+
+export async function collectBrowserDeviceTelemetry(appVersion: string): Promise<Record<string, unknown>> {
+  const env = detectNativeEnvironment();
+  const baseNative = (window.__RECURSOS_DEVICE_TELEMETRY__ || {}) as Record<string, unknown>;
+  const nav = typeof navigator !== 'undefined' ? navigator : undefined;
+  const ua = nav?.userAgent || '';
+  const uaData = (nav as unknown as { userAgentData?: NavigatorUADataLike } | undefined)?.userAgentData;
+
+  let architecture = '';
+  let model = '';
+  let osPlatform = uaData?.platform || nav?.platform || '';
+  let osVersion = '';
+
+  if (uaData?.getHighEntropyValues) {
+    try {
+      const high = await uaData.getHighEntropyValues([
+        'architecture',
+        'bitness',
+        'model',
+        'platform',
+        'platformVersion',
+      ]);
+      if (high.architecture) {
+        architecture = high.bitness ? `${high.architecture} (${high.bitness}-bit)` : high.architecture;
+      }
+      if (high.model) model = high.model;
+      if (high.platform) osPlatform = high.platform;
+      if (high.platformVersion) osVersion = high.platformVersion;
+    } catch {
+      // Ignore userAgentData permission/platform errors
+    }
+  }
+
+  let browserName = '';
+  if (!env.isNativeApp) {
+    if (Array.isArray(uaData?.brands)) {
+      const preferredBrand = uaData.brands.find(
+        (b) => b.brand && !/Not.?A.?Brand|Chromium/i.test(b.brand)
+      );
+      browserName = preferredBrand?.brand || '';
+    }
+    if (!browserName) {
+      browserName = detectBrowserNameFromUa(ua);
+    }
+  }
+
+  const osInfo = [osPlatform, osVersion].filter(Boolean).join(' ').trim();
+  const screenW = typeof window !== 'undefined' ? window.screen?.width : undefined;
+  const screenH = typeof window !== 'undefined' ? window.screen?.height : undefined;
+  const deviceMem = (nav as unknown as { deviceMemory?: number } | undefined)?.deviceMemory;
+  const hwCores = nav?.hardwareConcurrency;
+  const timezone = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const webTelemetry: Record<string, unknown> = {
+    client_type: env.isUbuntuNative
+      ? 'ubuntu_native'
+      : env.isAndroidNative
+        ? 'android_native'
+        : 'web_browser',
+    full_access: env.isNativeApp,
+    app_version: appVersion,
+    install_id: getOrCreateWebInstallId(),
+    browser_name: browserName || undefined,
+    os_info: osInfo || undefined,
+    architecture: architecture || undefined,
+    model: model || undefined,
+    cpu_cores_logical: typeof hwCores === 'number' && hwCores > 0 ? hwCores : undefined,
+    ram_total_gb: typeof deviceMem === 'number' && deviceMem > 0 ? deviceMem : undefined,
+    screen_width: screenW,
+    screen_height: screenH,
+    screen_resolution: screenW && screenH ? `${screenW}x${screenH}` : undefined,
+    timezone: timezone || undefined,
+    language: nav?.language || undefined,
+  };
+
+  // Preserve richer native telemetry fields while adding non-empty browser defaults
+  const merged: Record<string, unknown> = { ...webTelemetry };
+  for (const [k, v] of Object.entries(baseNative)) {
+    if (v !== undefined && v !== null && v !== '') {
+      merged[k] = v;
+    }
+  }
+  return merged;
+}
+
 function encodeTelemetryBase64(): string {
   if (typeof window === 'undefined' || !window.__RECURSOS_DEVICE_TELEMETRY__) return '';
   try {

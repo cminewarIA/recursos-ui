@@ -1958,21 +1958,33 @@ export const MoreView: React.FC<MoreViewProps> = ({
                 const isOpen = expandedDevId === dev.id;
                 const accessText = dev.full_access ? t('more.native_verified') : t('more.web_verified');
                 const tel = (dev.device_telemetry || {}) as Record<string, unknown>;
-                const uaLower = String(dev.client_type || dev.client_label || tel.os_distro || '').toLowerCase();
+                const osInfo = String(dev.os_info || tel.os_info || tel.os_distro || '').trim();
+                const archInfo = String(dev.architecture || tel.architecture || '').trim();
+                const modelInfo = String(dev.model || tel.model || '').trim();
+                const manufacturerInfo = String(dev.manufacturer || tel.manufacturer || '').trim();
+                const macInfo = String(dev.mac_address || tel.mac_address || '').trim();
+                const hostnameInfo = String(dev.hostname || tel.hostname || '').trim();
+                const uaLower = `${dev.client_type || ''} ${dev.client_label || ''} ${osInfo} ${modelInfo}`.toLowerCase();
                 const isMobileDev =
                   uaLower.includes('android') || uaLower.includes('iphone') || uaLower.includes('ipad') || uaLower.includes('mobile');
                 const isUbuntuOrDesktop =
                   uaLower.includes('ubuntu') || uaLower.includes('linux') || uaLower.includes('windows') || uaLower.includes('mac');
                 const subtitleParts = [
-                  dev.client_label || accessText,
+                  modelInfo && modelInfo !== dev.name ? modelInfo : '',
+                  osInfo || dev.client_label || accessText,
+                  archInfo,
                   dev.app_version ? `v${dev.app_version}` : '',
-                  typeof tel.model === 'string' && tel.model && tel.model !== dev.name ? tel.model : '',
                 ].filter(Boolean);
                 const endpointText = `${dev.connection_mode || 'LAN'} · ${dev.local_ip || dev.last_external_ip || t('more.connected_fallback')}`;
+                const clientsList = Array.isArray(dev.clients) ? dev.clients : [];
+                const observedIps = Array.isArray(dev.observed_ips) ? dev.observed_ips : [];
+                const installIds = Array.isArray(dev.installation_ids) ? dev.installation_ids : [];
+                const hasRoot = Boolean(dev.root_access ?? tel.root_access);
+                const rootMethod = String(dev.root_method || tel.root_method || '').trim();
 
                 return (
                   <article key={dev.id} className="cockpit-subtile flex min-w-0 flex-col gap-3 p-4">
-                    {/* Header: Device icon + Name/Subtitle + Access Badge */}
+                    {/* Header: Device icon + Name/Subtitle + Unified Access/LAN Badges */}
                     {editingId === dev.id ? (
                       <div className="flex w-full min-w-0 items-center gap-2">
                         <input
@@ -2007,7 +2019,7 @@ export const MoreView: React.FC<MoreViewProps> = ({
                             )}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                               <p
                                 className="truncate text-sm font-semibold text-slate-900 dark:text-white"
                                 title={dev.name}
@@ -2029,17 +2041,25 @@ export const MoreView: React.FC<MoreViewProps> = ({
                           </div>
                         </div>
 
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${
-                            dev.full_access ? 'cockpit-pill-violet' : 'cockpit-pill-cyan'
-                          }`}
-                        >
-                          {accessText}
-                        </span>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${
+                              dev.full_access ? 'cockpit-pill-violet' : 'cockpit-pill-cyan'
+                            }`}
+                          >
+                            {accessText}
+                          </span>
+                          {dev.verified_in_lan && (
+                            <span className="cockpit-pill-emerald inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap">
+                              <ShieldCheck className="h-2.5 w-2.5" />
+                              <span>{t('devices.lan_verified_badge')}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
 
-                    {/* Structured Network & Visit Telemetry Strip */}
+                    {/* Unified Certificate & Network Strip */}
                     <div className="grid grid-cols-2 gap-2 border-t border-slate-200/70 pt-2.5 text-[11px] dark:border-slate-800">
                       <div className="min-w-0">
                         <span
@@ -2047,6 +2067,13 @@ export const MoreView: React.FC<MoreViewProps> = ({
                           title={endpointText}
                         >
                           {endpointText}
+                        </span>
+                        <span
+                          className="mt-0.5 block truncate font-mono text-[10px] text-slate-400"
+                          title={dev.certificate_serial || ''}
+                        >
+                          {dev.certificate_serial || '--'}
+                          {macInfo ? ` · ${macInfo}` : ''}
                         </span>
                       </div>
                       <div className="min-w-0 text-right">
@@ -2056,24 +2083,46 @@ export const MoreView: React.FC<MoreViewProps> = ({
                         >
                           {dev.last_seen || '--'}
                         </span>
+                        <span className="mt-0.5 block truncate font-mono text-[10px] text-slate-400 tabular-nums">
+                          {observedIps.length > 0
+                            ? t('devices.observed_ips_count', { count: observedIps.length })
+                            : dev.first_seen || '--'}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Grouped Client Containers if > 1 */}
-                    {Array.isArray(dev.clients) && dev.clients.length > 1 && (
-                      <div className="flex flex-wrap items-center gap-1">
-                        {dev.clients.slice(0, 4).map((cl, ci) => (
-                          <span
-                            key={cl.client_key || `${dev.id}-cl-${ci}`}
-                            className={`inline-flex max-w-full items-center truncate rounded-md px-2 py-0.5 text-[10px] font-medium ${
-                              cl.is_current_client
-                                ? 'cockpit-pill-emerald'
-                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800/80 dark:text-slate-300'
-                            }`}
-                          >
-                            {cl.client_label || cl.client_type}
-                          </span>
-                        ))}
+                    {/* Unified Associated Clients / Browsers under this single physical certificate */}
+                    {clientsList.length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                          {t('devices.associated_clients_count', { count: clientsList.length })}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {clientsList.slice(0, 6).map((cl, ci) => (
+                            <span
+                              key={cl.client_key || `${dev.id}-cl-${ci}`}
+                              title={[
+                                cl.client_label || cl.client_type,
+                                cl.app_version ? `v${cl.app_version}` : '',
+                                cl.connection_mode || '',
+                                cl.ip || '',
+                                cl.last_seen || '',
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                              className={`inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-0.5 text-[10px] font-medium ${
+                                cl.is_current_client
+                                  ? 'cockpit-pill-emerald'
+                                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800/80 dark:text-slate-300'
+                              }`}
+                            >
+                              <span className="truncate">{cl.client_label || cl.client_type}</span>
+                              {cl.connection_mode && (
+                                <span className="font-mono text-[9px] opacity-70">{cl.connection_mode}</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -2113,8 +2162,6 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     </div>
 
                     {isOpen && (() => {
-                      const hasRoot = Boolean(dev.root_access ?? tel.root_access);
-                      const rootMethod = String(dev.root_method || tel.root_method || '').trim();
                       const rootLabel = hasRoot
                         ? rootMethod
                           ? t('devices.root_active_method', { method: rootMethod })
@@ -2123,7 +2170,70 @@ export const MoreView: React.FC<MoreViewProps> = ({
 
                       return (
                         <div className="space-y-2.5">
+                          {/* Structured Unified Certificate & Hardware Summary */}
                           <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200/70 bg-slate-950/[0.03] p-2.5 text-[11px] dark:border-slate-800 dark:bg-slate-950/40 sm:grid-cols-2">
+                            <div className="min-w-0">
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                {t('devices.credential_cert_label')}
+                              </span>
+                              <span className="mt-0.5 block truncate font-mono text-slate-700 dark:text-slate-200">
+                                {dev.certificate_serial || '--'}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                {t('devices.lan_verified_at_label')}
+                              </span>
+                              <span className="mt-0.5 block truncate font-mono text-slate-700 dark:text-slate-200 tabular-nums">
+                                {dev.lan_verified_at || (dev.verified_in_lan ? t('devices.lan_verified_badge') : '--')}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                {t('devices.first_seen_label')}
+                              </span>
+                              <span className="mt-0.5 block truncate font-mono text-slate-700 dark:text-slate-200 tabular-nums">
+                                {dev.first_seen || '--'}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                {t('more.last_visit_label')}
+                              </span>
+                              <span className="mt-0.5 block truncate font-mono text-slate-700 dark:text-slate-200 tabular-nums">
+                                {dev.last_seen || '--'}
+                              </span>
+                            </div>
+                            {(osInfo || archInfo) && (
+                              <div className="min-w-0">
+                                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                  {t('devices.os_arch_label')}
+                                </span>
+                                <span className="mt-0.5 block truncate font-mono text-slate-700 dark:text-slate-200">
+                                  {[osInfo, archInfo].filter(Boolean).join(' · ')}
+                                </span>
+                              </div>
+                            )}
+                            {(manufacturerInfo || modelInfo || hostnameInfo) && (
+                              <div className="min-w-0">
+                                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                  {t('devices.hardware_label')}
+                                </span>
+                                <span className="mt-0.5 block truncate font-mono text-slate-700 dark:text-slate-200">
+                                  {[manufacturerInfo, modelInfo, hostnameInfo].filter(Boolean).join(' · ')}
+                                </span>
+                              </div>
+                            )}
+                            {macInfo && (
+                              <div className="min-w-0">
+                                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                  MAC
+                                </span>
+                                <span className="mt-0.5 block truncate font-mono text-slate-700 dark:text-slate-200">
+                                  {macInfo}
+                                </span>
+                              </div>
+                            )}
                             <div className="min-w-0">
                               <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                                 {t('devices.credential_root_label')}
@@ -2138,15 +2248,76 @@ export const MoreView: React.FC<MoreViewProps> = ({
                                 {rootLabel}
                               </span>
                             </div>
-                            <div className="min-w-0">
-                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                                {t('devices.credential_cert_label')}
-                              </span>
-                              <span className="mt-0.5 block truncate font-mono text-slate-700 dark:text-slate-200">
-                                {dev.certificate_serial || '--'}
-                              </span>
-                            </div>
+                            {installIds.length > 0 && (
+                              <div className="min-w-0 sm:col-span-2">
+                                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                  {t('devices.install_ids_label')}
+                                </span>
+                                <span className="mt-0.5 block truncate font-mono text-[10.5px] text-slate-600 dark:text-slate-300">
+                                  {installIds.join(', ')}
+                                </span>
+                              </div>
+                            )}
                           </div>
+
+                          {/* Observed IPs History */}
+                          {observedIps.length > 0 && (
+                            <div className="rounded-xl border border-slate-200/70 bg-slate-950/[0.03] p-2.5 text-[11px] dark:border-slate-800 dark:bg-slate-950/40">
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                {t('devices.observed_ips_label')}
+                              </span>
+                              <div className="mt-1.5 space-y-1">
+                                {observedIps.map((ipItem, idx) => (
+                                  <div
+                                    key={`${ipItem.ip}-${idx}`}
+                                    className="flex flex-wrap items-center justify-between gap-2 font-mono text-[10.5px]"
+                                  >
+                                    <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+                                      <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[9px] font-bold dark:bg-slate-800">
+                                        {ipItem.mode || 'LAN'}
+                                      </span>
+                                      <span>{ipItem.ip}</span>
+                                    </span>
+                                    <span className="text-slate-400 tabular-nums">{ipItem.last_seen || ipItem.first_seen || '--'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Detailed Clients / Browsers List */}
+                          {clientsList.length > 0 && (
+                            <div className="rounded-xl border border-slate-200/70 bg-slate-950/[0.03] p-2.5 text-[11px] dark:border-slate-800 dark:bg-slate-950/40">
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                {t('devices.associated_clients_label')}
+                              </span>
+                              <div className="mt-1.5 space-y-1.5">
+                                {clientsList.map((cl, idx) => (
+                                  <div
+                                    key={cl.client_key || `${dev.id}-det-cl-${idx}`}
+                                    className="rounded-lg border border-slate-200/50 px-2 py-1.5 dark:border-slate-800/70"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-1">
+                                      <span className="font-semibold text-slate-800 dark:text-slate-100">
+                                        {cl.client_label || cl.client_type}
+                                        {cl.app_version ? ` · v${cl.app_version}` : ''}
+                                      </span>
+                                      <span className="font-mono text-[10px] text-slate-400 tabular-nums">
+                                        {cl.connection_mode || 'LAN'}
+                                        {cl.ip ? ` · ${cl.ip}` : ''} · {cl.last_seen || '--'}
+                                      </span>
+                                    </div>
+                                    {cl.user_agent && (
+                                      <p className="mt-0.5 truncate font-mono text-[9.5px] text-slate-400" title={cl.user_agent}>
+                                        {cl.user_agent}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           <pre
                             data-cockpit-scroll-contain="true"
                             className="cockpit-scroll-panel w-full max-w-full overflow-auto overscroll-contain rounded-xl border border-slate-200/70 bg-slate-950/[0.03] p-2.5 font-mono text-[10.5px] leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300"
@@ -2155,6 +2326,9 @@ export const MoreView: React.FC<MoreViewProps> = ({
                               {
                                 id: dev.id,
                                 certificado: dev.certificate_serial,
+                                physical_key: dev.physical_key,
+                                verified_in_lan: Boolean(dev.verified_in_lan),
+                                lan_verified_at: dev.lan_verified_at,
                                 root_access: hasRoot,
                                 root_method: rootMethod || 'none',
                                 hardware: dev.device_telemetry,

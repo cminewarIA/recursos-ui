@@ -616,6 +616,7 @@ def collect_native_device_telemetry():
         "root_access": bool(root_status.get("root_access", False)),
         "root_method": str(root_status.get("root_method") or "none"),
         "hardware_id": hardware_id,
+        "install_id": hardware_id,
         "name": f"{display_model} · {hostname}",
         "hostname": hostname,
         "manufacturer": manufacturer or "Linux System",
@@ -625,8 +626,10 @@ def collect_native_device_telemetry():
         "bios_version": bios_version,
         "chassis_type": chassis_type,
         "os_distro": os_distro,
+        "os_info": os_distro,
         "kernel": kernel,
         "arch": arch,
+        "architecture": arch,
         "desktop_session": desktop_session,
         "cpu_model": cpu_model,
         "cpu_cores_physical": phys_cores,
@@ -1196,11 +1199,18 @@ class ServerConnectionManager:
 
     def _build_auth_headers(self, extra=None):
         ver = get_app_version()
+        tel = self.device_telemetry if isinstance(self.device_telemetry, dict) else {}
         headers = {
             "User-Agent": f"RecursosCockpit-Linux/{ver} (Ubuntu; NativeHTML; FullAccess)",
             "X-Recursos-Client": "ubuntu_native",
-            "X-Device-Telemetry": encode_telemetry_header(self.device_telemetry),
+            "X-Device-Telemetry": encode_telemetry_header(tel),
         }
+        origin_ip = str(tel.get("local_ip") or "").strip()
+        if origin_ip and origin_ip not in ("127.0.0.1", "::1", "localhost"):
+            headers["X-Recursos-Origin-IP"] = origin_ip
+        dev_name = str(tel.get("hostname") or tel.get("name") or "").strip()
+        if dev_name:
+            headers["X-Recursos-Device-Name"] = dev_name[:48]
         if self.device_token:
             headers["X-Device-Token"] = self.device_token
             headers["Authorization"] = f"Bearer {self.device_token}"
@@ -1669,9 +1679,28 @@ class ServerConnectionManager:
             except Exception:
                 pass
 
+        def _is_native_tag(tag_str, plat):
+            low_t = str(tag_str or "").strip().lower()
+            if not low_t:
+                return False
+            if plat == "ubuntu":
+                return low_t.startswith("ubuntu-v") or low_t.startswith("native-")
+            if plat == "android":
+                return low_t.startswith("android-v") or low_t.startswith("native-")
+            return low_t.startswith(("ubuntu-v", "android-v", "native-"))
+
+        def _is_compat_native_ver(cand_ver, canonical_ver):
+            c_t = parse_semver_tuple(cand_ver)
+            r_t = parse_semver_tuple(canonical_ver)
+            if c_t == (0, 0, 0):
+                return False
+            if 0 < r_t[0] < 10 and c_t[0] >= 10:
+                return False
+            return True
+
         releases_list = []
         try:
-            rel_api = "https://api.github.com/repos/cminewarIA/recursos-ui/releases?per_page=8"
+            rel_api = "https://api.github.com/repos/cminewarIA/recursos-ui/releases?per_page=15"
             if is_allowed_github_url(rel_api):
                 req = urllib.request.Request(rel_api, headers=headers)
                 with urllib.request.urlopen(req, timeout=5.0) as resp:
@@ -1684,6 +1713,8 @@ class ServerConnectionManager:
 
         for rel in releases_list:
             r_tag = str(rel.get("tag_name") or "").strip()
+            if not _is_native_tag(r_tag, "any"):
+                continue
             r_name = str(rel.get("name") or r_tag).strip()
             r_html = str(rel.get("html_url") or "").strip()
             r_pub = str(rel.get("published_at") or "").strip()
@@ -1707,9 +1738,12 @@ class ServerConnectionManager:
                 m_ver = re.search(r"(\d+\.\d+\.\d+)", a_name)
                 if low == "sha256sums.txt" and not sha256_url:
                     sha256_url = a_url
-                elif low.endswith(".deb"):
+                elif low.endswith(".deb") and _is_native_tag(r_tag, "ubuntu"):
+                    cand_ver = m_ver.group(1) if m_ver else remote_ubuntu
+                    if not _is_compat_native_ver(cand_ver, remote_ubuntu):
+                        continue
                     cand = {
-                        "version": m_ver.group(1) if m_ver else remote_ubuntu,
+                        "version": cand_ver,
                         "asset_name": a_name,
                         "download_url": a_url,
                         "size_bytes": a_size,
@@ -1718,9 +1752,12 @@ class ServerConnectionManager:
                     }
                     if deb_asset is None or ("_" in a_name and "_" not in deb_asset["asset_name"]):
                         deb_asset = cand
-                elif low.endswith(".apk"):
+                elif low.endswith(".apk") and _is_native_tag(r_tag, "android"):
+                    cand_ver = m_ver.group(1) if m_ver else remote_android
+                    if not _is_compat_native_ver(cand_ver, remote_android):
+                        continue
                     cand = {
-                        "version": m_ver.group(1) if m_ver else remote_android,
+                        "version": cand_ver,
                         "asset_name": a_name,
                         "download_url": a_url,
                         "size_bytes": a_size,
@@ -1753,23 +1790,23 @@ class ServerConnectionManager:
                 "version": deb_ver,
                 "local_version": local_ubuntu,
                 "asset_name": (deb_asset or {}).get("asset_name") or f"recursos-cockpit_{deb_ver}_amd64.deb",
-                "download_url": (deb_asset or {}).get("download_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.deb",
+                "download_url": (deb_asset or {}).get("download_url") or f"https://github.com/cminewarIA/recursos-ui/releases/tag/ubuntu-v{deb_ver}",
                 "size_bytes": int((deb_asset or {}).get("size_bytes") or 0),
                 "published_at": (deb_asset or {}).get("published_at") or published_at,
-                "tag_name": (deb_asset or {}).get("tag_name") or tag_name,
+                "tag_name": (deb_asset or {}).get("tag_name") or f"ubuntu-v{deb_ver}",
                 "available": bool(deb_asset),
-                "update_available": parse_semver_tuple(deb_ver) > parse_semver_tuple(local_ubuntu),
+                "update_available": bool(deb_asset) and (parse_semver_tuple(deb_ver) > parse_semver_tuple(local_ubuntu)),
             },
             "apk": {
                 "version": apk_ver,
                 "local_version": local_android,
                 "asset_name": (apk_asset or {}).get("asset_name") or f"recursos-cockpit_{apk_ver}.apk",
-                "download_url": (apk_asset or {}).get("download_url") or "https://github.com/cminewarIA/recursos-ui/releases/latest/download/recursos-cockpit.apk",
+                "download_url": (apk_asset or {}).get("download_url") or f"https://github.com/cminewarIA/recursos-ui/releases/tag/android-v{apk_ver}",
                 "size_bytes": int((apk_asset or {}).get("size_bytes") or 0),
                 "published_at": (apk_asset or {}).get("published_at") or published_at,
-                "tag_name": (apk_asset or {}).get("tag_name") or tag_name,
+                "tag_name": (apk_asset or {}).get("tag_name") or f"android-v{apk_ver}",
                 "available": bool(apk_asset),
-                "update_available": parse_semver_tuple(apk_ver) > parse_semver_tuple(local_android),
+                "update_available": bool(apk_asset) and (parse_semver_tuple(apk_ver) > parse_semver_tuple(local_android)),
             },
             "checked_at": time.strftime("%H:%M:%S"),
         }
