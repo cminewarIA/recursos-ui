@@ -38,16 +38,17 @@ object ApkSessionInstaller {
                 }
             }
             sessionId = packageInstaller.createSession(params)
-            session = packageInstaller.openSession(sessionId)
+            val activeSession = packageInstaller.openSession(sessionId)
+            session = activeSession
 
             FileInputStream(apkFile).use { input ->
-                session.openWrite("recursos_cockpit_update.apk", 0, apkFile.length()).use { output ->
+                activeSession.openWrite("recursos_cockpit_update.apk", 0, apkFile.length()).use { output ->
                     val buffer = ByteArray(64 * 1024)
                     var read: Int
                     while (input.read(buffer).also { read = it } != -1) {
                         output.write(buffer, 0, read)
                     }
-                    session.fsync(output)
+                    activeSession.fsync(output)
                 }
             }
 
@@ -67,8 +68,8 @@ object ApkSessionInstaller {
                 piFlags
             )
 
-            session.commit(pendingIntent.intentSender)
-            session.close()
+            activeSession.commit(pendingIntent.intentSender)
+            activeSession.close()
             session = null
             Result.success(sessionId)
         } catch (e: Exception) {
