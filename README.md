@@ -200,11 +200,14 @@ sequenceDiagram
         G->>B: Resuelve dispositivo físico único (MAC / hardware_id / LAN) y fusiona metadatos sin pérdida
         G-->>C: 200 OK + Cookie HttpOnly + certificado unificado ZT-*
     else Origen desde Internet (WAN TLS)
-        G->>B: Verifica firma HMAC-SHA256 y marca verified_in_lan
-        alt Certificado LAN previo válido
+        G->>B: Verifica firma HMAC-SHA256 (certificado LAN o clave maestra)
+        alt Certificado vigente y no revocado
             G-->>C: 200 OK · Telemetría cifrada completa
-        else Sin certificado LAN previo o revocado
-            G-->>C: 403 Forbidden · Pantalla de bloqueo sin exponer versión, dominio ni métricas
+        else Sin certificado previo o revocado
+            G-->>C: 403 Forbidden · Bloqueo sin datos + solicitud de contraseña maestra
+            C->>G: POST /api/auth/unlock (contraseña maestra con límite de intentos)
+            G->>B: Emite o unifica el certificado del dispositivo físico
+            G-->>C: 200 OK + Cookie HttpOnly + token unificado
         end
     end
 ```

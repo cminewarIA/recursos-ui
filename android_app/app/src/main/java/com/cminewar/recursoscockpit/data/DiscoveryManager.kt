@@ -115,28 +115,42 @@ class DiscoveryManager(
         val trimmed = rawHostOrUrl.trim().trimEnd('/')
         if (trimmed.isEmpty()) return@withContext ResolvedEndpoint("", ConnectionMode.ERROR)
         val defaultPort = securePreferences.manualPort
-        val candidateUrl = when {
-            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
-            trimmed.contains(":") -> "http://$trimmed"
-            else -> "http://$trimmed:$defaultPort"
+        val looksLikeIp = trimmed.all { it.isDigit() || it == '.' } && trimmed.count { it == '.' } == 3
+        val candidateUrls = when {
+            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> listOf(trimmed)
+            trimmed.contains(":") -> listOf("http://$trimmed", "https://$trimmed")
+            looksLikeIp || isPrivateRfc1918Ipv4(trimmed) -> listOf("http://$trimmed:$defaultPort")
+            else -> listOf("https://$trimmed", "http://$trimmed:$defaultPort", "http://$trimmed")
         }
         val lanContexts = discoverLocalLanContexts()
         val primarySocketFactory = lanContexts.firstOrNull { it.socketFactory != null }?.socketFactory
-        var res = apiService.probeNode(candidateUrl, isQuickScan = false)
-        if (!res.isOnline && primarySocketFactory != null) {
-            res = apiService.probeNode(candidateUrl, isQuickScan = false, socketFactory = primarySocketFactory)
+
+        for (candidateUrl in candidateUrls) {
+            var res = apiService.probeNode(candidateUrl, isQuickScan = false)
+            if (!res.isOnline && primarySocketFactory != null && !candidateUrl.startsWith("https://")) {
+                res = apiService.probeNode(candidateUrl, isQuickScan = false, socketFactory = primarySocketFactory)
+            }
+            if (res.isRevoked) {
+                securePreferences.isCertRevoked = true
+                persistDiscoveredHostAndPort(candidateUrl, clearRevoked = false)
+                return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.REVOKED)
+            }
+            if (res.isOnline && res.isRecursosServer) {
+                persistDiscoveredHostAndPort(candidateUrl, clearRevoked = true)
+                val cleanHost = candidateUrl.removePrefix("http://").removePrefix("https://").substringBefore("/").substringBefore(":")
+                val mode = if (candidateUrl.startsWith("https://") || !isPrivateRfc1918Ipv4(cleanHost)) {
+                    ConnectionMode.CONNECTED_WAN
+                } else {
+                    ConnectionMode.CONNECTED_LAN
+                }
+                return@withContext ResolvedEndpoint(candidateUrl, mode)
+            }
         }
-        if (res.isRevoked) {
-            securePreferences.isCertRevoked = true
-            persistDiscoveredHostAndPort(candidateUrl)
-            return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.REVOKED)
-        }
-        if (res.isOnline && res.isRecursosServer) {
-            persistDiscoveredHostAndPort(candidateUrl)
-            val mode = if (candidateUrl.startsWith("https://")) ConnectionMode.CONNECTED_WAN else ConnectionMode.CONNECTED_LAN
-            return@withContext ResolvedEndpoint(candidateUrl, mode)
-        }
-        ResolvedEndpoint(candidateUrl, ConnectionMode.ERROR)
+        ResolvedEndpoint(candidateUrls.first(), ConnectionMode.ERROR)
+    }
+
+    fun persistEndpointAfterUnlock(url: String) {
+        persistDiscoveredHostAndPort(url, clearRevoked = true)
     }
 
     suspend fun discoverLocalServers(
@@ -613,16 +627,28 @@ class DiscoveryManager(
         }
     }
 
-    private fun persistDiscoveredHostAndPort(url: String) {
-        val clean = url.removePrefix("http://").removePrefix("https://").substringBefore("/")
+    private fun persistDiscoveredHostAndPort(url: String, clearRevoked: Boolean = true) {
+        val normalizedUrl = url.trim().trimEnd('/')
+        val clean = normalizedUrl.removePrefix("http://").removePrefix("https://").substringBefore("/")
         val host = clean.substringBefore(":")
         val port = clean.substringAfter(":", "").toIntOrNull()
-        securePreferences.isCertRevoked = false
-        if (host.isNotEmpty()) {
-            securePreferences.savedHost = host
+        if (clearRevoked) {
+            securePreferences.isCertRevoked = false
         }
-        if (port != null && port in 1..65535 && port != securePreferences.manualPort) {
-            securePreferences.manualPort = port
+        val isWanEndpoint = normalizedUrl.startsWith("https://", ignoreCase = true) ||
+            (host.isNotEmpty() && !isPrivateRfc1918Ipv4(host))
+        if (isWanEndpoint) {
+            apiService.learnWanDomain(normalizedUrl)
+            if (securePreferences.savedHost.isBlank()) {
+                securePreferences.savedHost = normalizedUrl
+            }
+        } else {
+            if (host.isNotEmpty()) {
+                securePreferences.savedHost = host
+            }
+            if (port != null && port in 1..65535 && port != securePreferences.manualPort) {
+                securePreferences.manualPort = port
+            }
         }
     }
 }

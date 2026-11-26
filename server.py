@@ -10130,6 +10130,8 @@ def consolidate_devices_by_hardware(devices):
             base_entry["certificate_scope"] = "PER_PHYSICAL_DEVICE"
             if base_entry.get("verified_in_lan") and not base_entry.get("lan_verified_at"):
                 base_entry["lan_verified_at"] = base_entry.get("first_seen") or now_fallback
+            if base_entry.get("verified_by_master_key") and not base_entry.get("master_verified_at"):
+                base_entry["master_verified_at"] = base_entry.get("first_seen") or now_fallback
             grouped_by_phys[matched_key] = base_entry
         else:
             target = grouped_by_phys[matched_key]
@@ -10157,6 +10159,11 @@ def consolidate_devices_by_hardware(devices):
                 rv_lan_ts = raw_v.get("lan_verified_at") or raw_v.get("last_seen") or now_fallback
                 if not target.get("lan_verified_at") or rv_lan_ts > target.get("lan_verified_at", ""):
                     target["lan_verified_at"] = rv_lan_ts
+            if raw_v.get("verified_by_master_key"):
+                target["verified_by_master_key"] = True
+                rv_mk_ts = raw_v.get("master_verified_at") or raw_v.get("last_seen") or now_fallback
+                if not target.get("master_verified_at") or rv_mk_ts > target.get("master_verified_at", ""):
+                    target["master_verified_at"] = rv_mk_ts
 
             if raw_v.get("custom_alias") and not target.get("custom_alias"):
                 target["custom_alias"] = raw_v["custom_alias"]
@@ -10758,11 +10765,20 @@ def _find_trusted_match_for_token(devices, candidate_token):
     return None, None, False
 
 
+def _is_device_certified(entry):
+    return bool(
+        isinstance(entry, dict)
+        and entry.get("trusted", False)
+        and (entry.get("verified_in_lan", False) or entry.get("verified_by_master_key", False))
+    )
+
+
 def check_trust_status(handler):
     """
     Verifica el origen de la petición y valida el certificado HMAC único por dispositivo físico.
     - Bloqueo estricto Zero-Trust: fuera de la red local (WAN), solo acceden dispositivos
-      previamente certificados en LAN con token criptográfico vigente y no revocado.
+      previamente certificados (en red local o mediante contraseña maestra) con token
+      criptográfico vigente y no revocado.
     - En red local (LAN), certifica automáticamente unificando múltiples navegadores y apps
       nativas del mismo equipo físico bajo un único certificado.
     """
@@ -10801,7 +10817,7 @@ def check_trust_status(handler):
 
         for cand_tok in [t for t in (hdr_bearer, hdr_xtoken, cookie_token) if t]:
             m_id, m_dev, needs_uni = _find_trusted_match_for_token(devices, cand_tok)
-            if m_id and m_dev and m_dev.get("trusted", False) and m_dev.get("verified_in_lan", False):
+            if m_id and _is_device_certified(m_dev):
                 token = cand_tok
                 matched_id = m_id
                 device_entry = m_dev
@@ -10817,7 +10833,7 @@ def check_trust_status(handler):
         cookie_matched_id = None
         if cookie_token:
             c_mid, c_dev, _ = _find_trusted_match_for_token(devices, cookie_token)
-            if c_mid and c_dev and c_dev.get("trusted", False) and c_dev.get("verified_in_lan", False):
+            if c_mid and _is_device_certified(c_dev):
                 cookie_matched_id = c_mid
         has_valid_cookie = bool(matched_id and cookie_matched_id == matched_id)
         needs_proactive_rotation = bool(token_ts and (time.time() - token_ts) > TOKEN_ROTATION_AGE_SEC)
@@ -10894,8 +10910,8 @@ def check_trust_status(handler):
                     "token": new_token
                 }
         else:
-            # Petición desde el EXTERIOR (WAN): acceso permitido SOLO con certificado emitido en red local
-            if device_entry and device_entry.get("trusted", False) and device_entry.get("verified_in_lan", False):
+            # Petición desde el EXTERIOR (WAN): acceso permitido SOLO con certificado vigente (LAN o clave maestra)
+            if _is_device_certified(device_entry):
                 device_entry["last_seen"] = now_iso
                 device_entry["last_external_ip"] = client_ip
                 enrich_device_entry(device_entry, ua, hdr_telemetry, client_ip, is_local=False)
@@ -10903,7 +10919,8 @@ def check_trust_status(handler):
                 return {
                     "is_local": False,
                     "is_trusted": True,
-                    "verified_in_lan": True,
+                    "verified_in_lan": bool(device_entry.get("verified_in_lan", False)),
+                    "verified_by_master_key": bool(device_entry.get("verified_by_master_key", False)),
                     "client_ip": client_ip,
                     "device_info": device_entry,
                     "device_id": verified_device_id,
@@ -10916,6 +10933,7 @@ def check_trust_status(handler):
                     "is_local": False,
                     "is_trusted": False,
                     "verified_in_lan": False,
+                    "verified_by_master_key": False,
                     "client_ip": client_ip,
                     "device_info": None,
                     "device_id": None,
@@ -11059,6 +11077,44 @@ def get_locked_page_html(client_ip):
       opacity: 0.6;
       cursor: not-allowed;
     }
+    .secondary-btn {
+      width: 100%;
+      min-height: 40px;
+      margin-top: 10px;
+      padding: 9px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .secondary-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .pwd-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 6px;
+      text-align: left;
+    }
+    .pwd-input {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+    .pwd-input:focus {
+      border-color: var(--accent);
+    }
     .status-msg {
       margin-top: 12px;
       font-size: 12.5px;
@@ -11079,17 +11135,26 @@ def get_locked_page_html(client_ip):
 <body>
   <main class="auth-card">
     <img src="/recursos-cockpit.png" alt="Recursos Cockpit" class="brand-logo" />
-    <span class="badge">CERTIFICACIÓN LAN REQUERIDA</span>
+    <span class="badge">CERTIFICACIÓN REQUERIDA</span>
     <h1>Dispositivo no certificado</h1>
     <p class="subtitle">
-      Por seguridad, no se muestra ningún dato del sistema a equipos sin un certificado válido emitido previamente en la red local.
+      Por seguridad, no se muestra ningún dato del sistema hasta certificar este dispositivo en tu red local o mediante la contraseña maestra.
     </p>
-    <div class="steps-box">
-      <strong>Certificación automática en red local:</strong><br>
-      Conecta este dispositivo a tu misma red local (Wi-Fi o Ethernet) y abre el panel una sola vez. Se emitirá automáticamente un único certificado para todos los navegadores y apps de este equipo.
-    </div>
-    <button type="button" id="btnRetryLan" class="retry-btn" onclick="retryLanVerification()">
-      Reintentar verificación en red local
+    <form id="masterKeyForm" class="pwd-form" onsubmit="submitMasterPassword(event)">
+      <input
+        type="password"
+        id="masterKeyInput"
+        class="pwd-input"
+        placeholder="Contraseña maestra del servidor"
+        autocomplete="current-password"
+        required
+      />
+      <button type="submit" id="btnUnlockMaster" class="retry-btn">
+        Certificar y acceder
+      </button>
+    </form>
+    <button type="button" id="btnRetryLan" class="secondary-btn" onclick="retryLanVerification()">
+      Verificar automáticamente en red local
     </button>
     <div class="status-msg" id="statusMsg"></div>
   </main>
@@ -11124,6 +11189,9 @@ def get_locked_page_html(client_ip):
       try {
         localStorage.setItem('recursos_device_token', tok);
         localStorage.setItem('sysmon_device_token', tok);
+        if (window.RecursosAndroidBridge && typeof window.RecursosAndroidBridge.onTokenUpdated === 'function') {
+          window.RecursosAndroidBridge.onTokenUpdated(tok);
+        }
       } catch (e) {}
     }
 
@@ -11165,6 +11233,57 @@ def get_locked_page_html(client_ip):
         }
       } catch (e) {}
       return false;
+    }
+
+    async function submitMasterPassword(ev) {
+      if (ev) ev.preventDefault();
+      var input = document.getElementById('masterKeyInput');
+      var btn = document.getElementById('btnUnlockMaster');
+      var msg = document.getElementById('statusMsg');
+      var pwd = input ? String(input.value || '').trim() : '';
+      if (!pwd) return;
+      if (btn) btn.disabled = true;
+      if (msg) {
+        msg.style.color = 'var(--text-dim)';
+        msg.textContent = 'Verificando contraseña maestra...';
+      }
+      try {
+        var res = await fetch('/api/auth/unlock', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: pwd })
+        });
+        var data = {};
+        try { data = await res.json(); } catch (e) {}
+        if (res.ok && data && data.success) {
+          if (data.token) persistTokenLocally(data.token);
+          if (msg) {
+            msg.style.color = 'var(--success)';
+            msg.textContent = 'Dispositivo certificado. Accediendo...';
+          }
+          window.location.reload();
+          return;
+        }
+        if (res.status === 429) {
+          if (msg) {
+            msg.style.color = 'var(--error)';
+            msg.textContent = 'Demasiados intentos fallidos. Espera unos minutos antes de volver a intentarlo.';
+          }
+        } else {
+          if (msg) {
+            msg.style.color = 'var(--error)';
+            msg.textContent = 'Contraseña maestra incorrecta.';
+          }
+        }
+      } catch (e) {
+        if (msg) {
+          msg.style.color = 'var(--error)';
+          msg.textContent = 'No se pudo conectar con el servidor.';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     }
 
     async function retryLanVerification() {
@@ -17137,6 +17256,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                         "connection_mode": v.get("connection_mode", "LAN" if not v.get("last_external_ip") else "WAN"),
                         "user_agent": ua_str,
                         "verified_in_lan": bool(v.get("verified_in_lan", False)),
+                        "verified_by_master_key": bool(v.get("verified_by_master_key", False)),
+                        "master_verified_at": v.get("master_verified_at", ""),
                         "trusted": bool(v.get("trusted", True)),
                         "is_current": is_cur_dev,
                         "root_access": bool(tel.get("root_access", False)),
@@ -17728,36 +17849,163 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # 1. Bloqueo estricto Zero-Trust: la certificación se emite exclusivamente en red local (LAN)
+        # 1. Certificación Zero-Trust mediante contraseña maestra (con bloqueo anti-fuerza bruta) o verificación LAN
         if clean_path in ("/api/auth/unlock", "/api/unlock"):
-            auth = check_trust_status(self)
-            if auth["is_trusted"] and auth.get("is_local"):
-                resp = json.dumps({
-                    "success": True,
-                    "token": auth.get("token") or auth.get("new_token") or "",
-                    "device_id": auth.get("device_id") or "",
-                    "certificate_serial": auth.get("certificate_serial") or "",
+            is_locked_ip, wait_sec = is_ip_locked_out(client_ip)
+            if is_locked_ip:
+                err_resp = json.dumps({
+                    "success": False,
+                    "status": "locked_out",
+                    "retry_after": wait_sec,
+                    "error": "Demasiados intentos fallidos. Espera antes de volver a intentarlo."
                 }).encode('utf-8')
-                self.send_response(200)
+                self.send_response(429)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Retry-After', str(wait_sec))
+                self.send_security_headers()
+                self.send_header('Content-Length', str(len(err_resp)))
+                self.end_headers()
+                self.wfile.write(err_resp)
+                return
+
+            body, err_code = self._read_json_body(max_bytes=16384)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            entered_key = str(
+                (body or {}).get("key")
+                or (body or {}).get("password")
+                or (body or {}).get("master_key")
+                or ""
+            ).strip()
+
+            if not entered_key:
+                auth = check_trust_status(self)
+                if auth["is_trusted"] and auth.get("is_local"):
+                    resp = json.dumps({
+                        "success": True,
+                        "token": auth.get("token") or auth.get("new_token") or "",
+                        "device_id": auth.get("device_id") or "",
+                        "certificate_serial": auth.get("certificate_serial") or "",
+                    }).encode('utf-8')
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_security_headers()
+                    if auth.get("new_token"):
+                        self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
+                    self.send_header('Content-Length', str(len(resp)))
+                    self.end_headers()
+                    self.wfile.write(resp)
+                    return
+
+            if not entered_key or len(entered_key) > 512 or not verify_master_key(entered_key):
+                locked_now, info_val = record_auth_failure(client_ip)
+                if locked_now:
+                    err_resp = json.dumps({
+                        "success": False,
+                        "status": "locked_out",
+                        "retry_after": info_val,
+                        "error": "Demasiados intentos fallidos. Espera antes de volver a intentarlo."
+                    }).encode('utf-8')
+                    self.send_response(429)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Retry-After', str(info_val))
+                    self.send_security_headers()
+                    self.send_header('Content-Length', str(len(err_resp)))
+                    self.end_headers()
+                    self.wfile.write(err_resp)
+                    return
+                err_resp = json.dumps({
+                    "success": False,
+                    "status": "invalid_master_key",
+                    "remaining_attempts": info_val,
+                    "error": "Contraseña maestra incorrecta."
+                }).encode('utf-8')
+                self.send_response(403)
                 self.send_header('Content-Type', 'application/json')
                 self.send_security_headers()
-                if auth.get("new_token"):
-                    self.send_header('Set-Cookie', get_cookie_header_value(self, auth["new_token"]))
-                self.send_header('Content-Length', str(len(resp)))
+                self.send_header('Content-Length', str(len(err_resp)))
                 self.end_headers()
-                self.wfile.write(resp)
+                self.wfile.write(err_resp)
                 return
-            err_resp = json.dumps({
-                "success": False,
-                "status": "lan_certification_required",
-                "error": "Certificación previa en red local requerida."
+
+            record_auth_success(client_ip)
+            ua = self.headers.get('User-Agent', '')
+            hdr_tel = extract_header_telemetry(self) or {}
+            body_tel = (body or {}).get("device_telemetry")
+            merged_tel_in = dict(hdr_tel)
+            if isinstance(body_tel, dict):
+                merged_tel_in.update(body_tel)
+
+            is_local = is_local_ip(client_ip)
+            norm_client_ip = normalize_lan_ip(client_ip) if is_local else client_ip
+            now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            with TRUST_LOCK:
+                devices = load_trusted_devices()
+                matched_id, matched_dev, _ = find_device_by_id_or_physical(
+                    devices, None, merged_tel_in, norm_client_ip, ua, is_local=is_local, allow_wan_hw_match=True
+                )
+                target_id = matched_id or f"dev_{secrets.token_hex(6)}"
+                ua_parsed = parse_user_agent(ua)
+                dev_only_name = ua_parsed.split("•")[0].strip() if "•" in ua_parsed else ua_parsed
+                entry = matched_dev or {
+                    "id": target_id,
+                    "alias_ids": [target_id],
+                    "name": dev_only_name,
+                    "first_seen": now_iso,
+                    "last_seen": now_iso,
+                    "local_ip": norm_client_ip if is_local else "",
+                    "last_external_ip": "" if is_local else client_ip,
+                    "user_agent": ua[:240],
+                    "verified_in_lan": bool(is_local),
+                    "verified_by_master_key": True,
+                    "master_verified_at": now_iso,
+                    "trusted": True,
+                }
+                entry["id"] = target_id
+                entry["trusted"] = True
+                entry["verified_by_master_key"] = True
+                entry["master_verified_at"] = now_iso
+                if is_local:
+                    entry["verified_in_lan"] = True
+                    entry["lan_verified_at"] = entry.get("lan_verified_at") or now_iso
+                else:
+                    entry["last_external_ip"] = client_ip
+                entry["last_seen"] = now_iso
+                enrich_device_entry(entry, ua, merged_tel_in, norm_client_ip if is_local else client_ip, is_local=is_local)
+                devices[target_id] = entry
+
+                consolidated = consolidate_devices_by_hardware(devices)
+                if target_id not in consolidated:
+                    for cid, cdev in consolidated.items():
+                        if target_id in (cdev.get("alias_ids") or []):
+                            target_id = cid
+                            entry = cdev
+                            break
+                else:
+                    entry = consolidated[target_id]
+                save_trusted_devices(consolidated)
+                issued_token = create_device_token(target_id)
+                cert_serial = entry.get("certificate_serial", "")
+
+            resp = json.dumps({
+                "success": True,
+                "token": issued_token,
+                "device_id": target_id,
+                "certificate_serial": cert_serial,
             }).encode('utf-8')
-            self.send_response(403)
+            self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_security_headers()
-            self.send_header('Content-Length', str(len(err_resp)))
+            self.send_header('Set-Cookie', get_cookie_header_value(self, issued_token))
+            self.send_header('Content-Length', str(len(resp)))
             self.end_headers()
-            self.wfile.write(err_resp)
+            self.wfile.write(resp)
             return
 
         # 2. Revocación de certificado de dispositivo físico (o de un cliente agrupado concreto)
@@ -17911,7 +18159,8 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                     "last_seen": now_iso,
                     "local_ip": norm_client_ip if is_local else "",
                     "last_external_ip": "" if is_local else client_ip,
-                    "verified_in_lan": True,
+                    "verified_in_lan": bool(is_local),
+                    "verified_by_master_key": bool(not is_local),
                     "trusted": True,
                 }
                 entry["id"] = target_id
@@ -17974,7 +18223,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             with TRUST_LOCK:
                 devices = load_trusted_devices()
                 m_id, entry, needs_uni = _find_trusted_match_for_token(devices, candidate_tok)
-                if m_id and entry and entry.get("trusted", False) and entry.get("verified_in_lan", True):
+                if m_id and _is_device_certified(entry):
                     matched_id = m_id
                     verified_raw, tok_ts = parse_verified_device_token(candidate_tok)
                     needs_rot = bool(tok_ts and (time.time() - tok_ts) > TOKEN_ROTATION_AGE_SEC)

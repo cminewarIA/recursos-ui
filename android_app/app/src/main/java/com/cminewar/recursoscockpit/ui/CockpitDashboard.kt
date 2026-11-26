@@ -67,9 +67,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import com.cminewar.recursoscockpit.BuildConfig
 import com.cminewar.recursoscockpit.R
 import com.cminewar.recursoscockpit.data.ConnectionMode
@@ -188,6 +197,12 @@ fun CockpitDashboard(
     isDiscoveringServers: Boolean = false,
     discoveredServers: List<DiscoveredServerNode> = emptyList(),
     discovererError: String = "",
+    masterPasswordPromptUrl: String = "",
+    masterPasswordError: String = "",
+    isUnlockingMasterPassword: Boolean = false,
+    onSubmitMasterPassword: (String, String) -> Unit = { _, _ -> },
+    onDismissMasterPasswordPrompt: () -> Unit = {},
+    onRequestMasterPasswordUnlock: () -> Unit = {},
     onSelectDiscoveredServer: (String) -> Unit = {},
     onRescanLocalServers: () -> Unit = {},
     onTriggerApkUpdate: (GithubAndroidReleaseInfo) -> Unit = {},
@@ -208,6 +223,8 @@ fun CockpitDashboard(
     var revokedBtnFocused by remember { mutableStateOf(false) }
     var updateBtnFocused by remember { mutableStateOf(false) }
     var manualHostInput by remember { mutableStateOf(securePreferences.savedHost) }
+    var masterPasswordInput by remember(masterPasswordPromptUrl) { mutableStateOf("") }
+    var masterPasswordVisible by remember(masterPasswordPromptUrl) { mutableStateOf(false) }
     val availableApkUpdateVersion = if (githubAndroidRelease?.updateAvailable == true) githubAndroidRelease.latestVersion else ""
     var updateBannerDismissed by remember(availableApkUpdateVersion) { mutableStateOf(false) }
 
@@ -360,12 +377,15 @@ fun CockpitDashboard(
         }
     }
 
-    LaunchedEffect(activeUrl, connectionMode, securePreferences.deviceToken) {
+    LaunchedEffect(activeUrl, connectionMode, masterPasswordPromptUrl, securePreferences.deviceToken) {
         val wv = webViewRef ?: return@LaunchedEffect
         val currentToken = securePreferences.deviceToken.trim()
-        if (activeUrl.isNotEmpty()) {
+        val isCertifiedConnected =
+            masterPasswordPromptUrl.isBlank() &&
+                (connectionMode == ConnectionMode.CONNECTED_LAN || connectionMode == ConnectionMode.CONNECTED_WAN)
+        if (activeUrl.isNotEmpty() && isCertifiedConnected) {
             syncWebViewAuthCookie(activeUrl, wv)
-            val needsReloadWithToken = lastLoadedToken.isEmpty() && currentToken.isNotEmpty()
+            val needsReloadWithToken = currentToken.isNotEmpty() && currentToken != lastLoadedToken
             if (activeUrl != lastLoadedBaseUrl || needsReloadWithToken) {
                 lastLoadedBaseUrl = activeUrl
                 lastLoadedToken = currentToken
@@ -386,16 +406,17 @@ fun CockpitDashboard(
             try {
                 wv.clearCache(true)
             } catch (_: Exception) {}
-            if (hadPrevious && activeUrl.isNotEmpty()) {
+            if (hadPrevious && activeUrl.isNotEmpty() && masterPasswordPromptUrl.isBlank()) {
                 reloadWithAuthHeaders(wv)
             }
         }
     }
 
-    val isSearching = isDiscoveringServers || connectionMode == ConnectionMode.SCANNING_LAN || connectionMode == ConnectionMode.CONNECTING
+    val isMasterPromptVisible = masterPasswordPromptUrl.isNotBlank()
+    val isSearching = isDiscoveringServers || isUnlockingMasterPassword || connectionMode == ConnectionMode.SCANNING_LAN || connectionMode == ConnectionMode.CONNECTING
     val isOfflineFallback =
         (connectionMode == ConnectionMode.DISCONNECTED || connectionMode == ConnectionMode.ERROR) && activeUrl.isEmpty()
-    val showConnectionOverlay = showServerDiscoverer || isSearching || isOfflineFallback || (isPageLoading && activeUrl.isEmpty())
+    val showConnectionOverlay = isMasterPromptVisible || showServerDiscoverer || isSearching || isOfflineFallback || (isPageLoading && activeUrl.isEmpty())
 
     // Interfaz única de borde a borde: sin cabecera nativa duplicada compitiendo con la barra web Alethia
     Box(
@@ -525,12 +546,18 @@ fun CockpitDashboard(
             enter = fadeIn(tween(240)) + scaleIn(initialScale = 0.96f, animationSpec = tween(260)),
             exit = fadeOut(tween(220)) + scaleOut(targetScale = 0.97f, animationSpec = tween(220))
         ) {
-            val dotColor = if (isOfflineFallback) dangerColor else if (isSearching) warnColor else okColor
-            val statusLabel = when (connectionMode) {
-                ConnectionMode.SCANNING_LAN -> I18nDictionary.t(context, "native_android.searching", "Buscando...")
-                ConnectionMode.CONNECTING -> I18nDictionary.t(context, "native_android.connecting", "Conectando...")
-                ConnectionMode.DISCONNECTED -> I18nDictionary.t(context, "native_android.disconnected", "Desconectado")
-                ConnectionMode.ERROR -> I18nDictionary.t(context, "native_android.no_connection", "Sin conexión")
+            val dotColor = when {
+                isMasterPromptVisible -> warnColor
+                isOfflineFallback -> dangerColor
+                isSearching -> warnColor
+                else -> okColor
+            }
+            val statusLabel = when {
+                isMasterPromptVisible -> I18nDictionary.t(context, "native_android.master_pwd_badge", "Certificación requerida")
+                connectionMode == ConnectionMode.SCANNING_LAN -> I18nDictionary.t(context, "native_android.searching", "Buscando...")
+                connectionMode == ConnectionMode.CONNECTING -> I18nDictionary.t(context, "native_android.connecting", "Conectando...")
+                connectionMode == ConnectionMode.DISCONNECTED -> I18nDictionary.t(context, "native_android.disconnected", "Desconectado")
+                connectionMode == ConnectionMode.ERROR -> I18nDictionary.t(context, "native_android.no_connection", "Sin conexión")
                 else -> I18nDictionary.t(context, "native_android.connecting", "Conectando...")
             }
 
@@ -615,10 +642,22 @@ fun CockpitDashboard(
                     }
 
                     Text(
-                        text = if (showServerDiscoverer) {
-                            I18nDictionary.t(context, "native_android.discoverer_title", "Buscador de servidores locales")
-                        } else {
-                            I18nDictionary.t(context, "native_android.server_panel", "Panel del Servidor")
+                        text = when {
+                            isMasterPromptVisible -> I18nDictionary.t(
+                                context,
+                                "native_android.master_pwd_title",
+                                "Certificar dispositivo"
+                            )
+                            showServerDiscoverer -> I18nDictionary.t(
+                                context,
+                                "native_android.discoverer_title",
+                                "Buscador de servidores locales"
+                            )
+                            else -> I18nDictionary.t(
+                                context,
+                                "native_android.server_panel",
+                                "Panel del Servidor"
+                            )
                         },
                         color = paletteTextPrimary,
                         fontSize = 18.sp,
@@ -627,14 +666,156 @@ fun CockpitDashboard(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = discovererError.ifBlank { scanningMessage },
-                        color = if (discovererError.isNotBlank()) dangerColor else paletteTextSecondary,
+                        text = when {
+                            isMasterPromptVisible -> masterPasswordError.ifBlank {
+                                I18nDictionary.t(
+                                    context,
+                                    "native_android.master_pwd_desc",
+                                    "Este dispositivo aún no está certificado. Introduce la contraseña maestra del servidor para emitir su certificado único."
+                                )
+                            }
+                            else -> discovererError.ifBlank { scanningMessage }
+                        },
+                        color = when {
+                            isMasterPromptVisible && masterPasswordError.isNotBlank() -> dangerColor
+                            !isMasterPromptVisible && discovererError.isNotBlank() -> dangerColor
+                            else -> paletteTextSecondary
+                        },
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,
                         lineHeight = 19.sp
                     )
 
-                    if (showServerDiscoverer) {
+                    if (isMasterPromptVisible) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(paletteSubtle)
+                                .border(1.dp, paletteBorder, RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 9.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Key,
+                                contentDescription = null,
+                                tint = accentPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = masterPasswordPromptUrl
+                                    .removePrefix("https://")
+                                    .removePrefix("http://"),
+                                color = paletteTextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = masterPasswordInput,
+                            onValueChange = { masterPasswordInput = it },
+                            singleLine = true,
+                            enabled = !isUnlockingMasterPassword,
+                            label = {
+                                Text(
+                                    text = I18nDictionary.t(
+                                        context,
+                                        "native_android.master_pwd_label",
+                                        "Contraseña maestra"
+                                    ),
+                                    fontSize = 11.sp
+                                )
+                            },
+                            visualTransformation = if (masterPasswordVisible) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    if (masterPasswordInput.isNotBlank() && !isUnlockingMasterPassword) {
+                                        onSubmitMasterPassword(masterPasswordPromptUrl, masterPasswordInput)
+                                    }
+                                }
+                            ),
+                            trailingIcon = {
+                                IconButton(onClick = { masterPasswordVisible = !masterPasswordVisible }) {
+                                    Icon(
+                                        imageVector = if (masterPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = null,
+                                        tint = paletteTextSecondary
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(paletteSubtle)
+                                    .border(1.dp, paletteBorder, RoundedCornerShape(12.dp))
+                                    .focusable()
+                                    .clickable(enabled = !isUnlockingMasterPassword) {
+                                        masterPasswordInput = ""
+                                        onDismissMasterPasswordPrompt()
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = I18nDictionary.t(context, "native_android.back_btn", "Volver"),
+                                    color = paletteTextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .weight(1.4f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isDarkTheme) AlethiaLime else AlethiaObsidian)
+                                    .border(
+                                        width = if (retryBtnFocused) 2.dp else 1.dp,
+                                        color = if (retryBtnFocused) accentPrimary else paletteBorder,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .onFocusChanged { retryBtnFocused = it.isFocused }
+                                    .focusable()
+                                    .clickable(enabled = !isUnlockingMasterPassword && masterPasswordInput.isNotBlank()) {
+                                        onSubmitMasterPassword(masterPasswordPromptUrl, masterPasswordInput)
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = if (isUnlockingMasterPassword) {
+                                        I18nDictionary.t(context, "native_android.master_pwd_verifying", "Verificando...")
+                                    } else {
+                                        I18nDictionary.t(context, "native_android.master_pwd_btn", "Autorizar")
+                                    },
+                                    color = if (isDarkTheme) AlethiaObsidian else AlethiaLime,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    } else if (showServerDiscoverer) {
                         Spacer(modifier = Modifier.height(14.dp))
                         Column(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -811,7 +992,7 @@ fun CockpitDashboard(
 
         // Aviso flotante de acceso revocado en estética Alethia semántica
         AnimatedVisibility(
-            visible = connectionMode == ConnectionMode.REVOKED,
+            visible = connectionMode == ConnectionMode.REVOKED && !isMasterPromptVisible,
             enter = fadeIn(tween(240)) + slideInVertically(initialOffsetY = { -40 }),
             exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { -40 })
         ) {
@@ -844,7 +1025,7 @@ fun CockpitDashboard(
                             text = I18nDictionary.t(
                                 context,
                                 "native_android.revoked_desc",
-                                "Este dispositivo fue desconectado desde el servidor. Conéctate a tu red Wi-Fi de casa y pulsa Reconectar."
+                                "Este dispositivo requiere certificación. Conéctate a tu Wi-Fi o usa la contraseña maestra."
                             ),
                             color = paletteTextPrimary,
                             fontSize = 12.sp
@@ -862,11 +1043,11 @@ fun CockpitDashboard(
                             )
                             .onFocusChanged { revokedBtnFocused = it.isFocused }
                             .focusable()
-                            .clickable { onRefresh() }
+                            .clickable { onRequestMasterPasswordUnlock() }
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = I18nDictionary.t(context, "native_android.reconnect", "Reconectar"),
+                            text = I18nDictionary.t(context, "native_android.master_pwd_btn", "Autorizar"),
                             color = Color.White,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold

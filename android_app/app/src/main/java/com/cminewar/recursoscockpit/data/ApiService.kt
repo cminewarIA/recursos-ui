@@ -44,6 +44,15 @@ data class HealthCheckResult(
     val serverVersion: String = ""
 )
 
+data class MasterUnlockResult(
+    val success: Boolean,
+    val token: String = "",
+    val lockedOut: Boolean = false,
+    val retryAfterSec: Int = 0,
+    val remainingAttempts: Int? = null,
+    val errorMessage: String = ""
+)
+
 class ApiService(
     private val context: Context,
     private val securePreferences: SecurePreferences
@@ -507,7 +516,11 @@ class ApiService(
                     HealthCheckResult(isOnline = true, isRevoked = false, isRecursosServer = isRecursos, serverVersion = detectedVer)
                 } else if (response.code == 403) {
                     val body = response.body?.string() ?: ""
-                    val isLocked = body.contains("locked") || body.contains("denegado") || body.isEmpty()
+                    val isLocked = body.isBlank() ||
+                        body.contains("locked", ignoreCase = true) ||
+                        body.contains("denegado", ignoreCase = true) ||
+                        body.contains("certificado", ignoreCase = true) ||
+                        body.contains("protegido", ignoreCase = true)
                     HealthCheckResult(isOnline = true, isRevoked = isLocked, isRecursosServer = true)
                 } else {
                     if (!isQuickScan) {
@@ -521,6 +534,68 @@ class ApiService(
                 Log.w("RecursosCockpit", "Fallo sondeando $baseUrl: ${e.javaClass.simpleName}: ${e.message}")
             }
             HealthCheckResult(isOnline = false)
+        }
+    }
+
+    suspend fun unlockWithMasterPassword(baseUrl: String, masterPassword: String): MasterUnlockResult = withContext(Dispatchers.IO) {
+        val cleanPwd = masterPassword.trim()
+        if (cleanPwd.isEmpty()) {
+            return@withContext MasterUnlockResult(success = false, errorMessage = "empty")
+        }
+        try {
+            val url = "${baseUrl.trimEnd('/')}/api/auth/unlock"
+            val payload = mapOf(
+                "key" to cleanPwd,
+                "device_telemetry" to collectDeviceTelemetry()
+            )
+            val jsonBody = gson.toJson(payload).toRequestBody("application/json; charset=utf-8".toMediaType())
+            val reqBuilder = Request.Builder().url(url).post(jsonBody)
+            applyAuthAndTelemetryHeaders(reqBuilder)
+
+            client.newCall(reqBuilder.build()).execute().use { response ->
+                val body = response.body?.string() ?: ""
+                if (response.isSuccessful) {
+                    val jsonObj = try {
+                        org.json.JSONObject(body)
+                    } catch (_: Exception) {
+                        org.json.JSONObject()
+                    }
+                    val ok = jsonObj.optBoolean("success", false)
+                    val returnedToken = jsonObj.optString("token", "").trim()
+                    if (ok && returnedToken.isNotEmpty()) {
+                        securePreferences.deviceToken = returnedToken
+                        securePreferences.isCertRevoked = false
+                        return@withContext MasterUnlockResult(success = true, token = returnedToken)
+                    }
+                    return@withContext MasterUnlockResult(success = false, errorMessage = "invalid_response")
+                } else if (response.code == 429) {
+                    val jsonObj = try { org.json.JSONObject(body) } catch (_: Exception) { org.json.JSONObject() }
+                    val retrySec = jsonObj.optInt(
+                        "retry_after",
+                        response.header("Retry-After")?.toIntOrNull() ?: 900
+                    )
+                    return@withContext MasterUnlockResult(
+                        success = false,
+                        lockedOut = true,
+                        retryAfterSec = retrySec
+                    )
+                } else if (response.code == 403) {
+                    val jsonObj = try { org.json.JSONObject(body) } catch (_: Exception) { org.json.JSONObject() }
+                    val rem = if (jsonObj.has("remaining_attempts")) jsonObj.optInt("remaining_attempts", -1).takeIf { it >= 0 } else null
+                    return@withContext MasterUnlockResult(
+                        success = false,
+                        remainingAttempts = rem
+                    )
+                } else {
+                    return@withContext MasterUnlockResult(
+                        success = false,
+                        errorMessage = "http_${response.code}"
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("RecursosCockpit", "Fallo en /api/auth/unlock contra $baseUrl: ${e.javaClass.simpleName}")
+            MasterUnlockResult(success = false, errorMessage = e.javaClass.simpleName)
         }
     }
 

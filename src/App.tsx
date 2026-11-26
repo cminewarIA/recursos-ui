@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import {
   Activity,
+  Eye,
+  EyeOff,
+  KeyRound,
   Lock,
   Moon,
   RefreshCw,
@@ -53,6 +56,10 @@ export function App() {
 
   const [certState, setCertState] = useState<'checking' | 'certified' | 'locked'>('checking');
   const [retryingAuth, setRetryingAuth] = useState(false);
+  const [masterPwdInput, setMasterPwdInput] = useState('');
+  const [masterPwdVisible, setMasterPwdVisible] = useState(false);
+  const [unlockingMasterPwd, setUnlockingMasterPwd] = useState(false);
+  const [masterPwdError, setMasterPwdError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<MainTabId>(() => {
     if (typeof window !== 'undefined') {
@@ -166,6 +173,7 @@ export function App() {
 
   const handleRetryLanVerification = useCallback(async () => {
     setRetryingAuth(true);
+    setMasterPwdError(null);
     try {
       const authRes = await apiFetchJson<{ is_trusted?: boolean; is_local?: boolean; token?: string }>(
         '/api/auth/status'
@@ -182,6 +190,39 @@ export function App() {
       setRetryingAuth(false);
     }
   }, [fetchMetrics, purgeSensitiveState, t]);
+
+  const handleUnlockWithMasterPassword = useCallback(
+    async (ev: React.FormEvent) => {
+      ev.preventDefault();
+      const pwd = masterPwdInput.trim();
+      if (!pwd || unlockingMasterPwd) return;
+      setUnlockingMasterPwd(true);
+      setMasterPwdError(null);
+      try {
+        const telemetry = await collectBrowserDeviceTelemetry(getCanonicalVersion());
+        const res = await apiFetchJson<{ success?: boolean; token?: string; status?: string }>('/api/auth/unlock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: pwd, device_telemetry: telemetry }),
+        });
+        if (res.ok && res.data?.success && res.data?.token) {
+          setStoredToken(res.data.token);
+          setMasterPwdInput('');
+          setMasterPwdError(null);
+          await fetchMetrics();
+        } else if (res.status === 429 || res.data?.status === 'locked_out') {
+          setMasterPwdError(t('lock.master_pwd_locked'));
+        } else {
+          setMasterPwdError(t('lock.master_pwd_invalid'));
+        }
+      } catch {
+        setMasterPwdError(t('lock.master_pwd_invalid'));
+      } finally {
+        setUnlockingMasterPwd(false);
+      }
+    },
+    [fetchMetrics, masterPwdInput, t, unlockingMasterPwd]
+  );
 
   useEffect(() => {
     const isPaused = () =>
@@ -574,15 +615,50 @@ export function App() {
               </p>
             </div>
 
-            <div className="cockpit-subtile w-full p-3.5 text-left text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
-              {t('lock.lan_note')}
-            </div>
+            <form onSubmit={(e) => void handleUnlockWithMasterPassword(e)} className="w-full space-y-2.5 text-left">
+              <div className="relative flex items-center">
+                <KeyRound className="pointer-events-none absolute left-3.5 h-4 w-4 text-slate-400" />
+                <input
+                  type={masterPwdVisible ? 'text' : 'password'}
+                  value={masterPwdInput}
+                  onChange={(e) => {
+                    setMasterPwdInput(e.target.value);
+                    if (masterPwdError) setMasterPwdError(null);
+                  }}
+                  placeholder={t('lock.master_pwd_label')}
+                  autoComplete="current-password"
+                  disabled={unlockingMasterPwd}
+                  className="cockpit-input w-full rounded-xl py-2.5 pl-10 pr-10 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMasterPwdVisible((v) => !v)}
+                  className="absolute right-2.5 rounded-lg p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  aria-label={t('lock.master_pwd_label')}
+                >
+                  {masterPwdVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {masterPwdError && (
+                <p className="text-center text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                  {masterPwdError}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={unlockingMasterPwd || !masterPwdInput.trim()}
+                className="cockpit-btn-accent inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-60 cursor-pointer"
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                <span>{unlockingMasterPwd ? t('lock.checking') : t('lock.master_pwd_btn')}</span>
+              </button>
+            </form>
 
             <button
               type="button"
               disabled={retryingAuth}
               onClick={() => void handleRetryLanVerification()}
-              className="cockpit-btn-accent inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-60 cursor-pointer"
+              className="cockpit-btn inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all disabled:opacity-60 cursor-pointer"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${retryingAuth ? 'animate-spin' : ''}`} />
               <span>{retryingAuth ? t('lock.checking') : t('lock.retry_btn')}</span>

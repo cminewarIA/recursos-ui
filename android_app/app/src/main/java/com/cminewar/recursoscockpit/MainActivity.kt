@@ -230,6 +230,9 @@ class MainActivity : ComponentActivity() {
                 var isDiscoveringServers by remember { mutableStateOf(false) }
                 var discoveredServers by remember { mutableStateOf<List<DiscoveredServerNode>>(emptyList()) }
                 var discovererError by remember { mutableStateOf("") }
+                var masterPasswordPromptUrl by remember { mutableStateOf("") }
+                var masterPasswordError by remember { mutableStateOf("") }
+                var isUnlockingMasterPassword by remember { mutableStateOf(false) }
                 var githubAndroidRelease by remember { mutableStateOf<GithubAndroidReleaseInfo?>(null) }
                 var apkUpdateProgress by remember { mutableStateOf<Int?>(null) }
                 var apkUpdateStatus by remember { mutableStateOf("") }
@@ -257,16 +260,27 @@ class MainActivity : ComponentActivity() {
                         val vInfo = metricsData?.versionInfo
                         updateDetectedServerVersion(vInfo?.currentVersion ?: vInfo?.localVersion ?: vInfo?.version)
                         activeUrl = endpoint.url
-                        showServerDiscoverer = false
                         discovererError = ""
-                        connectionMode = if (isRevoked || securePreferences.isCertRevoked) {
-                            ConnectionMode.REVOKED
+                        if (isRevoked || securePreferences.isCertRevoked) {
+                            masterPasswordPromptUrl = endpoint.url
+                            masterPasswordError = ""
+                            showServerDiscoverer = true
+                            connectionMode = ConnectionMode.REVOKED
                         } else {
-                            endpoint.mode
+                            masterPasswordPromptUrl = ""
+                            masterPasswordError = ""
+                            showServerDiscoverer = false
+                            connectionMode = endpoint.mode
+                            lifecycleScope.launch {
+                                I18nDictionary.syncRemoteDictionary(applicationContext, endpoint.url)
+                            }
                         }
-                        lifecycleScope.launch {
-                            I18nDictionary.syncRemoteDictionary(applicationContext, endpoint.url)
-                        }
+                    } else if (endpoint.mode == ConnectionMode.REVOKED) {
+                        activeUrl = endpoint.url
+                        masterPasswordPromptUrl = endpoint.url
+                        masterPasswordError = ""
+                        showServerDiscoverer = true
+                        connectionMode = ConnectionMode.REVOKED
                     } else {
                         activeUrl = endpoint.url
                         connectionMode = endpoint.mode
@@ -276,6 +290,8 @@ class MainActivity : ComponentActivity() {
                 fun pairWithServer(targetUrlOrHost: String) {
                     lifecycleScope.launch {
                         discovererError = ""
+                        masterPasswordError = ""
+                        masterPasswordPromptUrl = ""
                         connectionMode = ConnectionMode.CONNECTING
                         scanningMessage = I18nDictionary.t(
                             this@MainActivity,
@@ -283,7 +299,13 @@ class MainActivity : ComponentActivity() {
                             "Emparejando con $targetUrlOrHost..."
                         )
                         val endpoint = discoveryManager.selectAndPersistNode(targetUrlOrHost)
-                        if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN || endpoint.mode == ConnectionMode.REVOKED) {
+                        if (endpoint.mode == ConnectionMode.REVOKED) {
+                            activeUrl = endpoint.url
+                            masterPasswordPromptUrl = endpoint.url
+                            masterPasswordError = ""
+                            showServerDiscoverer = true
+                            connectionMode = ConnectionMode.REVOKED
+                        } else if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN) {
                             finalizeConnectedEndpoint(endpoint)
                         } else {
                             connectionMode = ConnectionMode.ERROR
@@ -293,6 +315,44 @@ class MainActivity : ComponentActivity() {
                                 "No se pudo conectar con $targetUrlOrHost"
                             )
                             showServerDiscoverer = true
+                        }
+                    }
+                }
+
+                fun submitMasterPassword(targetUrl: String, password: String) {
+                    if (isUnlockingMasterPassword || targetUrl.isBlank() || password.isBlank()) return
+                    lifecycleScope.launch {
+                        isUnlockingMasterPassword = true
+                        masterPasswordError = ""
+                        val result = apiService.unlockWithMasterPassword(targetUrl, password)
+                        isUnlockingMasterPassword = false
+                        if (result.success) {
+                            discoveryManager.persistEndpointAfterUnlock(targetUrl)
+                            val cleanHost = targetUrl
+                                .removePrefix("http://")
+                                .removePrefix("https://")
+                                .substringBefore("/")
+                                .substringBefore(":")
+                            val resolvedMode = if (targetUrl.startsWith("https://", ignoreCase = true) || !isPrivateRfc1918Ipv4(cleanHost)) {
+                                ConnectionMode.CONNECTED_WAN
+                            } else {
+                                ConnectionMode.CONNECTED_LAN
+                            }
+                            masterPasswordPromptUrl = ""
+                            masterPasswordError = ""
+                            finalizeConnectedEndpoint(ResolvedEndpoint(targetUrl, resolvedMode))
+                        } else if (result.lockedOut) {
+                            masterPasswordError = I18nDictionary.t(
+                                this@MainActivity,
+                                "native_android.master_pwd_locked",
+                                "Demasiados intentos fallidos. Espera unos minutos antes de volver a intentarlo."
+                            )
+                        } else {
+                            masterPasswordError = I18nDictionary.t(
+                                this@MainActivity,
+                                "native_android.master_pwd_invalid",
+                                "Contraseña maestra incorrecta. Inténtalo de nuevo."
+                            )
                         }
                     }
                 }
@@ -573,8 +633,26 @@ class MainActivity : ComponentActivity() {
                     isDiscoveringServers = isDiscoveringServers,
                     discoveredServers = discoveredServers,
                     discovererError = discovererError,
+                    masterPasswordPromptUrl = masterPasswordPromptUrl,
+                    masterPasswordError = masterPasswordError,
+                    isUnlockingMasterPassword = isUnlockingMasterPassword,
+                    onSubmitMasterPassword = { url, pwd -> submitMasterPassword(url, pwd) },
+                    onDismissMasterPasswordPrompt = {
+                        masterPasswordPromptUrl = ""
+                        masterPasswordError = ""
+                        showServerDiscoverer = true
+                    },
+                    onRequestMasterPasswordUnlock = {
+                        if (activeUrl.isNotBlank()) {
+                            masterPasswordPromptUrl = activeUrl
+                            masterPasswordError = ""
+                            showServerDiscoverer = true
+                        }
+                    },
                     onSelectDiscoveredServer = { urlOrHost -> pairWithServer(urlOrHost) },
                     onRescanLocalServers = {
+                        masterPasswordPromptUrl = ""
+                        masterPasswordError = ""
                         startLocalServerDiscoverer(
                             requestPermission = true,
                             autoConnectIfDisconnected = activeUrl.isBlank()
