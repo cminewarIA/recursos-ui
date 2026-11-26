@@ -69,65 +69,124 @@ class DiscoveryManager(
     private val securePreferences: SecurePreferences
 ) {
 
+    private fun buildCandidateUrls(rawHostOrUrl: String, defaultPort: Int): List<String> {
+        val trimmed = rawHostOrUrl.trim().trimEnd('/')
+        if (trimmed.isEmpty()) return emptyList()
+        val looksLikeIp = trimmed.all { it.isDigit() || it == '.' } && trimmed.count { it == '.' } == 3
+        return when {
+            trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true) ->
+                listOf(trimmed)
+            trimmed.contains(":") ->
+                listOf("http://$trimmed", "https://$trimmed")
+            looksLikeIp || isPrivateRfc1918Ipv4(trimmed) ->
+                listOf("http://$trimmed:$defaultPort")
+            else ->
+                listOf("https://$trimmed", "http://$trimmed:$defaultPort", "http://$trimmed")
+        }
+    }
+
+    private fun extractHostFromUrl(url: String): String {
+        return url.removePrefix("http://")
+            .removePrefix("https://")
+            .substringBefore("/")
+            .substringBefore(":")
+            .trim()
+    }
+
+    private fun isLocalUrl(url: String): Boolean {
+        val host = extractHostFromUrl(url)
+        return !url.startsWith("https://", ignoreCase = true) && isPrivateRfc1918Ipv4(host)
+    }
+
+    private fun classifyConnectionMode(url: String): ConnectionMode {
+        return if (isLocalUrl(url)) ConnectionMode.CONNECTED_LAN else ConnectionMode.CONNECTED_WAN
+    }
+
+    fun hasAnySavedEndpoint(): Boolean {
+        return securePreferences.lastConnectedUrl.isNotBlank() ||
+            securePreferences.savedHost.isNotBlank() ||
+            apiService.isValidWanDomain(securePreferences.wanDomain)
+    }
+
     suspend fun trySavedNodeOnly(): ResolvedEndpoint? = withContext(Dispatchers.IO) {
         val defaultPort = securePreferences.manualPort
-        val savedHost = securePreferences.savedHost.trim()
         val lanContexts = discoverLocalLanContexts()
+        val hasLocalLan = lanContexts.isNotEmpty()
         val primarySocketFactory = lanContexts.firstOrNull { it.socketFactory != null }?.socketFactory
 
-        if (savedHost.isNotEmpty()) {
-            val candidateUrl = if (savedHost.startsWith("http://") || savedHost.startsWith("https://")) {
-                savedHost.trimEnd('/')
-            } else {
-                "http://$savedHost:$defaultPort"
-            }
-            var res = apiService.probeNode(candidateUrl, isQuickScan = false)
-            if (!res.isOnline && primarySocketFactory != null) {
-                res = apiService.probeNode(candidateUrl, isQuickScan = false, socketFactory = primarySocketFactory)
-            }
-            if (res.isRevoked) {
-                securePreferences.isCertRevoked = true
-                return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.REVOKED)
-            }
-            if (res.isOnline && res.isRecursosServer) {
-                securePreferences.isCertRevoked = false
-                return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.CONNECTED_LAN)
-            }
+        val candidateUrls = linkedSetOf<String>()
+        val lastUrl = securePreferences.lastConnectedUrl.trim().trimEnd('/')
+        if (lastUrl.isNotEmpty()) {
+            candidateUrls.addAll(buildCandidateUrls(lastUrl, defaultPort))
         }
-
+        val savedHost = securePreferences.savedHost.trim()
+        if (savedHost.isNotEmpty()) {
+            candidateUrls.addAll(buildCandidateUrls(savedHost, defaultPort))
+        }
         val wanDomain = securePreferences.wanDomain.trim().trimEnd('/')
         if (apiService.isValidWanDomain(wanDomain)) {
-            val wanCandidate = if (wanDomain.startsWith("http://") || wanDomain.startsWith("https://")) wanDomain else "https://$wanDomain"
-            val wanRes = apiService.probeNode(wanCandidate, isQuickScan = false)
-            if (wanRes.isRevoked) {
-                securePreferences.isCertRevoked = true
-                return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.REVOKED)
+            val wanCandidate = if (wanDomain.startsWith("http://", ignoreCase = true) || wanDomain.startsWith("https://", ignoreCase = true)) {
+                wanDomain
+            } else {
+                "https://$wanDomain"
             }
-            if (wanRes.isOnline && wanRes.isRecursosServer) {
-                securePreferences.isCertRevoked = false
-                return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.CONNECTED_WAN)
-            }
+            candidateUrls.add(wanCandidate)
         }
-        null
+
+        if (candidateUrls.isEmpty()) return@withContext null
+
+        // Si estamos en datos móviles sin red local Wi-Fi/Ethernet, evitar esperas inútiles sobre IPs privadas LAN
+        val activeCandidates = candidateUrls.filter { url ->
+            hasLocalLan || !isLocalUrl(url)
+        }.ifEmpty { candidateUrls.toList() }
+
+        val probeResults = coroutineScope {
+            activeCandidates.map { url ->
+                async {
+                    val localEndpoint = isLocalUrl(url)
+                    var res = apiService.probeNode(url, isQuickScan = false)
+                    if (!res.isOnline && localEndpoint && primarySocketFactory != null) {
+                        res = apiService.probeNode(url, isQuickScan = false, socketFactory = primarySocketFactory)
+                    }
+                    if (res.isRevoked || (res.isOnline && res.isRecursosServer)) {
+                        url to res
+                    } else {
+                        null
+                    }
+                }
+            }.awaitAll().filterNotNull()
+        }
+
+        if (probeResults.isEmpty()) return@withContext null
+
+        // Prioridad: 1) LAN certificado, 2) WAN certificado (o último usado), 3) Revocado/sin certificar
+        val preferred = probeResults.firstOrNull { (url, res) -> !res.isRevoked && isLocalUrl(url) }
+            ?: probeResults.firstOrNull { (url, res) -> !res.isRevoked && url == lastUrl }
+            ?: probeResults.firstOrNull { (_, res) -> !res.isRevoked }
+            ?: probeResults.firstOrNull { (url, _) -> url == lastUrl }
+            ?: probeResults.first()
+
+        val (resolvedUrl, result) = preferred
+        if (result.isRevoked) {
+            securePreferences.isCertRevoked = true
+            persistDiscoveredHostAndPort(resolvedUrl, clearRevoked = false)
+            return@withContext ResolvedEndpoint(resolvedUrl, ConnectionMode.REVOKED)
+        }
+        persistDiscoveredHostAndPort(resolvedUrl, clearRevoked = true)
+        ResolvedEndpoint(resolvedUrl, classifyConnectionMode(resolvedUrl))
     }
 
     suspend fun selectAndPersistNode(rawHostOrUrl: String): ResolvedEndpoint = withContext(Dispatchers.IO) {
         val trimmed = rawHostOrUrl.trim().trimEnd('/')
         if (trimmed.isEmpty()) return@withContext ResolvedEndpoint("", ConnectionMode.ERROR)
         val defaultPort = securePreferences.manualPort
-        val looksLikeIp = trimmed.all { it.isDigit() || it == '.' } && trimmed.count { it == '.' } == 3
-        val candidateUrls = when {
-            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> listOf(trimmed)
-            trimmed.contains(":") -> listOf("http://$trimmed", "https://$trimmed")
-            looksLikeIp || isPrivateRfc1918Ipv4(trimmed) -> listOf("http://$trimmed:$defaultPort")
-            else -> listOf("https://$trimmed", "http://$trimmed:$defaultPort", "http://$trimmed")
-        }
+        val candidateUrls = buildCandidateUrls(trimmed, defaultPort)
         val lanContexts = discoverLocalLanContexts()
         val primarySocketFactory = lanContexts.firstOrNull { it.socketFactory != null }?.socketFactory
 
         for (candidateUrl in candidateUrls) {
             var res = apiService.probeNode(candidateUrl, isQuickScan = false)
-            if (!res.isOnline && primarySocketFactory != null && !candidateUrl.startsWith("https://")) {
+            if (!res.isOnline && primarySocketFactory != null && isLocalUrl(candidateUrl)) {
                 res = apiService.probeNode(candidateUrl, isQuickScan = false, socketFactory = primarySocketFactory)
             }
             if (res.isRevoked) {
@@ -137,13 +196,7 @@ class DiscoveryManager(
             }
             if (res.isOnline && res.isRecursosServer) {
                 persistDiscoveredHostAndPort(candidateUrl, clearRevoked = true)
-                val cleanHost = candidateUrl.removePrefix("http://").removePrefix("https://").substringBefore("/").substringBefore(":")
-                val mode = if (candidateUrl.startsWith("https://") || !isPrivateRfc1918Ipv4(cleanHost)) {
-                    ConnectionMode.CONNECTED_WAN
-                } else {
-                    ConnectionMode.CONNECTED_LAN
-                }
-                return@withContext ResolvedEndpoint(candidateUrl, mode)
+                return@withContext ResolvedEndpoint(candidateUrl, classifyConnectionMode(candidateUrl))
             }
         }
         ResolvedEndpoint(candidateUrls.first(), ConnectionMode.ERROR)
@@ -192,7 +245,9 @@ class DiscoveryManager(
         val priorityUrls = linkedSetOf<Pair<String, SocketFactory?>>()
         val savedHost = securePreferences.savedHost.trim()
         if (savedHost.isNotEmpty()) {
-            priorityUrls.add("http://$savedHost:$defaultPort" to primarySocketFactory)
+            for (u in buildCandidateUrls(savedHost, defaultPort)) {
+                priorityUrls.add(u to if (isLocalUrl(u)) primarySocketFactory else null)
+            }
         }
         for (u in nsdCandidates) {
             priorityUrls.add(u to primarySocketFactory)
@@ -273,23 +328,13 @@ class DiscoveryManager(
             "Autodescubrimiento iniciado: subredes=[${lanContexts.joinToString { "${it.subnetBase}.0/24(${it.interfaceName},gw=${it.gatewayIp ?: "-"})" }}], vpn=$hasVpn, port=$defaultPort"
         )
 
-        // 1. Probar el último host guardado para conexión instantánea si está disponible
-        val savedHost = securePreferences.savedHost.trim()
-        if (savedHost.isNotEmpty()) {
-            val candidateUrl = "http://$savedHost:$defaultPort"
-            var res = apiService.probeNode(candidateUrl, isQuickScan = false)
-            if (!res.isOnline && primarySocketFactory != null) {
-                res = apiService.probeNode(candidateUrl, isQuickScan = false, socketFactory = primarySocketFactory)
-            }
-            if (res.isRevoked) {
-                securePreferences.isCertRevoked = true
-                return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.REVOKED)
-            }
-            if (res.isOnline && res.isRecursosServer) {
-                securePreferences.isCertRevoked = false
-                return@withContext ResolvedEndpoint(candidateUrl, ConnectionMode.CONNECTED_LAN)
-            }
+        // 1. Probar en paralelo los últimos nodos guardados (LAN + WAN) para conexión automática instantánea
+        val savedResolved = trySavedNodeOnly()
+        if (savedResolved != null) {
+            Log.i("RecursosCockpit", "Reconexión automática instantánea en ${System.currentTimeMillis() - startMs}ms -> ${savedResolved.url} (${savedResolved.mode})")
+            return@withContext savedResolved
         }
+        val savedHost = securePreferences.savedHost.trim()
 
         // 2. Descubrimiento paralelo: mDNS/NSD (_recursos._tcp) + candidatos prioritarios en cada subred Wi-Fi/Ethernet
         onScanningProgress?.invoke(
@@ -407,12 +452,12 @@ class DiscoveryManager(
                 Log.i("RecursosCockpit", "Conectado por WAN exterior en ${System.currentTimeMillis() - startMs}ms -> $wanCandidate")
                 return@withContext ResolvedEndpoint(wanCandidate, ConnectionMode.CONNECTED_WAN)
             }
-            val fallback = if (savedHost.isNotEmpty()) "http://$savedHost:$defaultPort" else wanCandidate
+            val fallback = buildCandidateUrls(savedHost, defaultPort).firstOrNull() ?: wanCandidate
             return@withContext ResolvedEndpoint(fallback, ConnectionMode.ERROR)
         }
 
         Log.w("RecursosCockpit", "No se encontró servidor local ni dominio WAN tras ${System.currentTimeMillis() - startMs}ms")
-        val fallback = if (savedHost.isNotEmpty()) "http://$savedHost:$defaultPort" else ""
+        val fallback = buildCandidateUrls(savedHost, defaultPort).firstOrNull() ?: ""
         ResolvedEndpoint(fallback, ConnectionMode.ERROR)
     }
 
@@ -632,6 +677,9 @@ class DiscoveryManager(
         val clean = normalizedUrl.removePrefix("http://").removePrefix("https://").substringBefore("/")
         val host = clean.substringBefore(":")
         val port = clean.substringAfter(":", "").toIntOrNull()
+        if (normalizedUrl.isNotEmpty()) {
+            securePreferences.lastConnectedUrl = normalizedUrl
+        }
         if (clearRevoked) {
             securePreferences.isCertRevoked = false
         }

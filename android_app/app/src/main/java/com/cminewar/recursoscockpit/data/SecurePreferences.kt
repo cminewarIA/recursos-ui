@@ -51,6 +51,10 @@ class SecurePreferences(context: Context) {
         get() = prefs.getString(KEY_LAST_SERVER_VERSION, "") ?: ""
         set(value) = prefs.edit().putString(KEY_LAST_SERVER_VERSION, value).apply()
 
+    var lastConnectedUrl: String
+        get() = prefs.getString(KEY_LAST_CONNECTED_URL, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_LAST_CONNECTED_URL, value).apply()
+
     companion object {
         private const val KEY_DEVICE_TOKEN = "device_token"
         private const val KEY_SAVED_HOST = "saved_host"
@@ -59,5 +63,6 @@ class SecurePreferences(context: Context) {
         private const val KEY_CERT_REVOKED = "cert_revoked"
         private const val KEY_UI_THEME = "ui_theme"
         private const val KEY_LAST_SERVER_VERSION = "last_server_version"
+        private const val KEY_LAST_CONNECTED_URL = "last_connected_url"
     }
 }

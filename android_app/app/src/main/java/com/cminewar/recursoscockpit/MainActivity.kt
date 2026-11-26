@@ -373,7 +373,7 @@ class MainActivity : ComponentActivity() {
                         var autoConnected = false
 
                         suspend fun tryAutoConnectNode(candidate: DiscoveredServerNode) {
-                            if (!autoConnectIfDisconnected || activeUrl.isNotBlank() || autoConnected || candidate.isRevoked) return
+                            if (!autoConnectIfDisconnected || activeUrl.isNotBlank() || autoConnected) return
                             autoConnected = true
                             val endpoint = discoveryManager.selectAndPersistNode(candidate.url)
                             if (endpoint.mode == ConnectionMode.CONNECTED_LAN || endpoint.mode == ConnectionMode.CONNECTED_WAN || endpoint.mode == ConnectionMode.REVOKED) {
@@ -390,7 +390,7 @@ class MainActivity : ComponentActivity() {
                                     if (discoveredServers.none { it.url == node.url }) {
                                         discoveredServers = discoveredServers + node
                                     }
-                                    if (autoConnectIfDisconnected && activeUrl.isBlank() && !node.isRevoked && !autoConnected) {
+                                    if (autoConnectIfDisconnected && activeUrl.isBlank() && !autoConnected) {
                                         tryAutoConnectNode(node)
                                     }
                                 }
@@ -567,17 +567,15 @@ class MainActivity : ComponentActivity() {
                         I18nDictionary.syncRemoteDictionary(applicationContext, null)
                     }
 
-                    // 4. Inicio inteligente: si ya está emparejado usa su nodo; si no o falla, conecta automáticamente con el nodo local detectado
-                    val isPaired = securePreferences.savedHost.isNotBlank() && securePreferences.deviceToken.isNotBlank()
-                    if (!isPaired) {
-                        if (!autoConnectLocalNode()) {
-                            startLocalServerDiscoverer(
-                                requestPermission = false,
-                                autoConnectIfDisconnected = true
-                            )
-                        }
-                    } else {
+                    // 4. Inicio automático inmediato: prueba primero cualquier servidor guardado (LAN + WAN en paralelo) sin pedir confirmación manual
+                    showServerDiscoverer = false
+                    if (discoveryManager.hasAnySavedEndpoint()) {
                         connectionMode = ConnectionMode.CONNECTING
+                        scanningMessage = I18nDictionary.t(
+                            this@MainActivity,
+                            "native_android.connecting",
+                            "Conectando..."
+                        )
                         val savedEndpoint = discoveryManager.trySavedNodeOnly()
                         if (savedEndpoint != null) {
                             finalizeConnectedEndpoint(savedEndpoint)
@@ -587,6 +585,11 @@ class MainActivity : ComponentActivity() {
                                 autoConnectIfDisconnected = true
                             )
                         }
+                    } else if (!autoConnectLocalNode()) {
+                        startLocalServerDiscoverer(
+                            requestPermission = false,
+                            autoConnectIfDisconnected = true
+                        )
                     }
 
                     while (isActive) {
