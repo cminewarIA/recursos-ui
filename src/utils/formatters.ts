@@ -128,6 +128,7 @@ const CANONICAL_SUBTAB_SLUG: Record<AppViewId, Record<string, string>> = {
     devices: 'dispositivos',
     manual: 'manual',
     dex: 'dex',
+    ubuntu: 'ubuntu',
   },
 };
 
@@ -164,6 +165,7 @@ export function normalizeSubTabForView(view: AppViewId, hint?: string): string |
     if (['devices', 'dispositivos', 'nodos', 'security', 'seguridad'].includes(h)) return 'devices';
     if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(h)) return 'manual';
     if (['dex'].includes(h)) return 'dex';
+    if (['ubuntu', 'app', 'desktop', 'escritorio', 'nativo', 'native'].includes(h)) return 'ubuntu';
     if (['updates', 'actualizaciones', 'version', 'sistema', 'settings', 'ajustes', 'cloud', 'nube', 'health', 'salud', 'logs'].includes(h)) return 'updates';
     return 'updates';
   }
@@ -214,6 +216,7 @@ export function resolveAppRoute(pathStr: string): AppRouteInfo {
   if (['actualizaciones', 'updates', 'version', 'ajustes', 'settings', 'cloud', 'nube', 'health', 'salud', 'logs'].includes(p0)) return { view: 'mas', subTab: 'updates' };
   if (['dispositivos', 'devices', 'nodos'].includes(p0)) return { view: 'mas', subTab: 'devices' };
   if (['dex'].includes(p0)) return { view: 'mas', subTab: 'dex' };
+  if (['ubuntu'].includes(p0)) return { view: 'mas', subTab: 'ubuntu' };
   if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(p0)) return { view: 'mas', subTab: 'manual' };
 
   return { view: 'inicio' };

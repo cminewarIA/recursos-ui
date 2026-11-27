@@ -236,6 +236,36 @@ export function detectNativeEnvironment(): {
   };
 }
 
+export function sendUbuntuWindowAction(
+  action:
+    | 'minimize'
+    | 'maximize'
+    | 'unmaximize'
+    | 'toggle_maximize'
+    | 'fullscreen'
+    | 'unfullscreen'
+    | 'toggle_fullscreen'
+    | 'close'
+    | 'reload'
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const handler = window.webkit?.messageHandlers?.recursosWindow;
+    if (handler && typeof handler.postMessage === 'function') {
+      handler.postMessage(action);
+      return;
+    }
+  } catch {
+    // Fallback al puente HTTP loopback local
+  }
+  void fetch('/api/native/window', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+    credentials: 'same-origin',
+  }).catch(() => undefined);
+}
+
 const WEB_INSTALL_ID_KEY = 'recursos_web_install_id';
 
 export function getOrCreateWebInstallId(): string {

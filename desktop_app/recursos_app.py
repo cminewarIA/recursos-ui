@@ -12,6 +12,7 @@ Arquitectura Híbrida Unificada:
 
 import argparse
 import base64
+import concurrent.futures
 import hashlib
 import http.server
 import ipaddress
@@ -29,13 +30,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-try:
-    import cairo
-    HAS_CAIRO = True
-except ImportError:
-    cairo = None
-    HAS_CAIRO = False
-
 HAS_GTK = False
 HAS_WEBKIT2 = False
 WebKit2 = None
@@ -45,8 +39,7 @@ try:
 
     gi.require_version("Gtk", "3.0")
     gi.require_version("Gdk", "3.0")
-    gi.require_version("GdkPixbuf", "2.0")
-    from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango
+    from gi.repository import Gdk, GLib, Gtk
 
     HAS_GTK = True
 
@@ -62,14 +55,12 @@ try:
             continue
 except ImportError:
     class _GtkStub:
-        DrawingArea = object
         ApplicationWindow = object
         Application = object
 
     Gtk = _GtkStub()
     Gdk = object()
     GLib = object()
-    Pango = object()
 
 try:
     import psutil
@@ -663,233 +654,10 @@ window {
     color: #0f1f10;
     font-family: "Geist", "Inter", "Ubuntu", sans-serif;
 }
-headerbar {
-    background-image: none;
-    background-color: #ffffff;
+.fallback-label {
     color: #0f1f10;
-    border-bottom: 1px solid #e0dfda;
-    min-height: 44px;
-    padding: 0 10px;
-}
-headerbar .title {
-    color: #0f1f10;
-    font-weight: 700;
-}
-headerbar .subtitle {
-    color: #5f6c61;
-    font-size: 11px;
-}
-headerbar button {
-    color: #0f1f10;
-    transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-headerbar:backdrop {
-    background-color: #ffffff;
-    color: #0f1f10;
-}
-headerbar:backdrop .title {
-    color: #0f1f10;
-}
-headerbar:backdrop .subtitle {
-    color: #5f6c61;
-}
-headerbar button.titlebutton,
-headerbar .titlebutton,
-headerbar:backdrop button.titlebutton,
-headerbar:backdrop .titlebutton {
-    background-image: none;
-    background-color: #eeede9;
-    color: #0f1f10;
-    border: 1px solid #c8c6bd;
-    border-radius: 9999px;
-    min-width: 28px;
-    min-height: 28px;
-    margin: 0 3px;
-    padding: 2px;
-    box-shadow: none;
-    opacity: 1;
-}
-headerbar button.titlebutton:hover,
-headerbar .titlebutton:hover {
-    background-color: #e5f8d3;
-    border-color: #9bd86b;
-    color: #0f1f10;
-}
-headerbar button.titlebutton.close,
-headerbar .titlebutton.close,
-headerbar:backdrop button.titlebutton.close,
-headerbar:backdrop .titlebutton.close {
-    background-color: #fee2e2;
-    border-color: #fca5a5;
-    color: #b91c1c;
-}
-headerbar button.titlebutton.close:hover,
-headerbar .titlebutton.close:hover {
-    background-color: #dc2626;
-    border-color: #b91c1c;
-    color: #ffffff;
-}
-headerbar button.titlebutton image,
-headerbar .titlebutton image,
-headerbar:backdrop button.titlebutton image,
-headerbar:backdrop .titlebutton image {
-    color: #0f1f10;
-    opacity: 1;
-    -gtk-icon-style: symbolic;
-    -gtk-icon-shadow: none;
-}
-headerbar button.titlebutton.close image,
-headerbar .titlebutton.close image,
-headerbar:backdrop button.titlebutton.close image,
-headerbar:backdrop .titlebutton.close image {
-    color: #b91c1c;
-}
-headerbar button.titlebutton.close:hover image,
-headerbar .titlebutton.close:hover image {
-    color: #ffffff;
-}
-.btn-nav image {
-    color: #0f1f10;
-    -gtk-icon-style: symbolic;
-}
-.launcher-hero {
-    background-image: linear-gradient(135deg, #0c190d, #0f1f10 55%, #162818);
-    border: 1px solid #2b452d;
-    border-radius: 22px;
-    padding: 24px 28px;
-    color: #f5f4f2;
-    box-shadow: 0 14px 32px -10px rgba(10, 20, 11, 0.36);
-}
-.launcher-hero .launcher-title {
-    font-size: 21px;
-    font-weight: 800;
-    color: #f5f4f2;
-}
-.launcher-hero .launcher-subtitle {
-    font-size: 13px;
-    color: #c8d2c6;
-}
-.launcher-card {
-    background-color: #ffffff;
-    border: 1px solid #e0dfda;
-    border-radius: 18px;
-    padding: 20px;
-    box-shadow: 0 4px 16px -4px rgba(15, 31, 16, 0.06);
-    transition: all 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.launcher-card:hover {
-    border-color: #9bd86b;
-    box-shadow: 0 12px 26px -8px rgba(30, 107, 56, 0.14);
-}
-.launcher-title {
-    font-size: 20px;
-    font-weight: 800;
-    color: #0f1f10;
-}
-.launcher-card-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #0f1f10;
-}
-.launcher-subtitle {
-    font-size: 13px;
-    color: #3e4d40;
-}
-.badge-ready {
-    background-color: #c6f19d;
-    border: 1px solid #9bd86b;
-    color: #0f1f10;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-lan {
-    background-color: #e5f8d3;
-    border: 1px solid #9bd86b;
-    color: #144d23;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-wan {
-    background-color: #e6f5ee;
-    border: 1px solid #7bd1a8;
-    color: #0f5132;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-revoked {
-    background-color: #fee2e2;
-    border: 1px solid #fca5a5;
-    color: #b91c1c;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-scanning {
-    background-color: #fef3c7;
-    border: 1px solid #f5c95c;
-    color: #92400e;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-local {
-    background-color: #eeede9;
-    border: 1px solid #c8c6bd;
-    color: #3e4d40;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.btn-primary {
-    background-image: linear-gradient(135deg, #0f1f10, #173019);
-    color: #c6f19d;
-    font-weight: 700;
-    border-radius: 12px;
-    padding: 10px 18px;
-    border: 1px solid #2c4a2e;
-    box-shadow: 0 6px 14px -4px rgba(15, 31, 16, 0.32);
-    transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.btn-primary:hover {
-    background-image: linear-gradient(135deg, #173019, #1e6b38);
-    color: #f5f4f2;
-}
-.btn-nav {
-    background-image: none;
-    background-color: #eeede9;
-    color: #0f1f10;
-    font-weight: 600;
-    border-radius: 10px;
-    padding: 6px 12px;
-    border: 1px solid #c8c6bd;
-    transition: all 180ms ease;
-}
-.btn-nav:hover {
-    background-color: #e5f8d3;
-    border-color: #9bd86b;
-    color: #0f1f10;
-}
-.btn-dex {
-    background-image: none;
-    background-color: #c6f19d;
-    color: #0f1f10;
-    font-weight: 700;
-    border-radius: 10px;
-    padding: 6px 12px;
-    border: 1px solid #9bd86b;
-    transition: all 180ms ease;
-}
-.btn-dex:hover {
-    background-color: #d5eebc;
+    font-size: 14px;
+    padding: 24px;
 }
 """
 
@@ -899,234 +667,10 @@ window {
     color: #f5f4f2;
     font-family: "Geist", "Inter", "Ubuntu", sans-serif;
 }
-headerbar {
-    background-image: none;
-    background-color: #111f13;
+.fallback-label {
     color: #f5f4f2;
-    border-bottom: 1px solid rgba(198, 241, 157, 0.14);
-    min-height: 44px;
-    padding: 0 10px;
-}
-headerbar .title {
-    color: #f5f4f2;
-    font-weight: 700;
-}
-headerbar .subtitle {
-    color: #8b9a8c;
-    font-size: 11px;
-}
-headerbar button {
-    color: #f5f4f2;
-    transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-headerbar:backdrop {
-    background-color: #111f13;
-    color: #f5f4f2;
-}
-headerbar:backdrop .title {
-    color: #f5f4f2;
-}
-headerbar:backdrop .subtitle {
-    color: #8b9a8c;
-}
-headerbar button.titlebutton,
-headerbar .titlebutton,
-headerbar:backdrop button.titlebutton,
-headerbar:backdrop .titlebutton {
-    background-image: none;
-    background-color: #18291a;
-    color: #f5f4f2;
-    border: 1px solid rgba(198, 241, 157, 0.18);
-    border-radius: 9999px;
-    min-width: 28px;
-    min-height: 28px;
-    margin: 0 3px;
-    padding: 2px;
-    box-shadow: none;
-    opacity: 1;
-}
-headerbar button.titlebutton:hover,
-headerbar .titlebutton:hover {
-    background-color: #213624;
-    border-color: rgba(198, 241, 157, 0.42);
-    color: #c6f19d;
-}
-headerbar button.titlebutton.close,
-headerbar .titlebutton.close,
-headerbar:backdrop button.titlebutton.close,
-headerbar:backdrop .titlebutton.close {
-    background-color: #34161a;
-    border-color: rgba(251, 113, 133, 0.38);
-    color: #fb7185;
-}
-headerbar button.titlebutton.close:hover,
-headerbar .titlebutton.close:hover {
-    background-color: #dc2626;
-    border-color: #fb7185;
-    color: #ffffff;
-}
-headerbar button.titlebutton image,
-headerbar .titlebutton image,
-headerbar:backdrop button.titlebutton image,
-headerbar:backdrop .titlebutton image {
-    color: #f5f4f2;
-    opacity: 1;
-    -gtk-icon-style: symbolic;
-    -gtk-icon-shadow: none;
-}
-headerbar button.titlebutton.close image,
-headerbar .titlebutton.close image,
-headerbar:backdrop button.titlebutton.close image,
-headerbar:backdrop .titlebutton.close image {
-    color: #fb7185;
-}
-headerbar button.titlebutton.close:hover image,
-headerbar .titlebutton.close:hover image {
-    color: #ffffff;
-}
-.btn-nav image {
-    color: #f5f4f2;
-    -gtk-icon-style: symbolic;
-}
-.launcher-hero {
-    background-image: linear-gradient(135deg, #0f1f10, #162818 58%, #1d3620);
-    border: 1px solid rgba(198, 241, 157, 0.22);
-    border-radius: 22px;
-    padding: 24px 28px;
-    color: #f5f4f2;
-    box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.65);
-}
-.launcher-hero .launcher-title {
-    font-size: 21px;
-    font-weight: 800;
-    color: #f5f4f2;
-}
-.launcher-hero .launcher-subtitle {
-    font-size: 13px;
-    color: #c8d2c6;
-}
-.launcher-card {
-    background-color: #111f13;
-    border: 1px solid rgba(198, 241, 157, 0.14);
-    border-radius: 18px;
-    padding: 20px;
-    box-shadow: 0 10px 26px -6px rgba(0, 0, 0, 0.55);
-    transition: all 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.launcher-card:hover {
-    border-color: rgba(198, 241, 157, 0.36);
-    box-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.68);
-}
-.launcher-title {
-    font-size: 20px;
-    font-weight: 800;
-    color: #f5f4f2;
-}
-.launcher-card-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #f5f4f2;
-}
-.launcher-subtitle {
-    font-size: 13px;
-    color: #c8d2c6;
-}
-.badge-ready {
-    background-color: #c6f19d;
-    border: 1px solid #a8e474;
-    color: #0f1f10;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-lan {
-    background-color: rgba(198, 241, 157, 0.14);
-    border: 1px solid rgba(198, 241, 157, 0.34);
-    color: #c6f19d;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-wan {
-    background-color: rgba(94, 234, 212, 0.14);
-    border: 1px solid rgba(94, 234, 212, 0.32);
-    color: #5eead4;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-revoked {
-    background-color: rgba(251, 113, 133, 0.14);
-    border: 1px solid rgba(251, 113, 133, 0.36);
-    color: #fb7185;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-scanning {
-    background-color: rgba(251, 191, 36, 0.14);
-    border: 1px solid rgba(251, 191, 36, 0.34);
-    color: #fbbf24;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.badge-local {
-    background-color: #18291a;
-    border: 1px solid rgba(198, 241, 157, 0.18);
-    color: #c8d2c6;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-weight: 700;
-    font-size: 11px;
-}
-.btn-primary {
-    background-image: none;
-    background-color: #c6f19d;
-    color: #0f1f10;
-    font-weight: 700;
-    border-radius: 12px;
-    padding: 10px 18px;
-    border: 1px solid #a8e474;
-    box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.45);
-    transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.btn-primary:hover {
-    background-color: #d7f7b7;
-    color: #0a140b;
-}
-.btn-nav {
-    background-image: none;
-    background-color: #18291a;
-    color: #f5f4f2;
-    font-weight: 600;
-    border-radius: 10px;
-    padding: 6px 12px;
-    border: 1px solid rgba(198, 241, 157, 0.18);
-    transition: all 180ms ease;
-}
-.btn-nav:hover {
-    background-color: #213624;
-    border-color: rgba(198, 241, 157, 0.42);
-    color: #c6f19d;
-}
-.btn-dex {
-    background-image: none;
-    background-color: #c6f19d;
-    color: #0f1f10;
-    font-weight: 700;
-    border-radius: 10px;
-    padding: 6px 12px;
-    border: 1px solid #a8e474;
-    transition: all 180ms ease;
-}
-.btn-dex:hover {
-    background-color: #d7f7b7;
+    font-size: 14px;
+    padding: 24px;
 }
 """
 
@@ -2399,6 +1943,81 @@ class ServerConnectionManager:
         self.connection_mode = "DISCONNECTED"
         self._save_config()
 
+    def set_manual_host(self, host, port=None):
+        clean_host = str(host or "").strip()
+        if "://" in clean_host:
+            parsed = urllib.parse.urlparse(clean_host)
+            clean_host = (parsed.hostname or "").strip()
+            if parsed.port and port is None:
+                port = parsed.port
+        if ":" in clean_host and clean_host.count(":") == 1:
+            h_part, p_part = clean_host.split(":", 1)
+            if p_part.isdigit():
+                clean_host = h_part.strip()
+                if port is None:
+                    port = int(p_part)
+        if not clean_host or not re.match(r"^[A-Za-z0-9.\-]+$", clean_host):
+            return False, i18n_t("more.ubuntu_host_invalid", fallback="Dirección IP o host no válido.")
+        target_port = self.node_port or 8085
+        if port is not None:
+            try:
+                p_int = int(port)
+                if 1 <= p_int <= 65535:
+                    target_port = p_int
+            except (TypeError, ValueError):
+                pass
+        cand = f"http://{clean_host}:{target_port}"
+        ok, is_rev = self._probe(cand, timeout=2.0)
+        if is_rev:
+            with self.lock:
+                self.saved_host = clean_host
+                self.node_port = target_port
+                self.active_url = ""
+                self.is_revoked = True
+                self.connection_mode = "REVOKED"
+                self._save_config()
+            return False, i18n_t("native_ubuntu.access_revoked")
+        if ok:
+            with self.lock:
+                self.saved_host = clean_host
+                self.node_port = target_port
+                self.active_url = cand
+                self.is_revoked = False
+                self.connection_mode = "LAN"
+                self._save_config()
+            self.register_device_with_server(cand)
+            return True, i18n_t("more.ubuntu_reconnected", fallback=f"Conectado a {cand}")
+        return False, i18n_t("native_ubuntu.no_sync_server")
+
+    def get_ubuntu_control_state(self, window_state=None):
+        win_state = window_state if isinstance(window_state, dict) else {"is_fullscreen": True, "is_maximized": False}
+        app_ver = get_app_version()
+        disp_ver = get_display_version(app_ver)
+        return {
+            "ok": True,
+            "app_version": app_ver,
+            "app_display_version": disp_ver,
+            "connection_mode": self.connection_mode or "LOCAL",
+            "active_url": self.active_url or "",
+            "saved_host": self.saved_host or "",
+            "node_port": int(self.node_port or 8085),
+            "wan_domain": self.wan_domain or "",
+            "has_token": bool(self.device_token),
+            "is_revoked": bool(self.is_revoked),
+            "local_node": self.detect_local_node_status(),
+            "window": {
+                "is_fullscreen": bool(win_state.get("is_fullscreen", False)),
+                "is_maximized": bool(win_state.get("is_maximized", False)),
+            },
+            "about": {
+                "name": i18n_t("app.brand"),
+                "version": app_ver,
+                "display_version": disp_ver,
+                "repo_url": "https://github.com/cminewarIA/recursos-ui",
+                "license": "MIT",
+            },
+        }
+
     def register_device_with_server(self, base_url=None):
         target_base = base_url or self.active_url
         if not target_base or self.is_revoked:
@@ -2474,6 +2093,37 @@ class ServerConnectionManager:
             pass
         return None
 
+    def _discover_via_avahi(self, timeout=0.8):
+        try:
+            p = subprocess.run(
+                ["avahi-browse", "-rpt", "_recursos._tcp"],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if p.returncode != 0 or not p.stdout:
+                return []
+            found = []
+            seen = set()
+            for raw_line in p.stdout.splitlines():
+                if not raw_line.startswith("="):
+                    continue
+                cols = raw_line.split(";")
+                if len(cols) < 9:
+                    continue
+                proto = cols[2].strip()
+                addr = cols[7].strip()
+                try:
+                    pnum = int(cols[8].strip())
+                except Exception:
+                    pnum = self.node_port or 8085
+                if proto == "IPv4" and addr and pnum > 0 and (addr, pnum) not in seen:
+                    seen.add((addr, pnum))
+                    found.append((addr, pnum))
+            return found
+        except Exception:
+            return []
+
     def discover_server(self):
         with self.lock:
             port = self.node_port or 8085
@@ -2507,9 +2157,27 @@ class ServerConnectionManager:
                     self._save_config()
                     return cand
 
+            for m_host, m_port in self._discover_via_avahi():
+                cand = f"http://{m_host}:{m_port}"
+                ok, is_rev = self._probe(cand, timeout=0.5)
+                if is_rev:
+                    self.is_revoked = True
+                    self.connection_mode = "REVOKED"
+                    self._save_config()
+                    return cand
+                if ok:
+                    self.active_url = cand
+                    self.connection_mode = "LAN"
+                    self.saved_host = m_host
+                    self.node_port = m_port
+                    self.is_revoked = False
+                    self._save_config()
+                    return cand
+
             subnet = self._get_local_subnet_base()
             if subnet:
-                cands = [f"http://{subnet}.{last}:{port}" for last in (2, 1, 10, 50, 100, 150, 200)]
+                priority_octets = (2, 1, 10, 50, 100, 150, 200)
+                cands = [f"http://{subnet}.{last}:{port}" for last in priority_octets]
                 cands.append(f"http://recursos.local:{port}")
                 for cand in cands:
                     ok, is_rev = self._probe(cand, timeout=0.35)
@@ -2525,6 +2193,40 @@ class ServerConnectionManager:
                         self.is_revoked = False
                         self._save_config()
                         return cand
+
+                # Escaneo paralelo rápido del resto de la subred LAN /24
+                priority_set = set(priority_octets)
+                rest_hosts = [f"http://{subnet}.{i}:{port}" for i in range(1, 255) if i not in priority_set]
+                stop_scan = threading.Event()
+
+                def _probe_lan_worker(url_cand):
+                    if stop_scan.is_set():
+                        return None, False, False
+                    ok_p, rev_p = self._probe(url_cand, timeout=0.3)
+                    return url_cand, ok_p, rev_p
+
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=32)
+                try:
+                    futures = [executor.submit(_probe_lan_worker, u) for u in rest_hosts]
+                    for fut in concurrent.futures.as_completed(futures):
+                        url_cand, ok_p, rev_p = fut.result()
+                        if rev_p:
+                            stop_scan.set()
+                            self.is_revoked = True
+                            self.connection_mode = "REVOKED"
+                            self._save_config()
+                            return url_cand
+                        if ok_p and url_cand:
+                            stop_scan.set()
+                            self.active_url = url_cand
+                            self.connection_mode = "LAN"
+                            self.saved_host = url_cand.split("//")[1].split(":")[0]
+                            self.is_revoked = False
+                            self._save_config()
+                            return url_cand
+                finally:
+                    stop_scan.set()
+                    executor.shutdown(wait=False, cancel_futures=True)
 
             wan_dom = (self.wan_domain or "").strip().rstrip("/")
             if wan_dom and _is_valid_wan_domain(wan_dom):
@@ -2734,11 +2436,17 @@ class LocalHtmlBridgeServer:
         dex: DexController,
         on_deb_relaunch=None,
         on_theme_change=None,
+        on_window_action=None,
+        get_window_state=None,
+        on_connection_changed=None,
     ):
         self.conn_mgr = conn_mgr
         self.dex = dex
         self.on_deb_relaunch = on_deb_relaunch
         self.on_theme_change = on_theme_change
+        self.on_window_action = on_window_action
+        self.get_window_state = get_window_state
+        self.on_connection_changed = on_connection_changed
         self.html_path = resolve_bundled_html_path()
         self.server = None
         self.port = 0
@@ -2790,11 +2498,15 @@ class LocalHtmlBridgeServer:
                 )
                 app_ver = get_app_version()
                 disp_ver = get_display_version(app_ver)
+                win_state = parent.get_window_state() if parent.get_window_state else {"is_fullscreen": True, "is_maximized": False}
+                win_state_js = json.dumps(win_state)
                 bridge_script = (
                     "<script>"
                     "window.__RECURSOS_UBUNTU_NATIVE__ = true;"
                     "window.__RECURSOS_NATIVE__ = true;"
                     "window.__RECURSOS_NATIVE_PLATFORM__ = 'ubuntu';"
+                    f"window.__RECURSOS_UBUNTU_APP_VERSION__ = {json.dumps(app_ver)};"
+                    f"window.__RECURSOS_WINDOW_STATE__ = {win_state_js};"
                     f"window.__INITIAL_APP_VERSION__ = '{app_ver}';"
                     f"window.__INITIAL_DISPLAY_VERSION__ = '{disp_ver}';"
                     "window.__INITIAL_APP_HASH__ = 'HEAD';"
@@ -2992,6 +2704,11 @@ class LocalHtmlBridgeServer:
 
                 if clean_path == "/api/native/device-info":
                     self._send_json(parent.conn_mgr.refresh_device_telemetry())
+                    return
+
+                if clean_path == "/api/native/ubuntu-control":
+                    win_state = parent.get_window_state() if parent.get_window_state else None
+                    self._send_json(parent.conn_mgr.get_ubuntu_control_state(window_state=win_state))
                     return
 
                 if clean_path == "/api/native/github-releases":
@@ -3362,6 +3079,95 @@ class LocalHtmlBridgeServer:
                     self._send_json({"ok": True, "theme": parent.conn_mgr.ui_theme})
                     return
 
+                if clean_path == "/api/native/window":
+                    try:
+                        payload = json.loads(raw_body.decode("utf-8"))
+                    except Exception:
+                        payload = {}
+                    action = str(payload.get("action") or "").strip().lower()
+                    valid_actions = (
+                        "minimize",
+                        "maximize",
+                        "unmaximize",
+                        "toggle_maximize",
+                        "fullscreen",
+                        "unfullscreen",
+                        "toggle_fullscreen",
+                        "close",
+                        "reload",
+                    )
+                    if action not in valid_actions:
+                        self._send_json({"ok": False, "error": f"Acción de ventana desconocida: {action}"}, 400)
+                        return
+                    if parent.on_window_action:
+                        try:
+                            parent.on_window_action(action)
+                        except Exception:
+                            pass
+                    win_state = parent.get_window_state() if parent.get_window_state else {"is_fullscreen": True, "is_maximized": False}
+                    self._send_json({"ok": True, "action": action, "window": win_state})
+                    return
+
+                if clean_path == "/api/native/connection":
+                    try:
+                        payload = json.loads(raw_body.decode("utf-8"))
+                    except Exception:
+                        payload = {}
+                    action = str(payload.get("action") or "").strip().lower()
+                    win_state = parent.get_window_state() if parent.get_window_state else None
+                    ok_conn = False
+                    msg_conn = ""
+                    if action == "reconnect":
+                        parent.conn_mgr.active_url = ""
+                        found_url = parent.conn_mgr.discover_server()
+                        if found_url and not parent.conn_mgr.is_revoked:
+                            parent.conn_mgr.register_device_with_server(found_url)
+                            ok_conn = True
+                            msg_conn = i18n_t("more.ubuntu_reconnected", fallback=f"Conectado a {found_url}")
+                        elif parent.conn_mgr.is_revoked:
+                            msg_conn = i18n_t("native_ubuntu.access_revoked")
+                        else:
+                            msg_conn = i18n_t("native_ubuntu.no_sync_server")
+                    elif action == "connect_local":
+                        ok_conn, msg_conn = parent.conn_mgr.set_manual_host("127.0.0.1", parent.conn_mgr.node_port)
+                    elif action == "set_host":
+                        ok_conn, msg_conn = parent.conn_mgr.set_manual_host(payload.get("host"), payload.get("port"))
+                    elif action == "forget":
+                        parent.conn_mgr.clear_saved_node()
+                        ok_conn = True
+                        msg_conn = i18n_t("native_ubuntu.forgotten_msg")
+                    else:
+                        self._send_json({"ok": False, "error": f"Acción de conexión desconocida: {action}"}, 400)
+                        return
+                    if parent.on_connection_changed:
+                        try:
+                            parent.on_connection_changed()
+                        except Exception:
+                            pass
+                    ctrl = parent.conn_mgr.get_ubuntu_control_state(window_state=win_state)
+                    self._send_json({"ok": ok_conn, "message": msg_conn, "control": ctrl})
+                    return
+
+                if clean_path == "/api/native/local-node":
+                    ok_ln, msg_ln, st_ln = parent.conn_mgr.install_or_enable_local_node()
+                    if ok_ln and not parent.conn_mgr.active_url:
+                        parent.conn_mgr.set_manual_host("127.0.0.1", parent.conn_mgr.node_port)
+                    if parent.on_connection_changed:
+                        try:
+                            parent.on_connection_changed()
+                        except Exception:
+                            pass
+                    win_state = parent.get_window_state() if parent.get_window_state else None
+                    self._send_json(
+                        {
+                            "ok": ok_ln,
+                            "message": msg_ln,
+                            "local_node": st_ln,
+                            "control": parent.conn_mgr.get_ubuntu_control_state(window_state=win_state),
+                        }
+                    )
+                    return
+
                 if clean_path == "/api/native/download-deb":
                     rel_info = parent.conn_mgr.fetch_github_native_releases(force_refresh=True)
                     ok_deb, msg_deb, new_ver = parent.conn_mgr._install_deb_from_github(
@@ -3639,10 +3445,11 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         )
         self.set_default_size(1280, 820)
         self.set_position(Gtk.WindowPosition.CENTER)
-        self.is_fullscreen = False
+        self.set_decorated(False)
+        self.is_fullscreen = True
+        self.is_maximized = False
         self.start_in_dex = start_in_dex
         self.webview = None
-        self.main_stack = None
         self._css_provider = None
         self._current_theme = "light"
         self._webview_uri_loaded = False
@@ -3657,70 +3464,44 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
 
         relaunch_cb = lambda: GLib.idle_add(self._reexec_after_update)
         theme_cb = lambda th: GLib.idle_add(self._apply_theme, th)
+        win_action_cb = lambda act: GLib.idle_add(self._handle_window_action, act)
+        win_state_cb = lambda: {
+            "is_fullscreen": bool(self.is_fullscreen),
+            "is_maximized": bool(self.is_maximized),
+        }
+        conn_changed_cb = lambda: GLib.idle_add(self._sync_webview_session)
+
         self.bridge = LocalHtmlBridgeServer(
             self.conn_mgr,
             self.dex,
             on_deb_relaunch=relaunch_cb,
             on_theme_change=theme_cb,
+            on_window_action=win_action_cb,
+            get_window_state=win_state_cb,
+            on_connection_changed=conn_changed_cb,
         )
         self.bridge_port = self.bridge.start()
 
-        self._build_headerbar()
-        self._build_main_layout()
+        self._build_webview_layout()
 
         self.connect("key-press-event", self._on_key_press)
+        self.connect("window-state-event", self._on_window_state_event)
         self.connect("destroy", lambda *_: self.bridge.stop())
-        auto_enter_web = bool(self.start_in_dex or self.conn_mgr.saved_host or self.conn_mgr.wan_domain)
-        if hasattr(self, "btn_back_home"):
-            self.btn_back_home.set_no_show_all(True)
-            self.btn_back_home.set_visible(auto_enter_web)
         self.show_all()
+        self.fullscreen()
 
-        GLib.idle_add(self._refresh_config_labels)
-        GLib.idle_add(self._refresh_local_node_panel)
-        GLib.idle_add(self._trigger_github_check_async)
         self.conn_mgr.start_auto_update_watcher(on_deb_installed_cb=relaunch_cb)
-        if self.start_in_dex:
-            self._connect_and_open_webview(target_view="dex")
-        elif auto_enter_web:
-            self._connect_and_open_webview(target_view="inicio")
-        GLib.timeout_add(3000, self._refresh_connection_badge)
+        self._connect_and_sync_async()
 
-    def _connect_and_open_webview(self, target_view="inicio"):
-        self.lbl_conn_status.set_text(i18n_t("native_ubuntu.searching_node"))
-        if hasattr(self, "lbl_home_status"):
-            self.lbl_home_status.set_text(i18n_t("native_ubuntu.searching_node_desc"))
-
+    def _connect_and_sync_async(self):
         def worker():
             self.conn_mgr.discover_server()
             if self.conn_mgr.active_url and not self.conn_mgr.is_revoked:
                 self.conn_mgr.register_device_with_server()
                 self.conn_mgr.fetch_metrics()
-            GLib.idle_add(self._on_node_connected_ui, target_view)
+            GLib.idle_add(self._sync_webview_session)
 
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _on_node_connected_ui(self, target_view="inicio"):
-        self._refresh_connection_badge()
-        self._refresh_config_labels()
-        if target_view:
-            self._pending_nav_view = target_view
-        if self.webview and HAS_WEBKIT2:
-            if not self._webview_uri_loaded and self._target_webview_uri:
-                nav_view = target_view or ("dex" if self.start_in_dex else "inicio")
-                base_uri = self._target_webview_uri.split("?")[0]
-                self.webview.load_uri(f"{base_uri}?env=ubuntu_native&view={nav_view}")
-            else:
-                self._set_webview_paused(False)
-                self._sync_webview_session()
-                if target_view:
-                    self._navigate_spa(target_view)
-                    self._pending_nav_view = None
-        if self.main_stack:
-            self.main_stack.set_visible_child_name("webview")
-        if hasattr(self, "btn_back_home"):
-            self.btn_back_home.set_visible(True)
-        return False
+        threading.Thread(target=worker, daemon=True, name="UbuntuAutoDiscovery").start()
 
     def _on_webview_create(self, _webview, navigation_action):
         """Open external target=_blank links cleanly in the Ubuntu system browser."""
@@ -3740,17 +3521,15 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
     def _on_webview_load_changed(self, _webview, load_event):
         if HAS_WEBKIT2 and WebKit2 is not None and load_event == WebKit2.LoadEvent.FINISHED:
             self._webview_uri_loaded = True
-            self._set_webview_paused(False)
             self._sync_webview_session()
+            self._emit_window_state_to_webview()
             if self._pending_nav_view:
                 nav = self._pending_nav_view
                 self._pending_nav_view = None
                 self._navigate_spa(nav)
 
-    def _set_webview_paused(self, paused):
-        if self.webview and HAS_WEBKIT2 and self._webview_uri_loaded:
-            flag = "true" if paused else "false"
-            js = f"window.__RECURSOS_PAUSED__={flag};window.dispatchEvent(new CustomEvent('recursos-visibility',{{detail:{{paused:{flag}}}}}));"
+    def _eval_js(self, js):
+        if self.webview and HAS_WEBKIT2:
             try:
                 if hasattr(self.webview, "evaluate_javascript"):
                     self.webview.evaluate_javascript(js, -1, None, None, None, None, None)
@@ -3762,19 +3541,32 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
     def _sync_webview_session(self):
         if self.webview and HAS_WEBKIT2:
             tok = json.dumps(self.conn_mgr.device_token or "")
+            mode_js = json.dumps(self.conn_mgr.connection_mode or "LOCAL")
+            url_js = json.dumps(self.conn_mgr.active_url or "local")
             dev_info = json.dumps(self.conn_mgr.refresh_device_telemetry(), ensure_ascii=False)
             js = (
+                f"window.__RECURSOS_CONN_MODE__={mode_js};"
+                f"window.__RECURSOS_NODE_URL__={url_js};"
                 f"window.__RECURSOS_DEVICE_TELEMETRY__={dev_info};"
                 f"if(window.injectNativeSession){{window.injectNativeSession({tok},{dev_info});}}"
+                f"window.dispatchEvent(new CustomEvent('recursos-ubuntu-state-changed',{{detail:{{mode:{mode_js},url:{url_js}}}}}));"
             )
-            try:
-                if hasattr(self.webview, "evaluate_javascript"):
-                    self.webview.evaluate_javascript(js, -1, None, None, None, None, None)
-                elif hasattr(self.webview, "run_javascript"):
-                    self.webview.run_javascript(js, None, None, None)
-            except Exception:
-                pass
+            self._eval_js(js)
         return False
+
+    def _emit_window_state_to_webview(self):
+        if self.webview and HAS_WEBKIT2 and self._webview_uri_loaded:
+            state_js = json.dumps(
+                {
+                    "is_fullscreen": bool(self.is_fullscreen),
+                    "is_maximized": bool(self.is_maximized),
+                }
+            )
+            js = (
+                f"window.__RECURSOS_WINDOW_STATE__={state_js};"
+                f"window.dispatchEvent(new CustomEvent('recursos-ubuntu-window-state',{{detail:{state_js}}}));"
+            )
+            self._eval_js(js)
 
     def _set_app_icon(self):
         icon_candidates = [
@@ -3834,259 +3626,40 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             self._apply_css(normalized)
         return False
 
+    def _extract_webkit_message_str(self, js_result):
+        raw_val = ""
+        if hasattr(js_result, "get_js_value"):
+            js_val = js_result.get_js_value()
+            if js_val and hasattr(js_val, "to_string"):
+                raw_val = str(js_val.to_string() or "")
+        elif isinstance(js_result, str):
+            raw_val = js_result
+        return raw_val.strip()
+
     def _on_webkit_theme_message(self, _manager, js_result):
         try:
-            raw_val = ""
-            if hasattr(js_result, "get_js_value"):
-                js_val = js_result.get_js_value()
-                if js_val and hasattr(js_val, "to_string"):
-                    raw_val = str(js_val.to_string() or "")
-            elif isinstance(js_result, str):
-                raw_val = js_result
-            raw_val = raw_val.strip().lower()
+            raw_val = self._extract_webkit_message_str(js_result).lower()
             if raw_val in ("light", "dark"):
                 self._apply_theme(raw_val)
         except Exception:
             pass
 
-    def _build_headerbar(self):
-        hb = Gtk.HeaderBar()
-        hb.set_show_close_button(True)
-        if hasattr(hb, "set_decoration_layout"):
-            hb.set_decoration_layout(":minimize,maximize,close")
-        disp_ver = get_display_version()
-        hb.props.title = i18n_t("app.brand")
-        hb.props.subtitle = i18n_t("native_ubuntu.subtitle", {"ver": disp_ver})
-
-        self.btn_back_home = Gtk.Button(label=i18n_t("native_ubuntu.main_menu"))
-        self.btn_back_home.get_style_context().add_class("btn-nav")
-        self.btn_back_home.set_tooltip_text(i18n_t("native_ubuntu.main_menu_tip"))
-        self.btn_back_home.connect("clicked", lambda *_: self._show_launcher_view("home"))
-        hb.pack_start(self.btn_back_home)
-
-        self.lbl_conn_status = Gtk.Label(label=i18n_t("native_ubuntu.ready_connect"))
-        self.lbl_conn_status.get_style_context().add_class("badge-local")
-        hb.pack_start(self.lbl_conn_status)
-
-        btn_dex = Gtk.Button(label=i18n_t("native_ubuntu.usb_phone_screen"))
-        btn_dex.get_style_context().add_class("btn-dex")
-        btn_dex.set_tooltip_text(i18n_t("native_ubuntu.usb_phone_screen_tip"))
-        btn_dex.connect("clicked", lambda *_: self._connect_and_open_webview(target_view="dex"))
-        hb.pack_start(btn_dex)
-
-        btn_about = Gtk.Button.new_from_icon_name("help-about-symbolic", Gtk.IconSize.BUTTON)
-        btn_about.get_style_context().add_class("btn-nav")
-        btn_about.set_tooltip_text(i18n_t("native_ubuntu.about_tip", {"ver": disp_ver}))
-        btn_about.connect("clicked", self._show_about_dialog)
-        hb.pack_end(btn_about)
-
-        btn_fs = Gtk.Button(label=i18n_t("native_ubuntu.fullscreen"))
-        btn_fs.get_style_context().add_class("btn-nav")
-        btn_fs.set_tooltip_text(i18n_t("native_ubuntu.fullscreen_tip"))
-        btn_fs.connect("clicked", lambda *_: self._toggle_fullscreen())
-        hb.pack_end(btn_fs)
-
-        self.set_titlebar(hb)
-
-    def _show_launcher_view(self, stack_name="home"):
-        if self.main_stack:
-            self.main_stack.set_visible_child_name(stack_name)
-        is_home = (stack_name == "home")
-        if hasattr(self, "btn_back_home"):
-            self.btn_back_home.set_visible(not is_home)
-        if is_home:
-            self._set_webview_paused(True)
-            self._refresh_config_labels()
-            self._refresh_local_node_panel()
-        else:
-            self._set_webview_paused(False)
+    def _on_webkit_window_message(self, _manager, js_result):
+        try:
+            action = self._extract_webkit_message_str(js_result).lower()
+            if action:
+                self._handle_window_action(action)
+        except Exception:
+            pass
 
     def _navigate_spa(self, view_name):
         if self.webview and HAS_WEBKIT2:
             if not self._webview_uri_loaded:
                 self._pending_nav_view = view_name
                 return
-            js = f"if(typeof window.switchView==='function'){{window.switchView('{view_name}');}}"
-            try:
-                if hasattr(self.webview, "evaluate_javascript"):
-                    self.webview.evaluate_javascript(js, -1, None, None, None, None, None)
-                elif hasattr(self.webview, "run_javascript"):
-                    self.webview.run_javascript(js, None, None, None)
-            except Exception:
-                pass
+            self._eval_js(f"if(typeof window.switchView==='function'){{window.switchView('{view_name}');}}")
 
-    def _show_about_dialog(self, _widget):
-        about = Gtk.AboutDialog(transient_for=self, modal=True)
-        about.set_program_name(i18n_t("app.brand"))
-        about.set_version(f"v{get_display_version()}")
-        about.set_comments(i18n_t("native_ubuntu.about_comments"))
-        about.set_website("https://github.com/cminewarIA/recursos-ui")
-        about.set_website_label("GitHub cminewarIA/recursos-ui")
-        about.set_authors(["cminewarIA"])
-        about.set_license_type(Gtk.License.MIT_X11)
-
-        logo_candidates = [
-            os.path.join(SCRIPT_DIR, "assets", "recursos-cockpit.png"),
-            "/usr/lib/recursos-cockpit/assets/recursos-cockpit.png",
-        ]
-        for l_path in logo_candidates:
-            if os.path.isfile(l_path):
-                try:
-                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(l_path, 128, 128, True)
-                    about.set_logo(pb)
-                    break
-                except Exception:
-                    pass
-        about.run()
-        about.destroy()
-
-    def _build_main_layout(self):
-        self.main_stack = Gtk.Stack()
-        self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        self.main_stack.set_transition_duration(260)
-
-        # Page 1: Native 3-Option Home Launcher
-        home_scroll = Gtk.ScrolledWindow()
-        home_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        center_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
-        center_box.set_valign(Gtk.Align.CENTER)
-        center_box.set_halign(Gtk.Align.CENTER)
-        center_box.set_margin_top(28)
-        center_box.set_margin_bottom(28)
-        center_box.set_margin_start(28)
-        center_box.set_margin_end(28)
-        center_box.set_size_request(680, -1)
-
-        # Header with CMineWar Logo inside Asset Hero Card
-        brand_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        brand_box.set_halign(Gtk.Align.FILL)
-        brand_box.get_style_context().add_class("launcher-hero")
-        logo_path = resolve_static_asset_path("recursos-cockpit.png")
-        if logo_path:
-            try:
-                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(logo_path, 140, 140, True)
-                img = Gtk.Image.new_from_pixbuf(pb)
-                brand_box.pack_start(img, False, False, 0)
-            except Exception:
-                pass
-        title_lbl = Gtk.Label(label=i18n_t("native_ubuntu.title_banner", {"ver": get_display_version()}))
-        title_lbl.get_style_context().add_class("launcher-title")
-        sub_lbl = Gtk.Label(label=i18n_t("native_ubuntu.choose_mode"))
-        sub_lbl.get_style_context().add_class("launcher-subtitle")
-        brand_box.pack_start(title_lbl, False, False, 0)
-        brand_box.pack_start(sub_lbl, False, False, 0)
-        center_box.pack_start(brand_box, False, False, 4)
-
-        self.lbl_home_status = Gtk.Label(label="")
-        self.lbl_home_status.set_line_wrap(True)
-        self.lbl_home_status.get_style_context().add_class("launcher-subtitle")
-        center_box.pack_start(self.lbl_home_status, False, False, 0)
-
-        # Opción 1: Conectar con el nodo
-        card1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        card1.get_style_context().add_class("launcher-card")
-        c1_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        c1_t = Gtk.Label(label=i18n_t("native_ubuntu.opt1_title"), xalign=0)
-        c1_t.get_style_context().add_class("launcher-card-title")
-        c1_d = Gtk.Label(
-            label=i18n_t("native_ubuntu.opt1_desc"),
-            xalign=0,
-        )
-        c1_d.set_line_wrap(True)
-        c1_d.get_style_context().add_class("launcher-subtitle")
-        c1_text.pack_start(c1_t, False, False, 0)
-        c1_text.pack_start(c1_d, False, False, 0)
-        btn_opt1 = Gtk.Button(label=i18n_t("native_ubuntu.opt1_btn"))
-        btn_opt1.get_style_context().add_class("btn-primary")
-        btn_opt1.set_valign(Gtk.Align.CENTER)
-        btn_opt1.connect("clicked", lambda *_: self._connect_and_open_webview("inicio"))
-        card1.pack_start(c1_text, True, True, 0)
-        card1.pack_end(btn_opt1, False, False, 0)
-        center_box.pack_start(card1, False, False, 0)
-
-        # Opción 2: Instalar nodo local (y actualizar desde GitHub cuando ya está instalada)
-        card2 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        card2.get_style_context().add_class("launcher-card")
-        c2_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        c2_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        c2_t = Gtk.Label(label=i18n_t("native_ubuntu.opt2_title"), xalign=0)
-        c2_t.get_style_context().add_class("launcher-card-title")
-        self.lbl_node_info = Gtk.Label(
-            label=i18n_t("native_ubuntu.checking_local"),
-            xalign=0,
-        )
-        self.lbl_node_info.set_line_wrap(True)
-        self.lbl_node_info.get_style_context().add_class("launcher-subtitle")
-        self.lbl_github_info = Gtk.Label(
-            label=i18n_t("native_ubuntu.checking_github"),
-            xalign=0,
-        )
-        self.lbl_github_info.set_line_wrap(True)
-        self.lbl_github_info.get_style_context().add_class("launcher-subtitle")
-        c2_text.pack_start(c2_t, False, False, 0)
-        c2_text.pack_start(self.lbl_node_info, False, False, 0)
-        c2_text.pack_start(self.lbl_github_info, False, False, 0)
-        self.lbl_github_releases = Gtk.Label(
-            label=f"GitHub · Ubuntu .deb v{get_app_version()} · Android .apk v{get_android_client_version()}",
-            xalign=0,
-        )
-        self.lbl_github_releases.set_line_wrap(True)
-        self.lbl_github_releases.get_style_context().add_class("launcher-subtitle")
-        c2_text.pack_start(self.lbl_github_releases, False, False, 0)
-
-        c2_btns = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        c2_btns.set_valign(Gtk.Align.CENTER)
-        self.btn_opt2 = Gtk.Button(label=i18n_t("native_ubuntu.install_node"))
-        self.btn_opt2.get_style_context().add_class("btn-nav")
-        self.btn_opt2.connect("clicked", self._on_install_local_node_clicked)
-        self.btn_opt2_update = Gtk.Button(label=i18n_t("native_ubuntu.update_github"))
-        self.btn_opt2_update.get_style_context().add_class("btn-nav")
-        self.btn_opt2_update.connect("clicked", self._on_update_from_github_clicked)
-        c2_btns.pack_start(self.btn_opt2, False, False, 0)
-        c2_btns.pack_start(self.btn_opt2_update, False, False, 0)
-
-        c2_top.pack_start(c2_text, True, True, 0)
-        c2_top.pack_end(c2_btns, False, False, 0)
-        card2.pack_start(c2_top, False, False, 0)
-
-        c2_dl_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.btn_dl_deb = Gtk.Button(label=i18n_t("native_ubuntu.download_install_deb", fallback="Descargar e instalar .deb (GitHub)"))
-        self.btn_dl_deb.get_style_context().add_class("btn-primary")
-        self.btn_dl_deb.connect("clicked", self._on_download_deb_clicked)
-        self.btn_dl_apk = Gtk.Button(label=i18n_t("native_ubuntu.download_apk_downloads", fallback="Descargar .apk en Descargas"))
-        self.btn_dl_apk.get_style_context().add_class("btn-nav")
-        self.btn_dl_apk.connect("clicked", self._on_download_apk_clicked)
-        c2_dl_row.pack_start(self.btn_dl_deb, False, False, 0)
-        c2_dl_row.pack_start(self.btn_dl_apk, False, False, 0)
-        card2.pack_start(c2_dl_row, False, False, 0)
-        center_box.pack_start(card2, False, False, 0)
-
-        # Opción 3: Configuraciones (Muestra y guarda la conexión detectada desde Opción 1)
-        card3 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        card3.get_style_context().add_class("launcher-card")
-        c3_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        c3_t = Gtk.Label(label=i18n_t("native_ubuntu.opt3_title"), xalign=0)
-        c3_t.get_style_context().add_class("launcher-card-title")
-        c3_header.pack_start(c3_t, True, True, 0)
-        btn_forget = Gtk.Button(label=i18n_t("native_ubuntu.forget_conn"))
-        btn_forget.get_style_context().add_class("btn-nav")
-        btn_forget.connect("clicked", self._on_forget_config_clicked)
-        c3_header.pack_end(btn_forget, False, False, 0)
-        card3.pack_start(c3_header, False, False, 0)
-
-        self.lbl_cfg_lan = Gtk.Label(label=i18n_t("native_ubuntu.lan_pending"), xalign=0)
-        self.lbl_cfg_dns = Gtk.Label(label=i18n_t("native_ubuntu.dns_pending"), xalign=0)
-        self.lbl_cfg_cert = Gtk.Label(label=i18n_t("native_ubuntu.cert_pending"), xalign=0)
-        for lbl in (self.lbl_cfg_lan, self.lbl_cfg_dns, self.lbl_cfg_cert):
-            lbl.get_style_context().add_class("launcher-subtitle")
-            lbl.set_selectable(True)
-            card3.pack_start(lbl, False, False, 0)
-
-        center_box.pack_start(card3, False, False, 0)
-        home_scroll.add(center_box)
-        self.main_stack.add_named(home_scroll, "home")
-
-        # Page 2: WebKit2 Unified Interface (single canonical Web UI)
+    def _build_webview_layout(self):
         initial_view = "dex" if self.start_in_dex else "inicio"
         target_uri = f"http://localhost:{self.bridge_port}/?env=ubuntu_native&view={initial_view}"
 
@@ -4097,6 +3670,8 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
                     ucm = WebKit2.UserContentManager()
                     ucm.register_script_message_handler("recursosTheme")
                     ucm.connect("script-message-received::recursosTheme", self._on_webkit_theme_message)
+                    ucm.register_script_message_handler("recursosWindow")
+                    ucm.connect("script-message-received::recursosWindow", self._on_webkit_window_message)
             except Exception:
                 ucm = None
             self.webview = (
@@ -4132,10 +3707,8 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             self._target_webview_uri = target_uri
             self.webview.connect("load-changed", self._on_webview_load_changed)
             self.webview.connect("create", self._on_webview_create)
-            # Carga diferida: no cargar HTML5/animations hasta entrar al panel o --dex (evita consumo CPU en menú inicio)
-            if self.start_in_dex:
-                self.webview.load_uri(target_uri)
-            self.main_stack.add_named(self.webview, "webview")
+            self.webview.load_uri(target_uri)
+            self.add(self.webview)
         else:
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
             box.set_valign(Gtk.Align.CENTER)
@@ -4146,173 +3719,9 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
                     {"ver": get_display_version(), "uri": target_uri},
                 )
             )
+            lbl.get_style_context().add_class("fallback-label")
             box.pack_start(lbl, False, False, 0)
-            self.main_stack.add_named(box, "webview")
-
-        self.main_stack.set_visible_child_name("webview" if self.start_in_dex else "home")
-        self.add(self.main_stack)
-
-    def _trigger_github_check_async(self):
-        def worker():
-            gh = self.conn_mgr.check_github_app_update()
-            GLib.idle_add(self._refresh_local_node_panel, gh)
-
-        threading.Thread(target=worker, daemon=True).start()
-        return False
-
-    def _refresh_local_node_panel(self, gh_info=None):
-        st = self.conn_mgr.detect_local_node_status()
-        gh = gh_info or self.conn_mgr.github_update_info
-        app_installed = bool(st.get("app_installed_deb") or st.get("installed"))
-
-        if st["installed"]:
-            state_txt = (
-                i18n_t("native_ubuntu.local_state_active")
-                if st["running"]
-                else i18n_t("native_ubuntu.local_state_installed")
-            )
-            self.lbl_node_info.set_text(
-                i18n_t(
-                    "native_ubuntu.node_info_running",
-                    {"state": state_txt, "ip": st["lan_ip"], "port": st["port"]},
-                )
-            )
-            self.btn_opt2.set_label(
-                i18n_t("native_ubuntu.connect_local_node")
-                if st["running"]
-                else i18n_t("native_ubuntu.start_local_node")
-            )
-        elif st.get("app_installed_deb"):
-            inst_ver = get_display_version(st.get("installed_deb_version") or get_app_version())
-            self.lbl_node_info.set_text(
-                i18n_t("native_ubuntu.node_info_deb", {"ver": inst_ver})
-            )
-            self.btn_opt2.set_label(i18n_t("native_ubuntu.install_node"))
-        else:
-            self.lbl_node_info.set_text(i18n_t("native_ubuntu.node_info_none"))
-            self.btn_opt2.set_label(i18n_t("native_ubuntu.install_node"))
-
-        if hasattr(self, "lbl_github_info") and hasattr(self, "btn_opt2_update"):
-            has_server_gap = bool(gh and gh.get("server_needs_update"))
-            self.btn_opt2_update.set_visible(app_installed or has_server_gap)
-            ctx = self.btn_opt2_update.get_style_context()
-            ctx.remove_class("btn-primary")
-            ctx.remove_class("btn-nav")
-            if gh and gh.get("effective_update_available"):
-                summary = gh.get("update_summary") or i18n_t(
-                    "native_ubuntu.unified_update_summary", {"ver": gh.get("target_version")}
-                )
-                btn_lbl = gh.get("update_action_label") or i18n_t(
-                    "native_ubuntu.update_app_btn", {"ver": gh.get("target_version")}
-                )
-                self.lbl_github_info.set_text(summary)
-                self.btn_opt2_update.set_label(btn_lbl)
-                ctx.add_class("btn-primary")
-            elif gh and gh.get("app_above_github"):
-                srv_note = (
-                    i18n_t("native_ubuntu.app_ahead_srv_note", {"ver": gh.get("server_display_version")})
-                    if gh.get("server_reachable")
-                    else ""
-                )
-                self.lbl_github_info.set_text(
-                    i18n_t(
-                        "native_ubuntu.app_ahead_info",
-                        {
-                            "app": gh.get("app_display_version"),
-                            "gh": gh.get("github_display_version"),
-                            "srv_note": srv_note,
-                        },
-                    )
-                )
-                self.btn_opt2_update.set_label(
-                    gh.get("update_action_label") or i18n_t("native_ubuntu.sync_local_web_short")
-                )
-                ctx.add_class("btn-nav")
-            elif gh and gh.get("github_version"):
-                self.lbl_github_info.set_text(
-                    gh.get("update_summary")
-                    or i18n_t("native_ubuntu.github_ahead_msg", {"ver": gh.get("github_display_version")})
-                )
-                self.btn_opt2_update.set_label(
-                    gh.get("update_action_label") or i18n_t("native_ubuntu.update_reinstall_btn")
-                )
-                ctx.add_class("btn-nav")
-            else:
-                self.lbl_github_info.set_text(i18n_t("native_ubuntu.unified_update_avail"))
-                self.btn_opt2_update.set_label(i18n_t("native_ubuntu.check_and_update"))
-                ctx.add_class("btn-nav")
-
-        if hasattr(self, "lbl_github_releases"):
-            rel_meta = (gh or {}).get("native_releases") if isinstance(gh, dict) else None
-            if isinstance(rel_meta, dict):
-                deb_m = rel_meta.get("deb") or {}
-                apk_m = rel_meta.get("apk") or {}
-                deb_mb = f" ({deb_m.get('size_bytes', 0) / (1024 * 1024):.1f} MB)" if deb_m.get("size_bytes") else ""
-                apk_mb = f" ({apk_m.get('size_bytes', 0) / (1024 * 1024):.1f} MB)" if apk_m.get("size_bytes") else ""
-                tag_str = f" · {rel_meta.get('tag_name')}" if rel_meta.get("tag_name") else ""
-                self.lbl_github_releases.set_text(
-                    f"GitHub{tag_str} · Ubuntu .deb v{deb_m.get('version', get_app_version())}{deb_mb} · Android .apk v{apk_m.get('version', get_android_client_version())}{apk_mb}"
-                )
-        return False
-
-    def _on_download_deb_clicked(self, _widget):
-        if hasattr(self, "btn_dl_deb"):
-            self.btn_dl_deb.set_sensitive(False)
-            self.btn_dl_deb.set_label("Descargando e instalando .deb...")
-        if hasattr(self, "lbl_home_status"):
-            self.lbl_home_status.set_text("Descargando la última compilación .deb desde GitHub...")
-
-        def worker():
-            rel_info = self.conn_mgr.fetch_github_native_releases(force_refresh=True)
-            ok, msg, _new_ver = self.conn_mgr._install_deb_from_github(rel_info, relaunch_on_deb=False, interactive=True)
-            GLib.idle_add(self._on_download_deb_finished, ok, msg, rel_info)
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _on_download_deb_finished(self, ok, msg, rel_info):
-        if hasattr(self, "btn_dl_deb"):
-            self.btn_dl_deb.set_sensitive(True)
-            self.btn_dl_deb.set_label(i18n_t("native_ubuntu.download_install_deb", fallback="Descargar e instalar .deb (GitHub)"))
-        if hasattr(self, "lbl_home_status"):
-            self.lbl_home_status.set_text(msg)
-        if ok and os.environ.get("DISPLAY"):
-            GLib.timeout_add(450, self._reexec_after_update)
-        return False
-
-    def _on_download_apk_clicked(self, _widget):
-        if hasattr(self, "btn_dl_apk"):
-            self.btn_dl_apk.set_sensitive(False)
-            self.btn_dl_apk.set_label("Descargando .apk...")
-        if hasattr(self, "lbl_home_status"):
-            self.lbl_home_status.set_text("Descargando la última compilación .apk desde GitHub en Descargas...")
-
-        def worker():
-            rel_info = self.conn_mgr.fetch_github_native_releases(force_refresh=True)
-            ok, msg, saved_path = self.conn_mgr.download_apk_to_downloads(rel_info)
-            GLib.idle_add(self._on_download_apk_finished, ok, msg, saved_path)
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _on_download_apk_finished(self, ok, msg, _saved_path):
-        if hasattr(self, "btn_dl_apk"):
-            self.btn_dl_apk.set_sensitive(True)
-            self.btn_dl_apk.set_label(i18n_t("native_ubuntu.download_apk_downloads", fallback="Descargar .apk en Descargas"))
-        if hasattr(self, "lbl_home_status"):
-            self.lbl_home_status.set_text(msg)
-        return False
-
-    def _on_update_from_github_clicked(self, _widget):
-        if hasattr(self, "btn_opt2_update"):
-            self.btn_opt2_update.set_sensitive(False)
-            self.btn_opt2_update.set_label(i18n_t("native_ubuntu.updating_btn"))
-        if hasattr(self, "lbl_github_info"):
-            self.lbl_github_info.set_text(i18n_t("native_ubuntu.updating_desc"))
-
-        def worker():
-            ok, msg, gh, flags = self.conn_mgr.perform_unified_update(relaunch_on_deb=False, interactive=True, force_download=True)
-            GLib.idle_add(self._on_github_update_finished, ok, msg, gh, flags)
-
-        threading.Thread(target=worker, daemon=True).start()
+            self.add(box)
 
     def _reexec_after_update(self):
         try:
@@ -4336,105 +3745,74 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
             pass
         return False
 
-    def _on_github_update_finished(self, ok, msg, gh, flags=None):
-        if hasattr(self, "lbl_home_status"):
-            self.lbl_home_status.set_text(msg)
-        if hasattr(self, "btn_opt2_update"):
-            self.btn_opt2_update.set_sensitive(True)
-        self._refresh_local_node_panel(gh)
-        if ok:
-            self._refresh_config_labels()
-            if isinstance(flags, dict) and flags.get("deb_installed") and os.environ.get("DISPLAY"):
-                if hasattr(self, "lbl_home_status"):
-                    self.lbl_home_status.set_text(i18n_t("native_ubuntu.restarting_suffix", {"msg": msg}))
-                GLib.timeout_add(450, self._reexec_after_update)
-        return False
-
-    def _refresh_config_labels(self):
-        lan_txt = (
-            f"{self.conn_mgr.saved_host}:{self.conn_mgr.node_port}"
-            if self.conn_mgr.saved_host
-            else i18n_t("native_ubuntu.lan_wait")
-        )
-        dns_txt = (
-            self.conn_mgr.wan_domain
-            if self.conn_mgr.wan_domain
-            else i18n_t("native_ubuntu.dns_auto")
-        )
-        cert_txt = (
-            i18n_t("native_ubuntu.cert_ok")
-            if self.conn_mgr.device_token and not self.conn_mgr.is_revoked
-            else (
-                i18n_t("native_ubuntu.cert_revoked")
-                if self.conn_mgr.is_revoked
-                else i18n_t("native_ubuntu.cert_verify_lan")
-            )
-        )
-        self.lbl_cfg_lan.set_text(i18n_t("native_ubuntu.lan_prefix", {"value": lan_txt}))
-        self.lbl_cfg_dns.set_text(i18n_t("native_ubuntu.dns_prefix", {"value": dns_txt}))
-        self.lbl_cfg_cert.set_text(i18n_t("native_ubuntu.cert_prefix", {"value": cert_txt}))
-        return False
-
-    def _on_install_local_node_clicked(self, _widget):
-        st = self.conn_mgr.detect_local_node_status()
-        if st["installed"] and st["running"]:
-            self.conn_mgr.saved_host = "127.0.0.1"
-            self.conn_mgr._save_config()
-            self._connect_and_open_webview("inicio")
-            return
-        self.lbl_node_info.set_text(i18n_t("native_ubuntu.installing_node"))
-
-        def worker():
-            ok, msg, new_st = self.conn_mgr.install_or_enable_local_node()
-            GLib.idle_add(self._on_install_finished, ok, msg, new_st)
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _on_install_finished(self, ok, msg, _st):
-        self.lbl_home_status.set_text(msg)
-        self._refresh_local_node_panel()
-        if ok:
-            self._refresh_config_labels()
-        return False
-
-    def _on_forget_config_clicked(self, _widget):
-        self.conn_mgr.clear_saved_node()
-        self.lbl_home_status.set_text(i18n_t("native_ubuntu.forgotten_msg"))
-        self._refresh_config_labels()
-        self._refresh_connection_badge()
-
     def _on_dex_status_callback(self, _status, _message):
         GLib.idle_add(self._sync_webview_session)
 
-    def _refresh_connection_badge(self):
-        mode = self.conn_mgr.connection_mode
-        ctx = self.lbl_conn_status.get_style_context()
-        for cls in ["badge-lan", "badge-wan", "badge-revoked", "badge-scanning", "badge-local"]:
-            ctx.remove_class(cls)
+    def _on_window_state_event(self, _widget, event):
+        state = event.new_window_state
+        self.is_fullscreen = bool(state & Gdk.WindowState.FULLSCREEN)
+        self.is_maximized = bool(state & Gdk.WindowState.MAXIMIZED)
+        self._emit_window_state_to_webview()
+        return False
 
-        if mode == "LAN":
-            ctx.add_class("badge-lan")
-            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.red_local", {"host": self.conn_mgr.saved_host}))
-        elif mode == "WAN":
-            ctx.add_class("badge-wan")
-            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.external_conn", {"domain": self.conn_mgr.wan_domain or "DNS"}))
-        elif mode == "REVOKED":
-            ctx.add_class("badge-revoked")
-            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.access_revoked"))
-        elif mode == "LOCAL":
-            ctx.add_class("badge-local")
-            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.no_remote_node"))
-        else:
-            ctx.add_class("badge-local")
-            self.lbl_conn_status.set_text(i18n_t("native_ubuntu.ready_connect"))
-        return True
+    def _handle_window_action(self, action):
+        act = str(action or "").strip().lower()
+        if act == "minimize":
+            self.iconify()
+        elif act == "maximize":
+            if self.is_fullscreen:
+                self.unfullscreen()
+                self.is_fullscreen = False
+            self.maximize()
+            self.is_maximized = True
+        elif act == "unmaximize":
+            if self.is_fullscreen:
+                self.unfullscreen()
+                self.is_fullscreen = False
+            self.unmaximize()
+            self.is_maximized = False
+        elif act == "toggle_maximize":
+            if self.is_fullscreen:
+                self.unfullscreen()
+                self.is_fullscreen = False
+                self.maximize()
+                self.is_maximized = True
+            elif self.is_maximized:
+                self.unmaximize()
+                self.is_maximized = False
+            else:
+                self.maximize()
+                self.is_maximized = True
+        elif act == "fullscreen":
+            self.fullscreen()
+            self.is_fullscreen = True
+        elif act == "unfullscreen":
+            self.unfullscreen()
+            self.is_fullscreen = False
+        elif act == "toggle_fullscreen":
+            self._toggle_fullscreen()
+        elif act == "reload":
+            if self.webview:
+                self.webview.reload()
+        elif act == "close":
+            app = self.get_application()
+            if app:
+                app.quit()
+            else:
+                self.destroy()
+        self._emit_window_state_to_webview()
+        return False
 
     def _on_key_press(self, _widget, event):
+        ctrl = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
         if event.keyval == Gdk.KEY_F11:
             self._toggle_fullscreen()
             return True
-        if event.keyval == Gdk.KEY_F5 and self.webview:
+        if (event.keyval == Gdk.KEY_F5 or (ctrl and event.keyval in (Gdk.KEY_r, Gdk.KEY_R))) and self.webview:
             self.webview.reload()
+            return True
+        if ctrl and event.keyval in (Gdk.KEY_q, Gdk.KEY_Q):
+            self._handle_window_action("close")
             return True
         return False
 
@@ -4445,6 +3823,7 @@ class RecursosNativeWindow(Gtk.ApplicationWindow):
         else:
             self.fullscreen()
             self.is_fullscreen = True
+        self._emit_window_state_to_webview()
 
 
 class RecursosNativeApp(Gtk.Application):
@@ -4466,6 +3845,8 @@ class RecursosNativeApp(Gtk.Application):
         if not self.win:
             self.win = RecursosNativeWindow(self, start_in_dex=self.start_in_dex)
         self.win.show_all()
+        if getattr(self.win, "is_fullscreen", True):
+            self.win.fullscreen()
         self.win.present()
 
 

@@ -3,10 +3,15 @@ import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import {
   Activity,
   Lock,
+  Maximize2,
+  Minimize2,
+  Minus,
   Moon,
   RefreshCw,
   Search,
+  Square,
   Sun,
+  X,
 } from 'lucide-react';
 import { COCKPIT_EASE, COCKPIT_SPRING, ViewStage } from './components/MotionPrimitives';
 import { LoginModal } from './components/LoginModal';
@@ -20,12 +25,21 @@ import { NavigationSidebar } from './components/NavigationSidebar';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { MatrixTelemetryBackdrop } from './components/MatrixTelemetryBackdrop';
 import { recordProcessCpuSamples } from './components/ProcessCpuSparkline';
-import { MainTabId, MetricsPayload, TelemetryHistoryResponse, VersionInfo, WifiClient } from './types/telemetry';
+import {
+  MainTabId,
+  MetricsPayload,
+  TelemetryHistoryResponse,
+  UbuntuNativeControlPayload,
+  UbuntuNativeWindowState,
+  VersionInfo,
+  WifiClient,
+} from './types/telemetry';
 import {
   apiFetchJson,
   clearStoredToken,
   collectBrowserDeviceTelemetry,
   detectNativeEnvironment,
+  sendUbuntuWindowAction,
   setStoredToken,
 } from './utils/api';
 import { formatCanonicalRoute, normalizeSubTabForView, resolveAppRoute } from './utils/formatters';
@@ -73,6 +87,45 @@ export function App() {
   });
   const [navTick, setNavTick] = useState(0);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const { isUbuntuNative } = detectNativeEnvironment();
+  const [ubuntuWindowState, setUbuntuWindowState] = useState<UbuntuNativeWindowState>(() =>
+    typeof window !== 'undefined' && window.__RECURSOS_WINDOW_STATE__
+      ? window.__RECURSOS_WINDOW_STATE__
+      : { is_fullscreen: true, is_maximized: false }
+  );
+  const [ubuntuConnMode, setUbuntuConnMode] = useState<string>(() =>
+    typeof window !== 'undefined' ? String(window.__RECURSOS_CONN_MODE__ || 'LOCAL') : 'LOCAL'
+  );
+  const [ubuntuNodeUrl, setUbuntuNodeUrl] = useState<string>(() =>
+    typeof window !== 'undefined' ? String(window.__RECURSOS_NODE_URL__ || '') : ''
+  );
+
+  // Sync window state & connection mode exclusively inside Ubuntu native GTK3+WebKit2 shell
+  useEffect(() => {
+    if (!isUbuntuNative) return;
+    const onWinState = (ev: Event) => {
+      const detail = (ev as CustomEvent<UbuntuNativeWindowState>).detail;
+      if (detail) setUbuntuWindowState(detail);
+    };
+    const onConnState = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ mode?: string; url?: string }>).detail;
+      if (detail?.mode) setUbuntuConnMode(detail.mode);
+      if (detail?.url !== undefined) setUbuntuNodeUrl(detail.url);
+    };
+    window.addEventListener('recursos-ubuntu-window-state', onWinState);
+    window.addEventListener('recursos-ubuntu-state-changed', onConnState);
+    void apiFetchJson<UbuntuNativeControlPayload>('/api/native/ubuntu-control').then((res) => {
+      if (res.ok && res.data) {
+        if (res.data.window) setUbuntuWindowState(res.data.window);
+        if (res.data.connection_mode) setUbuntuConnMode(res.data.connection_mode);
+        if (res.data.active_url !== undefined) setUbuntuNodeUrl(res.data.active_url);
+      }
+    });
+    return () => {
+      window.removeEventListener('recursos-ubuntu-window-state', onWinState);
+      window.removeEventListener('recursos-ubuntu-state-changed', onConnState);
+    };
+  }, [isUbuntuNative]);
 
   // Global Ctrl+K / Cmd+K quick search shortcut (only when certified)
   useEffect(() => {
@@ -760,6 +813,77 @@ export function App() {
                 />
                 <span>v{displayVersion}</span>
               </motion.button>
+
+              {/* Controles nativos de escritorio (exclusivos de la App Nativa Ubuntu) */}
+              {isUbuntuNative && (
+                <>
+                  <span aria-hidden="true" className="mx-0.5 hidden sm:inline-block h-5 w-px bg-slate-200/80 dark:bg-slate-700/70" />
+                  <motion.button
+                    type="button"
+                    data-testid="ubuntu-conn-pill"
+                    onClick={() => navigateTo('mas', 'ubuntu')}
+                    title={ubuntuNodeUrl && ubuntuNodeUrl !== 'local' ? `${ubuntuConnMode} · ${ubuntuNodeUrl}` : ubuntuConnMode}
+                    aria-label={t('more.subtabs.ubuntu')}
+                    className={`hidden md:inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-[10.5px] font-bold tracking-[0.04em] cursor-pointer ${
+                      ubuntuConnMode === 'REVOKED'
+                        ? 'cockpit-pill-amber'
+                        : ubuntuConnMode === 'WAN'
+                          ? 'cockpit-pill-cyan'
+                          : ubuntuConnMode === 'LAN'
+                            ? 'cockpit-pill-emerald'
+                            : 'cockpit-subtile text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    <span>{ubuntuConnMode || 'LOCAL'}</span>
+                  </motion.button>
+                  <button
+                    type="button"
+                    data-testid="ubuntu-win-minimize"
+                    onClick={() => sendUbuntuWindowAction('minimize')}
+                    title={t('more.ubuntu_minimize')}
+                    aria-label={t('more.ubuntu_minimize')}
+                    className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-600 transition-colors hover:border-[#1e6b38]/40 hover:text-slate-900 dark:text-slate-300 dark:hover:border-[#c6f19d]/40 dark:hover:text-white cursor-pointer"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  {!ubuntuWindowState.is_fullscreen && (
+                    <button
+                      type="button"
+                      data-testid="ubuntu-win-maximize"
+                      onClick={() => sendUbuntuWindowAction('toggle_maximize')}
+                      title={ubuntuWindowState.is_maximized ? t('more.ubuntu_restore') : t('more.ubuntu_maximize')}
+                      aria-label={ubuntuWindowState.is_maximized ? t('more.ubuntu_restore') : t('more.ubuntu_maximize')}
+                      className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-600 transition-colors hover:border-[#1e6b38]/40 hover:text-slate-900 dark:text-slate-300 dark:hover:border-[#c6f19d]/40 dark:hover:text-white cursor-pointer"
+                    >
+                      <Square className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    data-testid="ubuntu-win-fullscreen"
+                    onClick={() => sendUbuntuWindowAction('toggle_fullscreen')}
+                    title={t('native_ubuntu.fullscreen_tip')}
+                    aria-label={ubuntuWindowState.is_fullscreen ? t('more.ubuntu_exit_fullscreen') : t('native_ubuntu.fullscreen')}
+                    className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-600 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-300 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
+                  >
+                    {ubuntuWindowState.is_fullscreen ? (
+                      <Minimize2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="ubuntu-win-close"
+                    onClick={() => sendUbuntuWindowAction('close')}
+                    title={t('more.ubuntu_close_app')}
+                    aria-label={t('more.ubuntu_close_app')}
+                    className="cockpit-subtile flex min-h-[36px] min-w-[36px] items-center justify-center text-slate-600 transition-colors hover:border-rose-500/50 hover:bg-rose-500/15 hover:text-rose-600 dark:text-slate-300 dark:hover:border-rose-400/50 dark:hover:text-rose-400 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </>
+              )}
             </div>
           </header>
           {/* Top-bar / Top-tabs desktop navigation (GTA III, GTA IV, GTA V) */}

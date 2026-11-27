@@ -16008,7 +16008,8 @@ VALID_WEB_ROUTES = {
     "/version",
     "/dns",
     "/duckdns",
-    "/dex"
+    "/dex",
+    "/ubuntu",
 }
 
 VALID_WEB_PREFIXES = (
@@ -16079,6 +16080,7 @@ VALID_WEB_PREFIXES = (
     "/historial",
     "/history",
     "/dex",
+    "/ubuntu",
     "/ajustes",
     "/settings",
     "/cloud",

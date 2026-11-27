@@ -14,17 +14,25 @@ import {
   Languages,
   Laptop,
   Lock,
+  Maximize2,
+  Minimize2,
+  Minus,
   Moon,
   Palette,
   RefreshCw,
+  RotateCcw,
   Search,
+  Server,
   ShieldCheck,
   Smartphone,
   Sparkles,
+  Square,
   Sun,
   Terminal,
   Trash2,
   Usb,
+  Wifi,
+  X,
 } from 'lucide-react';
 import { COCKPIT_SPRING, MorphPill, ViewStage } from './MotionPrimitives';
 import { ServiceConsoleView } from './ServiceConsoleView';
@@ -39,9 +47,10 @@ import {
   SystemErrorsSummary,
   ThemeMode,
   TrustedDevice,
+  UbuntuNativeControlPayload,
   VersionInfo,
 } from '../types/telemetry';
-import { apiFetchJson, detectNativeEnvironment } from '../utils/api';
+import { apiFetchJson, detectNativeEnvironment, sendUbuntuWindowAction } from '../utils/api';
 import { formatBytes, getDisplayVersionString } from '../utils/formatters';
 import { getCanonicalDisplayVersion, getCanonicalVersion } from '../utils/version';
 import { useI18n } from '../i18n';
@@ -67,7 +76,7 @@ function getThemeLayoutLabelKey(pos?: ThemeNavPosition): string {
   }
 }
 
-type MoreSubTab = 'updates' | 'themes' | 'console' | 'devices' | 'manual' | 'dex';
+type MoreSubTab = 'updates' | 'themes' | 'console' | 'devices' | 'manual' | 'dex' | 'ubuntu';
 
 function resolveMoreSubTab(hint?: string): MoreSubTab | undefined {
   if (!hint) return undefined;
@@ -78,6 +87,7 @@ function resolveMoreSubTab(hint?: string): MoreSubTab | undefined {
   if (['devices', 'dispositivos', 'nodos', 'security', 'seguridad'].includes(h)) return 'devices';
   if (['manual', 'manual.html', 'readme', 'ayuda', 'docs'].includes(h)) return 'manual';
   if (h === 'dex') return 'dex';
+  if (['ubuntu', 'app', 'desktop', 'escritorio', 'nativo', 'native'].includes(h)) return 'ubuntu';
   return undefined;
 }
 
@@ -216,6 +226,22 @@ export const MoreView: React.FC<MoreViewProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [aliasDraft, setAliasDraft] = useState('');
   const [expandedDevId, setExpandedDevId] = useState<string | null>(null);
+
+  // Ubuntu Native Desktop state (Ubuntu Native only)
+  const [ubuntuControl, setUbuntuControl] = useState<UbuntuNativeControlPayload | null>(null);
+  const [loadingUbuntuControl, setLoadingUbuntuControl] = useState(false);
+  const [ubuntuBusyAction, setUbuntuBusyAction] = useState<string | null>(null);
+  const [manualHostInput, setManualHostInput] = useState('');
+
+  const loadUbuntuControl = useCallback(async () => {
+    if (!isUbuntuNative) return;
+    setLoadingUbuntuControl(true);
+    const res = await apiFetchJson<UbuntuNativeControlPayload>('/api/native/ubuntu-control');
+    setLoadingUbuntuControl(false);
+    if (res.ok && res.data) {
+      setUbuntuControl(res.data);
+    }
+  }, [isUbuntuNative]);
 
   // DeX USB state (Ubuntu Native only)
   const [dexStatus, setDexStatus] = useState<DexStatusPayload | null>(null);
@@ -391,8 +417,29 @@ export const MoreView: React.FC<MoreViewProps> = ({
       void loadDevices();
     } else if (subTab === 'dex') {
       void loadDex();
+    } else if (subTab === 'ubuntu') {
+      void loadUbuntuControl();
     }
-  }, [subTab, loadVersion, loadGithubReleases, loadLogs, loadDevices, loadDex]);
+  }, [subTab, loadVersion, loadGithubReleases, loadLogs, loadDevices, loadDex, loadUbuntuControl]);
+
+  useEffect(() => {
+    if (!isUbuntuNative || subTab !== 'ubuntu') return;
+    const onWinState = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ is_fullscreen?: boolean; is_maximized?: boolean }>).detail;
+      if (detail) {
+        setUbuntuControl((prev) => (prev ? { ...prev, window: detail } : prev));
+      }
+    };
+    const onConnChanged = () => {
+      void loadUbuntuControl();
+    };
+    window.addEventListener('recursos-ubuntu-window-state', onWinState);
+    window.addEventListener('recursos-ubuntu-state-changed', onConnChanged);
+    return () => {
+      window.removeEventListener('recursos-ubuntu-window-state', onWinState);
+      window.removeEventListener('recursos-ubuntu-state-changed', onConnChanged);
+    };
+  }, [isUbuntuNative, subTab, loadUbuntuControl]);
 
   const activeVer = versionInfo || metrics?.version_info;
   const displayVer = getCanonicalDisplayVersion(activeVer);
@@ -562,6 +609,66 @@ export const MoreView: React.FC<MoreViewProps> = ({
     }
   };
 
+  const handleUbuntuConnectionAction = async (
+    action: 'reconnect' | 'forget' | 'connect_local' | 'set_host'
+  ) => {
+    const hostClean = manualHostInput.trim();
+    if (action === 'set_host' && !hostClean) {
+      onNotify(t('more.ubuntu_host_invalid'), true);
+      return;
+    }
+    setUbuntuBusyAction(action);
+    const res = await apiFetchJson<{
+      ok?: boolean;
+      message?: string;
+      error?: string;
+      control?: UbuntuNativeControlPayload;
+    }>('/api/native/connection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(action === 'set_host' ? { action, host: hostClean } : { action }),
+    });
+    setUbuntuBusyAction(null);
+    if (res.data?.control) {
+      setUbuntuControl(res.data.control);
+    } else {
+      void loadUbuntuControl();
+    }
+    if (res.ok && res.data?.ok !== false) {
+      if (action === 'set_host') setManualHostInput('');
+      onNotify(res.data?.message || t('more.ubuntu_reconnected'));
+      onRefreshMetrics();
+    } else {
+      onNotify(res.data?.message || res.data?.error || res.error || t('status.signal_error'), true);
+    }
+  };
+
+  const handleUbuntuLocalNodeAction = async () => {
+    setUbuntuBusyAction('local_node');
+    const res = await apiFetchJson<{
+      ok?: boolean;
+      message?: string;
+      error?: string;
+      control?: UbuntuNativeControlPayload;
+    }>('/api/native/local-node', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'install_or_start' }),
+    });
+    setUbuntuBusyAction(null);
+    if (res.data?.control) {
+      setUbuntuControl(res.data.control);
+    } else {
+      void loadUbuntuControl();
+    }
+    if (res.ok && res.data?.ok !== false) {
+      onNotify(res.data?.message || t('more.ubuntu_local_active_badge'));
+      onRefreshMetrics();
+    } else {
+      onNotify(res.data?.message || res.data?.error || res.error || t('status.action_error'), true);
+    }
+  };
+
   const triggerDirectDownload = (url: string, fallbackHref: string) => {
     const clean = String(url || '').trim();
     const safeUrl = clean.startsWith('https://') ? clean : fallbackHref;
@@ -635,7 +742,10 @@ export const MoreView: React.FC<MoreViewProps> = ({
             { id: 'devices' as const, label: t('more.subtabs.devices'), icon: <ShieldCheck className="h-4 w-4" /> },
             { id: 'manual' as const, label: t('more.subtabs.manual'), icon: <BookOpen className="h-4 w-4" /> },
             ...(isUbuntuNative
-              ? [{ id: 'dex' as const, label: t('more.subtabs.dex'), icon: <Usb className="h-4 w-4" /> }]
+              ? [
+                  { id: 'ubuntu' as const, label: t('more.subtabs.ubuntu'), icon: <Laptop className="h-4 w-4" /> },
+                  { id: 'dex' as const, label: t('more.subtabs.dex'), icon: <Usb className="h-4 w-4" /> },
+                ]
               : []),
           ].map((tab) => {
             const active = subTab === tab.id;
@@ -2385,6 +2495,315 @@ export const MoreView: React.FC<MoreViewProps> = ({
               className="cockpit-manual-frame w-full bg-white dark:bg-[#0a140b]"
             />
           </div>
+        </section>
+      )}
+
+      {/* 5. Control Nativo de Escritorio Ubuntu (Solo en Ubuntu nativa; en web/Android mensaje pasivo) */}
+      {subTab === 'ubuntu' && (
+        <section className="cockpit-bento p-5" data-testid="ubuntu-native-panel">
+          {!isUbuntuNative ? (
+            <div className="flex flex-col items-center py-10 text-center">
+              <Lock className="h-8 w-8 text-slate-400" />
+              <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {t('more.ubuntu_locked_msg')}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 pb-4 dark:border-slate-800">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                      {t('more.ubuntu_title')}
+                    </h2>
+                    <span className="cockpit-pill-emerald rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
+                      {t('more.ubuntu_native_badge')}
+                    </span>
+                    <span className="cockpit-pill-cyan rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums">
+                      v{ubuntuControl?.app_display_version || window.__RECURSOS_UBUNTU_APP_VERSION__ || '—'}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    {t('more.ubuntu_desc')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={loadingUbuntuControl}
+                  onClick={() => void loadUbuntuControl()}
+                  className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingUbuntuControl ? 'animate-spin' : ''}`} />
+                  <span>{t('more.check_btn')}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {/* Tarjeta 1: Conexión LAN / WAN / Autodescubrimiento */}
+                <div className="cockpit-subtile flex flex-col justify-between gap-4 p-4">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Wifi className="h-4 w-4 text-[#1e6b38] dark:text-[#c6f19d]" />
+                        <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white">
+                          {t('more.ubuntu_conn_title')}
+                        </h3>
+                      </div>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 font-mono text-[11px] font-bold ${
+                          ubuntuControl?.connection_mode === 'LAN'
+                            ? 'cockpit-pill-emerald'
+                            : ubuntuControl?.connection_mode === 'WAN'
+                              ? 'cockpit-pill-cyan'
+                              : ubuntuControl?.connection_mode === 'REVOKED'
+                                ? 'cockpit-pill-amber'
+                                : 'cockpit-subtile text-slate-600 dark:text-slate-300'
+                        }`}
+                      >
+                        {ubuntuControl?.connection_mode === 'LAN'
+                          ? t('more.ubuntu_conn_mode_lan')
+                          : ubuntuControl?.connection_mode === 'WAN'
+                            ? t('more.ubuntu_conn_mode_wan')
+                            : ubuntuControl?.connection_mode === 'REVOKED'
+                              ? t('native_ubuntu.access_revoked')
+                              : t('more.ubuntu_conn_mode_local')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {t('more.ubuntu_conn_desc')}
+                    </p>
+                    <div className="space-y-1.5 rounded-xl border border-slate-200/70 bg-white/60 p-3 font-mono text-[11px] dark:border-slate-800 dark:bg-black/20">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-500 dark:text-slate-400">LAN</span>
+                        <span className="truncate font-semibold text-slate-900 dark:text-slate-100">
+                          {ubuntuControl?.saved_host
+                            ? `${ubuntuControl.saved_host}:${ubuntuControl.node_port || 8085}`
+                            : t('native_ubuntu.lan_wait')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-500 dark:text-slate-400">DNS (WAN)</span>
+                        <span className="truncate font-semibold text-slate-900 dark:text-slate-100">
+                          {ubuntuControl?.wan_domain || t('native_ubuntu.dns_auto')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-500 dark:text-slate-400">Zero-Trust</span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#1e6b38] dark:text-[#c6f19d]">
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          {ubuntuControl?.is_revoked
+                            ? t('native_ubuntu.cert_revoked')
+                            : ubuntuControl?.has_token
+                              ? t('native_ubuntu.cert_ok')
+                              : t('native_ubuntu.no_remote_node')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={manualHostInput}
+                        onChange={(e) => setManualHostInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void handleUbuntuConnectionAction('set_host');
+                          }
+                        }}
+                        placeholder={t('more.ubuntu_manual_host_placeholder')}
+                        className="cockpit-subtile min-h-[38px] flex-1 px-3 font-mono text-xs text-slate-900 placeholder:text-slate-400 dark:text-white"
+                      />
+                      <button
+                        type="button"
+                        disabled={Boolean(ubuntuBusyAction)}
+                        onClick={() => void handleUbuntuConnectionAction('set_host')}
+                        className="cockpit-subtile min-h-[38px] px-3 text-xs font-semibold text-slate-700 hover:text-[#1e6b38] disabled:opacity-50 dark:text-slate-200 dark:hover:text-[#c6f19d] cursor-pointer"
+                      >
+                        {t('more.ubuntu_manual_connect_btn')}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={Boolean(ubuntuBusyAction)}
+                      onClick={() => void handleUbuntuConnectionAction('reconnect')}
+                      className="cockpit-btn-accent inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-4 text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${ubuntuBusyAction === 'reconnect' ? 'animate-spin' : ''}`} />
+                      <span>
+                        {ubuntuBusyAction === 'reconnect'
+                          ? t('more.ubuntu_reconnecting')
+                          : t('more.ubuntu_reconnect_btn')}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={Boolean(ubuntuBusyAction)}
+                      onClick={() => void handleUbuntuConnectionAction('connect_local')}
+                      className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      <span>{t('more.ubuntu_connect_local_btn')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={Boolean(ubuntuBusyAction)}
+                      onClick={() => void handleUbuntuConnectionAction('forget')}
+                      className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-500/10 disabled:opacity-50 dark:text-rose-400 cursor-pointer"
+                    >
+                      <span>{t('native_ubuntu.forget_conn')}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tarjeta 2: Nodo local Ubuntu y Accesos rápidos */}
+                <div className="cockpit-subtile flex flex-col justify-between gap-4 p-4">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Server className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                        <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white">
+                          {t('more.ubuntu_local_node_title')}
+                        </h3>
+                      </div>
+                      {ubuntuControl?.local_node?.running ? (
+                        <span className="cockpit-pill-emerald inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>{t('more.ubuntu_local_active_badge')}</span>
+                        </span>
+                      ) : (
+                        <span className="cockpit-pill-amber rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
+                          {ubuntuControl?.local_node?.installed
+                            ? t('native_ubuntu.local_state_installed')
+                            : t('more.ubuntu_conn_mode_local')}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {t('more.ubuntu_local_node_desc')}
+                    </p>
+                    {ubuntuControl?.local_node?.lan_url && (
+                      <div className="rounded-xl border border-slate-200/70 bg-white/60 px-3 py-2 font-mono text-[11px] text-slate-700 dark:border-slate-800 dark:bg-black/20 dark:text-slate-200">
+                        {ubuntuControl.local_node.lan_url}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!ubuntuControl?.local_node?.running && (
+                        <button
+                          type="button"
+                          disabled={Boolean(ubuntuBusyAction)}
+                          onClick={() => void handleUbuntuLocalNodeAction()}
+                          className="cockpit-btn-accent inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-4 text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                        >
+                          <span>
+                            {ubuntuControl?.local_node?.installed
+                              ? t('native_ubuntu.start_local_node')
+                              : t('native_ubuntu.install_node')}
+                          </span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSubTab('dex')}
+                        className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-[#1e6b38] dark:text-slate-200 dark:hover:text-[#c6f19d] cursor-pointer"
+                      >
+                        <Usb className="h-3.5 w-3.5" />
+                        <span>{t('more.ubuntu_open_dex')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSubTab('updates')}
+                        className="cockpit-subtile inline-flex min-h-[40px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-sky-700 dark:text-slate-200 dark:hover:text-sky-300 cursor-pointer"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span>{t('more.ubuntu_open_updates')}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tarjeta 3: Ventana sin bordes y Acerca de */}
+              <div className="cockpit-subtile flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-1">
+                  <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white">
+                    {t('more.ubuntu_window_title')}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('more.ubuntu_window_desc')} · {t('more.ubuntu_about_title')}{' '}
+                    <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">
+                      v{ubuntuControl?.about?.display_version || window.__RECURSOS_UBUNTU_APP_VERSION__ || '—'}
+                    </span>{' '}
+                    ({t('more.ubuntu_about_license')})
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => sendUbuntuWindowAction('toggle_fullscreen')}
+                    className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-[#1e6b38] dark:text-slate-200 dark:hover:text-[#c6f19d] cursor-pointer"
+                  >
+                    {ubuntuControl?.window?.is_fullscreen ? (
+                      <Minimize2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    )}
+                    <span>
+                      {ubuntuControl?.window?.is_fullscreen
+                        ? t('more.ubuntu_exit_fullscreen')
+                        : t('native_ubuntu.fullscreen')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendUbuntuWindowAction('minimize')}
+                    className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                    <span>{t('more.ubuntu_minimize')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendUbuntuWindowAction('toggle_maximize')}
+                    className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                    <span>
+                      {ubuntuControl?.window?.is_maximized
+                        ? t('more.ubuntu_restore')
+                        : t('more.ubuntu_maximize')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendUbuntuWindowAction('reload')}
+                    className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>{t('more.ubuntu_reload_ui')}</span>
+                  </button>
+                  <a
+                    href={ubuntuControl?.about?.repo_url || 'https://github.com/cminewarIA/recursos-ui'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 text-xs font-semibold text-slate-700 hover:text-sky-700 dark:text-slate-200 dark:hover:text-sky-300"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>GitHub</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => sendUbuntuWindowAction('close')}
+                    className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    <span>{t('more.ubuntu_close_app')}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       )}
 

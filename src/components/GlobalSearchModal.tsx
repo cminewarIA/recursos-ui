@@ -11,6 +11,7 @@ import {
   Globe,
   HardDrive,
   Home,
+  Laptop,
   Layers,
   MapPin,
   Network,
@@ -19,11 +20,13 @@ import {
   Server,
   Shield,
   Terminal,
+  Usb,
   Wifi,
   X,
 } from 'lucide-react';
 import { COCKPIT_SPRING } from './MotionPrimitives';
 import { MainTabId, MetricsPayload } from '../types/telemetry';
+import { detectNativeEnvironment } from '../utils/api';
 import { formatCanonicalRoute } from '../utils/formatters';
 import { useI18n } from '../i18n';
 
@@ -51,6 +54,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   metrics,
 }) => {
   const { t } = useI18n();
+  const { isUbuntuNative } = detectNativeEnvironment();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -254,8 +258,30 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         icon: <BookOpen className="h-4 w-4 text-emerald-500" />,
         hint: 'Docs',
       },
+      ...(isUbuntuNative
+        ? [
+            {
+              id: 'nav-ubuntu',
+              title: t('more.subtabs.ubuntu'),
+              category: t('nav.mas'),
+              tab: 'mas' as MainTabId,
+              subTab: 'ubuntu',
+              icon: <Laptop className="h-4 w-4 text-sky-500" />,
+              hint: 'LAN · Ventana · Nodo',
+            },
+            {
+              id: 'nav-dex',
+              title: t('more.subtabs.dex'),
+              category: t('nav.mas'),
+              tab: 'mas' as MainTabId,
+              subTab: 'dex',
+              icon: <Usb className="h-4 w-4 text-[#1e6b38] dark:text-[#c6f19d]" />,
+              hint: 'USB · scrcpy',
+            },
+          ]
+        : []),
     ],
-    [t, metrics?.cpu?.model, metrics?.gpu?.name]
+    [t, isUbuntuNative, metrics?.cpu?.model, metrics?.gpu?.name]
   );
 
   // Dynamic live search items (processes, LAN devices, Docker containers)

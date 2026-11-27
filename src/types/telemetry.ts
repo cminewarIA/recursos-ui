@@ -1275,12 +1275,49 @@ export interface MetricsPayload {
   maps_engine?: string;
 }
 
+export interface UbuntuNativeWindowState {
+  is_fullscreen?: boolean;
+  is_maximized?: boolean;
+}
+
+export interface UbuntuNativeControlPayload {
+  ok?: boolean;
+  app_version?: string;
+  app_display_version?: string;
+  connection_mode?: 'LAN' | 'WAN' | 'LOCAL' | 'REVOKED' | 'DISCONNECTED' | string;
+  active_url?: string;
+  saved_host?: string;
+  node_port?: number;
+  wan_domain?: string;
+  has_token?: boolean;
+  is_revoked?: boolean;
+  local_node?: {
+    installed?: boolean;
+    running?: boolean;
+    lan_ip?: string;
+    port?: number;
+    lan_url?: string;
+    app_installed_deb?: boolean;
+    installed_deb_version?: string;
+  };
+  window?: UbuntuNativeWindowState;
+  about?: {
+    name?: string;
+    version?: string;
+    display_version?: string;
+    repo_url?: string;
+    license?: string;
+  };
+}
+
 declare global {
   interface Window {
     __INITIAL_APP_VERSION__?: string;
     __INITIAL_DISPLAY_VERSION__?: string;
     __INITIAL_APP_HASH__?: string;
     __RECURSOS_UBUNTU_NATIVE__?: boolean;
+    __RECURSOS_UBUNTU_APP_VERSION__?: string;
+    __RECURSOS_WINDOW_STATE__?: UbuntuNativeWindowState;
     __RECURSOS_ANDROID_NATIVE__?: boolean;
     __RECURSOS_ANDROID_TV__?: boolean;
     __RECURSOS_DEVICE_TOKEN__?: string;
@@ -1310,6 +1347,9 @@ declare global {
           postMessage: (msg: unknown) => void;
         };
         recursosTheme?: {
+          postMessage: (msg: unknown) => void;
+        };
+        recursosWindow?: {
           postMessage: (msg: unknown) => void;
         };
       };

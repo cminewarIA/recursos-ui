@@ -44,7 +44,7 @@
   <tr>
     <td width="33%" valign="top">
       <b>📱 4. Apps Nativas y DeX USB</b><br/>
-      Domina el lanzador de Ubuntu (<code>.deb</code>), la conmutación automática <code>LAN ↔ WAN</code>, Android Zero-Config y <b>Pantalla móvil USB (DeX)</b>.<br/><br/>
+      Domina la app nativa de Ubuntu (<code>.deb</code>) a pantalla completa sin barra superior, el panel desbloqueable <code>/sistema/ubuntu</code>, la conmutación automática <code>LAN ↔ WAN</code>, Android Zero-Config y <b>Pantalla móvil USB (DeX)</b>.<br/><br/>
       <a href="#-cap%C3%ADtulo-4--manual-de-aplicaciones-nativas-deb--apk-y-dex-usb">Ir al Capítulo 4 →</a>
     </td>
     <td width="33%" valign="top">
@@ -132,6 +132,7 @@ Toda la plataforma se organiza en **5 dominios funcionales sin duplicidades**, c
    - **`/sistema/dispositivos`**: **Certificado único unificado por dispositivo físico**, emitido automáticamente al conectar desde la red local (LAN). Agrupa todos los navegadores web y aplicaciones nativas de un mismo equipo bajo una sola credencial consolidando de forma incremental modelo, SO, arquitectura, MAC, IDs de instalación, IPs observadas, fecha de verificación LAN y acceso root (si aplica), sin exponer nunca datos del sistema a clientes no certificados.
    - **`/sistema/manual`**: Manual interactivo completo con simuladores en vivo sobre `<canvas>` y explorador de API REST.
    - **`/sistema/dex`**: Conexión de pantalla móvil USB (DeX a 60 FPS) desbloqueada exclusivamente en el cliente nativo de Ubuntu Linux.
+   - **`/sistema/ubuntu`**: Panel de control nativo de Ubuntu (conexión automática LAN/WAN, nodo local, controles de ventana sin barra superior y Acerca de) desbloqueado exclusivamente en la app nativa de Ubuntu Linux.
 
 </details>
 
@@ -235,22 +236,19 @@ Las aplicaciones nativas siguen el **Principio Contractual de Paridad y Simetrí
 | Característica | Interfaz Web SPA | App Nativa Ubuntu (`.deb`) | App Nativa Android &amp; Android TV (`.apk`) |
 | :--- | :--- | :--- | :--- |
 | **Contenedor Nativo** | Navegador Web Moderno | `GTK 3` + `WebKit2` + `LocalHtmlBridgeServer` | `Jetpack Compose` + `android.webkit.WebView` + `Leanback` |
-| **Detección del Nodo** | Manual por URL / IP | Escaneo LAN / `mDNS` + Lanzador 3 tarjetas | **Descubridor local automático al iniciar** (si no está emparejado o falla el nodo guardado) con escaneo dual `mDNS/NSD` (`_recursos._tcp`) + subred `Wi-Fi`/`Ethernet`, emparejamiento en 1 toque e IP manual |
+| **Detección del Nodo** | Manual por URL / IP | **Conexión automática local al iniciar** (`mDNS` + escaneo paralelo `/24` LAN → `WAN` DDNS), sin barra superior GTK y vista directa a pantalla completa | **Descubridor local automático al iniciar** (si no está emparejado o falla el nodo guardado) con escaneo dual `mDNS/NSD` (`_recursos._tcp`) + subred `Wi-Fi`/`Ethernet`, emparejamiento en 1 toque e IP manual |
 | **Almacén de Credenciales** | `Cookie HttpOnly` + `localStorage` | Configuración protegida / Keyring local + detección silenciosa de root | `Android KeyStore` + `EncryptedSharedPreferences` + detección silenciosa de root reflejada solo en la credencial |
 | **Conmutación `LAN ↔ WAN`** | Según ruta accedida | IP LAN mínima latencia ↔ DDNS WAN cifrado | Automática al cambiar entre red local (LAN/Wi-Fi) y WAN exterior |
 | **Control y Ergonomía** | Ratón / Táctil | Ratón / Táctil / Atajos nativos | Táctil móvil/tablet + **D-Pad / Mando Android TV** (anillo cian + overscan) |
 | **Ciclo de Versiones y Descargas GitHub** | [`./VERSION`](./VERSION) | [`./UBUNTU_VERSION`](./UBUNTU_VERSION) independiente · compara estrictamente su versión instalada contra releases nativas `ubuntu-v*`/`native-*`; descarga e instala `.deb` y guarda `.apk` en `Descargas` | [`./ANDROID_VERSION`](./ANDROID_VERSION) independiente · compara su `versionName` instalado contra releases `android-v*`/`native-*`; autoinstalación in-app con `root` o **`PackageInstaller.Session`** oficial sin root (guiando el permiso una única vez) |
-| **Pantalla Móvil USB (`DeX`)** | Oculto por arquitectura | **Desbloqueado en exclusiva** (`adb`, `scrcpy`, `/dev/uhid`) | Oculto por arquitectura |
+| **Pantalla Móvil USB (`DeX`) y Escritorio Ubuntu** | Oculto por arquitectura (`/sistema/dex` y `/sistema/ubuntu` bloqueados) | **Desbloqueados en exclusiva** dentro de la interfaz web (`/sistema/ubuntu` + `/sistema/dex` con `adb`, `scrcpy`, `/dev/uhid` y controles de ventana) | Oculto por arquitectura |
 
 <details>
-<summary><b>🐧 Guía paso a paso · App Nativa Ubuntu (<code>.deb</code>) y Lanzador en 3 Tarjetas</b></summary>
+<summary><b>🐧 Guía paso a paso · App Nativa Ubuntu (<code>.deb</code>) a Pantalla Completa y Panel <code>/sistema/ubuntu</code></b></summary>
 
-1. **Tarjeta 1 · Conectar con el nodo**: Busca automáticamente tu servidor en la red local o utiliza el dominio DDNS guardado para conmutar a WAN cuando sales de casa.
-2. **Tarjeta 2 · Compilaciones GitHub (`.deb` / `.apk`) y Nodo local**: Consulta dinámicamente la última publicación oficial en GitHub (separada del ciclo del servidor gracias a [`./UBUNTU_VERSION`](./UBUNTU_VERSION) y [`./ANDROID_VERSION`](./ANDROID_VERSION)):
-   - **Descargar e instalar `.deb` (GitHub)**: descarga el paquete `.deb` verificado desde GitHub e instala la actualización automáticamente sin perder tokens.
-   - **Descargar `.apk` a Descargas**: descarga la última compilación Android desde GitHub y la guarda directamente en tu carpeta `Descargas` (`xdg-user-dir DOWNLOAD`).
-   - **Sincronización web en caliente**: actualiza el servidor local sin sobrescribir `recursos_history.db` ni forzar nuevas compilaciones nativas cuando solo cambian la web o los temas.
-3. **Tarjeta 3 · Configuraciones y Verificación CLI**: Puedes verificar todo el entorno nativo y el puente loopback sin abrir ventana ejecutando:
+1. **Arranque directo a pantalla completa y conexión LAN automática**: Al abrir la aplicación de Ubuntu, se oculta por completo la barra nativa de Linux (`Gtk.HeaderBar` eliminada, ventana sin decoraciones) y se muestra directamente la interfaz web del servidor a pantalla completa mientras autodescubre el nodo en la red local (`mDNS` + subred `/24` + DDNS WAN guardado).
+2. **Controles de ventana y gestión Ubuntu desbloqueados dentro del servidor**: Tanto los botones compactos de ventana en la cabecera (`Minimizar`, `Maximizar/Restaurar`, `Pantalla completa` / `F11` y `Cerrar` / `Ctrl+Q`) como la pestaña **Sistema → Escritorio Ubuntu** (`/sistema/ubuntu`) solo se desbloquean cuando ejecutas desde la app nativa `.deb` (mismo mecanismo de seguridad exclusivo que **Pantalla móvil USB / DeX**).
+3. **Gestión del nodo local y compilaciones GitHub**: Desde `/sistema/ubuntu` puedes reconectar o fijar una IP manual, olvidar la conexión guardada, instalar o iniciar el nodo local (`system-dashboard.service`) y saltar en un clic a `/sistema/actualizaciones` (instalador `.deb`/`.apk`) o `/sistema/dex`. Para verificación CLI sin ventana:
    ```bash
    /usr/bin/recursos-cockpit --test-mode
    ```
