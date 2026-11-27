@@ -648,6 +648,7 @@ export interface WifiSourceStatus {
   label?: string;
   model?: string;
   ip?: string;
+  creds_decrypt_failed?: boolean;
 }
 
 export interface WifiSummary {
@@ -658,6 +659,7 @@ export interface WifiSummary {
   router_ip?: string;
   router_online?: boolean;
   router_encrypted?: boolean;
+  router_creds_decrypt_failed?: boolean;
   router_auth_mode?: string;
   asus_model?: string;
   gateway_ip?: string;

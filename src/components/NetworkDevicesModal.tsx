@@ -484,6 +484,7 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                   const srcs = client.sources ?? [];
                   const wanD = Number(client.wan_speed_down ?? 0);
                   const wanU = Number(client.wan_speed_up ?? 0);
+                  const lanT = Number(client.lan_speed_down ?? 0) + Number(client.lan_speed_up ?? 0);
 
                   return (
                     <div
@@ -523,10 +524,16 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                           </div>
                         </div>
 
-                        {(wanD > 0 || wanU > 0) && (
+                        {(wanD > 0 || wanU > 0 || lanT > 0) && (
                           <div className="text-right font-mono text-[11px] tabular-nums shrink-0">
-                            <div className="font-semibold text-sky-700 dark:text-sky-300">↓ {formatSpeed(wanD)}</div>
-                            <div className="font-semibold text-emerald-700 dark:text-emerald-300">↑ {formatSpeed(wanU)}</div>
+                            {wanD > 0 || wanU > 0 ? (
+                              <>
+                                <div className="font-semibold text-sky-700 dark:text-sky-300">↓ {formatSpeed(wanD)}</div>
+                                <div className="font-semibold text-emerald-700 dark:text-emerald-300">↑ {formatSpeed(wanU)}</div>
+                              </>
+                            ) : (
+                              <div className="font-semibold text-indigo-700 dark:text-indigo-300">LAN {formatSpeed(lanT)}</div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -627,6 +634,14 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
               </div>
             </div>
 
+            {!summary.router_wan_available && (
+              <div className="cockpit-subtile px-3.5 py-2.5 text-xs text-amber-800 dark:text-amber-300 border border-amber-500/25 bg-amber-500/5">
+                {summary.router_creds_decrypt_failed
+                  ? t('overview.bw_router_decrypt_notice')
+                  : t('overview.bw_router_unlinked_notice')}
+              </div>
+            )}
+
             {/* Controles Táctiles de Ordenación Rápida + Filtro Tráfico Activo */}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <LayoutGroup id="net-bw-sort">
@@ -697,6 +712,7 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                   const lanT = Number(c.lan_speed_down ?? 0) + Number(c.lan_speed_up ?? 0);
                   const downPct = Math.min(100, Math.round((wanD / peakBwDeviceRate) * 100));
                   const upPct = Math.min(100, Math.round((wanU / peakBwDeviceRate) * 100));
+                  const lanPct = Math.min(100, Math.round((lanT / peakBwDeviceRate) * 100));
 
                   return (
                     <div
@@ -747,13 +763,17 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex items-baseline justify-between sm:block sm:text-right min-w-0">
-                          <span className="block truncate text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                            {t('overview.bw_col_lan')}
-                          </span>
-                          <span className="font-mono text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300 shrink-0">
-                            {formatSpeed(lanT)}
-                          </span>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-1 text-[11px] font-mono tabular-nums">
+                            <span className="truncate text-slate-500 dark:text-slate-400">{t('overview.bw_col_lan')}</span>
+                            <span className="font-bold text-indigo-700 dark:text-indigo-300 shrink-0">{formatSpeed(lanT)}</span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+                            <div
+                              className="h-full rounded-full bg-indigo-500 transition-all duration-300"
+                              style={{ width: `${lanPct}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>

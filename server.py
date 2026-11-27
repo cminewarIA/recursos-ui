@@ -354,6 +354,7 @@ def _load_router_credentials():
     cfg_user = os.environ.get("RECURSOS_ROUTER_USER", "").strip()
     cfg_pass = os.environ.get("RECURSOS_ROUTER_PASS", "").strip()
     creds_encrypted = False
+    decrypt_failed = False
     creds_file = os.path.join(BASE_DIR, ".router_credentials.json")
     if os.path.isfile(creds_file):
         try:
@@ -367,6 +368,8 @@ def _load_router_credentials():
                         cfg_ip = cfg_ip or str(dec.get("router_ip", "")).strip()
                         cfg_user = cfg_user or str(dec.get("router_user", "")).strip()
                         cfg_pass = cfg_pass or str(dec.get("router_pass", "")).strip()
+                    else:
+                        decrypt_failed = True
                 else:
                     plain_ip = str(raw_creds.get("router_ip", "")).strip()
                     plain_user = str(raw_creds.get("router_user", "")).strip()
@@ -391,9 +394,9 @@ def _load_router_credentials():
             pass
     if not cfg_ip:
         cfg_ip = _detect_default_gateway_ip()
-    return cfg_ip, cfg_user, cfg_pass, creds_encrypted
+    return cfg_ip, cfg_user, cfg_pass, creds_encrypted, decrypt_failed
 
-ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_CREDS_ENCRYPTED = _load_router_credentials()
+ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_CREDS_ENCRYPTED, ROUTER_CREDS_DECRYPT_FAILED = _load_router_credentials()
 # Hash criptográfico con sal (PBKDF2-HMAC-SHA256) para clave maestra secundaria de respaldo
 _DEFAULT_SECONDARY_KEY_HASH = "pbkdf2_sha256$200000$d5d02ed57d1232f3da8f212fb615ad59$c1f752cd0c3ffe58203801901e98f7263401f847c74e815d375a8a3e5227ae3f"
 
@@ -13641,6 +13644,7 @@ _FCACHE_BASELINE_READY = False
 _WL_BYTES_PREV = {}             # { mac: (ts, tx_bytes, rx_bytes) }
 _GATEWAY_UPNP_CACHE = {"ts": 0.0, "ip": "", "data": {}}
 _SERVER_DIRECT_NET_SPEEDS = {"wan_rx": 0.0, "wan_tx": 0.0, "lan_rx": 0.0, "lan_tx": 0.0, "ts": 0.0}
+_SERVER_PEER_LAN_SPEEDS = {"ts": 0.0, "peers": {}}
 _DEVICES_DB_CACHE = {"ts": 0.0, "payload": None}
 _DEVICES_DB_LOCK = threading.Lock()
 _PIHOLE_CATALOG_CACHE = {"ts": 0.0, "data": {}}
@@ -13942,9 +13946,13 @@ def build_unified_devices_database(force_refresh=False):
     return payload
 
 def fetch_wifi_worker():
-    global WIFI_CACHE, MAC_RATE_CACHE, _FCACHE_FLOW_PREV, _FCACHE_LAST_TS, _FCACHE_BASELINE_READY, _WL_BYTES_PREV
+    global WIFI_CACHE, MAC_RATE_CACHE, _FCACHE_FLOW_PREV, _FCACHE_LAST_TS, _FCACHE_BASELINE_READY, _WL_BYTES_PREV, SERVER_LOCAL_IP
     while True:
         try:
+            if not SERVER_LOCAL_IP or SERVER_LOCAL_IP.startswith("127."):
+                resolved_local_ip = detect_local_server_ip()
+                if resolved_local_ip and not resolved_local_ip.startswith("127."):
+                    SERVER_LOCAL_IP = resolved_local_ip
             arp_map = get_arp_and_pihole_names()
             pihole_catalog = _read_pihole_network_catalog(limit=2000, max_age=10.0)
             friendly_names = load_device_friendly_names()
@@ -14008,7 +14016,10 @@ def fetch_wifi_worker():
                         "online": True,
                         "is_online": True,
                         "is_server": True,
-                        "is_local_host": bool(ipv4_addr == SERVER_LOCAL_IP),
+                        "is_local_host": bool(
+                            (SERVER_LOCAL_IP and not SERVER_LOCAL_IP.startswith("127.") and ipv4_addr == SERVER_LOCAL_IP)
+                            or (not any(cc.get("is_local_host") for cc in cable_clients) and _is_lan_ipv4(ipv4_addr))
+                        ),
                         "is_gateway": False,
                         "sources": srv_sources,
                         "tx_bytes": tx_b,
@@ -14718,6 +14729,9 @@ def fetch_wifi_worker():
             # Enriquecer cada dispositivo con velocidades WAN/LAN separadas, fuentes reales y datos de Pi-hole
             srv_direct = dict(_SERVER_DIRECT_NET_SPEEDS)
             srv_direct_fresh = (time.time() - float(srv_direct.get("ts") or 0.0)) < 10.0
+            peer_lan_snap = dict(_SERVER_PEER_LAN_SPEEDS)
+            peer_lan_fresh = (time.time() - float(peer_lan_snap.get("ts") or 0.0)) < 10.0
+            peer_lan_map = peer_lan_snap.get("peers") if peer_lan_fresh and isinstance(peer_lan_snap.get("peers"), dict) else {}
 
             router_wan_rx_sum = 0.0
             router_wan_tx_sum = 0.0
@@ -14765,14 +14779,20 @@ def fetch_wifi_worker():
                     wan_up = max(wan_up, float(srv_direct.get("wan_tx") or 0.0))
                     lan_down = max(lan_down, float(srv_direct.get("lan_rx") or 0.0))
                     lan_up = max(lan_up, float(srv_direct.get("lan_tx") or 0.0))
-                elif mac in wl_speed_map:
-                    wl_d, wl_u = wl_speed_map[mac]
-                    cur_tot_d = wan_down + lan_down
-                    cur_tot_u = wan_up + lan_up
-                    if wl_d > cur_tot_d:
-                        lan_down = round(lan_down + (wl_d - cur_tot_d), 1)
-                    if wl_u > cur_tot_u:
-                        lan_up = round(lan_up + (wl_u - cur_tot_u), 1)
+                elif not c.get("is_gateway"):
+                    c_ip = str(c.get("ip") or "").strip()
+                    if c_ip and c_ip in peer_lan_map:
+                        p_spd = peer_lan_map[c_ip]
+                        lan_down = max(lan_down, float(p_spd.get("lan_down") or 0.0))
+                        lan_up = max(lan_up, float(p_spd.get("lan_up") or 0.0))
+                    if mac in wl_speed_map:
+                        wl_d, wl_u = wl_speed_map[mac]
+                        cur_tot_d = wan_down + lan_down
+                        cur_tot_u = wan_up + lan_up
+                        if wl_d > cur_tot_d:
+                            lan_down = round(lan_down + (wl_d - cur_tot_d), 1)
+                        if wl_u > cur_tot_u:
+                            lan_up = round(lan_up + (wl_u - cur_tot_u), 1)
 
                 c['wan_speed_down'] = round(wan_down, 1)
                 c['wan_speed_up'] = round(wan_up, 1)
@@ -14831,6 +14851,7 @@ def fetch_wifi_worker():
                 "gateway_model": gw_upnp.get("model_display", ""),
                 "router_online": bool(router_ssh_ok or any(c.get('is_gateway') for c in cable_clients)),
                 "router_encrypted": bool(ROUTER_CREDS_ENCRYPTED),
+                "router_creds_decrypt_failed": bool(ROUTER_CREDS_DECRYPT_FAILED),
                 "router_auth_mode": "SSH + AES-256-GCM" if ROUTER_CREDS_ENCRYPTED else "SSH",
                 "router_wan_available": router_wan_avail,
                 "router_wan_rx_bytes_sec": round(router_wan_rx_sum, 1),
@@ -14856,6 +14877,7 @@ def fetch_wifi_worker():
                         "online_count": asus_cnt,
                         "model": asus_model,
                         "ip": ROUTER_IP or "",
+                        "creds_decrypt_failed": bool(ROUTER_CREDS_DECRYPT_FAILED),
                     },
                     "gateway": {
                         "available": bool(gw_ip),
@@ -15364,7 +15386,7 @@ def get_system_info():
         }
 
 def background_collector():
-    global METRICS_CACHE, METRICS_CACHE_BYTES, HISTORY
+    global METRICS_CACHE, METRICS_CACHE_BYTES, HISTORY, SERVER_LOCAL_IP, _SERVER_PEER_LAN_SPEEDS
     last_time = time.time()
     psutil.cpu_percent(interval=None, percpu=True)
     
@@ -15433,22 +15455,26 @@ def background_collector():
             w_bytes += d_st.write_bytes
         return r_bytes, w_bytes
 
-    prev_socket_bytes = {}  # { flow_key: (rx_bytes, tx_bytes, is_private) }
+    prev_socket_bytes = {}  # { flow_key: (rx_bytes, tx_bytes, is_private, r_ip) }
     prev_cifs_totals = [0, 0]
+    prev_cifs_by_host = {}  # { host_ip: (read_bytes, write_bytes) }
+    ss_baseline_ready = False
 
     def sample_lan_wan_flow_shares(dt_sec):
         """
         Mide deltas de bytes en tiempo real por flujo TCP/CIFS clasificando cada par remoto
         mediante _is_private_ip (RFC1918 LAN privada vs WAN pública) y devuelve
-        (wan_rx_share, wan_tx_share, lan_rx_bps_floor, lan_tx_bps_floor).
+        (wan_rx_share, wan_tx_share, peer_lan_speeds).
         """
-        nonlocal prev_socket_bytes
+        nonlocal prev_socket_bytes, prev_cifs_by_host, ss_baseline_ready
         lan_rx_delta = 0.0
         lan_tx_delta = 0.0
         wan_rx_delta = 0.0
         wan_tx_delta = 0.0
         lan_conns = 0
         wan_conns = 0
+        cifs_peer_deltas = {}
+        ss_peer_deltas = {}
 
         # 1. Contadores CIFS/SMB montados en red local
         try:
@@ -15462,6 +15488,18 @@ def background_collector():
                 lan_tx_delta += dw
             prev_cifs_totals[0] = tot_cifs_r
             prev_cifs_totals[1] = tot_cifs_w
+
+            next_cifs_by_host = {}
+            for c_host, (r_val, w_val) in cifs_hosts.items():
+                c_ip = str(c_host).strip()
+                next_cifs_by_host[c_ip] = (r_val, w_val)
+                if c_ip in prev_cifs_by_host:
+                    p_r, p_w = prev_cifs_by_host[c_ip]
+                    d_r = max(0, r_val - p_r)
+                    d_w = max(0, w_val - p_w)
+                    if d_r > 0 or d_w > 0:
+                        cifs_peer_deltas[c_ip] = (d_r, d_w)
+            prev_cifs_by_host = next_cifs_by_host
         except Exception:
             pass
 
@@ -15476,6 +15514,7 @@ def background_collector():
                 lines = p_ss.stdout.splitlines()
                 cur_key = None
                 cur_priv = True
+                cur_r_ip = ""
                 for ln in lines:
                     s = ln.strip()
                     if not s:
@@ -15489,38 +15528,63 @@ def background_collector():
                             r_ip = r_ip[7:]
                         if r_ip in ("127.0.0.1", "::1", "0.0.0.0", "*"):
                             cur_key = None
+                            cur_r_ip = ""
                             continue
                         cur_priv = _is_private_ip(r_ip)
+                        cur_r_ip = r_ip
                         if cur_priv:
                             lan_conns += 1
                         else:
                             wan_conns += 1
                         cur_key = f"{l_ep}->{r_ep}"
-                        curr_sockets.setdefault(cur_key, [0, 0, cur_priv])
+                        curr_sockets.setdefault(cur_key, [0, 0, cur_priv, cur_r_ip])
                     elif cur_key is not None:
                         m_rcv = re.search(r"bytes_received:(\d+)", s)
                         m_ack = re.search(r"bytes_acked:(\d+)", s)
                         m_sent = re.search(r"bytes_sent:(\d+)", s)
                         rx_b = int(m_rcv.group(1)) if m_rcv else 0
                         tx_b = int(m_sent.group(1)) if m_sent else (int(m_ack.group(1)) if m_ack else 0)
-                        curr_sockets[cur_key] = [rx_b, tx_b, cur_priv]
+                        curr_sockets[cur_key] = [rx_b, tx_b, cur_priv, cur_r_ip]
                         prev_entry = prev_socket_bytes.get(cur_key)
                         if prev_entry is not None:
                             d_rx = max(0, rx_b - prev_entry[0])
                             d_tx = max(0, tx_b - prev_entry[1])
-                        else:
+                        elif ss_baseline_ready:
                             d_rx = rx_b
                             d_tx = tx_b
+                        else:
+                            d_rx = 0
+                            d_tx = 0
                         if cur_priv:
                             lan_rx_delta += d_rx
                             lan_tx_delta += d_tx
+                            if cur_r_ip and (d_rx > 0 or d_tx > 0):
+                                acc_p = ss_peer_deltas.setdefault(cur_r_ip, [0, 0])
+                                acc_p[0] += d_rx
+                                acc_p[1] += d_tx
                         else:
                             wan_rx_delta += d_rx
                             wan_tx_delta += d_tx
                         cur_key = None
+                        cur_r_ip = ""
             prev_socket_bytes = curr_sockets
+            ss_baseline_ready = True
         except Exception:
             pass
+
+        peer_lan_speeds = {}
+        denom_dt = max(dt_sec, 0.001)
+        for p_ip in set(cifs_peer_deltas.keys()) | set(ss_peer_deltas.keys()):
+            if not _is_lan_ipv4(p_ip) or p_ip == SERVER_LOCAL_IP or p_ip.startswith("127."):
+                continue
+            c_r, c_w = cifs_peer_deltas.get(p_ip, (0, 0))
+            s_r, s_w = ss_peer_deltas.get(p_ip, (0, 0))
+            p_rx_from_peer = max(c_r, s_r)  # servidor lee/recibe -> subida del par remoto
+            p_tx_to_peer = max(c_w, s_w)    # servidor escribe/envía -> descarga del par remoto
+            lan_down = round(p_tx_to_peer / denom_dt, 1)
+            lan_up = round(p_rx_from_peer / denom_dt, 1)
+            if lan_down > 0.0 or lan_up > 0.0:
+                peer_lan_speeds[p_ip] = {"lan_down": lan_down, "lan_up": lan_up}
 
         tot_rx_delta = lan_rx_delta + wan_rx_delta
         tot_tx_delta = lan_tx_delta + wan_tx_delta
@@ -15540,7 +15604,7 @@ def background_collector():
         else:
             wan_tx_share = 0.65
 
-        return wan_rx_share, wan_tx_share
+        return wan_rx_share, wan_tx_share, peer_lan_speeds
 
     last_rx, last_tx, prev_ifaces_map, _ = get_real_net()
     last_r, last_w = get_real_disk()
@@ -15553,6 +15617,11 @@ def background_collector():
             dt = max(now - last_time, 0.001)
             last_time = now
             cycle_counter += 1
+
+            if not SERVER_LOCAL_IP or SERVER_LOCAL_IP.startswith("127."):
+                resolved_local_ip = detect_local_server_ip()
+                if resolved_local_ip and not resolved_local_ip.startswith("127."):
+                    SERVER_LOCAL_IP = resolved_local_ip
             
             curr_rx, curr_tx, interfaces, interfaces_list = get_real_net(prev_ifaces_map, dt)
             prev_ifaces_map = interfaces
@@ -15560,7 +15629,7 @@ def background_collector():
             tx_bytes_sec = max(0, (curr_tx - last_tx) / dt)
             last_rx, last_tx = curr_rx, curr_tx
 
-            wan_rx_share, wan_tx_share = sample_lan_wan_flow_shares(dt)
+            wan_rx_share, wan_tx_share, peer_lan_speeds = sample_lan_wan_flow_shares(dt)
             wan_rx_bytes_sec = round(rx_bytes_sec * wan_rx_share, 1)
             lan_rx_bytes_sec = round(max(0.0, rx_bytes_sec - wan_rx_bytes_sec), 1)
             wan_tx_bytes_sec = round(tx_bytes_sec * wan_tx_share, 1)
@@ -15572,6 +15641,7 @@ def background_collector():
                 "lan_tx": lan_tx_bytes_sec,
                 "ts": now,
             })
+            _SERVER_PEER_LAN_SPEEDS = {"ts": now, "peers": peer_lan_speeds}
 
             # Accumulate rolling 20-minute bandwidth history per NIC (5s fixed buckets, 240 buckets across 1200s)
             with NIC_BANDWIDTH_LOCK:
