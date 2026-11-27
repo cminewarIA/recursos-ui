@@ -436,6 +436,28 @@ def _validate_router_credentials_input(ip_val, user_val, pass_val, port_val=22):
         return None, "El puerto SSH debe ser numérico."
     return (clean_ip, clean_user, clean_pass, clean_port), ""
 
+def _build_router_ssh_base_cmd(clean_ip, clean_user, clean_port, use_control_master=False):
+    cmd = [
+        "sshpass", "-e",
+        "ssh",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "PreferredAuthentications=password",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR",
+        "-o", "ConnectTimeout=4",
+    ]
+    if use_control_master:
+        cmd.extend([
+            "-o", "ServerAliveInterval=25",
+            "-o", "ControlMaster=auto",
+            "-o", "ControlPersist=300",
+            "-o", f"ControlPath={_router_ssh_control_path()}",
+        ])
+    cmd.extend(["-p", str(clean_port), f"{clean_user}@{clean_ip}"])
+    return cmd
+
 def _test_router_ssh_connection(ip_val, user_val, pass_val, port_val=22):
     validated, err = _validate_router_credentials_input(ip_val, user_val, pass_val, port_val)
     if not validated:
@@ -445,14 +467,7 @@ def _test_router_ssh_connection(ip_val, user_val, pass_val, port_val=22):
         return False, "", "sshpass o el cliente ssh no están disponibles en este servidor."
     ssh_env = os.environ.copy()
     ssh_env["SSHPASS"] = clean_pass
-    cmd = [
-        "sshpass", "-e",
-        "ssh",
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "ConnectTimeout=4",
-        "-p", str(clean_port),
-        f"{clean_user}@{clean_ip}",
+    cmd = _build_router_ssh_base_cmd(clean_ip, clean_user, clean_port, use_control_master=False) + [
         "nvram get productid 2>/dev/null || uname -n 2>/dev/null || echo OK",
     ]
     try:
@@ -14245,19 +14260,12 @@ def fetch_wifi_worker():
                 try:
                     ssh_env = os.environ.copy()
                     ssh_env["SSHPASS"] = r_pass_now
-                    ssh_cmd = [
-                        'sshpass', '-e',
-                        'ssh',
-                        '-o', 'StrictHostKeyChecking=no',
-                        '-o', 'UserKnownHostsFile=/dev/null',
-                        '-o', 'LogLevel=ERROR',
-                        '-o', 'ConnectTimeout=4',
-                        '-o', 'ServerAliveInterval=25',
-                        '-o', 'ControlMaster=auto',
-                        '-o', 'ControlPersist=300',
-                        '-o', f'ControlPath={ctl_path}',
-                        '-p', str(r_port_now),
-                        f'{r_user_now}@{r_ip_now}',
+                    ssh_cmd = _build_router_ssh_base_cmd(
+                        r_ip_now,
+                        r_user_now,
+                        r_port_now,
+                        use_control_master=True,
+                    ) + [
                         '''
                         echo "=== ROUTER_MODEL ==="
                         nvram get productid 2>/dev/null
