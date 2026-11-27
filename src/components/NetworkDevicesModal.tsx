@@ -6,10 +6,15 @@ import {
   ArrowDownUp,
   ArrowUp,
   ArrowUpDown,
+  CheckCircle2,
   Database,
+  Eye,
+  EyeOff,
   Globe,
   HardDrive,
+  KeyRound,
   Laptop,
+  Lock,
   Network,
   Power,
   PowerOff,
@@ -17,13 +22,20 @@ import {
   Router,
   Search,
   Server,
+  ShieldCheck,
   Smartphone,
+  Trash2,
   Tv,
   Wifi,
   X,
 } from 'lucide-react';
 import { COCKPIT_EASE, COCKPIT_SPRING, MorphPill } from './MotionPrimitives';
-import { MetricsPayload, NetworkDevicesDbResponse, WifiClient } from '../types/telemetry';
+import {
+  MetricsPayload,
+  NetworkDevicesDbResponse,
+  RouterCredentialsStatus,
+  WifiClient,
+} from '../types/telemetry';
 import { apiFetchJson } from '../utils/api';
 import { formatSpeed } from '../utils/formatters';
 import { useI18n } from '../i18n';
@@ -67,6 +79,16 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
 
   const [dbResponse, setDbResponse] = useState<NetworkDevicesDbResponse | null>(null);
   const [loadingDb, setLoadingDb] = useState(false);
+  const [routerFormOpen, setRouterFormOpen] = useState(false);
+  const [routerCredStatus, setRouterCredStatus] = useState<RouterCredentialsStatus | null>(null);
+  const [loadingRouterCreds, setLoadingRouterCreds] = useState(false);
+  const [routerIpInput, setRouterIpInput] = useState('');
+  const [routerPortInput, setRouterPortInput] = useState('22');
+  const [routerUserInput, setRouterUserInput] = useState('');
+  const [routerPassInput, setRouterPassInput] = useState('');
+  const [showRouterPass, setShowRouterPass] = useState(false);
+  const [routerActionBusy, setRouterActionBusy] = useState<'test' | 'save' | 'clear' | null>(null);
+  const [routerFeedback, setRouterFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -310,6 +332,98 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
     } else {
       setSortBy(key);
       setSortDesc(key !== 'name');
+    }
+  };
+
+  const loadRouterCredStatus = useCallback(async () => {
+    setLoadingRouterCreds(true);
+    const res = await apiFetchJson<RouterCredentialsStatus>('/api/network/router-credentials');
+    if (!mountedRef.current) return;
+    setLoadingRouterCreds(false);
+    if (res.ok && res.data) {
+      setRouterCredStatus(res.data);
+      const suggestedIp = res.data.router_ip || summary.router_ip || summary.gateway_ip || '';
+      if (suggestedIp) setRouterIpInput(suggestedIp);
+      setRouterPortInput(String(res.data.router_port || 22));
+      if (res.data.router_user) setRouterUserInput(res.data.router_user);
+    }
+  }, [summary.gateway_ip, summary.router_ip]);
+
+  const handleToggleRouterForm = () => {
+    setRouterFeedback(null);
+    setRouterPassInput('');
+    setRouterFormOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        void loadRouterCredStatus();
+      }
+      return next;
+    });
+  };
+
+  const handleRouterCredAction = async (action: 'test' | 'save' | 'clear') => {
+    setRouterFeedback(null);
+    if (action !== 'clear') {
+      if (!routerIpInput.trim() || !routerUserInput.trim() || !routerPassInput) {
+        setRouterFeedback({ ok: false, text: t('overview.router_cfg_fill_required') });
+        return;
+      }
+    }
+    setRouterActionBusy(action);
+    const body =
+      action === 'clear'
+        ? { action }
+        : {
+            action,
+            router_ip: routerIpInput.trim(),
+            router_port: Number(routerPortInput.trim() || 22),
+            router_user: routerUserInput.trim(),
+            router_pass: routerPassInput,
+          };
+    const res = await apiFetchJson<RouterCredentialsStatus>('/api/network/router-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!mountedRef.current) return;
+    setRouterActionBusy(null);
+    if (res.ok && res.data?.ok !== false) {
+      if (action === 'test') {
+        const modelSuffix = res.data?.model ? ` (${res.data.model})` : '';
+        setRouterFeedback({ ok: true, text: `${t('overview.router_cfg_test_ok')}${modelSuffix}` });
+      } else if (action === 'save') {
+        setRouterPassInput('');
+        const modelSuffix = res.data?.model ? ` (${res.data.model})` : '';
+        setRouterFeedback({ ok: true, text: `${t('overview.router_cfg_saved_ok')}${modelSuffix}` });
+        setRouterCredStatus((prev) => ({
+          ...(prev || {}),
+          is_local: true,
+          configured: true,
+          encrypted: true,
+          decrypt_failed: false,
+          router_ip: res.data?.router_ip || routerIpInput.trim(),
+          router_port: res.data?.router_port || Number(routerPortInput.trim() || 22),
+          router_user: res.data?.router_user || routerUserInput.trim(),
+        }));
+        void fetchDevicesDb(true, false);
+      } else {
+        setRouterPassInput('');
+        setRouterUserInput('');
+        setRouterFeedback({ ok: true, text: t('overview.router_cfg_cleared_ok') });
+        setRouterCredStatus((prev) => ({
+          ...(prev || {}),
+          configured: false,
+          encrypted: false,
+          decrypt_failed: false,
+          router_user: '',
+        }));
+        void fetchDevicesDb(true, false);
+      }
+    } else {
+      setRouterFeedback({
+        ok: false,
+        text: res.data?.error || res.data?.message || res.error || t('status.action_error'),
+      });
     }
   };
 
@@ -625,20 +739,224 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                   {formatSpeed(globalLanRate)}
                 </p>
               </div>
-              <div className="cockpit-subtile p-3">
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('overview.bw_source_label')}</span>
-                <p className="mt-0.5 truncate text-xs font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1">
-                  <Globe className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
-                  <span className="truncate">{summary.router_traffic_source || summary.gateway_name || '--'}</span>
-                </p>
+              <div className="cockpit-subtile p-3 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('overview.bw_source_label')}</span>
+                  <p className="mt-0.5 truncate text-xs font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                    <Globe className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
+                    <span className="truncate">{summary.router_traffic_source || summary.gateway_name || '--'}</span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleRouterForm}
+                  title={t('overview.router_cfg_btn')}
+                  aria-label={t('overview.router_cfg_btn')}
+                  className="cockpit-subtile shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:text-[#c6f19d] cursor-pointer"
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
 
             {!summary.router_wan_available && (
-              <div className="cockpit-subtile px-3.5 py-2.5 text-xs text-amber-800 dark:text-amber-300 border border-amber-500/25 bg-amber-500/5">
-                {summary.router_creds_decrypt_failed
-                  ? t('overview.bw_router_decrypt_notice')
-                  : t('overview.bw_router_unlinked_notice')}
+              <div className="cockpit-subtile flex flex-col gap-2.5 px-3.5 py-2.5 text-xs text-amber-800 dark:text-amber-300 border border-amber-500/25 bg-amber-500/5 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  {summary.router_creds_decrypt_failed
+                    ? t('overview.bw_router_decrypt_notice')
+                    : t('overview.bw_router_unlinked_notice')}
+                </span>
+                <button
+                  type="button"
+                  data-testid="configure-router-btn"
+                  onClick={handleToggleRouterForm}
+                  className="cockpit-btn-accent shrink-0 inline-flex min-h-[34px] items-center gap-1.5 rounded-lg px-3 py-1 text-[11px] font-semibold cursor-pointer"
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                  <span>{t('overview.router_cfg_btn')}</span>
+                </button>
+              </div>
+            )}
+
+            {routerFormOpen && (
+              <div
+                data-testid="router-credentials-form"
+                className="cockpit-subtile border border-emerald-500/25 p-4 space-y-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <KeyRound className="h-4 w-4 text-[#1e6b38] dark:text-[#c6f19d]" />
+                      <h4 className="font-display text-sm font-semibold text-slate-900 dark:text-white">
+                        {t('overview.router_cfg_title')}
+                      </h4>
+                      <span className="cockpit-pill-emerald inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold">
+                        <ShieldCheck className="h-3 w-3" />
+                        <span>AES-256-GCM</span>
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                      {t('overview.router_cfg_desc')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRouterFormOpen(false)}
+                    aria-label={t('charts.close_aria')}
+                    className="cockpit-subtile inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {loadingRouterCreds ? (
+                  <div className="py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                    <RefreshCw className="mx-auto mb-1.5 h-4 w-4 animate-spin" />
+                  </div>
+                ) : routerCredStatus?.is_local === false ? (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-3 text-xs text-amber-800 dark:text-amber-300">
+                    <Lock className="h-4 w-4 shrink-0" />
+                    <span>{t('overview.router_cfg_lan_only')}</span>
+                  </div>
+                ) : (
+                  <>
+                    {routerCredStatus?.sshpass_available === false && (
+                      <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+                        {t('overview.router_cfg_sshpass_missing')}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-4 text-xs">
+                      <label className="block sm:col-span-1">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {t('overview.router_cfg_ip_label')}
+                        </span>
+                        <input
+                          type="text"
+                          value={routerIpInput}
+                          onChange={(e) => setRouterIpInput(e.target.value)}
+                          placeholder="192.168.1.1"
+                          autoComplete="off"
+                          className="cockpit-subtile mt-1 min-h-[38px] w-full px-3 font-mono text-xs text-slate-900 dark:text-white"
+                        />
+                      </label>
+                      <label className="block sm:col-span-1">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {t('overview.router_cfg_port_label')}
+                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={65535}
+                          value={routerPortInput}
+                          onChange={(e) => setRouterPortInput(e.target.value)}
+                          placeholder="22"
+                          className="cockpit-subtile mt-1 min-h-[38px] w-full px-3 font-mono text-xs text-slate-900 dark:text-white tabular-nums"
+                        />
+                      </label>
+                      <label className="block sm:col-span-1">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {t('overview.router_cfg_user_label')}
+                        </span>
+                        <input
+                          type="text"
+                          value={routerUserInput}
+                          onChange={(e) => setRouterUserInput(e.target.value)}
+                          placeholder="admin"
+                          autoComplete="off"
+                          className="cockpit-subtile mt-1 min-h-[38px] w-full px-3 font-mono text-xs text-slate-900 dark:text-white"
+                        />
+                      </label>
+                      <label className="block sm:col-span-1">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {t('overview.router_cfg_pass_label')}
+                        </span>
+                        <div className="relative mt-1">
+                          <input
+                            type={showRouterPass ? 'text' : 'password'}
+                            value={routerPassInput}
+                            onChange={(e) => setRouterPassInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                void handleRouterCredAction('save');
+                              }
+                            }}
+                            placeholder={t('overview.router_cfg_pass_placeholder')}
+                            autoComplete="new-password"
+                            className="cockpit-subtile min-h-[38px] w-full pl-3 pr-9 font-mono text-xs text-slate-900 dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRouterPass((s) => !s)}
+                            aria-label={t('overview.router_cfg_toggle_pass')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                          >
+                            {showRouterPass ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      </label>
+                    </div>
+
+                    {routerFeedback && (
+                      <div
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${
+                          routerFeedback.ok
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200'
+                            : 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
+                        }`}
+                      >
+                        {routerFeedback.ok && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
+                        <span>{routerFeedback.text}</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={Boolean(routerActionBusy)}
+                          onClick={() => void handleRouterCredAction('test')}
+                          className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${routerActionBusy === 'test' ? 'animate-spin' : ''}`} />
+                          <span>
+                            {routerActionBusy === 'test'
+                              ? t('overview.router_cfg_testing')
+                              : t('overview.router_cfg_test_btn')}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={Boolean(routerActionBusy)}
+                          onClick={() => void handleRouterCredAction('save')}
+                          className="cockpit-btn-accent inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-4 text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          <span>
+                            {routerActionBusy === 'save'
+                              ? t('overview.router_cfg_saving')
+                              : t('overview.router_cfg_save_btn')}
+                          </span>
+                        </button>
+                      </div>
+                      {(routerCredStatus?.configured ||
+                        routerCredStatus?.decrypt_failed ||
+                        summary.router_creds_decrypt_failed ||
+                        summary.router_encrypted) && (
+                        <button
+                          type="button"
+                          disabled={Boolean(routerActionBusy)}
+                          onClick={() => void handleRouterCredAction('clear')}
+                          className="cockpit-subtile inline-flex min-h-[38px] items-center gap-1.5 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-500/10 disabled:opacity-50 dark:text-rose-400 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>{t('overview.router_cfg_clear_btn')}</span>
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

@@ -692,6 +692,23 @@ export interface NetworkDevicesDbResponse {
   total_count?: number;
 }
 
+export interface RouterCredentialsStatus {
+  ok?: boolean;
+  is_local?: boolean;
+  configured?: boolean;
+  router_ip?: string;
+  router_port?: number;
+  router_user?: string;
+  encrypted?: boolean;
+  decrypt_failed?: boolean;
+  sshpass_available?: boolean;
+  gateway_ip?: string;
+  model?: string;
+  message?: string;
+  error?: string;
+  lan_only?: boolean;
+}
+
 export interface SystemProcess {
   pid: number;
   name: string;

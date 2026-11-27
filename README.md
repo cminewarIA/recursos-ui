@@ -216,8 +216,8 @@ sequenceDiagram
 <details>
 <summary><b>🔐 Cómo se protegen tus credenciales del router, claves maestras y tokens sin texto plano</b></summary>
 
-1. **Bóveda Cifrada `AES-256-GCM` para ASUS AiMesh**:
-   - Las credenciales SSH guardadas en `.router_credentials.json` (`0600`) nunca se leen desde valores fijos en el código ni pasan como argumentos visibles (`sshpass -p`), sino que se descifran en memoria usando una clave derivada vía `PBKDF2-HMAC-SHA256` (`200.000` iteraciones) ligada a `.admin_master_key` y `/etc/machine-id`, pasando al subproceso vía `SSHPASS` privado.
+1. **Bóveda Cifrada `AES-256-GCM` para Credenciales SSH del Router**:
+   - Las credenciales SSH guardadas en `.router_credentials.json` (`0600`) se configuran desde el propio panel mediante `POST /api/network/router-credentials` (**estrictamente restringido a clientes en red local LAN**) con prueba SSH en vivo y cifrado automático en caliente usando una clave derivada vía `PBKDF2-HMAC-SHA256` (`200.000` iteraciones) ligada a `.admin_master_key` y `/etc/machine-id`, pasando al subproceso vía `SSHPASS` privado y sin valores fijos en el código.
 2. **Clave Maestra Generada Localmente y Modo Dual**:
    - Si no existe una clave maestra previa, el nodo genera automáticamente `.admin_master_key` (`0600`) única por instalación, junto con una clave secundaria protegida mediante hash salado `PBKDF2-HMAC-SHA256`.
 3. **Tokens Nunca Expuestos**:

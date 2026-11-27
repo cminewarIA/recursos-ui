@@ -348,11 +348,23 @@ def _decrypt_router_credentials_dict(enc_data):
     except Exception:
         return {}
 
+ROUTER_CREDS_LOCK = threading.Lock()
+
+def _normalize_router_port(raw_port):
+    try:
+        p = int(str(raw_port or "").strip())
+        if 1 <= p <= 65535:
+            return p
+    except Exception:
+        pass
+    return 22
+
 def _load_router_credentials():
-    """Carga IP/usuario/clave del router desde env o .router_credentials.json cifrado en AES-256-GCM."""
+    """Carga IP/usuario/clave/puerto del router desde env o .router_credentials.json cifrado en AES-256-GCM."""
     cfg_ip = os.environ.get("RECURSOS_ROUTER_IP", "").strip()
     cfg_user = os.environ.get("RECURSOS_ROUTER_USER", "").strip()
     cfg_pass = os.environ.get("RECURSOS_ROUTER_PASS", "").strip()
+    cfg_port = _normalize_router_port(os.environ.get("RECURSOS_ROUTER_PORT", "22"))
     creds_encrypted = False
     decrypt_failed = False
     creds_file = os.path.join(BASE_DIR, ".router_credentials.json")
@@ -368,21 +380,27 @@ def _load_router_credentials():
                         cfg_ip = cfg_ip or str(dec.get("router_ip", "")).strip()
                         cfg_user = cfg_user or str(dec.get("router_user", "")).strip()
                         cfg_pass = cfg_pass or str(dec.get("router_pass", "")).strip()
+                        if dec.get("router_port") is not None and not os.environ.get("RECURSOS_ROUTER_PORT"):
+                            cfg_port = _normalize_router_port(dec.get("router_port"))
                     else:
                         decrypt_failed = True
                 else:
                     plain_ip = str(raw_creds.get("router_ip", "")).strip()
                     plain_user = str(raw_creds.get("router_user", "")).strip()
                     plain_pass = str(raw_creds.get("router_pass", "")).strip()
+                    plain_port = _normalize_router_port(raw_creds.get("router_port"))
                     cfg_ip = cfg_ip or plain_ip
                     cfg_user = cfg_user or plain_user
                     cfg_pass = cfg_pass or plain_pass
+                    if not os.environ.get("RECURSOS_ROUTER_PORT"):
+                        cfg_port = plain_port
                     if plain_ip and plain_user and plain_pass and AESGCM is not None:
                         try:
                             enc_blob = _encrypt_router_credentials_dict({
                                 "router_ip": plain_ip,
                                 "router_user": plain_user,
                                 "router_pass": plain_pass,
+                                "router_port": cfg_port,
                             })
                             with open(creds_file, "w", encoding="utf-8") as wf:
                                 json.dump(enc_blob, wf, indent=2)
@@ -394,9 +412,117 @@ def _load_router_credentials():
             pass
     if not cfg_ip:
         cfg_ip = _detect_default_gateway_ip()
-    return cfg_ip, cfg_user, cfg_pass, creds_encrypted, decrypt_failed
+    return cfg_ip, cfg_user, cfg_pass, cfg_port, creds_encrypted, decrypt_failed
 
-ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_CREDS_ENCRYPTED, ROUTER_CREDS_DECRYPT_FAILED = _load_router_credentials()
+ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_SSH_PORT, ROUTER_CREDS_ENCRYPTED, ROUTER_CREDS_DECRYPT_FAILED = _load_router_credentials()
+
+def _validate_router_credentials_input(ip_val, user_val, pass_val, port_val=22):
+    clean_ip = str(ip_val or "").strip()
+    clean_user = str(user_val or "").strip()
+    clean_pass = str(pass_val or "")
+    clean_port = _normalize_router_port(port_val)
+    if not _is_lan_ipv4(clean_ip):
+        return None, "La IP del router debe ser una dirección IPv4 privada válida en red local (LAN)."
+    if not clean_user or clean_user.startswith("-") or not re.match(r"^[A-Za-z0-9._-]{1,64}$", clean_user):
+        return None, "El usuario SSH del router contiene caracteres no válidos."
+    if not clean_pass or len(clean_pass) > 256:
+        return None, "Introduce la contraseña SSH del router."
+    try:
+        p_raw = int(str(port_val if port_val not in (None, "") else 22).strip())
+        if not (1 <= p_raw <= 65535):
+            return None, "El puerto SSH debe estar entre 1 y 65535."
+        clean_port = p_raw
+    except Exception:
+        return None, "El puerto SSH debe ser numérico."
+    return (clean_ip, clean_user, clean_pass, clean_port), ""
+
+def _test_router_ssh_connection(ip_val, user_val, pass_val, port_val=22):
+    validated, err = _validate_router_credentials_input(ip_val, user_val, pass_val, port_val)
+    if not validated:
+        return False, "", err
+    clean_ip, clean_user, clean_pass, clean_port = validated
+    if not shutil.which("sshpass") or not shutil.which("ssh"):
+        return False, "", "sshpass o el cliente ssh no están disponibles en este servidor."
+    ssh_env = os.environ.copy()
+    ssh_env["SSHPASS"] = clean_pass
+    cmd = [
+        "sshpass", "-e",
+        "ssh",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "ConnectTimeout=4",
+        "-p", str(clean_port),
+        f"{clean_user}@{clean_ip}",
+        "nvram get productid 2>/dev/null || uname -n 2>/dev/null || echo OK",
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=7, env=ssh_env)
+        if res.returncode == 0:
+            lines = [ln.strip() for ln in (res.stdout or "").splitlines() if ln.strip() and ln.strip() != "OK"]
+            model_name = lines[0][:64] if lines else ""
+            return True, model_name, ""
+        err_out = (res.stderr or res.stdout or "").strip()
+        if "permission denied" in err_out.lower() or res.returncode == 5:
+            return False, "", "Autenticación SSH rechazada: usuario o contraseña incorrectos."
+        if "connection refused" in err_out.lower():
+            return False, "", f"Conexión rechazada en {clean_ip}:{clean_port} (verifica que SSH esté habilitado en el router)."
+        if "timed out" in err_out.lower() or res.returncode == 255:
+            return False, "", f"No se pudo conectar por SSH con {clean_ip}:{clean_port} ({err_out[:140] or 'tiempo agotado'})."
+        return False, "", err_out[:180] or f"Error SSH (código {res.returncode})."
+    except subprocess.TimeoutExpired:
+        return False, "", f"Tiempo de espera agotado conectando por SSH con {clean_ip}:{clean_port}."
+    except Exception as exc:
+        return False, "", str(exc)[:180]
+
+def _save_router_credentials_vault(ip_val, user_val, pass_val, port_val=22):
+    global ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_SSH_PORT, ROUTER_CREDS_ENCRYPTED, ROUTER_CREDS_DECRYPT_FAILED
+    validated, err = _validate_router_credentials_input(ip_val, user_val, pass_val, port_val)
+    if not validated:
+        return False, err
+    if AESGCM is None:
+        return False, "Módulo criptográfico AES-256-GCM no disponible en Python."
+    clean_ip, clean_user, clean_pass, clean_port = validated
+    enc_blob = _encrypt_router_credentials_dict({
+        "router_ip": clean_ip,
+        "router_user": clean_user,
+        "router_pass": clean_pass,
+        "router_port": clean_port,
+    })
+    creds_file = os.path.join(BASE_DIR, ".router_credentials.json")
+    tmp_file = f"{creds_file}.tmp"
+    with open(tmp_file, "w", encoding="utf-8") as wf:
+        json.dump(enc_blob, wf, indent=2)
+    os.chmod(tmp_file, 0o600)
+    os.replace(tmp_file, creds_file)
+    with ROUTER_CREDS_LOCK:
+        ROUTER_IP = clean_ip
+        ROUTER_USER = clean_user
+        ROUTER_PASS = clean_pass
+        ROUTER_SSH_PORT = clean_port
+        ROUTER_CREDS_ENCRYPTED = True
+        ROUTER_CREDS_DECRYPT_FAILED = False
+    with METRICS_LOCK:
+        _invalidate_metrics_bytes_cache()
+    return True, ""
+
+def _clear_router_credentials_vault():
+    global ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_SSH_PORT, ROUTER_CREDS_ENCRYPTED, ROUTER_CREDS_DECRYPT_FAILED
+    creds_file = os.path.join(BASE_DIR, ".router_credentials.json")
+    if os.path.isfile(creds_file):
+        try:
+            os.remove(creds_file)
+        except Exception:
+            pass
+    with ROUTER_CREDS_LOCK:
+        ROUTER_IP = os.environ.get("RECURSOS_ROUTER_IP", "").strip() or _detect_default_gateway_ip()
+        ROUTER_USER = os.environ.get("RECURSOS_ROUTER_USER", "").strip()
+        ROUTER_PASS = os.environ.get("RECURSOS_ROUTER_PASS", "").strip()
+        ROUTER_SSH_PORT = _normalize_router_port(os.environ.get("RECURSOS_ROUTER_PORT", "22"))
+        ROUTER_CREDS_ENCRYPTED = False
+        ROUTER_CREDS_DECRYPT_FAILED = False
+    with METRICS_LOCK:
+        _invalidate_metrics_bytes_cache()
+    return True
 # Hash criptográfico con sal (PBKDF2-HMAC-SHA256) para clave maestra secundaria de respaldo
 _DEFAULT_SECONDARY_KEY_HASH = "pbkdf2_sha256$200000$d5d02ed57d1232f3da8f212fb615ad59$c1f752cd0c3ffe58203801901e98f7263401f847c74e815d375a8a3e5227ae3f"
 
@@ -14080,14 +14206,20 @@ def fetch_wifi_worker():
             asus_eth3_rx = asus_eth3_tx = 0
 
             # Sondeo opcional de AP/router vía SSH sólo si está explícitamente configurado
-            if ROUTER_IP and ROUTER_USER and ROUTER_PASS and shutil.which("sshpass"):
+            with ROUTER_CREDS_LOCK:
+                r_ip_now = ROUTER_IP
+                r_user_now = ROUTER_USER
+                r_pass_now = ROUTER_PASS
+                r_port_now = ROUTER_SSH_PORT
+            if r_ip_now and r_user_now and r_pass_now and shutil.which("sshpass"):
                 try:
                     ssh_env = os.environ.copy()
-                    ssh_env["SSHPASS"] = ROUTER_PASS
+                    ssh_env["SSHPASS"] = r_pass_now
                     ssh_cmd = [
                         'sshpass', '-e',
                         'ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=4',
-                        f'{ROUTER_USER}@{ROUTER_IP}',
+                        '-p', str(r_port_now),
+                        f'{r_user_now}@{r_ip_now}',
                         '''
                         echo "=== ROUTER_MODEL ==="
                         nvram get productid 2>/dev/null
@@ -16887,6 +17019,42 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
                 remaining -= chunk_len
             return
 
+        elif clean_path == "/api/network/router-credentials":
+            if not auth["is_trusted"]:
+                self.send_response(403)
+                self.send_security_headers()
+                self.end_headers()
+                return
+            with ROUTER_CREDS_LOCK:
+                r_ip = ROUTER_IP
+                r_port = ROUTER_SSH_PORT
+                r_user = ROUTER_USER
+                r_has_pass = bool(ROUTER_PASS)
+                r_enc = bool(ROUTER_CREDS_ENCRYPTED)
+                r_dec_fail = bool(ROUTER_CREDS_DECRYPT_FAILED)
+            gw_detected = _detect_default_gateway_ip()
+            payload = {
+                "ok": True,
+                "is_local": bool(auth.get("is_local")),
+                "configured": bool(r_ip and r_user and r_has_pass and not r_dec_fail),
+                "router_ip": r_ip or gw_detected or "",
+                "router_port": int(r_port or 22),
+                "router_user": r_user or "",
+                "encrypted": r_enc,
+                "decrypt_failed": r_dec_fail,
+                "sshpass_available": bool(shutil.which("sshpass") and shutil.which("ssh")),
+                "gateway_ip": gw_detected or "",
+            }
+            resp = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         # 1a-ter. BASE DE DATOS UNIFICADA DE DISPOSITIVOS DE RED (Pi-hole + ASUS + Puerta de Enlace)
         elif clean_path == "/api/network/devices-db":
             if not auth["is_trusted"]:
@@ -18908,6 +19076,114 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             resp = json.dumps({"success": True, "message": "Historial de mensajes vaciado"}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_security_headers()
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
+        # Configuración en caliente de credenciales SSH del router (estrictamente LAN + cifrado AES-256-GCM)
+        elif clean_path == "/api/network/router-credentials":
+            auth = check_trust_status(self)
+            if not auth["is_trusted"] or not auth.get("is_local"):
+                err_payload = {
+                    "ok": False,
+                    "lan_only": True,
+                    "error": "Por seguridad, la configuración del router solo está permitida desde la red local (LAN).",
+                }
+                err_resp = json.dumps(err_payload, ensure_ascii=False).encode('utf-8')
+                self.send_response(403)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_security_headers()
+                self.send_header('Content-Length', str(len(err_resp)))
+                self.end_headers()
+                self.wfile.write(err_resp)
+                return
+
+            body, err_code = self._read_json_body(max_bytes=8192)
+            if err_code:
+                self.send_response(err_code)
+                self.send_security_headers()
+                self.end_headers()
+                return
+
+            data = body if isinstance(body, dict) else {}
+            action = str(data.get("action") or "save").strip().lower()
+            r_ip = str(data.get("router_ip") or "").strip()
+            r_user = str(data.get("router_user") or "").strip()
+            r_pass = str(data.get("router_pass") or "")
+            r_port = data.get("router_port", 22)
+
+            status_code = 200
+            if action == "clear":
+                _clear_router_credentials_vault()
+                out_payload = {
+                    "ok": True,
+                    "configured": False,
+                    "encrypted": False,
+                    "message": "Credenciales del router eliminadas de la bóveda local.",
+                }
+            elif action == "test":
+                ok_ssh, model_name, err_ssh = _test_router_ssh_connection(r_ip, r_user, r_pass, r_port)
+                status_code = 200 if ok_ssh else 400
+                out_payload = {
+                    "ok": ok_ssh,
+                    "model": model_name,
+                    "message": f"Conexión SSH verificada{f' ({model_name})' if model_name else ''}." if ok_ssh else err_ssh,
+                    "error": "" if ok_ssh else err_ssh,
+                }
+            elif action == "save":
+                skip_test = bool(data.get("skip_test", False))
+                model_name = ""
+                if not skip_test:
+                    ok_ssh, model_name, err_ssh = _test_router_ssh_connection(r_ip, r_user, r_pass, r_port)
+                    if not ok_ssh:
+                        status_code = 400
+                        out_payload = {
+                            "ok": False,
+                            "model": "",
+                            "error": err_ssh,
+                            "message": err_ssh,
+                        }
+                    else:
+                        ok_save, err_save = _save_router_credentials_vault(r_ip, r_user, r_pass, r_port)
+                        status_code = 200 if ok_save else 500
+                        out_payload = {
+                            "ok": ok_save,
+                            "configured": ok_save,
+                            "encrypted": ok_save,
+                            "model": model_name,
+                            "router_ip": r_ip,
+                            "router_port": _normalize_router_port(r_port),
+                            "router_user": r_user,
+                            "message": (
+                                f"Credenciales cifradas en AES-256-GCM y activadas{f' ({model_name})' if model_name else ''}."
+                                if ok_save
+                                else err_save
+                            ),
+                            "error": "" if ok_save else err_save,
+                        }
+                else:
+                    ok_save, err_save = _save_router_credentials_vault(r_ip, r_user, r_pass, r_port)
+                    status_code = 200 if ok_save else 400
+                    out_payload = {
+                        "ok": ok_save,
+                        "configured": ok_save,
+                        "encrypted": ok_save,
+                        "router_ip": r_ip,
+                        "router_port": _normalize_router_port(r_port),
+                        "router_user": r_user,
+                        "message": "Credenciales cifradas en AES-256-GCM." if ok_save else err_save,
+                        "error": "" if ok_save else err_save,
+                    }
+            else:
+                status_code = 400
+                out_payload = {"ok": False, "error": f"Acción no soportada: {action}"}
+
+            resp = json.dumps(out_payload, ensure_ascii=False).encode('utf-8')
+            self.send_response(status_code)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_security_headers()
             self.send_header('Content-Length', str(len(resp)))
             self.end_headers()
