@@ -14,7 +14,6 @@ import {
   HardDrive,
   KeyRound,
   Laptop,
-  Lock,
   Network,
   Power,
   PowerOff,
@@ -764,7 +763,9 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                 <span>
                   {summary.router_creds_decrypt_failed
                     ? t('overview.bw_router_decrypt_notice')
-                    : t('overview.bw_router_unlinked_notice')}
+                    : summary.router_configured
+                      ? `${t('overview.router_cfg_reconnecting_notice')}${summary.router_ssh_error ? ` (${summary.router_ssh_error})` : ''}`
+                      : t('overview.bw_router_unlinked_notice')}
                 </span>
                 <button
                   type="button"
@@ -812,11 +813,6 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
                 {loadingRouterCreds ? (
                   <div className="py-4 text-center text-xs text-slate-500 dark:text-slate-400">
                     <RefreshCw className="mx-auto mb-1.5 h-4 w-4 animate-spin" />
-                  </div>
-                ) : routerCredStatus?.is_local === false ? (
-                  <div className="flex items-center gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-3 text-xs text-amber-800 dark:text-amber-300">
-                    <Lock className="h-4 w-4 shrink-0" />
-                    <span>{t('overview.router_cfg_lan_only')}</span>
                   </div>
                 ) : (
                   <>

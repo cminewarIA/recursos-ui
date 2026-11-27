@@ -658,6 +658,8 @@ export interface WifiSummary {
   router_model?: string;
   router_ip?: string;
   router_online?: boolean;
+  router_configured?: boolean;
+  router_ssh_error?: string;
   router_encrypted?: boolean;
   router_creds_decrypt_failed?: boolean;
   router_auth_mode?: string;
@@ -695,6 +697,7 @@ export interface NetworkDevicesDbResponse {
 export interface RouterCredentialsStatus {
   ok?: boolean;
   is_local?: boolean;
+  can_configure?: boolean;
   configured?: boolean;
   router_ip?: string;
   router_port?: number;

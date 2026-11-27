@@ -474,6 +474,31 @@ def _test_router_ssh_connection(ip_val, user_val, pass_val, port_val=22):
     except Exception as exc:
         return False, "", str(exc)[:180]
 
+ROUTER_SSH_BACKOFF_UNTIL = 0.0
+ROUTER_SSH_CONSECUTIVE_FAILS = 0
+ROUTER_SSH_LAST_ERROR = ""
+
+def _router_ssh_control_path():
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    return os.path.join("/tmp", f"recursos_router_ssh_{uid}.sock")
+
+def _reset_router_ssh_session():
+    global ROUTER_SSH_BACKOFF_UNTIL, ROUTER_SSH_CONSECUTIVE_FAILS, ROUTER_SSH_LAST_ERROR
+    ROUTER_SSH_BACKOFF_UNTIL = 0.0
+    ROUTER_SSH_CONSECUTIVE_FAILS = 0
+    ROUTER_SSH_LAST_ERROR = ""
+    ctl_path = _router_ssh_control_path()
+    if os.path.exists(ctl_path):
+        try:
+            subprocess.run(["ssh", "-O", "exit", "-o", f"ControlPath={ctl_path}", "127.0.0.1"], capture_output=True, timeout=2)
+        except Exception:
+            pass
+        try:
+            if os.path.exists(ctl_path):
+                os.remove(ctl_path)
+        except Exception:
+            pass
+
 def _save_router_credentials_vault(ip_val, user_val, pass_val, port_val=22):
     global ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_SSH_PORT, ROUTER_CREDS_ENCRYPTED, ROUTER_CREDS_DECRYPT_FAILED
     validated, err = _validate_router_credentials_input(ip_val, user_val, pass_val, port_val)
@@ -501,6 +526,7 @@ def _save_router_credentials_vault(ip_val, user_val, pass_val, port_val=22):
         ROUTER_SSH_PORT = clean_port
         ROUTER_CREDS_ENCRYPTED = True
         ROUTER_CREDS_DECRYPT_FAILED = False
+        _reset_router_ssh_session()
     with METRICS_LOCK:
         _invalidate_metrics_bytes_cache()
     return True, ""
@@ -520,6 +546,7 @@ def _clear_router_credentials_vault():
         ROUTER_SSH_PORT = _normalize_router_port(os.environ.get("RECURSOS_ROUTER_PORT", "22"))
         ROUTER_CREDS_ENCRYPTED = False
         ROUTER_CREDS_DECRYPT_FAILED = False
+        _reset_router_ssh_session()
     with METRICS_LOCK:
         _invalidate_metrics_bytes_cache()
     return True
@@ -14072,7 +14099,7 @@ def build_unified_devices_database(force_refresh=False):
     return payload
 
 def fetch_wifi_worker():
-    global WIFI_CACHE, MAC_RATE_CACHE, _FCACHE_FLOW_PREV, _FCACHE_LAST_TS, _FCACHE_BASELINE_READY, _WL_BYTES_PREV, SERVER_LOCAL_IP
+    global WIFI_CACHE, MAC_RATE_CACHE, _FCACHE_FLOW_PREV, _FCACHE_LAST_TS, _FCACHE_BASELINE_READY, _WL_BYTES_PREV, SERVER_LOCAL_IP, ROUTER_SSH_BACKOFF_UNTIL, ROUTER_SSH_CONSECUTIVE_FAILS, ROUTER_SSH_LAST_ERROR
     while True:
         try:
             if not SERVER_LOCAL_IP or SERVER_LOCAL_IP.startswith("127."):
@@ -14211,13 +14238,24 @@ def fetch_wifi_worker():
                 r_user_now = ROUTER_USER
                 r_pass_now = ROUTER_PASS
                 r_port_now = ROUTER_SSH_PORT
-            if r_ip_now and r_user_now and r_pass_now and shutil.which("sshpass"):
+                r_backoff_until = ROUTER_SSH_BACKOFF_UNTIL
+            router_configured = bool(r_ip_now and r_user_now and r_pass_now)
+            if router_configured and shutil.which("sshpass") and time.time() >= r_backoff_until:
+                ctl_path = _router_ssh_control_path()
                 try:
                     ssh_env = os.environ.copy()
                     ssh_env["SSHPASS"] = r_pass_now
                     ssh_cmd = [
                         'sshpass', '-e',
-                        'ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=4',
+                        'ssh',
+                        '-o', 'StrictHostKeyChecking=no',
+                        '-o', 'UserKnownHostsFile=/dev/null',
+                        '-o', 'LogLevel=ERROR',
+                        '-o', 'ConnectTimeout=4',
+                        '-o', 'ServerAliveInterval=25',
+                        '-o', 'ControlMaster=auto',
+                        '-o', 'ControlPersist=300',
+                        '-o', f'ControlPath={ctl_path}',
                         '-p', str(r_port_now),
                         f'{r_user_now}@{r_ip_now}',
                         '''
@@ -14243,9 +14281,13 @@ def fetch_wifi_worker():
                         cat /proc/fcache/l2list 2>/dev/null
                         '''
                     ]
-                    p = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=8, env=ssh_env)
+                    p = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=10, env=ssh_env)
                     if p.returncode == 0:
                         router_ssh_ok = True
+                        with ROUTER_CREDS_LOCK:
+                            ROUTER_SSH_CONSECUTIVE_FAILS = 0
+                            ROUTER_SSH_BACKOFF_UNTIL = 0.0
+                            ROUTER_SSH_LAST_ERROR = ""
                         current = None
                         clientlist_lines = []
                         brctl_lines = []
@@ -14567,8 +14609,32 @@ def fetch_wifi_worker():
                             elif 'eth3:' in line:
                                 parts = line.split(':', 1)[1].split()
                                 asus_eth3_rx, asus_eth3_tx = int(parts[0]), int(parts[8])
-                except Exception:
-                    pass
+                    else:
+                        if os.path.exists(ctl_path):
+                            try:
+                                os.remove(ctl_path)
+                            except Exception:
+                                pass
+                        backoff_steps = (20, 45, 90, 180, 300)
+                        err_txt = (p.stderr or p.stdout or "").strip()
+                        clean_err = err_txt.splitlines()[-1][:140] if err_txt else f"SSH rc={p.returncode}"
+                        with ROUTER_CREDS_LOCK:
+                            ROUTER_SSH_CONSECUTIVE_FAILS += 1
+                            idx_b = min(ROUTER_SSH_CONSECUTIVE_FAILS - 1, len(backoff_steps) - 1)
+                            ROUTER_SSH_BACKOFF_UNTIL = time.time() + backoff_steps[idx_b]
+                            ROUTER_SSH_LAST_ERROR = clean_err
+                except Exception as exc_ssh:
+                    if os.path.exists(ctl_path):
+                        try:
+                            os.remove(ctl_path)
+                        except Exception:
+                            pass
+                    backoff_steps = (20, 45, 90, 180, 300)
+                    with ROUTER_CREDS_LOCK:
+                        ROUTER_SSH_CONSECUTIVE_FAILS += 1
+                        idx_b = min(ROUTER_SSH_CONSECUTIVE_FAILS - 1, len(backoff_steps) - 1)
+                        ROUTER_SSH_BACKOFF_UNTIL = time.time() + backoff_steps[idx_b]
+                        ROUTER_SSH_LAST_ERROR = str(exc_ssh)[:140]
 
             # Incorporar delta directo de wl sta_info como refuerzo de velocidad Wi-Fi
             now_wl = time.monotonic()
@@ -14982,6 +15048,8 @@ def fetch_wifi_worker():
                 "gateway_name": gw_name_resolved,
                 "gateway_model": gw_upnp.get("model_display", ""),
                 "router_online": bool(router_ssh_ok or any(c.get('is_gateway') for c in cable_clients)),
+                "router_configured": router_configured,
+                "router_ssh_error": ROUTER_SSH_LAST_ERROR,
                 "router_encrypted": bool(ROUTER_CREDS_ENCRYPTED),
                 "router_creds_decrypt_failed": bool(ROUTER_CREDS_DECRYPT_FAILED),
                 "router_auth_mode": "SSH + AES-256-GCM" if ROUTER_CREDS_ENCRYPTED else "SSH",
@@ -17036,6 +17104,7 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             payload = {
                 "ok": True,
                 "is_local": bool(auth.get("is_local")),
+                "can_configure": True,
                 "configured": bool(r_ip and r_user and r_has_pass and not r_dec_fail),
                 "router_ip": r_ip or gw_detected or "",
                 "router_port": int(r_port or 22),
@@ -19082,14 +19151,13 @@ class DashboardHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
-        # Configuración en caliente de credenciales SSH del router (estrictamente LAN + cifrado AES-256-GCM)
+        # Configuración en caliente de credenciales SSH del router (protegido por Zero-Trust para dispositivos certificados + cifrado AES-256-GCM)
         elif clean_path == "/api/network/router-credentials":
             auth = check_trust_status(self)
-            if not auth["is_trusted"] or not auth.get("is_local"):
+            if not auth["is_trusted"]:
                 err_payload = {
                     "ok": False,
-                    "lan_only": True,
-                    "error": "Por seguridad, la configuración del router solo está permitida desde la red local (LAN).",
+                    "error": "Dispositivo no certificado. Solo los dispositivos certificados pueden configurar el router.",
                 }
                 err_resp = json.dumps(err_payload, ensure_ascii=False).encode('utf-8')
                 self.send_response(403)
