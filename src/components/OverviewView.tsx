@@ -168,7 +168,9 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
         ? 'text-sky-600 dark:text-sky-400'
         : tone.textClass;
 
-    const { diskSeries, diskTimestamps, diskEpochTs } = useMemo(() => {
+    const diskTempColor = isDark ? '#fb923c' : '#ea580c';
+
+    const { diskSeries, diskTimestamps, diskEpochTs, hasDiskTemp } = useMemo(() => {
       const rawIoHist = d.io_history || [];
       let ioHist = rawIoHist;
       if (rawIoHist.length >= 2) {
@@ -204,6 +206,14 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
           ? ioHist.map((b) => Math.round(b.t / 1000))
           : epochTs.slice(-2);
 
+      const currentDiskTemp =
+        d.temp_c !== null && d.temp_c !== undefined && Number.isFinite(Number(d.temp_c))
+          ? Number(d.temp_c)
+          : null;
+      const hasTemp =
+        currentDiskTemp !== null ||
+        ioHist.some((b) => typeof b.temp === 'number' && Number.isFinite(b.temp) && b.temp > 0);
+
       const series: ChartSeries[] = [
         {
           id: 'disk_r',
@@ -214,6 +224,7 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
           unit: 'MB/s',
           decimals: 2,
           fillAlpha: 0.16,
+          axis: 'left',
         },
         {
           id: 'disk_w',
@@ -224,15 +235,48 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
           unit: 'MB/s',
           decimals: 2,
           fillAlpha: 0.08,
+          axis: 'left',
         },
       ];
+
+      if (hasTemp) {
+        const firstValidSample = ioHist.find(
+          (b) => typeof b.temp === 'number' && Number.isFinite(b.temp) && b.temp > 0
+        )?.temp;
+        let lastTemp =
+          typeof firstValidSample === 'number' && firstValidSample > 0
+            ? firstValidSample
+            : currentDiskTemp ?? 0;
+        const diskTempPoints =
+          ioHist.length >= 2
+            ? ioHist.map((b) => {
+                if (typeof b.temp === 'number' && Number.isFinite(b.temp) && b.temp > 0) {
+                  lastTemp = b.temp;
+                }
+                return lastTemp;
+              })
+            : [currentDiskTemp ?? 0, currentDiskTemp ?? 0];
+        series.push({
+          id: 'disk_temp',
+          metricKey: 'disk_temp',
+          label: t('hardware.cpu.series_temp'),
+          data: diskTempPoints,
+          color: diskTempColor,
+          unit: '°C',
+          decimals: 1,
+          axis: 'right',
+          dashed: true,
+          fillAlpha: 0,
+        });
+      }
 
       return {
         diskSeries: series,
         diskTimestamps: computedTimestamps,
         diskEpochTs: computedEpochTs,
+        hasDiskTemp: hasTemp,
       };
-    }, [d.io_history, readMb, writeMb, readColor, writeColor, locale, timestamps, epochTs, t]);
+    }, [d.io_history, d.temp_c, readMb, writeMb, readColor, writeColor, diskTempColor, locale, timestamps, epochTs, t]);
 
     const expandSpec = useMemo<ExpandChartSpec>(
       () => ({
@@ -248,12 +292,13 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
         timestamps: diskTimestamps,
         epochTs: diskEpochTs,
         leftUnit: 'MB/s',
+        maxRight: hasDiskTemp ? 100 : undefined,
         chartKind: 'storage',
         diskMountpoint: d.mountpoint,
         entityKind: 'disk',
         entityId: d.device || d.mountpoint,
       }),
-      [widgetTitle, isMounted, d.free_bytes, d.total_bytes, d.mountpoint, d.device, diskSeries, diskTimestamps, diskEpochTs, t]
+      [widgetTitle, isMounted, d.free_bytes, d.total_bytes, d.mountpoint, d.device, diskSeries, diskTimestamps, diskEpochTs, hasDiskTemp, t]
     );
 
     const subtitleText =
@@ -363,6 +408,7 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
             timestamps={diskTimestamps}
             epochTs={diskEpochTs}
             heightClassName="cockpit-chart-compact"
+            maxRight={hasDiskTemp ? 100 : undefined}
             leftUnit="MB/s"
             theme={theme}
             onExpandClick={() => onExpandChart(expandSpec)}
@@ -609,6 +655,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     cpuTempHist,
     ramHist,
     gpuHist,
+    gpuTempHist,
     netWanRxHist,
     netWanTxHist,
     netLanRxHist,
@@ -620,6 +667,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     const rawCpuTemp = hist?.cpu_temp ?? [];
     const rawRam = hist?.ram ?? [];
     const rawGpu = hist?.gpu ?? [];
+    const rawGpuTemp = hist?.gpu_temp ?? [];
     const rawNetRx = hist?.net_rx ?? [];
     const rawNetTx = hist?.net_tx ?? [];
     const rawWanRx = hist?.net_wan_rx && hist.net_wan_rx.length > 0 ? hist.net_wan_rx : rawNetRx;
@@ -649,6 +697,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         cpuTempHist: rawCpuTemp,
         ramHist: rawRam,
         gpuHist: rawGpu,
+        gpuTempHist: rawGpuTemp,
         netWanRxHist: rawWanRx,
         netWanTxHist: rawWanTx,
         netLanRxHist: rawLanRx,
@@ -675,6 +724,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       cpuTempHist: rawCpuTemp.slice(startIdx),
       ramHist: rawRam.slice(startIdx),
       gpuHist: rawGpu.slice(startIdx),
+      gpuTempHist: rawGpuTemp.slice(startIdx),
       netWanRxHist: rawWanRx.slice(startIdx),
       netWanTxHist: rawWanTx.slice(startIdx),
       netLanRxHist: rawLanRx.slice(startIdx),
@@ -718,6 +768,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     [cpuTemp, cpuTempHist]
   );
 
+  const hasGpuTemp = useMemo(
+    () =>
+      gpuAvail &&
+      ((gpuTemp !== null && Number.isFinite(gpuTemp)) || gpuTempHist.some((v) => Number.isFinite(v) && v > 0)),
+    [gpuAvail, gpuTemp, gpuTempHist]
+  );
+
   const cpuSeries: ChartSeries[] = useMemo(() => {
     const list: ChartSeries[] = [
       { id: 'cpu', metricKey: 'cpu', label: t('hardware.cpu.title'), data: cpuHist, color: cpuChartColor, unit: '%', axis: 'left' },
@@ -748,10 +805,32 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     () => [{ id: 'ram', metricKey: 'ram', label: t('hardware.ram.title'), data: ramHist, color: ramChartColor, unit: '%' }],
     [ramHist, ramChartColor, t]
   );
-  const gpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.title'), data: gpuHist, color: gpuChartColor, unit: '%' }],
-    [gpuHist, gpuChartColor, t]
-  );
+  const gpuSeries: ChartSeries[] = useMemo(() => {
+    const list: ChartSeries[] = [
+      { id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.title'), data: gpuHist, color: gpuChartColor, unit: '%', axis: 'left' },
+    ];
+    if (hasGpuTemp) {
+      const tempData =
+        gpuTempHist.length >= 2
+          ? gpuTempHist
+          : gpuTemp !== null
+            ? gpuHist.map(() => gpuTemp)
+            : [];
+      list.push({
+        id: 'gpu_temp',
+        metricKey: 'gpu_temp',
+        label: t('hardware.gpu.series_temp'),
+        data: tempData,
+        color: cpuTempChartColor,
+        unit: '°C',
+        decimals: 1,
+        axis: 'right',
+        dashed: true,
+        fillAlpha: 0,
+      });
+    }
+    return list;
+  }, [gpuHist, gpuTempHist, gpuTemp, hasGpuTemp, gpuChartColor, cpuTempChartColor, t]);
   const wanSeries: ChartSeries[] = useMemo(
     () => [
       {
@@ -1310,6 +1389,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       epochTs,
                       leftUnit: '%',
                       maxLeft: 100,
+                      maxRight: hasGpuTemp ? 100 : undefined,
                       chartKind: 'gpu',
                     })
                   }
@@ -1337,6 +1417,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               epochTs={epochTs}
               heightClassName="cockpit-chart-compact"
               maxLeft={100}
+              maxRight={hasGpuTemp ? 100 : undefined}
               leftUnit="%"
               theme={theme}
               onExpandClick={() =>
@@ -1348,6 +1429,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   epochTs,
                   leftUnit: '%',
                   maxLeft: 100,
+                  maxRight: hasGpuTemp ? 100 : undefined,
                   chartKind: 'gpu',
                 })
               }

@@ -480,10 +480,40 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     ],
     [hist?.ram, hist?.ram_total, secondaryTeal, tertiaryIndigo, t]
   );
-  const gpuSeries: ChartSeries[] = useMemo(
-    () => [{ id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.series_compute'), data: hist?.gpu ?? [], color: tertiaryIndigo, unit: '%' }],
-    [hist?.gpu, tertiaryIndigo, t]
+  const hasGpuTemp = useMemo(
+    () =>
+      Boolean(metrics?.gpu?.available) &&
+      ((metrics?.gpu?.temp_c !== null && metrics?.gpu?.temp_c !== undefined) ||
+        (hist?.gpu_temp ?? []).some((v) => Number.isFinite(v) && v > 0)),
+    [metrics?.gpu?.available, metrics?.gpu?.temp_c, hist?.gpu_temp]
   );
+
+  const gpuSeries: ChartSeries[] = useMemo(() => {
+    const list: ChartSeries[] = [
+      { id: 'gpu', metricKey: 'gpu', label: t('hardware.gpu.series_compute'), data: hist?.gpu ?? [], color: tertiaryIndigo, unit: '%', axis: 'left' },
+    ];
+    if (hasGpuTemp) {
+      const tempArr =
+        hist?.gpu_temp && hist.gpu_temp.length >= 2
+          ? hist.gpu_temp
+          : metrics?.gpu?.temp_c !== null && metrics?.gpu?.temp_c !== undefined
+            ? (hist?.gpu ?? [metrics.gpu.temp_c, metrics.gpu.temp_c]).map(() => Number(metrics.gpu?.temp_c ?? 0))
+            : [];
+      list.push({
+        id: 'gpu_temp',
+        metricKey: 'gpu_temp',
+        label: t('hardware.gpu.series_temp'),
+        data: tempArr,
+        color: thermalOrange,
+        unit: '°C',
+        decimals: 1,
+        axis: 'right',
+        dashed: true,
+        fillAlpha: 0,
+      });
+    }
+    return list;
+  }, [hist?.gpu, hist?.gpu_temp, metrics?.gpu?.temp_c, hasGpuTemp, tertiaryIndigo, thermalOrange, t]);
 
   // Sub-gráficas de GPU dinámicamente activadas/desactivadas según capacidades reales de la tarjeta
   const gpuSubgraphs = useMemo(() => {
@@ -543,32 +573,55 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
       useMainGpuHistory?: boolean;
     }> = [];
 
-    // 1. Uso 3D / Cómputo
+    // 1. Uso 3D / Cómputo y Temperatura
+    const computeSeriesList: ChartSeries[] = [
+      {
+        id: 'gpu_compute',
+        metricKey: 'gpu',
+        label: t('hardware.gpu.series_compute'),
+        data: pickNumeric(
+          gHist.map((b) => b.util),
+          hist?.gpu ?? [Number(gpu?.gpu_util_percent ?? 0), Number(gpu?.gpu_util_percent ?? 0)]
+        ),
+        color: '#7c3aed',
+        unit: '%',
+        decimals: 1,
+        axis: 'left',
+      },
+    ];
+    if (hasTemp) {
+      computeSeriesList.push({
+        id: 'gpu_temp_overlay',
+        metricKey: 'gpu_temp',
+        label: t('hardware.gpu.series_temp'),
+        data: pickNumeric(
+          gHist.map((b) => b.temp),
+          hist?.gpu_temp ??
+            (gpu?.temp_c !== null && gpu?.temp_c !== undefined ? [Number(gpu.temp_c), Number(gpu.temp_c)] : [])
+        ),
+        color: thermalOrange,
+        unit: '°C',
+        decimals: 1,
+        axis: 'right',
+        dashed: true,
+        fillAlpha: 0,
+      });
+    }
     cards.push({
       id: 'compute',
       title: t('hardware.gpu.graph_compute_title'),
       subtitle: t('hardware.gpu.graph_compute_sub'),
-      headline: formatPct(gpu?.gpu_util_percent ?? 0),
+      headline: hasTemp
+        ? `${formatPct(gpu?.gpu_util_percent ?? 0)} · ${formatTemp(gpu?.temp_c)}`
+        : formatPct(gpu?.gpu_util_percent ?? 0),
       available: hasCompute,
       leftUnit: '%',
       maxLeft: 100,
+      maxRight: hasTemp ? 100 : undefined,
       timestamps: gHist.length >= 2 ? gTimestamps : timestamps,
       epochTs: gHist.length >= 2 ? gEpochTs : epochTs,
       useMainGpuHistory: true,
-      series: [
-        {
-          id: 'gpu_compute',
-          metricKey: 'gpu',
-          label: t('hardware.gpu.series_compute'),
-          data: pickNumeric(
-            gHist.map((b) => b.util),
-            hist?.gpu ?? [Number(gpu?.gpu_util_percent ?? 0), Number(gpu?.gpu_util_percent ?? 0)]
-          ),
-          color: '#7c3aed',
-          unit: '%',
-          decimals: 1,
-        },
-      ],
+      series: computeSeriesList,
     });
 
     // 2. Memoria VRAM y Controlador
@@ -813,6 +866,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
     timestamps,
     epochTs,
     locale,
+    thermalOrange,
     t,
   ]);
 
@@ -1401,6 +1455,7 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                           epochTs,
                           leftUnit: '%',
                           maxLeft: 100,
+                          maxRight: hasGpuTemp ? 100 : undefined,
                           chartKind: 'gpu',
                         })
                       }
@@ -1691,33 +1746,72 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                               ? dHist.map((b) => new Date(b.t).toLocaleTimeString(locale))
                               : timestamps;
                             const dEpoch = dHist.length ? dHist.map((b) => Math.round(b.t / 1000)) : epochTs;
+                            const currentDiskTemp =
+                              d.temp_c !== null && d.temp_c !== undefined && Number.isFinite(Number(d.temp_c))
+                                ? Number(d.temp_c)
+                                : null;
+                            const hasDiskTemp =
+                              currentDiskTemp !== null ||
+                              dHist.some((b) => typeof b.temp === 'number' && Number.isFinite(b.temp) && b.temp > 0);
+                            const diskExpandSeries: ChartSeries[] = [
+                              {
+                                id: 'disk_r',
+                                metricKey: 'disk_r',
+                                label: t('hardware.storage.read'),
+                                data: dHist.length ? dHist.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) : [0, 0],
+                                color: barColor,
+                                unit: 'MB/s',
+                                decimals: 2,
+                                axis: 'left',
+                              },
+                              {
+                                id: 'disk_w',
+                                metricKey: 'disk_w',
+                                label: t('hardware.storage.write'),
+                                data: dHist.length ? dHist.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) : [0, 0],
+                                color: '#f59e0b',
+                                unit: 'MB/s',
+                                decimals: 2,
+                                fillAlpha: 0.08,
+                                axis: 'left',
+                              },
+                            ];
+                            if (hasDiskTemp) {
+                              const firstValidTemp = dHist.find(
+                                (b) => typeof b.temp === 'number' && Number.isFinite(b.temp) && b.temp > 0
+                              )?.temp;
+                              let lastTemp =
+                                typeof firstValidTemp === 'number' && firstValidTemp > 0
+                                  ? firstValidTemp
+                                  : currentDiskTemp ?? 0;
+                              diskExpandSeries.push({
+                                id: 'disk_temp',
+                                metricKey: 'disk_temp',
+                                label: t('hardware.cpu.series_temp'),
+                                data: dHist.length
+                                  ? dHist.map((b) => {
+                                      if (typeof b.temp === 'number' && Number.isFinite(b.temp) && b.temp > 0) {
+                                        lastTemp = b.temp;
+                                      }
+                                      return lastTemp;
+                                    })
+                                  : [currentDiskTemp ?? 0, currentDiskTemp ?? 0],
+                                color: thermalOrange,
+                                unit: '°C',
+                                decimals: 1,
+                                axis: 'right',
+                                dashed: true,
+                                fillAlpha: 0,
+                              });
+                            }
                             onExpandChart({
                               title: formatDiskLabel(d, locale),
                               subtitle: `${d.mountpoint}${d.device && d.device !== d.mountpoint ? ` · ${d.device}` : ''}`,
-                              series: [
-                                {
-                                  id: 'disk_r',
-                                  metricKey: 'disk_r',
-                                  label: t('hardware.storage.read'),
-                                  data: dHist.length ? dHist.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) : [0, 0],
-                                  color: barColor,
-                                  unit: 'MB/s',
-                                  decimals: 2,
-                                },
-                                {
-                                  id: 'disk_w',
-                                  metricKey: 'disk_w',
-                                  label: t('hardware.storage.write'),
-                                  data: dHist.length ? dHist.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) : [0, 0],
-                                  color: '#f59e0b',
-                                  unit: 'MB/s',
-                                  decimals: 2,
-                                  fillAlpha: 0.08,
-                                },
-                              ],
+                              series: diskExpandSeries,
                               timestamps: dTs,
                               epochTs: dEpoch,
                               leftUnit: 'MB/s',
+                              maxRight: hasDiskTemp ? 100 : undefined,
                               chartKind: 'storage',
                               diskMountpoint: d.mountpoint,
                               entityKind: 'disk',

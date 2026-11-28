@@ -965,6 +965,15 @@ def _update_disk_io_history(disks_list, now_ts=None):
         for d in disks_list:
             io_key, r_total, w_total = _resolve_disk_io_counters(d, per_disk, cifs_by_host, cifs_by_share)
             active_keys.add(io_key)
+            temp_val = None
+            t_raw = d.get("temp_c")
+            if t_raw is not None:
+                try:
+                    t_num = round(float(t_raw), 1)
+                    if t_num > 0:
+                        temp_val = t_num
+                except Exception:
+                    temp_val = None
             if io_key not in computed_tick:
                 r_sec = 0.0
                 w_sec = 0.0
@@ -985,20 +994,30 @@ def _update_disk_io_history(disks_list, now_ts=None):
                 r_round = round(r_sec, 1)
                 w_round = round(w_sec, 1)
                 if not hist or (hist[-1]["t"] // DISK_BUCKET_INTERVAL_MS) * DISK_BUCKET_INTERVAL_MS < bucket_ms:
-                    hist.append({
+                    bucket_entry = {
                         "t": ts_ms,
                         "r": r_round,
                         "w": w_round,
-                    })
+                    }
+                    if temp_val is not None:
+                        bucket_entry["temp"] = temp_val
+                    hist.append(bucket_entry)
                 else:
                     hist[-1]["t"] = ts_ms
                     if r_round > hist[-1]["r"]:
                         hist[-1]["r"] = r_round
                     if w_round > hist[-1]["w"]:
                         hist[-1]["w"] = w_round
+                    if temp_val is not None:
+                        hist[-1]["temp"] = temp_val
                 while hist and hist[0]["t"] < cutoff_ms:
                     hist.pop(0)
                 computed_tick[io_key] = (r_round, w_round, list(hist))
+            elif temp_val is not None:
+                hist_existing = DISK_BANDWIDTH_HISTORY.get(io_key)
+                if hist_existing:
+                    hist_existing[-1]["temp"] = temp_val
+                    computed_tick[io_key] = (computed_tick[io_key][0], computed_tick[io_key][1], list(hist_existing))
 
             r_val, w_val, hist_copy = computed_tick[io_key]
             d["io_device"] = io_key
@@ -4360,6 +4379,7 @@ def query_device_series_history_from_sqlite(entity_kind, entity_id, before_ts=No
                 series_out["disk_r"] = v1_list
                 series_out["disk_w"] = v2_list
                 series_out["disk_pct"] = v3_list
+                series_out["disk_temp"] = v4_list
             elif kind == "nic":
                 series_out["net_wan_rx"] = v1_list
                 series_out["net_wan_tx"] = v2_list
@@ -16105,13 +16125,14 @@ def background_collector():
                         continue
                     d_key = str(d_item.get("device") or d_item.get("mountpoint") or "").strip()
                     if d_key:
+                        d_temp_val = round(float(d_item.get("temp_c")), 1) if d_item.get("temp_c") is not None else 0.0
                         dev_series_rows.append((
                             "disk",
                             d_key,
                             round(float(d_item.get("read_bytes_sec") or 0.0) / (1024 * 1024), 2),
                             round(float(d_item.get("write_bytes_sec") or 0.0) / (1024 * 1024), 2),
                             round(float(d_item.get("percent") or 0.0), 1),
-                            0.0,
+                            d_temp_val,
                         ))
                 raw_nics = net_info.get("interfaces_list")
                 if not isinstance(raw_nics, list):

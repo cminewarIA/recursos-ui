@@ -51,6 +51,8 @@ const PROBE_PALETTE_LIGHT = ['#ea580c', '#dc2626', '#d97706', '#0d9488', '#6366f
 const PROBE_PALETTE_DARK = ['#fb923c', '#f87171', '#fbbf24', '#2dd4bf', '#a5b4fc', '#c6f19d', '#38bdf8', '#f472b6'];
 
 const GPU_SUB_HISTORY_FIELD_MAP: Record<string, keyof Omit<GpuHistorySample, 't'>> = {
+  gpu_compute: 'util',
+  gpu_temp_overlay: 'temp',
   gpu_vram_pct: 'vram_pct',
   gpu_mem_ctrl: 'mem_util',
   gpu_enc: 'enc',
@@ -376,12 +378,17 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     return liveMetrics?.net?.ping_latency ?? null;
   }, [spec.chartKind, liveMetrics?.net?.ping_latency]);
 
-  const liveDiskHist = useMemo(() => {
-    if (spec.chartKind !== 'storage' || !spec.diskMountpoint) return null;
+  const { liveDiskHist, liveDiskTemp } = useMemo(() => {
+    if (spec.chartKind !== 'storage' || !spec.diskMountpoint) {
+      return { liveDiskHist: null, liveDiskTemp: null };
+    }
     const matched = (liveMetrics?.disks || []).find(
       (d) => d.mountpoint === spec.diskMountpoint || (d.shared_mounts || []).includes(spec.diskMountpoint || '')
     );
-    return matched?.io_history ?? null;
+    return {
+      liveDiskHist: matched?.io_history ?? null,
+      liveDiskTemp: matched?.temp_c ?? null,
+    };
   }, [spec.chartKind, spec.diskMountpoint, liveMetrics?.disks]);
 
   const liveGpuHist = useMemo(() => {
@@ -600,12 +607,33 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
 
     if (liveBucketWindow?.kind === 'disk') {
       const { sliced } = liveBucketWindow;
+      const firstValidTemp = sliced.find(
+        (b) => typeof b.temp === 'number' && Number.isFinite(b.temp) && b.temp > 0
+      )?.temp;
+      const seedTemp =
+        typeof firstValidTemp === 'number' && firstValidTemp > 0
+          ? firstValidTemp
+          : typeof liveDiskTemp === 'number' && Number.isFinite(liveDiskTemp)
+            ? liveDiskTemp
+            : 0;
       return spec.series.map((s) => {
         if (s.id === 'disk_r' || s.metricKey === 'disk_r') {
           return { ...s, data: sliced.map((b) => Math.round((b.r / (1024 * 1024)) * 100) / 100) };
         }
         if (s.id === 'disk_w' || s.metricKey === 'disk_w') {
           return { ...s, data: sliced.map((b) => Math.round((b.w / (1024 * 1024)) * 100) / 100) };
+        }
+        if (s.id === 'disk_temp' || s.metricKey === 'disk_temp') {
+          let lastTemp = seedTemp;
+          return {
+            ...s,
+            data: sliced.map((b) => {
+              if (typeof b.temp === 'number' && Number.isFinite(b.temp) && b.temp > 0) {
+                lastTemp = b.temp;
+              }
+              return lastTemp;
+            }),
+          };
         }
         return s;
       });
@@ -731,6 +759,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
         if (s.id === 'disk_r' && Array.isArray(entSeries.disk_r)) return { ...s, data: entSeries.disk_r };
         if (s.id === 'disk_w' && Array.isArray(entSeries.disk_w)) return { ...s, data: entSeries.disk_w };
         if (s.id === 'disk_pct' && Array.isArray(entSeries.disk_pct)) return { ...s, data: entSeries.disk_pct };
+        if (s.id === 'disk_temp' && Array.isArray(entSeries.disk_temp)) return { ...s, data: entSeries.disk_temp };
         return s;
       });
     }

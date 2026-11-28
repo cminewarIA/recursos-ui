@@ -91,8 +91,8 @@ Toda la plataforma se organiza en **5 dominios funcionales sin duplicidades**, c
 2. **Páginas Independientes de Silicio**:
    - **`/equipo/cpu`**: Gráfica dual de uso y temperatura (`°C` en eje derecho discontinuo), barra dinámica de sensores activos y **6 widgets modulares adaptados al estilo GPU** (`Uso y Temperatura`, `Consumo RAPL / Temperatura`, `Frecuencia de Reloj`, `Desglose Usuario/Sistema/E/S`, `Cola de Carga 1m/5m` y `Sensores Térmicos por Sonda` con inspección individual por sonda), carga por hilo y procesos activos de CPU.
    - **`/equipo/ram`**: Desglose de memoria física, caché recuperable, buffers del kernel y compresión ZRAM.
-   - **`/equipo/gpu`**: Métricas de cómputo 3D, VRAM, codificador/decodificador de vídeo, consumo/temperatura, relojes y bus PCIe — todos persistidos en `recursos_history.db` con historial completo (`En vivo · 20m · 1h · 6h · 24h · Todo`).
-   - **`/equipo/almacenamiento`**: Tarjetas independientes por disco físico y partición montada, con transporte (`NVMe`, `SATA`, `USB`), tasa de lectura/escritura en tiempo real e historial SQLite individual por disco.
+   - **`/equipo/gpu`**: Métricas de cómputo 3D con superposición de temperatura (`°C` en eje derecho discontinuo al estilo CPU), VRAM, codificador/decodificador de vídeo, consumo/temperatura, relojes y bus PCIe — todos persistidos en `recursos_history.db` con historial completo (`En vivo · 20m · 1h · 6h · 24h · Todo`).
+   - **`/equipo/almacenamiento`**: Tarjetas independientes por disco físico y partición montada, con transporte (`NVMe`, `SATA`, `USB`), tasa de lectura/escritura en tiempo real, registro térmico (`°C` en eje derecho para discos con sensor al estilo CPU) e historial SQLite individual por disco.
 
 </details>
 

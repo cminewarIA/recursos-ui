@@ -181,6 +181,7 @@ export interface DiskIoSample {
   t: number;
   r: number;
   w: number;
+  temp?: number | null;
 }
 
 export interface DiskInfo {
@@ -904,7 +905,8 @@ export type TelemetryMetricKey =
   | 'net_lan_tx'
   | 'disk_r'
   | 'disk_w'
-  | 'disk_pct';
+  | 'disk_pct'
+  | 'disk_temp';
 
 export interface HistorySeries {
   timestamps?: string[];
@@ -941,6 +943,7 @@ export interface HistorySeries {
   disk_r?: number[];
   disk_w?: number[];
   disk_pct?: number[];
+  disk_temp?: number[];
 }
 
 export interface TelemetryHistoryResponse {
