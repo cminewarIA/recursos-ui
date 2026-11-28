@@ -65,7 +65,7 @@ export interface ExpandChartSpec {
   gpuSubmetric?: 'compute' | 'vram' | 'video' | 'power_temp' | 'clocks' | 'pcie';
   nicName?: string;
   diskMountpoint?: string;
-  entityKind?: 'disk' | 'nic' | 'cpu_sensor';
+  entityKind?: 'disk' | 'nic' | 'router' | 'cpu_sensor';
   entityId?: string;
 }
 
@@ -413,7 +413,12 @@ const OverviewDiskCard = React.memo<OverviewDiskCardProps>(
             theme={theme}
             onExpandClick={() => onExpandChart(expandSpec)}
           />
-          <ChartNarrativeFooter data={diskSeries[0]?.data ?? []} unit="MB/s" decimals={2} />
+          <ChartNarrativeFooter
+            data={diskSeries[0]?.data ?? []}
+            secondaryData={diskSeries[1]?.data}
+            unit="MB/s"
+            decimals={2}
+          />
         </div>
       </motion.article>
     );
@@ -628,17 +633,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const hostLanRxBytes = Number(metrics?.net?.lan_rx_bytes_sec ?? 0);
   const hostLanTxBytes = Number(metrics?.net?.lan_tx_bytes_sec ?? 0);
   const wanRxBytes = routerWanAvailable
-    ? Number(wifiSummary?.router_wan_rx_bytes_sec ?? metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0)
-    : Number(metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0);
+    ? Number(wifiSummary?.router_wan_rx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_rx_bytes_sec ?? 0);
   const wanTxBytes = routerWanAvailable
-    ? Number(wifiSummary?.router_wan_tx_bytes_sec ?? metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0)
-    : Number(metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0);
-  const lanRxBytes = routerWanAvailable
-    ? Number(wifiSummary?.router_lan_rx_bytes_sec ?? hostLanRxBytes)
-    : hostLanRxBytes;
-  const lanTxBytes = routerWanAvailable
-    ? Number(wifiSummary?.router_lan_tx_bytes_sec ?? hostLanTxBytes)
-    : hostLanTxBytes;
+    ? Number(wifiSummary?.router_wan_tx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_tx_bytes_sec ?? 0);
+  // La tarjeta Comunicación Local refleja estrictamente el caudal LAN direccional del servidor
+  const lanRxBytes = hostLanRxBytes;
+  const lanTxBytes = hostLanTxBytes;
 
   const activeInterfaces = useMemo(() => {
     const list =
@@ -670,8 +672,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     const rawGpuTemp = hist?.gpu_temp ?? [];
     const rawNetRx = hist?.net_rx ?? [];
     const rawNetTx = hist?.net_tx ?? [];
-    const rawWanRx = hist?.net_wan_rx && hist.net_wan_rx.length > 0 ? hist.net_wan_rx : rawNetRx;
-    const rawWanTx = hist?.net_wan_tx && hist.net_wan_tx.length > 0 ? hist.net_wan_tx : rawNetTx;
+    const rawWanRx =
+      hist?.net_wan_rx && hist.net_wan_rx.length > 0 ? hist.net_wan_rx : rawNetRx.map(() => 0);
+    const rawWanTx =
+      hist?.net_wan_tx && hist.net_wan_tx.length > 0 ? hist.net_wan_tx : rawNetTx.map(() => 0);
     const rawLanRx =
       hist?.net_lan_rx && hist.net_lan_rx.length > 0 ? hist.net_lan_rx : rawNetRx.map(() => 0);
     const rawLanTx =
@@ -746,8 +750,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     return {
       timestamps: sliced.map((b) => new Date(b.t).toLocaleTimeString(loc)),
       epochTs: sliced.map((b) => Math.round(b.t / 1000)),
-      wanRx: sliced.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100),
-      wanTx: sliced.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100),
+      wanRx: sliced.map((b) => Math.round(((b.wan_rx ?? 0) / (1024 * 1024)) * 100) / 100),
+      wanTx: sliced.map((b) => Math.round(((b.wan_tx ?? 0) / (1024 * 1024)) * 100) / 100),
       lanRx: sliced.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100),
       lanTx: sliced.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100),
     };
@@ -862,7 +866,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         id: 'net_lan_rx',
         metricKey: 'net_lan_rx',
         label: t('hardware.net.lan_download'),
-        data: routerLiveWindow ? routerLiveWindow.lanRx : netLanRxHist,
+        data: netLanRxHist,
         color: lanRxChartColor,
         unit: 'MB/s',
         decimals: 2,
@@ -872,20 +876,20 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         id: 'net_lan_tx',
         metricKey: 'net_lan_tx',
         label: t('hardware.net.lan_upload'),
-        data: routerLiveWindow ? routerLiveWindow.lanTx : netLanTxHist,
+        data: netLanTxHist,
         color: lanTxChartColor,
         unit: 'MB/s',
         decimals: 2,
         fillAlpha: 0.08,
       },
     ],
-    [routerLiveWindow, netLanRxHist, netLanTxHist, lanRxChartColor, lanTxChartColor, t]
+    [netLanRxHist, netLanTxHist, lanRxChartColor, lanTxChartColor, t]
   );
 
   const wanTimestamps = routerLiveWindow ? routerLiveWindow.timestamps : timestamps;
   const wanEpochTs = routerLiveWindow ? routerLiveWindow.epochTs : epochTs;
-  const lanTimestamps = routerLiveWindow ? routerLiveWindow.timestamps : timestamps;
-  const lanEpochTs = routerLiveWindow ? routerLiveWindow.epochTs : epochTs;
+  const lanTimestamps = timestamps;
+  const lanEpochTs = epochTs;
   const routerSourceLabel =
     wifiSummary?.router_traffic_source ||
     wifiSummary?.router_model ||
@@ -902,12 +906,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     () => (metrics?.wifi_clients ?? []).filter((c) => c.online !== false && c.is_online !== false),
     [metrics?.wifi_clients]
   );
-  const bannerRxBytes = metrics?.wifi_summary?.router_wan_available
-    ? Number(metrics?.wifi_summary?.router_wan_rx_bytes_sec ?? metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0)
-    : Number(metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0);
-  const bannerTxBytes = metrics?.wifi_summary?.router_wan_available
-    ? Number(metrics?.wifi_summary?.router_wan_tx_bytes_sec ?? metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0)
-    : Number(metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0);
+  const bannerRxBytes = routerWanAvailable
+    ? Number(metrics?.wifi_summary?.router_wan_rx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_rx_bytes_sec ?? 0);
+  const bannerTxBytes = routerWanAvailable
+    ? Number(metrics?.wifi_summary?.router_wan_tx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_tx_bytes_sec ?? 0);
   const controllableClients = useMemo(
     () => (metrics?.wifi_clients ?? []).filter((c) => !c.is_server && !c.is_gateway).slice(0, 6),
     [metrics?.wifi_clients]
@@ -1495,7 +1499,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     timestamps: wanTimestamps,
                     epochTs: wanEpochTs,
                     leftUnit: 'MB/s',
-                    chartKind: routerLiveWindow ? 'router' : 'net',
+                    chartKind: routerWanAvailable ? 'router' : 'net',
+                    entityKind: routerWanAvailable ? 'router' : undefined,
+                    entityId: routerWanAvailable ? 'main' : undefined,
                   })
                 }
                 className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
@@ -1533,11 +1539,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   timestamps: wanTimestamps,
                   epochTs: wanEpochTs,
                   leftUnit: 'MB/s',
-                  chartKind: routerLiveWindow ? 'router' : 'net',
+                  chartKind: routerWanAvailable ? 'router' : 'net',
+                  entityKind: routerWanAvailable ? 'router' : undefined,
+                  entityId: routerWanAvailable ? 'main' : undefined,
                 })
               }
             />
-            <ChartNarrativeFooter data={wanSeries[0]?.data ?? []} unit="MB/s" decimals={2} />
+            <ChartNarrativeFooter
+              data={wanSeries[0]?.data ?? []}
+              secondaryData={wanSeries[1]?.data}
+              unit="MB/s"
+              decimals={2}
+            />
           </div>
         </motion.article>
 
@@ -1603,7 +1616,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     timestamps: lanTimestamps,
                     epochTs: lanEpochTs,
                     leftUnit: 'MB/s',
-                    chartKind: routerLiveWindow ? 'router' : 'net',
+                    chartKind: 'net',
                   })
                 }
                 className="cockpit-subtile flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:border-[#1e6b38]/40 hover:text-[#1e6b38] dark:text-slate-400 dark:hover:border-[#c6f19d]/40 dark:hover:text-[#c6f19d] cursor-pointer"
@@ -1641,11 +1654,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   timestamps: lanTimestamps,
                   epochTs: lanEpochTs,
                   leftUnit: 'MB/s',
-                  chartKind: routerLiveWindow ? 'router' : 'net',
+                  chartKind: 'net',
                 })
               }
             />
-            <ChartNarrativeFooter data={lanSeries[0]?.data ?? []} unit="MB/s" decimals={2} />
+            <ChartNarrativeFooter
+              data={lanSeries[0]?.data ?? []}
+              secondaryData={lanSeries[1]?.data}
+              unit="MB/s"
+              decimals={2}
+            />
           </div>
         </motion.article>
 

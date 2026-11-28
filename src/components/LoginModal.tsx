@@ -50,7 +50,8 @@ export function LoginModal({
 
   return (
     <div
-      className="flex min-h-dvh items-center justify-center bg-[var(--bg-canvas)] px-4 py-8 text-[var(--text-primary)]"
+      id="login-modal"
+      className="fixed inset-0 z-50 flex min-h-dvh w-full items-center justify-center overflow-y-auto px-4 py-8 text-[var(--text-primary)]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="login-modal-title"
@@ -59,7 +60,7 @@ export function LoginModal({
         initial={{ opacity: 0, y: 12, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={COCKPIT_SPRING}
-        className="cockpit-bento flex w-full max-w-md flex-col items-center gap-4 p-7 text-center"
+        className="login-modal-card cockpit-bento relative flex w-full max-w-md flex-col items-center gap-4 p-7 text-center"
       >
         {!logoBroken ? (
           <img

@@ -1229,9 +1229,12 @@ const TelemetryChartComponent: React.FC<TelemetryChartProps> = ({
         if (localIdx < 0 || localIdx >= s.data.length) return null;
         const val = Number(s.data[localIdx] ?? 0);
         const dec = s.decimals ?? 1;
+        const seriesUnit = s.unit ?? leftUnit;
         const formatted = formatValue
           ? formatValue(s, val)
-          : `${val.toFixed(dec).replace('.', ',')} ${s.unit ?? leftUnit}`;
+          : seriesUnit === 'MB/s' && val > 0 && val < 1
+            ? `${Math.round(val * 1024)} KB/s`
+            : `${val.toFixed(dec).replace('.', ',')} ${seriesUnit}`;
         return {
           label: s.label,
           value: formatted,

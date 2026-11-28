@@ -963,7 +963,7 @@ export interface TelemetryHistoryResponse {
 export interface EntityHistoryResponse {
   ok: boolean;
   db_file?: string;
-  entity_kind: 'disk' | 'nic' | 'cpu_sensor' | string;
+  entity_kind: 'disk' | 'nic' | 'router' | 'cpu_sensor' | string;
   entity_id: string;
   oldest_ts: number | null;
   newest_ts: number | null;

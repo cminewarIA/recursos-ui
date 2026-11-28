@@ -262,8 +262,8 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
     const activePool = liveClients.filter((c) => {
       if (c.is_gateway) return false;
       const isOnline = c.online !== false && c.is_online !== false;
-      const wanD = Number(c.wan_speed_down ?? c.speed_down ?? 0);
-      const wanU = Number(c.wan_speed_up ?? c.speed_up ?? 0);
+      const wanD = Number(c.wan_speed_down ?? 0);
+      const wanU = Number(c.wan_speed_up ?? 0);
       const lanD = Number(c.lan_speed_down ?? 0);
       const lanU = Number(c.lan_speed_up ?? 0);
       const anyTraffic = wanD + wanU + lanD + lanU > 0;
@@ -277,8 +277,8 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
     });
 
     const metricValue = (c: WifiClient): number => {
-      const wanD = Number(c.wan_speed_down ?? c.speed_down ?? 0);
-      const wanU = Number(c.wan_speed_up ?? c.speed_up ?? 0);
+      const wanD = Number(c.wan_speed_down ?? 0);
+      const wanU = Number(c.wan_speed_up ?? 0);
       const lanT = Number(c.lan_speed_down ?? 0) + Number(c.lan_speed_up ?? 0);
       if (sortBy === 'wan_down') return wanD;
       if (sortBy === 'wan_up') return wanU;
@@ -316,14 +316,14 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
   }, [bandwidthDevices]);
 
   const globalDownRate = summary.router_wan_available
-    ? Number(summary.router_wan_rx_bytes_sec ?? metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0)
-    : Number(metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0);
+    ? Number(summary.router_wan_rx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_rx_bytes_sec ?? 0);
   const globalUpRate = summary.router_wan_available
-    ? Number(summary.router_wan_tx_bytes_sec ?? metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0)
-    : Number(metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0);
-  const globalLanRate =
-    Number(summary.router_lan_rx_bytes_sec ?? metrics?.net?.lan_rx_bytes_sec ?? 0) +
-    Number(summary.router_lan_tx_bytes_sec ?? metrics?.net?.lan_tx_bytes_sec ?? 0);
+    ? Number(summary.router_wan_tx_bytes_sec ?? 0)
+    : Number(metrics?.net?.wan_tx_bytes_sec ?? 0);
+  const globalLanRate = summary.router_wan_available
+    ? Number(summary.router_lan_rx_bytes_sec ?? 0) + Number(summary.router_lan_tx_bytes_sec ?? 0)
+    : Number(metrics?.net?.lan_rx_bytes_sec ?? 0) + Number(metrics?.net?.lan_tx_bytes_sec ?? 0);
 
   const toggleSort = (key: BandwidthSortKey) => {
     if (sortBy === key) {
@@ -1021,8 +1021,8 @@ export const NetworkDevicesModal: React.FC<NetworkDevicesModalProps> = ({
               <div className="space-y-2">
                 {bandwidthDevices.map((c, idx) => {
                   const label = c.name || c.hostname || c.ip || t('overview.device_fallback');
-                  const wanD = Number(c.wan_speed_down ?? c.speed_down ?? 0);
-                  const wanU = Number(c.wan_speed_up ?? c.speed_up ?? 0);
+                  const wanD = Number(c.wan_speed_down ?? 0);
+                  const wanU = Number(c.wan_speed_up ?? 0);
                   const lanT = Number(c.lan_speed_down ?? 0) + Number(c.lan_speed_up ?? 0);
                   const downPct = Math.min(100, Math.round((wanD / peakBwDeviceRate) * 100));
                   const upPct = Math.min(100, Math.round((wanU / peakBwDeviceRate) * 100));

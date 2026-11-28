@@ -1139,6 +1139,13 @@ export const EquipmentView: React.FC<EquipmentViewProps> = ({
                           />
                           <ChartNarrativeFooter
                             data={g.series[0]?.data ?? []}
+                            secondaryData={
+                              g.series[1] &&
+                              g.series[1].axis !== 'right' &&
+                              (g.series[1].unit ?? g.leftUnit) === (g.series[0]?.unit ?? g.leftUnit)
+                                ? g.series[1].data
+                                : undefined
+                            }
                             unit={g.series[0]?.unit ?? g.leftUnit}
                             decimals={g.series[0]?.decimals ?? 1}
                           />

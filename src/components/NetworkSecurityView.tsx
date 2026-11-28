@@ -64,6 +64,7 @@ function escapeMapHtml(value: unknown): string {
 }
 
 type MapConnFilter = 'all' | 'incoming' | 'outgoing' | 'devices' | 'blocked';
+type TrafficScopeFilter = 'all' | 'wan' | 'lan';
 
 interface ActiveMapPopupState {
   isOpen: boolean;
@@ -85,25 +86,30 @@ interface NicHistoryCardProps {
 
 const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, onExpandChart }) => {
   const { t } = useI18n();
+  const [scope, setScope] = useState<TrafficScopeFilter>('all');
   const hist2h = useMemo(() => nic.history_2h ?? [], [nic.history_2h]);
 
   const { nicSeries, nicTimestamps, nicEpochTs, expandNicSpec } = useMemo(() => {
-    const wanRxData = hist2h.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100);
-    const wanTxData = hist2h.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100);
+    const wanRxData = hist2h.map((b) => Math.round(((b.wan_rx ?? 0) / (1024 * 1024)) * 100) / 100);
+    const wanTxData = hist2h.map((b) => Math.round(((b.wan_tx ?? 0) / (1024 * 1024)) * 100) / 100);
     const lanRxData = hist2h.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100);
     const lanTxData = hist2h.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100);
     const timestamps = hist2h.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale));
     const epochTs = hist2h.map((b) => Math.round(b.t / 1000));
-    const series: ChartSeries[] = [
+    const wanSeries: ChartSeries[] = [
       { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: theme === 'dark' ? '#c6f19d' : '#1e6b38', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
       { id: 'wan_tx', metricKey: 'net_wan_tx', label: t('hardware.net.wan_upload'), data: wanTxData, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
-      { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.10 },
-      { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.06 },
     ];
+    const lanSeries: ChartSeries[] = [
+      { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.12 },
+      { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.07 },
+    ];
+    const visibleSeries =
+      scope === 'wan' ? wanSeries : scope === 'lan' ? lanSeries : [...wanSeries, ...lanSeries];
     const spec: ExpandChartSpec = {
       title: t('hardware.net.iface_full_title', { name: nic.name }),
       subtitle: t('hardware.net.iface_20m_subtitle', { ip: nic.ip || t('hardware.net.local_net') }),
-      series,
+      series: visibleSeries,
       timestamps,
       epochTs,
       leftUnit: 'MB/s',
@@ -112,8 +118,8 @@ const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, on
       entityKind: 'nic',
       entityId: nic.name,
     };
-    return { nicSeries: series, nicTimestamps: timestamps, nicEpochTs: epochTs, expandNicSpec: spec };
-  }, [hist2h, nic.name, nic.ip, locale, theme, t]);
+    return { nicSeries: visibleSeries, nicTimestamps: timestamps, nicEpochTs: epochTs, expandNicSpec: spec };
+  }, [hist2h, nic.name, nic.ip, locale, theme, scope, t]);
 
   const formatNicLabel = useCallback(
     (idx: number) => {
@@ -129,8 +135,8 @@ const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, on
     if (onExpandChart) onExpandChart(expandNicSpec);
   }, [onExpandChart, expandNicSpec]);
 
-  const wanRxNow = nic.wan_rx_bytes_sec ?? nic.rx_bytes_sec;
-  const wanTxNow = nic.wan_tx_bytes_sec ?? nic.tx_bytes_sec;
+  const wanRxNow = nic.wan_rx_bytes_sec ?? 0;
+  const wanTxNow = nic.wan_tx_bytes_sec ?? 0;
   const lanRxNow = nic.lan_rx_bytes_sec ?? 0;
   const lanTxNow = nic.lan_tx_bytes_sec ?? 0;
 
@@ -145,31 +151,55 @@ const NicHistoryCard = React.memo<NicHistoryCardProps>(({ nic, theme, locale, on
             {nic.ip || t('hardware.net.no_local_ip')} · {nic.is_up ? t('hardware.net.active') : t('hardware.net.disconnected')}
           </p>
         </div>
-        {onExpandChart && (
-          <button
-            type="button"
-            aria-label={t('hardware.net.inspect_aria', { name: nic.name })}
-            onClick={handleExpand}
-            className="cockpit-subtile flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="cockpit-subtile inline-flex items-center p-0.5 text-[10px] font-semibold">
+            {(
+              [
+                { id: 'all' as TrafficScopeFilter, label: t('network.scope_all') },
+                { id: 'wan' as TrafficScopeFilter, label: 'WAN' },
+                { id: 'lan' as TrafficScopeFilter, label: 'LAN' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setScope(opt.id)}
+                className={`rounded-md px-1.5 py-1 transition-colors cursor-pointer ${
+                  scope === opt.id
+                    ? 'bg-[#1e6b38] text-white dark:bg-[#c6f19d] dark:text-[#0a140b]'
+                    : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {onExpandChart && (
+            <button
+              type="button"
+              aria-label={t('hardware.net.inspect_aria', { name: nic.name })}
+              onClick={handleExpand}
+              className="cockpit-subtile flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
       <div className="mt-2.5 grid grid-cols-2 gap-x-2.5 gap-y-1 border-t border-slate-200/70 pt-2 font-mono text-[11px] tabular-nums dark:border-slate-800">
-        <div className="min-w-0 truncate text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
+        <div className={`min-w-0 truncate text-sky-600 dark:text-sky-400 ${scope === 'lan' ? 'opacity-40' : ''}`} title={t('hardware.net.wan_download')}>
           <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
           ↓ {formatSpeed(wanRxNow)}
         </div>
-        <div className="min-w-0 truncate text-right text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
+        <div className={`min-w-0 truncate text-right text-indigo-600 dark:text-indigo-400 ${scope === 'wan' ? 'opacity-40' : ''}`} title={t('hardware.net.lan_download')}>
           <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
           ↓ {formatSpeed(lanRxNow)}
         </div>
-        <div className="min-w-0 truncate text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
+        <div className={`min-w-0 truncate text-emerald-600 dark:text-emerald-400 ${scope === 'lan' ? 'opacity-40' : ''}`} title={t('hardware.net.wan_upload')}>
           <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
           ↑ {formatSpeed(wanTxNow)}
         </div>
-        <div className="min-w-0 truncate text-right text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
+        <div className={`min-w-0 truncate text-right text-amber-600 dark:text-amber-400 ${scope === 'wan' ? 'opacity-40' : ''}`} title={t('hardware.net.lan_upload')}>
           <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
           ↑ {formatSpeed(lanTxNow)}
         </div>
@@ -200,47 +230,55 @@ interface RouterTrafficCardProps {
 
 const RouterTrafficCard = React.memo<RouterTrafficCardProps>(({ metrics, theme, locale, onExpandChart }) => {
   const { t } = useI18n();
+  const [scope, setScope] = useState<TrafficScopeFilter>('wan');
   const wifiSum = metrics?.wifi_summary;
+  const routerWanAvailable = Boolean(wifiSum?.router_wan_available);
   const routerHist: NicHistoryBucket[] = useMemo(
-    () => wifiSum?.router_history_20m ?? metrics?.net?.router_history_20m ?? [],
-    [wifiSum?.router_history_20m, metrics?.net?.router_history_20m]
+    () => (routerWanAvailable ? wifiSum?.router_history_20m ?? metrics?.net?.router_history_20m ?? [] : []),
+    [routerWanAvailable, wifiSum?.router_history_20m, metrics?.net?.router_history_20m]
   );
 
   const routerTitle =
-    wifiSum?.router_traffic_source ||
+    (routerWanAvailable ? wifiSum?.router_traffic_source : null) ||
     wifiSum?.router_model ||
     wifiSum?.gateway_name ||
     t('network.router_widget_title');
-  const routerIp = wifiSum?.router_ip || wifiSum?.gateway_ip || metrics?.net?.local_ip || t('hardware.net.local_net');
-  const wanRxNow = wifiSum?.router_wan_rx_bytes_sec ?? metrics?.net?.wan_rx_bytes_sec ?? metrics?.net?.rx_bytes_sec ?? 0;
-  const wanTxNow = wifiSum?.router_wan_tx_bytes_sec ?? metrics?.net?.wan_tx_bytes_sec ?? metrics?.net?.tx_bytes_sec ?? 0;
-  const lanRxNow = wifiSum?.router_lan_rx_bytes_sec ?? metrics?.net?.lan_rx_bytes_sec ?? 0;
-  const lanTxNow = wifiSum?.router_lan_tx_bytes_sec ?? metrics?.net?.lan_tx_bytes_sec ?? 0;
+  const routerIp = wifiSum?.router_ip || wifiSum?.gateway_ip || t('hardware.net.local_net');
+  const wanRxNow = routerWanAvailable ? Number(wifiSum?.router_wan_rx_bytes_sec ?? 0) : 0;
+  const wanTxNow = routerWanAvailable ? Number(wifiSum?.router_wan_tx_bytes_sec ?? 0) : 0;
+  const lanRxNow = routerWanAvailable ? Number(wifiSum?.router_lan_rx_bytes_sec ?? 0) : 0;
+  const lanTxNow = routerWanAvailable ? Number(wifiSum?.router_lan_tx_bytes_sec ?? 0) : 0;
 
   const { routerSeries, routerTimestamps, routerEpochTs, expandRouterSpec } = useMemo(() => {
-    const wanRxData = routerHist.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100);
-    const wanTxData = routerHist.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100);
+    const wanRxData = routerHist.map((b) => Math.round(((b.wan_rx ?? 0) / (1024 * 1024)) * 100) / 100);
+    const wanTxData = routerHist.map((b) => Math.round(((b.wan_tx ?? 0) / (1024 * 1024)) * 100) / 100);
     const lanRxData = routerHist.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100);
     const lanTxData = routerHist.map((b) => Math.round(((b.lan_tx ?? 0) / (1024 * 1024)) * 100) / 100);
     const timestamps = routerHist.map((b) => new Date(b.t).toLocaleTimeString(locale === 'es' ? 'es-ES' : locale));
     const epochTs = routerHist.map((b) => Math.round(b.t / 1000));
-    const series: ChartSeries[] = [
+    const wanSeries: ChartSeries[] = [
       { id: 'wan_rx', metricKey: 'net_wan_rx', label: t('hardware.net.wan_download'), data: wanRxData, color: theme === 'dark' ? '#c6f19d' : '#1e6b38', unit: 'MB/s', decimals: 2, fillAlpha: 0.16 },
       { id: 'wan_tx', metricKey: 'net_wan_tx', label: t('hardware.net.wan_upload'), data: wanTxData, color: '#10b981', unit: 'MB/s', decimals: 2, fillAlpha: 0.08 },
-      { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.10 },
-      { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.06 },
     ];
+    const lanSeries: ChartSeries[] = [
+      { id: 'lan_rx', metricKey: 'net_lan_rx', label: t('hardware.net.lan_download'), data: lanRxData, color: '#6366f1', unit: 'MB/s', decimals: 2, fillAlpha: 0.12 },
+      { id: 'lan_tx', metricKey: 'net_lan_tx', label: t('hardware.net.lan_upload'), data: lanTxData, color: '#f59e0b', unit: 'MB/s', decimals: 2, fillAlpha: 0.07 },
+    ];
+    const visibleSeries =
+      scope === 'wan' ? wanSeries : scope === 'lan' ? lanSeries : [...wanSeries, ...lanSeries];
     const spec: ExpandChartSpec = {
       title: `${t('network.router_widget_title')} · ${routerTitle}`,
       subtitle: t('hardware.net.iface_20m_subtitle', { ip: routerIp }),
-      series,
+      series: visibleSeries,
       timestamps,
       epochTs,
       leftUnit: 'MB/s',
       chartKind: 'router',
+      entityKind: 'router',
+      entityId: 'main',
     };
-    return { routerSeries: series, routerTimestamps: timestamps, routerEpochTs: epochTs, expandRouterSpec: spec };
-  }, [routerHist, routerTitle, routerIp, locale, theme, t]);
+    return { routerSeries: visibleSeries, routerTimestamps: timestamps, routerEpochTs: epochTs, expandRouterSpec: spec };
+  }, [routerHist, routerTitle, routerIp, locale, theme, scope, t]);
 
   const formatRouterLabel = useCallback(
     (idx: number) => {
@@ -253,8 +291,8 @@ const RouterTrafficCard = React.memo<RouterTrafficCardProps>(({ metrics, theme, 
   );
 
   const handleExpand = useCallback(() => {
-    if (onExpandChart) onExpandChart(expandRouterSpec);
-  }, [onExpandChart, expandRouterSpec]);
+    if (onExpandChart && routerWanAvailable) onExpandChart(expandRouterSpec);
+  }, [onExpandChart, routerWanAvailable, expandRouterSpec]);
 
   return (
     <div className="cockpit-bento min-w-0 overflow-hidden p-4" data-testid="router-traffic-widget">
@@ -270,33 +308,59 @@ const RouterTrafficCard = React.memo<RouterTrafficCardProps>(({ metrics, theme, 
             {routerTitle} · {routerIp}
           </p>
         </div>
-        {onExpandChart && (
-          <button
-            type="button"
-            aria-label={t('hardware.net.inspect_aria', { name: routerTitle })}
-            onClick={handleExpand}
-            className="cockpit-subtile flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
+        {routerWanAvailable && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="cockpit-subtile inline-flex items-center p-0.5 text-[10px] font-semibold">
+              {(
+                [
+                  { id: 'wan' as TrafficScopeFilter, label: 'WAN' },
+                  { id: 'lan' as TrafficScopeFilter, label: 'LAN' },
+                  { id: 'all' as TrafficScopeFilter, label: t('network.scope_all') },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setScope(opt.id)}
+                  className={`rounded-md px-1.5 py-1 transition-colors cursor-pointer ${
+                    scope === opt.id
+                      ? 'bg-[#1e6b38] text-white dark:bg-[#c6f19d] dark:text-[#0a140b]'
+                      : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {onExpandChart && (
+              <button
+                type="button"
+                aria-label={t('hardware.net.inspect_aria', { name: routerTitle })}
+                onClick={handleExpand}
+                className="cockpit-subtile flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-300"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         )}
       </div>
       <div className="mt-2.5 grid grid-cols-2 gap-x-2.5 gap-y-1 border-t border-slate-200/70 pt-2 font-mono text-[11px] tabular-nums dark:border-slate-800">
-        <div className="min-w-0 truncate text-sky-600 dark:text-sky-400" title={t('hardware.net.wan_download')}>
+        <div className={`min-w-0 truncate text-sky-600 dark:text-sky-400 ${routerWanAvailable && scope === 'lan' ? 'opacity-40' : ''}`} title={t('hardware.net.wan_download')}>
           <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
-          ↓ {formatSpeed(wanRxNow)}
+          ↓ {routerWanAvailable ? formatSpeed(wanRxNow) : '--'}
         </div>
-        <div className="min-w-0 truncate text-right text-indigo-600 dark:text-indigo-400" title={t('hardware.net.lan_download')}>
+        <div className={`min-w-0 truncate text-right text-indigo-600 dark:text-indigo-400 ${routerWanAvailable && scope === 'wan' ? 'opacity-40' : ''}`} title={t('hardware.net.lan_download')}>
           <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
-          ↓ {formatSpeed(lanRxNow)}
+          ↓ {routerWanAvailable ? formatSpeed(lanRxNow) : '--'}
         </div>
-        <div className="min-w-0 truncate text-emerald-600 dark:text-emerald-400" title={t('hardware.net.wan_upload')}>
+        <div className={`min-w-0 truncate text-emerald-600 dark:text-emerald-400 ${routerWanAvailable && scope === 'lan' ? 'opacity-40' : ''}`} title={t('hardware.net.wan_upload')}>
           <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.wan_short')}</span>
-          ↑ {formatSpeed(wanTxNow)}
+          ↑ {routerWanAvailable ? formatSpeed(wanTxNow) : '--'}
         </div>
-        <div className="min-w-0 truncate text-right text-amber-600 dark:text-amber-400" title={t('hardware.net.lan_upload')}>
+        <div className={`min-w-0 truncate text-right text-amber-600 dark:text-amber-400 ${routerWanAvailable && scope === 'wan' ? 'opacity-40' : ''}`} title={t('hardware.net.lan_upload')}>
           <span className="text-[10px] font-sans text-slate-400 dark:text-slate-500 mr-1">{t('hardware.net.lan_short')}</span>
-          ↑ {formatSpeed(lanTxNow)}
+          ↑ {routerWanAvailable ? formatSpeed(lanTxNow) : '--'}
         </div>
       </div>
       <div className="mt-3">
@@ -307,8 +371,8 @@ const RouterTrafficCard = React.memo<RouterTrafficCardProps>(({ metrics, theme, 
           heightClassName="cockpit-chart-compact"
           leftUnit="MB/s"
           theme={theme}
-          emptyMessage={t('network.router_accumulating')}
-          onExpandClick={onExpandChart ? handleExpand : undefined}
+          emptyMessage={routerWanAvailable ? t('network.router_accumulating') : t('network.router_unlinked_chart_hint')}
+          onExpandClick={onExpandChart && routerWanAvailable ? handleExpand : undefined}
           formatLabel={formatRouterLabel}
         />
       </div>
@@ -497,6 +561,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const [mapHistoryLoading, setMapHistoryLoading] = useState(false);
   const [mapHistoryClearing, setMapHistoryClearing] = useState(false);
   const [mapZoomTick, setMapZoomTick] = useState(0);
+  const [traffic24hScope, setTraffic24hScope] = useState<TrafficScopeFilter>('all');
 
   // Server-side Gemini AI connection identification & simplified presentation
   const [aiInsights, setAiInsights] = useState<Record<string, AiConnectionInsight>>(() => {
@@ -621,8 +686,8 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         const lb = (b.lan_speed_down ?? 0) + (b.lan_speed_up ?? 0);
         return lb - la;
       }
-      const da = a.wan_speed_down ?? a.speed_down ?? 0;
-      const db = b.wan_speed_down ?? b.speed_down ?? 0;
+      const da = a.wan_speed_down ?? 0;
+      const db = b.wan_speed_down ?? 0;
       return db - da;
     });
     return filtered;
@@ -631,8 +696,8 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
   const maxClientTotalBps = useMemo(() => {
     let peak = 1;
     for (const c of wifiClients) {
-      const wanDown = c.wan_speed_down ?? c.speed_down ?? 0;
-      const wanUp = c.wan_speed_up ?? c.speed_up ?? 0;
+      const wanDown = c.wan_speed_down ?? 0;
+      const wanUp = c.wan_speed_up ?? 0;
       const lanTotal = (c.lan_speed_down ?? 0) + (c.lan_speed_up ?? 0);
       const tot = wanDown + wanUp + lanTotal;
       if (tot > peak) peak = tot;
@@ -1004,8 +1069,8 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
 
     const rxTotal = sourceSeries?.net_rx ?? [];
     const txTotal = sourceSeries?.net_tx ?? [];
-    const wanRxData = sourceSeries?.net_wan_rx?.length ? sourceSeries.net_wan_rx : rxTotal;
-    const wanTxData = sourceSeries?.net_wan_tx?.length ? sourceSeries.net_wan_tx : txTotal;
+    const wanRxData = sourceSeries?.net_wan_rx?.length ? sourceSeries.net_wan_rx : rxTotal.map(() => 0);
+    const wanTxData = sourceSeries?.net_wan_tx?.length ? sourceSeries.net_wan_tx : txTotal.map(() => 0);
     const lanRxData = sourceSeries?.net_lan_rx?.length ? sourceSeries.net_lan_rx : rxTotal.map(() => 0);
     const lanTxData = sourceSeries?.net_lan_tx?.length ? sourceSeries.net_lan_tx : txTotal.map(() => 0);
 
@@ -1018,7 +1083,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
     const peakLanRxMb = lanRxData.length > 0 ? Math.max(...lanRxData) : 0;
     const peakLanTxMb = lanTxData.length > 0 ? Math.max(...lanTxData) : 0;
 
-    const series: ChartSeries[] = [
+    const wanSeries: ChartSeries[] = [
       {
         id: 'net_wan_rx_24h',
         metricKey: 'net_wan_rx',
@@ -1039,6 +1104,8 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         decimals: 2,
         fillAlpha: 0.08,
       },
+    ];
+    const lanSeries: ChartSeries[] = [
       {
         id: 'net_lan_rx_24h',
         metricKey: 'net_lan_rx',
@@ -1047,7 +1114,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         color: '#6366f1',
         unit: 'MB/s',
         decimals: 2,
-        fillAlpha: 0.10,
+        fillAlpha: 0.12,
       },
       {
         id: 'net_lan_tx_24h',
@@ -1057,9 +1124,15 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
         color: '#f59e0b',
         unit: 'MB/s',
         decimals: 2,
-        fillAlpha: 0.06,
+        fillAlpha: 0.07,
       },
     ];
+    const series: ChartSeries[] =
+      traffic24hScope === 'wan'
+        ? wanSeries
+        : traffic24hScope === 'lan'
+          ? lanSeries
+          : [...wanSeries, ...lanSeries];
 
     return {
       series,
@@ -1076,7 +1149,7 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
       peakLanRxMb,
       peakLanTxMb,
     };
-  }, [netHistory24h, metrics?.history, theme, t]);
+  }, [netHistory24h, metrics?.history, theme, traffic24hScope, t]);
 
   const openNetwork24hExpanded = useCallback(() => {
     if (!onExpandChart) return;
@@ -2724,8 +2797,8 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
                   const imgSrc = customLogo || client.logo_url;
                   const title = client.name || client.hostname || client.ip || t('network.device_fallback_alt');
 
-                  const wanDown = client.wan_speed_down ?? client.speed_down ?? 0;
-                  const wanUp = client.wan_speed_up ?? client.speed_up ?? 0;
+                  const wanDown = client.wan_speed_down ?? 0;
+                  const wanUp = client.wan_speed_up ?? 0;
                   const lanTotal = (client.lan_speed_down ?? 0) + (client.lan_speed_up ?? 0);
                   const clientTotal = wanDown + wanUp + lanTotal;
                   const barPct = clientTotal > 0 ? Math.min(100, Math.max(4, Math.round((clientTotal / maxClientTotalBps) * 100))) : 0;
@@ -2916,23 +2989,55 @@ export const NetworkSecurityView: React.FC<NetworkSecurityViewProps> = ({
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                <span className="h-2 w-2 rounded-full bg-[#1e6b38] dark:bg-[#c6f19d]" />
-                <span>{t('hardware.net.wan_download')}</span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                <span className="h-2 w-2 rounded-full bg-[#10b981]" />
-                <span>{t('hardware.net.wan_upload')}</span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                <span className="h-2 w-2 rounded-full bg-[#6366f1]" />
-                <span>{t('hardware.net.lan_download')}</span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
-                <span>{t('hardware.net.lan_upload')}</span>
-              </span>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
+                {traffic24hScope !== 'lan' && (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#1e6b38] dark:bg-[#c6f19d]" />
+                      <span>{t('hardware.net.wan_download')}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#10b981]" />
+                      <span>{t('hardware.net.wan_upload')}</span>
+                    </span>
+                  </>
+                )}
+                {traffic24hScope !== 'wan' && (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#6366f1]" />
+                      <span>{t('hardware.net.lan_download')}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
+                      <span>{t('hardware.net.lan_upload')}</span>
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="cockpit-subtile inline-flex items-center p-0.5 text-[11px] font-semibold">
+                {(
+                  [
+                    { id: 'all' as TrafficScopeFilter, label: t('network.scope_all') },
+                    { id: 'wan' as TrafficScopeFilter, label: 'WAN' },
+                    { id: 'lan' as TrafficScopeFilter, label: 'LAN' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setTraffic24hScope(opt.id)}
+                    className={`rounded-lg px-2.5 py-1 transition-colors cursor-pointer ${
+                      traffic24hScope === opt.id
+                        ? 'bg-[#1e6b38] text-white dark:bg-[#c6f19d] dark:text-[#0a140b]'
+                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Summary KPI row separated by clean hairline divider */}

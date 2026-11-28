@@ -179,6 +179,7 @@ export const AlethiaActionButton: React.FC<AlethiaActionButtonProps> = ({
 
 interface ChartNarrativeFooterProps {
   data: number[];
+  secondaryData?: number[];
   unit: string;
   decimals?: number;
   formatValue?: (val: number) => string;
@@ -190,6 +191,7 @@ interface ChartNarrativeFooterProps {
  */
 export const ChartNarrativeFooter: React.FC<ChartNarrativeFooterProps> = ({
   data,
+  secondaryData,
   unit,
   decimals = 1,
   formatValue,
@@ -197,13 +199,18 @@ export const ChartNarrativeFooter: React.FC<ChartNarrativeFooterProps> = ({
   const { t } = useI18n();
 
   const stats = React.useMemo(() => {
+    const len = Math.max(data.length, secondaryData?.length ?? 0);
     let count = 0;
     let sum = 0;
     let peak = -Infinity;
     let last = 0;
-    for (let i = 0; i < data.length; i++) {
-      const v = Number(data[i]);
-      if (!Number.isFinite(v)) continue;
+    for (let i = 0; i < len; i++) {
+      const a = i < data.length ? Number(data[i]) : NaN;
+      const b = secondaryData && i < secondaryData.length ? Number(secondaryData[i]) : NaN;
+      const aOk = Number.isFinite(a);
+      const bOk = Number.isFinite(b);
+      if (!aOk && !bOk) continue;
+      const v = aOk && bOk ? Math.max(a, b) : aOk ? a : b;
       count += 1;
       sum += v;
       if (v > peak) peak = v;
@@ -211,7 +218,7 @@ export const ChartNarrativeFooter: React.FC<ChartNarrativeFooterProps> = ({
     }
     if (count === 0) return null;
     return { avg: sum / count, peak: Math.max(0, peak), now: last };
-  }, [data]);
+  }, [data, secondaryData]);
 
   if (!stats) return null;
 

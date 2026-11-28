@@ -295,7 +295,11 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   const handleStepBackward = () => {
     if (!oldestTs || !newestTs) return;
     const span = preset === 'all' ? Math.max(1200, Math.min(3600, (newestTs - oldestTs) / 6)) : activeWindowSec;
-    const activeWinEnd = isPingHistoryMode ? pingHistoryData?.window_end_ts : historyData?.window_end_ts;
+    const activeWinEnd = isPingHistoryMode
+      ? pingHistoryData?.window_end_ts
+      : isEntityHistoryMode
+        ? entityHistoryData?.window_end_ts
+        : historyData?.window_end_ts;
     const currentEnd = cursorEndTs ?? activeWinEnd ?? newestTs;
     const nextEnd = currentEnd - Math.max(60, span * 0.6);
     jumpToTimestampEnd(nextEnd, span);
@@ -304,7 +308,11 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
   const handleStepForward = () => {
     if (!oldestTs || !newestTs) return;
     const span = activeWindowSec;
-    const activeWinEnd = isPingHistoryMode ? pingHistoryData?.window_end_ts : historyData?.window_end_ts;
+    const activeWinEnd = isPingHistoryMode
+      ? pingHistoryData?.window_end_ts
+      : isEntityHistoryMode
+        ? entityHistoryData?.window_end_ts
+        : historyData?.window_end_ts;
     const currentEnd = cursorEndTs ?? activeWinEnd ?? newestTs;
     const nextEnd = currentEnd + Math.max(60, span * 0.6);
     if (nextEnd >= newestTs - 2) {
@@ -312,6 +320,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       setSliderDraftTs(null);
       if (preset === 'live') {
         setHistoryData(null);
+        setEntityHistoryData(null);
         setPingHistoryData(null);
       } else {
         void fetchHistoricalSlice({ windowParam: span, beforeTs: newestTs, limit: 240 });
@@ -335,13 +344,18 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       if (!hasDatabaseHistory || !oldestTs || !newestTs) return;
       const span = preset === 'live' || preset === 'all' ? 1200 : activeWindowSec;
       const secPerStep = Math.max(2, span / 40);
-      const activeWinEnd = isPingHistoryMode ? pingHistoryData?.window_end_ts : historyData?.window_end_ts;
+      const activeWinEnd = isPingHistoryMode
+        ? pingHistoryData?.window_end_ts
+        : isEntityHistoryMode
+          ? entityHistoryData?.window_end_ts
+          : historyData?.window_end_ts;
       const currentEnd = cursorEndTs ?? activeWinEnd ?? newestTs;
       const nextEnd = currentEnd + deltaSteps * secPerStep;
       if (nextEnd >= newestTs - 1.5) {
         setPreset('live');
         setCursorEndTs(null);
         setHistoryData(null);
+        setEntityHistoryData(null);
         setPingHistoryData(null);
         return;
       }
@@ -350,12 +364,14 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
     [
       hasDatabaseHistory,
       isPingHistoryMode,
+      isEntityHistoryMode,
       oldestTs,
       newestTs,
       preset,
       activeWindowSec,
       cursorEndTs,
       historyData?.window_end_ts,
+      entityHistoryData?.window_end_ts,
       pingHistoryData?.window_end_ts,
       jumpToTimestampEnd,
     ]
@@ -450,6 +466,7 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       spec.chartKind === 'router' &&
       liveRouterHist &&
       liveRouterHist.length > 10 &&
+      !hasSqlEntitySeries &&
       !(historyData?.series?.net_wan_rx?.length)
   );
 
@@ -584,10 +601,10 @@ export const ExpandedChartModal: React.FC<ExpandedChartModalProps> = ({
       const { sliced } = liveBucketWindow;
       return spec.series.map((s) => {
         if (s.metricKey === 'net_wan_rx') {
-          return { ...s, data: sliced.map((b) => Math.round(((b.wan_rx ?? b.rx) / (1024 * 1024)) * 100) / 100) };
+          return { ...s, data: sliced.map((b) => Math.round(((b.wan_rx ?? 0) / (1024 * 1024)) * 100) / 100) };
         }
         if (s.metricKey === 'net_wan_tx') {
-          return { ...s, data: sliced.map((b) => Math.round(((b.wan_tx ?? b.tx) / (1024 * 1024)) * 100) / 100) };
+          return { ...s, data: sliced.map((b) => Math.round(((b.wan_tx ?? 0) / (1024 * 1024)) * 100) / 100) };
         }
         if (s.metricKey === 'net_lan_rx') {
           return { ...s, data: sliced.map((b) => Math.round(((b.lan_rx ?? 0) / (1024 * 1024)) * 100) / 100) };
