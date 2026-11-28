@@ -266,8 +266,20 @@
     touch-action: pan-y;
   }
 
-  /* Centered semi-transparent overlay & elevated card for #login-modal */
+  /* Dedicated dark semi-transparent overlay & elevated card for #login-modal */
   #login-modal {
+    --bg-canvas: #061007;
+    --bg-surface: #111f13;
+    --bg-subtle: #18291a;
+    --surface-bento: rgba(11, 23, 13, 0.84);
+    --surface-subtile: rgba(18, 34, 20, 0.78);
+    --border-hairline: rgba(198, 241, 157, 0.18);
+    --border-strong: rgba(198, 241, 157, 0.32);
+    --text-primary: #f5f4f2;
+    --text-secondary: #cdd6ce;
+    --accent: #c6f19d;
+    color-scheme: dark;
+    color: #f5f4f2;
     position: fixed;
     inset: 0;
     z-index: 50;
@@ -276,44 +288,116 @@
     justify-content: center;
     padding: clamp(1rem, 3vw, 2rem);
     overflow-y: auto;
-    background-color: color-mix(in srgb, var(--bg-canvas) 68%, rgba(15, 31, 16, 0.14));
+    background-color: rgba(5, 12, 6, 0.82);
     background-image:
-      radial-gradient(620px circle at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 65%),
-      radial-gradient(520px circle at 50% 100%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 62%);
-    backdrop-filter: blur(18px) saturate(1.25);
-    -webkit-backdrop-filter: blur(18px) saturate(1.25);
-  }
-  [data-theme="dark"] #login-modal,
-  .dark #login-modal {
-    background-color: color-mix(in srgb, var(--bg-canvas) 74%, rgba(0, 0, 0, 0.56));
-    background-image:
-      radial-gradient(620px circle at 50% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 64%),
-      radial-gradient(520px circle at 50% 100%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%);
+      radial-gradient(640px circle at 50% 0%, rgba(198, 241, 157, 0.12), transparent 64%),
+      radial-gradient(540px circle at 50% 100%, rgba(30, 107, 56, 0.16), transparent 62%);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
   }
   #login-modal .login-modal-card {
     width: 100%;
     max-width: 26rem;
     margin: auto;
     border-radius: var(--panel-radius, 24px);
-    background: color-mix(in srgb, var(--surface-bento) 94%, var(--bg-surface) 6%);
-    border: 1px solid var(--border-strong);
+    background: rgba(11, 23, 13, 0.82);
+    border: 1px solid rgba(198, 241, 157, 0.24);
+    color: #f5f4f2;
     box-shadow:
-      var(--ui-shadow-strong),
-      inset 0 1px 0 rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(calc(var(--surface-blur, 14px) + 6px)) saturate(1.25);
-    -webkit-backdrop-filter: blur(calc(var(--surface-blur, 14px) + 6px)) saturate(1.25);
+      0 24px 56px -12px rgba(0, 0, 0, 0.78),
+      0 0 0 1px rgba(198, 241, 157, 0.1),
+      inset 0 1px 0 rgba(198, 241, 157, 0.16);
+    backdrop-filter: blur(22px) saturate(1.25);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
   }
-  [data-theme="dark"] #login-modal .login-modal-card,
-  .dark #login-modal .login-modal-card {
-    box-shadow:
-      var(--ui-shadow-strong),
-      0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
-      inset 0 1px 0 rgba(198, 241, 157, 0.14);
+  #login-modal .cockpit-pill-amber {
+    background: rgba(180, 83, 9, 0.3);
+    border: 1px solid rgba(251, 191, 36, 0.48);
+    color: #fde68a;
+  }
+  #login-modal .cockpit-input {
+    background: rgba(6, 15, 8, 0.76);
+    border: 1px solid rgba(198, 241, 157, 0.24);
+    color: #f5f4f2;
+  }
+  #login-modal .cockpit-input::placeholder {
+    color: #97a89a;
   }
   #login-modal .cockpit-input:focus-visible {
     outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+    border-color: #c6f19d;
+    background: rgba(8, 19, 10, 0.9);
+    box-shadow: 0 0 0 3px rgba(198, 241, 157, 0.24);
+  }
+  #login-modal .cockpit-btn-accent {
+    background: #c6f19d;
+    border: 1px solid #d5eebc;
+    color: #0b170d;
+    box-shadow: 0 8px 20px -6px rgba(198, 241, 157, 0.34);
+  }
+  #login-modal .cockpit-btn-accent:hover:not(:disabled) {
+    background: #d7f7b7;
+    border-color: #e4fad0;
+  }
+  #login-modal .cockpit-btn {
+    background: rgba(245, 244, 242, 0.07);
+    border: 1px solid rgba(198, 241, 157, 0.24);
+    color: #f5f4f2;
+  }
+  #login-modal .cockpit-btn:hover:not(:disabled) {
+    background: rgba(198, 241, 157, 0.14);
+    border-color: rgba(198, 241, 157, 0.44);
+    color: #ffffff;
+  }
+  #login-modal .cockpit-subtile {
+    background: rgba(6, 15, 8, 0.72);
+    border: 1px solid rgba(198, 241, 157, 0.2);
+    color: #dce3dd;
+  }
+  @keyframes loginAuthPulseRing {
+    0% {
+      box-shadow:
+        0 0 0 0 rgba(198, 241, 157, 0.5),
+        0 8px 20px -6px rgba(198, 241, 157, 0.34);
+    }
+    70% {
+      box-shadow:
+        0 0 0 9px rgba(198, 241, 157, 0),
+        0 10px 24px -4px rgba(198, 241, 157, 0.42);
+    }
+    100% {
+      box-shadow:
+        0 0 0 0 rgba(198, 241, 157, 0),
+        0 8px 20px -6px rgba(198, 241, 157, 0.34);
+    }
+  }
+  @keyframes loginAuthBorderBreath {
+    0%, 100% {
+      opacity: 0.42;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.88;
+      transform: scale(1.015, 1.09);
+    }
+  }
+  #login-modal .login-auth-btn {
+    position: relative;
+    isolation: isolate;
+  }
+  #login-modal .login-auth-btn[data-authenticating="true"] {
+    opacity: 0.96;
+    cursor: progress;
+    animation: loginAuthPulseRing 1.65s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+  #login-modal .login-auth-btn[data-authenticating="true"]::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: calc(0.75rem + 4px);
+    border: 1.5px solid rgba(198, 241, 157, 0.58);
+    pointer-events: none;
+    animation: loginAuthBorderBreath 1.65s ease-in-out infinite;
   }
 
   .cockpit-toast-enter {
@@ -915,7 +999,9 @@ html.dark .leaflet-tooltip {
   .cockpit-toast-enter,
   .cockpit-tooltip-enter,
   .cockpit-hero,
-  .cockpit-progress-fill::after {
+  .cockpit-progress-fill::after,
+  #login-modal .login-auth-btn[data-authenticating="true"],
+  #login-modal .login-auth-btn[data-authenticating="true"]::after {
     animation: none !important;
   }
   .cockpit-bento,
